@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.routing;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -93,24 +92,23 @@ public interface RoutingManager {
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId);
 
-  /// Returns the segments that are relevant for the given broker request. Returns `null` if the table does not
-  /// exist.
-  @Nullable
-  List<String> getSegments(BrokerRequest brokerRequest);
-
-  /// Returns the segments that are relevant for the given broker request and optional sampler name.
+  /// Returns the segments that are relevant for the given broker request and optional sampler name, as the segments to
+  /// query on every server serving the table instead of on the server selected for each of them. This is how a table
+  /// that all of these servers hold in full is queried.
+  ///
+  /// The optional segments are the new segments that are not online on all of their servers yet, which a server queries
+  /// only if it has loaded them. The other segments are queried on every server, whatever their state.
+  ///
   /// Returns `null` if the table does not exist.
   @Nullable
-  default List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
-    return getSegments(brokerRequest);
-  }
+  SegmentsToQuery getSegmentsToQuery(BrokerRequest brokerRequest, @Nullable String samplerName);
 
   /// Returns the segments that the segment pruners *provably eliminated* for the given broker request, i.e. the
   /// selected segments that cannot hold a row matching the request's filter. Absence from the returned set means
   /// nothing: a segment may be missing because it matches, because it was never selected, or because the table does
   /// not exist. Only presence is a proof.
   ///
-  /// This is the complement of [#getSegments(BrokerRequest)], and the distinction is what makes it usable as a
+  /// This is the complement of [#getSegmentsToQuery], and the distinction is what makes it usable as a
   /// planning-time emptiness proof. Deciding "this segment does not match" from *absence* of a survivor conflates
   /// pruning with the several innocent reasons a segment can be missing from a routing result -- it was classified as
   /// optional by instance selection, its server left the enabled server map, or it entered the partition metadata
@@ -120,7 +118,7 @@ public interface RoutingManager {
   /// Instance selection deliberately takes no part, so the result depends only on the request and the pruners, never
   /// on a request id or on which replica a query happens to pick.
   ///
-  /// Returns `null` if the table does not exist, as [#getSegments(BrokerRequest)] does, which is not the same as an
+  /// Returns `null` if the table does not exist, as [#getSegmentsToQuery] does, which is not the same as an
   /// empty set: a broker that does not have the table eliminated nothing because it would have routed nothing, while
   /// an empty set is a broker that ran the pruners and proved nothing. A caller combining several brokers' verdicts
   /// has to tell those apart, and gets both from this one lookup rather than from a separate existence check that

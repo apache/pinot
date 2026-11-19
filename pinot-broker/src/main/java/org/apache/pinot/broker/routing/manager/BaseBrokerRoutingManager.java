@@ -1410,19 +1410,9 @@ public abstract class BaseBrokerRoutingManager
 
   @Nullable
   @Override
-  public List<String> getSegments(BrokerRequest brokerRequest) {
-    return getSegments(brokerRequest, extractSamplerName(brokerRequest));
-  }
-
-  @Nullable
-  @Override
-  public List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
-    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
-    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
-    if (routingEntry == null) {
-      return null;
-    }
-    return routingEntry.getSegments(brokerRequest, samplerName);
+  public SegmentsToQuery getSegmentsToQuery(BrokerRequest brokerRequest, @Nullable String samplerName) {
+    RoutingEntry routingEntry = _routingEntryMap.get(brokerRequest.getQuerySource().getTableName());
+    return routingEntry != null ? routingEntry.getSegmentsToQuery(brokerRequest, samplerName) : null;
   }
 
   @Nullable
@@ -1440,7 +1430,7 @@ public abstract class BaseBrokerRoutingManager
   }
 
   @Nullable
-  static String extractSamplerName(BrokerRequest brokerRequest) {
+  private static String extractSamplerName(BrokerRequest brokerRequest) {
     if (!brokerRequest.isSetPinotQuery()) {
       return null;
     }
@@ -1764,8 +1754,11 @@ public abstract class BaseBrokerRoutingManager
       }
     }
 
-    List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
-      return new ArrayList<>(selectThenPrune(brokerRequest, getSamplerInfo(samplerName))._surviving);
+    /// See [RoutingManager#getSegmentsToQuery].
+    SegmentsToQuery getSegmentsToQuery(BrokerRequest brokerRequest, @Nullable String samplerName) {
+      SamplerInfo samplerInfo = getSamplerInfo(samplerName);
+      InstanceSelector instanceSelector = samplerInfo != null ? samplerInfo._instanceSelector : _instanceSelector;
+      return instanceSelector.selectOnAllInstances(selectThenPrune(brokerRequest, samplerInfo)._surviving);
     }
 
     /// See [RoutingManager#getPrunedSegments]. The sampler is honoured for the same reason the query path honours it:

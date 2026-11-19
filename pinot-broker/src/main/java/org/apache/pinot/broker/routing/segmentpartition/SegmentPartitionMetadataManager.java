@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -368,9 +369,8 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     // consumers requiring a fully replicated server per partition can tell them apart from genuinely empty partitions.
     Set<Integer> partitionsWithOnlyDeferredSegments = Set.of();
     if (!newSegmentInfoEntries.isEmpty()) {
-      List<String> excludedNewSegments = new ArrayList<>();
-      // Sorted for deterministic reporting
-      Set<Integer> excludedNewSegmentPartitions = new TreeSet<>();
+      // The new segments excluded from each partition. Sorted for deterministic reporting
+      Map<Integer, List<String>> excludedNewSegmentsMap = new TreeMap<>();
       for (Map.Entry<String, SegmentInfo> entry : newSegmentInfoEntries) {
         String segment = entry.getKey();
         SegmentInfo segmentInfo = entry.getValue();
@@ -387,8 +387,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
             partitionInfo = new PartitionInfo(fullyReplicatedServers, segments);
             partitionInfoMap[partitionId] = partitionInfo;
           } else {
-            excludedNewSegments.add(segment);
-            excludedNewSegmentPartitions.add(partitionId);
+            excludedNewSegmentsMap.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segment);
           }
         } else {
           // If the new segment is not the first segment of a partition, add it only if it won't reduce the fully
@@ -410,30 +409,45 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
             }
             partitionInfo._segments.add(segment);
           } else {
-            excludedNewSegments.add(segment);
-            excludedNewSegmentPartitions.add(partitionId);
+            excludedNewSegmentsMap.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segment);
           }
         }
       }
-      if (!excludedNewSegments.isEmpty()) {
+      if (!excludedNewSegmentsMap.isEmpty()) {
+        // NOTE: Decided against the final partition info map, i.e. after the whole new segment pass, rather than
+        // latched when a segment is excluded: a partition can hold both an excluded new segment and one that ends up
+        // populating the partition info, and which of the two is visited first depends on the iteration order of
+        // _segmentInfoMap.
+        List<String> excludedNewSegments = new ArrayList<>();
+        // Sorted for deterministic reporting
+        Set<Integer> partitionsWithoutInfo = new TreeSet<>();
+        for (Map.Entry<Integer, List<String>> entry : excludedNewSegmentsMap.entrySet()) {
+          int partitionId = entry.getKey();
+          List<String> segments = entry.getValue();
+          excludedNewSegments.addAll(segments);
+          PartitionInfo partitionInfo = partitionInfoMap[partitionId];
+          if (partitionInfo != null) {
+            // The partition is served without them, and lists them as optional segments
+            partitionInfoMap[partitionId] =
+                new PartitionInfo(partitionInfo._fullyReplicatedServers, partitionInfo._segments, segments);
+          } else {
+            partitionsWithoutInfo.add(partitionId);
+          }
+        }
         int numSegments = excludedNewSegments.size();
         LOGGER.info("Excluded {} new segments: {}... without all replicas available in table: {}", numSegments,
             numSegments <= 10 ? excludedNewSegments : excludedNewSegments.subList(0, 10) + "...", _tableNameWithType);
-      }
-      // NOTE: Computed against the final partition info map, i.e. after the whole new segment pass, rather than latched
-      // when a segment is excluded: a partition can hold both an excluded new segment and one that ends up populating
-      // the partition info, and which of the two is visited first depends on the iteration order of _segmentInfoMap.
-      excludedNewSegmentPartitions.removeIf(partitionId -> partitionInfoMap[partitionId] != null);
-      if (!excludedNewSegmentPartitions.isEmpty()) {
-        // An unmodifiable view rather than Set.copyOf(): it enforces the accessor's effectively-immutable contract and
-        // keeps the sorted iteration order.
-        partitionsWithOnlyDeferredSegments = Collections.unmodifiableSet(excludedNewSegmentPartitions);
-        int numAffectedPartitions = excludedNewSegmentPartitions.size();
-        List<Integer> partitionsToLog = new ArrayList<>(excludedNewSegmentPartitions);
-        LOGGER.warn("Found {} partitions: {} without partition info because all their segments are new segments "
-                + "without all replicas available in table: {}", numAffectedPartitions,
-            numAffectedPartitions <= 10 ? partitionsToLog : partitionsToLog.subList(0, 10) + "...",
-            _tableNameWithType);
+        if (!partitionsWithoutInfo.isEmpty()) {
+          // An unmodifiable view rather than Set.copyOf(): it enforces the accessor's effectively-immutable contract
+          // and keeps the sorted iteration order.
+          partitionsWithOnlyDeferredSegments = Collections.unmodifiableSet(partitionsWithoutInfo);
+          int numAffectedPartitions = partitionsWithoutInfo.size();
+          List<Integer> partitionsToLog = new ArrayList<>(partitionsWithoutInfo);
+          LOGGER.warn("Found {} partitions: {} without partition info because all their segments are new segments "
+                  + "without all replicas available in table: {}", numAffectedPartitions,
+              numAffectedPartitions <= 10 ? partitionsToLog : partitionsToLog.subList(0, 10) + "...",
+              _tableNameWithType);
+        }
       }
     }
     _nextNewSegmentExpirationTimeMs = nextNewSegmentExpirationTimeMs;

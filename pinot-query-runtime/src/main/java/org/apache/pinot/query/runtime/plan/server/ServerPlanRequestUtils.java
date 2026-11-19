@@ -44,6 +44,7 @@ import org.apache.pinot.core.data.manager.LogicalTableContext;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
@@ -156,18 +157,18 @@ public class ServerPlanRequestUtils {
       PinotQuery pinotQuery, InstanceDataManager instanceDataManager) {
     StageMetadata stageMetadata = executionContext.getStageMetadata();
     String rawTableName = TableNameBuilder.extractRawTableName(stageMetadata.getTableName());
-    Map<String, List<String>> tableSegmentsMap = executionContext.getWorkerMetadata().getTableSegmentsMap();
+    Map<String, SegmentsToQuery> tableSegmentsMap = executionContext.getWorkerMetadata().getTableSegmentsMap();
     assert tableSegmentsMap != null;
     TimeBoundaryInfo timeBoundary = stageMetadata.getTimeBoundary();
     int numRequests = tableSegmentsMap.size();
     if (numRequests == 1) {
-      Map.Entry<String, List<String>> entry = tableSegmentsMap.entrySet().iterator().next();
+      Map.Entry<String, SegmentsToQuery> entry = tableSegmentsMap.entrySet().iterator().next();
       return List.of(compileInstanceRequest(executionContext, pinotQuery, timeBoundary,
           TableType.valueOf(entry.getKey()), rawTableName, entry.getValue(), instanceDataManager));
     } else {
       assert numRequests == 2;
-      List<String> offlineSegments = tableSegmentsMap.get(TableType.OFFLINE.name());
-      List<String> realtimeSegments = tableSegmentsMap.get(TableType.REALTIME.name());
+      SegmentsToQuery offlineSegments = tableSegmentsMap.get(TableType.OFFLINE.name());
+      SegmentsToQuery realtimeSegments = tableSegmentsMap.get(TableType.REALTIME.name());
       assert offlineSegments != null && realtimeSegments != null;
       // NOTE: Make a deep copy of PinotQuery for OFFLINE request.
       return List.of(
@@ -184,15 +185,15 @@ public class ServerPlanRequestUtils {
   /// only when the worker has a segment the server must have. Otherwise the request is built without the schema of
   /// the table, and the leaf query executor answers it with an empty result.
   private static InstanceRequest compileInstanceRequest(OpChainExecutionContext executionContext, PinotQuery pinotQuery,
-      @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType, String rawTableName, List<String> segments,
-      InstanceDataManager instanceDataManager) {
+      @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType, String rawTableName,
+      SegmentsToQuery segmentsToQuery, InstanceDataManager instanceDataManager) {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
     TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableNameWithType);
-    Preconditions.checkState(tableDataManager != null || segments.isEmpty(),
+    Preconditions.checkState(tableDataManager != null || segmentsToQuery.getSegments().isEmpty(),
         "Failed to find data manager for table: %s", tableNameWithType);
     Schema schema = tableDataManager != null ? tableDataManager.getCachedTableConfigAndSchema().getRight() : null;
     return compileInstanceRequest(executionContext, pinotQuery, timeBoundaryInfo, tableType, tableNameWithType, schema,
-        segments, null);
+        segmentsToQuery, null);
   }
 
   @VisibleForTesting
@@ -210,10 +211,10 @@ public class ServerPlanRequestUtils {
   /// Converts [PinotQuery] into an [InstanceRequest]. The schema is `null` when the table is not set up on the server.
   private static InstanceRequest compileInstanceRequest(OpChainExecutionContext executionContext, PinotQuery pinotQuery,
       @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType, String tableNameWithType,
-      @Nullable Schema schema, @Nullable List<String> segmentList,
+      @Nullable Schema schema, @Nullable SegmentsToQuery segmentsToQuery,
       @Nullable List<TableSegmentsInfo> tableRouteInfoList) {
-    Preconditions.checkArgument(segmentList == null || tableRouteInfoList == null,
-        "Either segmentList OR tableRouteInfoList should be set");
+    Preconditions.checkArgument(segmentsToQuery == null || tableRouteInfoList == null,
+        "Either segmentsToQuery OR tableRouteInfoList should be set");
 
     // 1. Modify the PinotQuery
     pinotQuery.getDataSource().setTableName(tableNameWithType);
@@ -253,19 +254,35 @@ public class ServerPlanRequestUtils {
     instanceRequest.setBrokerId(executionContext.getBrokerId());
     instanceRequest.setEnableTrace(executionContext.isTraceEnabled());
     /*
-     * If segmentList is not null, it means that the query is for a single table and we can directly set the segments.
-     * If segmentList is null, it means that the query is for a logical table and we need to set TableSegmentInfoList
+     * If segmentsToQuery is not null, it means that the query is for a single table and we can directly set the
+     * segments. If segmentsToQuery is null, it means that the query is for a logical table and we need to set
+     * TableSegmentInfoList
      *
-     * Either one of segmentList or tableRouteInfoList has to be set, but not both.
+     * Either one of segmentsToQuery or tableRouteInfoList has to be set, but not both.
      */
-    if (segmentList != null) {
-      instanceRequest.setSearchSegments(segmentList);
+    if (segmentsToQuery != null) {
+      instanceRequest.setSearchSegments(segmentsToQuery.getSegments());
+      List<String> optionalSegments = copyOptionalSegments(segmentsToQuery);
+      if (optionalSegments != null) {
+        instanceRequest.setOptionalSegments(optionalSegments);
+      }
     } else {
       instanceRequest.setTableSegmentsInfoList(tableRouteInfoList);
     }
     instanceRequest.setQuery(brokerRequest);
 
     return instanceRequest;
+  }
+
+  /// Returns a copy of the optional segments to set on a request, or `null` when there is none, in which case the
+  /// request leaves them unset, the same as on the single-stage engine.
+  ///
+  /// A copy because the query executor appends to the list of the request (the newly added segments of an upsert
+  /// table), while the given one belongs to the worker metadata, which more than one request can be built from.
+  @Nullable
+  private static List<String> copyOptionalSegments(SegmentsToQuery segmentsToQuery) {
+    List<String> optionalSegments = segmentsToQuery.getOptionalSegments();
+    return !optionalSegments.isEmpty() ? new ArrayList<>(optionalSegments) : null;
   }
 
   /// Helper method to update query options.
@@ -421,18 +438,23 @@ public class ServerPlanRequestUtils {
         String.format("LogicalTableContext not found for logical table name: %s, query context id: %s",
             logicalTableName, executionContext.getCid()));
 
-    Map<String, List<String>> logicalTableSegmentsMap =
+    Map<String, SegmentsToQuery> logicalTableSegmentsMap =
         executionContext.getWorkerMetadata().getLogicalTableSegmentsMap();
     List<TableSegmentsInfo> offlineTableRouteInfoList = new ArrayList<>();
     List<TableSegmentsInfo> realtimeTableRouteInfoList = new ArrayList<>();
 
     Preconditions.checkNotNull(logicalTableSegmentsMap);
-    for (Map.Entry<String, List<String>> entry : logicalTableSegmentsMap.entrySet()) {
+    for (Map.Entry<String, SegmentsToQuery> entry : logicalTableSegmentsMap.entrySet()) {
       String physicalTableName = entry.getKey();
+      SegmentsToQuery segmentsToQuery = entry.getValue();
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(physicalTableName);
       TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo();
       tableSegmentsInfo.setTableName(physicalTableName);
-      tableSegmentsInfo.setSegments(entry.getValue());
+      tableSegmentsInfo.setSegments(segmentsToQuery.getSegments());
+      List<String> optionalSegments = copyOptionalSegments(segmentsToQuery);
+      if (optionalSegments != null) {
+        tableSegmentsInfo.setOptionalSegments(optionalSegments);
+      }
       if (tableType == TableType.REALTIME) {
         realtimeTableRouteInfoList.add(tableSegmentsInfo);
       } else {

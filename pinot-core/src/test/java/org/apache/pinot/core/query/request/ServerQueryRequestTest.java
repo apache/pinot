@@ -45,6 +45,11 @@ public class ServerQueryRequestTest {
     assertFalse(request(List.of(), null).hasSegmentsToQuery());
   }
 
+  @Test
+  public void shouldHaveSegmentsWhenOnlyTheOptionalListIsPopulated() {
+    assertTrue(request(List.of(), List.of("segment1"), null).hasSegmentsToQuery());
+  }
+
   /// A logical table sets the per-table lists instead and leaves the flat one unset, which Thrift reports as null.
   /// Reading it without checking would throw, so this pins both that it stays null and that the question is still
   /// answered from the other representation.
@@ -72,16 +77,33 @@ public class ServerQueryRequestTest {
             new TableSegmentsInfo("tbl2_OFFLINE", List.of("segment1")))).hasSegmentsToQuery());
   }
 
+  @Test
+  public void shouldHaveSegmentsWhenOnlyAPerTableOptionalListIsPopulated() {
+    TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo("tbl_OFFLINE", List.of());
+    tableSegmentsInfo.setOptionalSegments(List.of("segment1"));
+
+    assertTrue(request(null, List.of(tableSegmentsInfo)).hasSegmentsToQuery());
+  }
+
   /// Exactly one of the two arguments is set on a real request, mirroring
   /// `ServerPlanRequestUtils.compileInstanceRequest`.
   private static ServerQueryRequest request(@Nullable List<String> searchSegments,
       @Nullable List<TableSegmentsInfo> tableSegmentsInfoList) {
+    return request(searchSegments, null, tableSegmentsInfoList);
+  }
+
+  /// Same as [#request(List, List)], with the optional segments that go along with the flat list.
+  private static ServerQueryRequest request(@Nullable List<String> searchSegments,
+      @Nullable List<String> optionalSegments, @Nullable List<TableSegmentsInfo> tableSegmentsInfoList) {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(1);
     instanceRequest.setBrokerId("broker");
     instanceRequest.setQuery(CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM tbl"));
     if (searchSegments != null) {
       instanceRequest.setSearchSegments(searchSegments);
+    }
+    if (optionalSegments != null) {
+      instanceRequest.setOptionalSegments(optionalSegments);
     }
     if (tableSegmentsInfoList != null) {
       instanceRequest.setTableSegmentsInfoList(tableSegmentsInfoList);

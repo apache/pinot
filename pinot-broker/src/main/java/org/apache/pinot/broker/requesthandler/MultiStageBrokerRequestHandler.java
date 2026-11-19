@@ -564,6 +564,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean defaultUseLeafServerForIntermediateStage = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE,
         CommonConstants.Broker.DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE);
+    boolean enableReplicatedLeafOptionalSegments = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_REPLICATED_LEAF_OPTIONAL_SEGMENTS,
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_REPLICATED_LEAF_OPTIONAL_SEGMENTS);
     boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM,
         CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM);
     boolean defaultEnableDynamicFilteringSemiJoin = _config.getProperty(
@@ -631,6 +634,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultSpoolMode(_defaultSpoolMode)
         .defaultUnnestColumnPruning(defaultUnnestColumnPruning)
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
+        .enableReplicatedLeafOptionalSegments(enableReplicatedLeafOptionalSegments)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
         .useApproximateFunction(useApproximateFunction)
         .approximateFunctionDistinctCountParams(approximateFunctionSettings._distinctCountParams)

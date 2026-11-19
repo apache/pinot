@@ -19,19 +19,33 @@
 package org.apache.pinot.core.routing;
 
 import java.util.List;
+import java.util.Objects;
+import javax.annotation.Nullable;
+
 
 /// Wrapper class around the list of segments and optional segments that need to be queried on a particular server.
+///
+/// Optional segments are new segments that are not online in the external view yet, but might already be loaded on the
+/// server. The server queries the ones it has loaded and skips the others without reporting them as missing, while a
+/// segment of the other list that the server cannot find is reported as missing.
 public class SegmentsToQuery {
   private final List<String> _segments;
   private final List<String> _optionalSegments;
 
+  /// Constructor for SegmentsToQuery without optional segments.
+  ///
+  /// @param segments List of segments assigned to the server.
+  public SegmentsToQuery(List<String> segments) {
+    this(segments, List.of());
+  }
+
   /// Constructor for SegmentsToQuery.
   ///
   /// @param segments List of segments assigned to the server.
-  /// @param optionalSegments List of optional segments assigned to the server.
-  public SegmentsToQuery(List<String> segments, List<String> optionalSegments) {
+  /// @param optionalSegments List of optional segments assigned to the server, `null` when there is none.
+  public SegmentsToQuery(List<String> segments, @Nullable List<String> optionalSegments) {
     _segments = segments;
-    _optionalSegments = optionalSegments;
+    _optionalSegments = optionalSegments != null ? optionalSegments : List.of();
   }
 
   /// Gets the list of segments assigned to the server.
@@ -46,5 +60,27 @@ public class SegmentsToQuery {
   /// @return List of optional segments.
   public List<String> getOptionalSegments() {
     return _optionalSegments;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof SegmentsToQuery)) {
+      return false;
+    }
+    SegmentsToQuery that = (SegmentsToQuery) o;
+    return _segments.equals(that._segments) && _optionalSegments.equals(that._optionalSegments);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_segments, _optionalSegments);
+  }
+
+  @Override
+  public String toString() {
+    return "SegmentsToQuery{segments=" + _segments + ", optionalSegments=" + _optionalSegments + '}';
   }
 }

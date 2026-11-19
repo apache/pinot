@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.physical;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -42,14 +43,21 @@ public class PinotDispatchPlannerTest extends QueryEnvironmentTestBase {
   @Test
   public void testHasNonEmptyReplicatedLeafEmptyLists() {
     DispatchablePlanMetadata metadata = new DispatchablePlanMetadata();
-    metadata.setReplicatedSegments(Map.of("t", List.of()));
+    metadata.setReplicatedSegments(Map.of("t", new SegmentsToQuery(List.of())));
     assertFalse(PinotDispatchPlanner.hasNonEmptyReplicatedLeaf(Map.of(0, metadata)));
   }
 
   @Test
   public void testHasNonEmptyReplicatedLeafNonEmpty() {
     DispatchablePlanMetadata metadata = new DispatchablePlanMetadata();
-    metadata.setReplicatedSegments(Map.of("t", List.of("seg1")));
+    metadata.setReplicatedSegments(Map.of("t", new SegmentsToQuery(List.of("seg1"))));
+    assertTrue(PinotDispatchPlanner.hasNonEmptyReplicatedLeaf(Map.of(0, metadata)));
+  }
+
+  @Test
+  public void testHasNonEmptyReplicatedLeafOptionalSegmentsOnly() {
+    DispatchablePlanMetadata metadata = new DispatchablePlanMetadata();
+    metadata.setReplicatedSegments(Map.of("t", new SegmentsToQuery(List.of(), List.of("seg1"))));
     assertTrue(PinotDispatchPlanner.hasNonEmptyReplicatedLeaf(Map.of(0, metadata)));
   }
 
@@ -57,7 +65,7 @@ public class PinotDispatchPlannerTest extends QueryEnvironmentTestBase {
   public void testHasNonEmptyReplicatedLeafMixed() {
     DispatchablePlanMetadata metadataNullSegments = new DispatchablePlanMetadata();
     DispatchablePlanMetadata metadataNonEmpty = new DispatchablePlanMetadata();
-    metadataNonEmpty.setReplicatedSegments(Map.of("t", List.of("seg1")));
+    metadataNonEmpty.setReplicatedSegments(Map.of("t", new SegmentsToQuery(List.of("seg1"))));
     Map<Integer, DispatchablePlanMetadata> metadataMap = Map.of(0, metadataNullSegments, 1, metadataNonEmpty);
     assertTrue(PinotDispatchPlanner.hasNonEmptyReplicatedLeaf(metadataMap));
   }

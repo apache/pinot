@@ -258,8 +258,10 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Set.of(SERVER_0));
     assertEquals(partitionInfoMap[0]._segments, Set.of(segment0));
+    assertEquals(partitionInfoMap[0]._optionalSegments, List.of(newSegment));
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Set.of(SERVER_0));
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
+    assertTrue(partitionInfoMap[1]._optionalSegments.isEmpty());
     assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
     // Partition 0 is still served by segment0, so it is not a deferred empty partition
     assertTrue(tablePartitionReplicatedServersInfo.getPartitionsWithOnlyDeferredSegments().isEmpty());
@@ -274,6 +276,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, ImmutableSet.of(SERVER_0, SERVER_1));
     assertEqualsNoOrder(partitionInfoMap[0]._segments.toArray(), new String[]{segment0, newSegment});
+    assertTrue(partitionInfoMap[0]._optionalSegments.isEmpty());
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, ImmutableSet.of(SERVER_0, SERVER_1));
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
     assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
@@ -333,6 +336,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap =
         partitionMetadataManager.getTablePartitionReplicatedServersInfo().getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._segments, List.of(oldSegment), "a segment still coming up stays deferred");
+    assertEquals(partitionInfoMap[0]._optionalSegments, List.of(comingUp));
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Set.of(SERVER_0));
 
     // A new segment of partition 0 fully online, but only on server1 -- the default spread of a table without
@@ -437,7 +441,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
 
   /// A partition holding both a new segment without any online replica and a new segment with all of them is servable,
   /// so it must never be reported -- whichever of the two the new-segment pass visits first, and one of them IS always
-  /// excluded (see the NOTE on the `removeIf` in [SegmentPartitionMetadataManager]).
+  /// excluded (see the NOTE on the excluded new segments in [SegmentPartitionMetadataManager]).
   ///
   /// The pass walks a [HashMap] keyed by segment name, so the names decide the visit order. This test pins down a name
   /// pair for each of the 2 orders and drives both announcement orders through the manager on top of that.
@@ -508,6 +512,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     assertNotNull(partitionInfo, "Partition 1 has no partition info " + context);
     assertEquals(partitionInfo._fullyReplicatedServers, Set.of(SERVER_0, SERVER_1), context);
     assertEquals(partitionInfo._segments, List.of(allReplicasSegment), context);
+    assertEquals(partitionInfo._optionalSegments, List.of(noReplicaSegment), context);
     assertTrue(tablePartitionReplicatedServersInfo.getPartitionsWithOnlyDeferredSegments().isEmpty(),
         "Servable partition reported as deferred empty " + context + ": "
             + tablePartitionReplicatedServersInfo.getPartitionsWithOnlyDeferredSegments());

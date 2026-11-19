@@ -716,6 +716,20 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST = "pinot.broker.mse.enable.proto.segment.list";
     public static final boolean DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST = false;
 
+    // TODO: Remove this config after release 1.7.0, and always send these segments as optional segments. The servers
+    //   understand optional segments since release 1.7.0.
+    /// Whether a replicated leaf stage of a multi-stage query (the scan of a table hinted `is_replicated`, which every
+    /// worker scans in full) sends the new segments that are not online on all of their servers yet as optional
+    /// segments. A server queries the optional segments it has loaded and skips the others, while a regular segment
+    /// it has not loaded fails the query.
+    ///
+    /// Ships disabled, and must stay disabled until every server the broker dispatches to runs release 1.7.0 or later:
+    /// an older server ignores the optional segments, so it skips these segments even when it has loaded them. When
+    /// disabled, these segments are sent as regular segments.
+    public static final String CONFIG_OF_MSE_ENABLE_REPLICATED_LEAF_OPTIONAL_SEGMENTS =
+        "pinot.broker.mse.enable.replicated.leaf.optional.segments";
+    public static final boolean DEFAULT_MSE_ENABLE_REPLICATED_LEAF_OPTIONAL_SEGMENTS = false;
+
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
 
