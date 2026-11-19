@@ -220,16 +220,16 @@ public class LookupJoinOperatorTest {
 
   @Test
   public void testDimensionColumnsFollowProjectInputRefsNotOutputNames() {
-    // SELECT currency AS rate, rate AS currency, rate_start_date, rate_start_date AS rate_start_date0
-    DataSchema projectSchema =
-        new DataSchema(new String[]{"rate", "currency", "rate_start_date", "rate_start_date0"}, new ColumnDataType[]{
-            ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.LONG
-        });
+    // SELECT rate_start_date AS currency, currency AS rate, rate_start_date AS rate_start_date0. The projection
+    // reorders the scan columns, prunes "rate" and repeats "rate_start_date", and every output name except the last
+    // is another table column.
+    DataSchema projectSchema = new DataSchema(new String[]{"currency", "rate", "rate_start_date0"},
+        new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.STRING, ColumnDataType.LONG});
     ProjectNode project = new ProjectNode(0, projectSchema, PlanNode.NodeHint.EMPTY, List.of(tableScan()),
-        List.of(new RexExpression.InputRef(DIM_CURRENCY), new RexExpression.InputRef(DIM_RATE),
-            new RexExpression.InputRef(DIM_RATE_START_DATE), new RexExpression.InputRef(DIM_RATE_START_DATE)));
+        List.of(new RexExpression.InputRef(DIM_RATE_START_DATE), new RexExpression.InputRef(DIM_CURRENCY),
+            new RexExpression.InputRef(DIM_RATE_START_DATE)));
     assertEquals(LookupJoinOperator.resolveDimensionColumns(project, TABLE_NAME),
-        new String[]{"currency", "rate", "rate_start_date", "rate_start_date"});
+        new String[]{"rate_start_date", "currency", "rate_start_date"});
   }
 
   @Test
