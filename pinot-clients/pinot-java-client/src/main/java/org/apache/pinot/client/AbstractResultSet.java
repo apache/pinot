@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client;
 
+import java.util.Objects;
 import javax.annotation.Nullable;
 
 /// Shared implementation between the different ResultSets.
@@ -49,6 +50,7 @@ public abstract class AbstractResultSet implements ResultSet {
     return getDouble(rowIndex, 0);
   }
 
+  @Nullable
   @Override
   public String getString(int rowIndex) {
     return getString(rowIndex, 0);
@@ -56,22 +58,22 @@ public abstract class AbstractResultSet implements ResultSet {
 
   @Override
   public int getInt(int rowIndex, int columnIndex) {
-    return Integer.parseInt(getString(rowIndex, columnIndex));
+    return Integer.parseInt(Objects.requireNonNull(getString(rowIndex, columnIndex)));
   }
 
   @Override
   public long getLong(int rowIndex, int columnIndex) {
-    return Long.parseLong(getString(rowIndex, columnIndex));
+    return Long.parseLong(Objects.requireNonNull(getString(rowIndex, columnIndex)));
   }
 
   @Override
   public float getFloat(int rowIndex, int columnIndex) {
-    return Float.parseFloat(getString(rowIndex, columnIndex));
+    return Float.parseFloat(Objects.requireNonNull(getString(rowIndex, columnIndex)));
   }
 
   @Override
   public double getDouble(int rowIndex, int columnIndex) {
-    return Double.parseDouble(getString(rowIndex, columnIndex));
+    return Double.parseDouble(Objects.requireNonNull(getString(rowIndex, columnIndex)));
   }
 
   @Override

@@ -165,7 +165,7 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
       throws SQLException {
     Object value = getValue(columnIndex);
     String val = value == null ? null : value.toString();
-    if (checkIsNull(val)) {
+    if (checkIsNull(columnIndex, val)) {
       return null;
     }
     return val;
@@ -287,8 +287,9 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     }
   }
 
-  private boolean checkIsNull(String val) {
-    if (val == null || val.toLowerCase().contentEquals(NULL_STRING)) {
+  private boolean checkIsNull(int columnIndex, String val) {
+    if (val == null || (_dataSchema.getColumnDataType(columnIndex - 1) != ColumnDataType.VARIANT
+        && val.equalsIgnoreCase(NULL_STRING))) {
       _wasNull = true;
       return true;
     }

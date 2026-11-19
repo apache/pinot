@@ -27,6 +27,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class ResultTableResultSetTest {
@@ -88,6 +89,24 @@ public class ResultTableResultSetTest {
 
     // Verify the results
     assertEquals("r1c1", result);
+  }
+
+  @Test
+  public void testGetStringPreservesLegacyNullBehaviorAndDistinguishesVariantNulls()
+      throws Exception {
+    JsonNode resultTable = JsonUtils.stringToJsonNode(
+        "{\"rows\":[[null,null,\"null\"],[\"null\",7,\"\\\"null\\\"\"],[\"value\",8,null]],"
+            + "\"dataSchema\":{\"columnNames\":[\"legacyString\",\"legacyInt\",\"payload\"],"
+            + "\"columnDataTypes\":[\"STRING\",\"INT\",\"VARIANT\"]}}");
+    ResultTableResultSet resultSet = new ResultTableResultSet(resultTable);
+
+    assertEquals(resultSet.getString(0, 0), "null", "JSON null must retain the established STRING behavior");
+    assertEquals(resultSet.getString(0, 1), "null", "JSON null must retain the established INT behavior");
+    assertEquals(resultSet.getString(1, 0), "null", "A textual null must retain the established STRING behavior");
+    assertEquals(resultSet.getString(0, 2), "null", "A Variant null is represented by canonical JSON");
+    assertEquals(resultSet.getString(1, 2), "\"null\"", "A Variant string containing null remains quoted");
+    assertNull(resultSet.getString(2, 2), "Only a SQL null maps to Java null for VARIANT");
+    assertNotEquals(resultSet.toString(), "");
   }
 
   @Test
