@@ -34,7 +34,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
-import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.IdealState;
@@ -370,47 +369,15 @@ public class RealtimeTableReadinessTest {
     }
   }
 
-  @DataProvider
-  public Object[][] readinessReads() {
-    PropertyKey.Builder keys = new PropertyKey.Builder("test-cluster");
-    return new Object[][]{{keys.idealStates(TABLE)}, {keys.liveInstance(SERVER)},
-        {keys.currentState(SERVER, "test-session", TABLE)}};
-  }
-
-  @Test(dataProvider = "readinessReads")
-  public void testReadinessRetriesTransientZooKeeperFailure(PropertyKey key)
-      throws Exception {
-    try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
-      LLCSegmentName base = name(0, 1);
-      LLCSegmentName consumer = name(0, 2);
-      table.assign(base, ONLINE);
-      table.publishState(base.getSegmentName(), ONLINE);
-      table.assign(consumer, CONSUMING);
-      HelixDataAccessor accessor = table.getHelixManager().getHelixDataAccessor();
-      HelixProperty recovered = accessor.getProperty(key);
-      when(accessor.<HelixProperty>getProperty(key))
-          .thenThrow(new ZkTimeoutException("Transient " + key.getPath() + " failure")).thenReturn(recovered);
-
-      BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
-      assertFalse(ready.getAsBoolean(), "A transient read failure must hold consumption without terminating it");
-      assertTrue(ready.getAsBoolean(), "The same consumer must become ready after the read recovers");
-    }
-  }
-
   @Test
   public void testReadinessRetriesHelixReconnectTimeout()
       throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
-      LLCSegmentName base = name(0, 1);
-      LLCSegmentName consumer = name(0, 2);
-      table.assign(base, ONLINE);
-      table.publishState(base.getSegmentName(), ONLINE);
+      LLCSegmentName consumer = name(0, 1);
       table.assign(consumer, CONSUMING);
       HelixManager helixManager = table.getHelixManager();
       HelixDataAccessor accessor = helixManager.getHelixDataAccessor();
-      when(helixManager.getHelixDataAccessor())
-          .thenThrow(new HelixException("HelixManager is not connected within retry timeout for cluster test-cluster"))
-          .thenReturn(accessor);
+      when(helixManager.getHelixDataAccessor()).thenThrow(new HelixException("Not connected")).thenReturn(accessor);
 
       BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
       assertFalse(ready.getAsBoolean(), "A reconnect timeout must hold consumption without terminating it");

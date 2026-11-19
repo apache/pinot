@@ -46,8 +46,6 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.HelixException;
-import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -266,8 +264,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       }
       try {
         return isReadyToConsume(llcSegmentName, consumerCreationTimeNs);
-      } catch (ZkException | HelixException e) {
-        // HelixException covers the Helix manager timing out while it waits for ZooKeeper to reconnect.
+      } catch (Exception e) {
+        // Helix and its ZooKeeper client fail with several exception types. The consumer has not read anything yet, so
+        // a failed check only delays it.
         _logger.warn("Failed to check readiness for segment: {}, will retry", llcSegmentName, e);
         return false;
       }
