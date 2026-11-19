@@ -843,8 +843,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         TimeUnit.SECONDS);
 
     LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
-    IngestionGroovyConfigListener.subscribeToClusterConfig(_helixManager, _clusterConfigChangeHandler,
-        _helixMessageCountScheduler::shutdownNow, _serverInstance::shutDown);
+    subscribeToClusterConfig(instanceDataManager);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottlerSet);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
     ResourceManager resourceManager = _serverInstance.getQueryScheduler().getResourceManager();
@@ -1049,6 +1048,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Relax throttling until the server is ready to serve queries
     return new SegmentOperationsThrottler(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries,
         false, ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_DOWNLOAD_COUNT, "SegmentDownload");
+  }
+
+  @VisibleForTesting
+  void subscribeToClusterConfig(InstanceDataManager instanceDataManager) {
+    // Only the data manager has started. Full server shutdown would also stop the process-wide metrics registry.
+    IngestionGroovyConfigListener.subscribeToClusterConfig(_helixManager, _clusterConfigChangeHandler,
+        _helixMessageCountScheduler::shutdownNow, instanceDataManager::shutDown);
   }
 
   /// Can be overridden to perform operations before server starts serving queries.

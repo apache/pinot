@@ -22,11 +22,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import org.apache.helix.HelixManager;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
@@ -34,7 +38,12 @@ import static org.apache.pinot.controller.ControllerConf.CONTROLLER_PORT;
 import static org.apache.pinot.controller.ControllerConf.DISABLE_GROOVY;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_INSTANCE_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONTROLLER_INSTANCE;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -83,6 +92,28 @@ public class ControllerStarterStatelessTest extends ControllerTest {
       TableConfigUtils.setDisableGroovy(false);
       _controllerPort = 0;
       stopZk();
+    }
+  }
+
+  @Test
+  public void testMissingClusterConfigCallbackCleansUpController() {
+    ControllerStarter starter = new ControllerStarter();
+    starter._config = new ControllerConf();
+    starter._config.setClusterIngestionGroovyDisabled(false);
+    starter._clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    starter._helixParticipantManager = mock(HelixManager.class);
+    starter._helixControllerManager = mock(HelixManager.class);
+    starter._executorService = mock(ExecutorService.class);
+    starter._metricsRegistry = mock(PinotMetricsRegistry.class);
+    try {
+      expectThrows(IllegalStateException.class, starter::subscribeToClusterConfig);
+      assertTrue(starter.getConfig().isDisableIngestionGroovy());
+      verify(starter._helixParticipantManager).disconnect();
+      verify(starter._helixControllerManager).disconnect();
+      verify(starter._executorService).shutdownNow();
+      verifyNoInteractions(starter._metricsRegistry);
+    } finally {
+      TableConfigUtils.setDisableGroovy(false);
     }
   }
 

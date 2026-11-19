@@ -21,7 +21,7 @@ package org.apache.pinot.common.utils.config;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.helix.HelixManager;
-import org.apache.helix.api.listeners.ClusterConfigChangeListener;
+import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
@@ -36,6 +36,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Groovy;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -100,9 +101,9 @@ public class IngestionGroovyConfigListenerTest {
       throws Exception {
     for (boolean server : new boolean[]{false, true}) {
       HelixManager manager = mock(HelixManager.class);
-      ClusterConfigChangeListener listener = mock(ClusterConfigChangeListener.class);
+      DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
       Exception registrationFailure = new Exception("Subscription failed");
-      doThrow(registrationFailure).when(manager).addClusterfigChangeListener(listener);
+      doThrow(registrationFailure).when(manager).addClusterfigChangeListener(handler);
       ExecutorService executor = mock(ExecutorService.class);
       RuntimeException cleanupFailure = new RuntimeException("Executor cleanup failed");
       doThrow(cleanupFailure).when(executor).shutdownNow();
@@ -113,7 +114,7 @@ public class IngestionGroovyConfigListenerTest {
       GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
 
       IllegalStateException failure = expectThrows(IllegalStateException.class,
-          () -> IngestionGroovyConfigListener.subscribeToClusterConfig(manager, listener, cleanup));
+          () -> IngestionGroovyConfigListener.subscribeToClusterConfig(manager, handler, cleanup));
       assertSame(failure.getCause(), registrationFailure);
       assertEquals(registrationFailure.getSuppressed().length, 1);
       assertSame(registrationFailure.getSuppressed()[0], cleanupFailure);
@@ -129,19 +130,51 @@ public class IngestionGroovyConfigListenerTest {
   }
 
   @Test
-  public void testSuccessfulSubscriptionPreservesPolicyAndResources()
+  public void testSuccessfulSubscriptionAppliesInitialPolicy()
       throws Exception {
     HelixManager manager = mock(HelixManager.class);
-    ClusterConfigChangeListener listener = mock(ClusterConfigChangeListener.class);
+    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    handler.registerClusterConfigChangeListener(new IngestionGroovyConfigListener());
+    // An empty initial snapshot must replace an enabled startup snapshot.
+    IngestionGroovyConfigListener.applyClusterConfig(Map.of(KEY, "false"));
+    NotificationContext context = new NotificationContext(manager);
+    context.setType(NotificationContext.Type.INIT);
+    doAnswer(invocation -> {
+      handler.onClusterConfigChange(new ClusterConfig("test"), context);
+      return null;
+    }).when(manager).addClusterfigChangeListener(handler);
     Runnable cleanup = mock(Runnable.class);
-    GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
 
-    IngestionGroovyConfigListener.subscribeToClusterConfig(manager, listener, cleanup);
+    IngestionGroovyConfigListener.subscribeToClusterConfig(manager, handler, cleanup);
 
-    verify(manager).addClusterfigChangeListener(listener);
+    expectThrows(IllegalStateException.class, () -> new GroovyFunctionEvaluator(EXPRESSION));
     verify(manager, never()).disconnect();
     verifyNoInteractions(cleanup);
-    assertEquals(new GroovyFunctionEvaluator(EXPRESSION).evaluate(new Object[]{1}), 2);
+  }
+
+  @Test
+  public void testSubscriptionWithoutInitialCallbackFailsClosed() {
+    HelixManager manager = mock(HelixManager.class);
+    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    handler.registerClusterConfigChangeListener(new IngestionGroovyConfigListener());
+    IngestionGroovyConfigListener.applyClusterConfig(Map.of(KEY, "false"));
+    ClusterConfig enabled = new ClusterConfig("test");
+    enabled.getRecord().setSimpleField(KEY, "false");
+    NotificationContext context = new NotificationContext(manager);
+    context.setType(NotificationContext.Type.FINALIZE);
+    doAnswer(invocation -> {
+      handler.onClusterConfigChange(enabled, context);
+      return null;
+    }).when(manager).disconnect();
+    Runnable cleanup = mock(Runnable.class);
+
+    IllegalStateException failure = expectThrows(IllegalStateException.class,
+        () -> IngestionGroovyConfigListener.subscribeToClusterConfig(manager, handler, cleanup));
+
+    assertEquals(failure.getCause().getMessage(), "Helix did not deliver the initial cluster config");
+    expectThrows(IllegalStateException.class, () -> new GroovyFunctionEvaluator(EXPRESSION));
+    verify(manager).disconnect();
+    verify(cleanup).run();
   }
 
   @Test

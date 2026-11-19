@@ -604,6 +604,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     LOGGER.info("Registering and connecting Helix participant manager as Helix Participant role");
     registerAndConnectAsHelixParticipant();
+    subscribeToClusterConfig();
 
     // LeadControllerManager needs to be started after the connection
     // as it can check Helix leadership and resource config only after connecting to Helix cluster.
@@ -664,15 +665,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _pinotLLCRealtimeSegmentManager = createPinotLLCRealtimeSegmentManager();
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
-
-    try {
-      // Register cluster config change handler with Helix
-      _helixParticipantManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
-    } catch (Exception e) {
-      TableConfigUtils.setDisableGroovy(true);
-      _config.setClusterIngestionGroovyDisabled(true);
-      throw new IllegalStateException("Failed to register cluster config change handler", e);
-    }
 
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
 
@@ -1050,6 +1042,18 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       throw new RuntimeException(
           "Error registering resource config listener for " + Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
     }
+  }
+
+  @VisibleForTesting
+  void subscribeToClusterConfig() {
+    _clusterConfigChangeHandler.subscribe(_helixParticipantManager, () -> {
+      TableConfigUtils.setDisableGroovy(true);
+      _config.setClusterIngestionGroovyDisabled(true);
+    }, () -> {
+      if (_helixControllerManager != null) {
+        stopHelixController();
+      }
+    }, _executorService::shutdownNow);
   }
 
   private void updateInstanceConfigIfNeeded() {
