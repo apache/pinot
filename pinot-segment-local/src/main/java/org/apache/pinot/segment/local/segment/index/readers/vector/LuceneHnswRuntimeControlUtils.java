@@ -155,6 +155,8 @@ public final class LuceneHnswRuntimeControlUtils {
   }
 
   private static final class RuntimeControlledKnnCollectorManager implements KnnCollectorManager {
+    private static final int LUCENE_LEAF_QUOTA_SCALE = 16;
+
     private final int _k;
     private final BlockingFloatHeap _globalScoreQueue;
     private final boolean _hasFilter;
@@ -175,9 +177,14 @@ public final class LuceneHnswRuntimeControlUtils {
 
     @Override
     public KnnCollector newCollector(int visitLimit, KnnSearchStrategy searchStrategy, LeafReaderContext context) {
-      // A reentrant pass is seeded with the first pass's candidates. Retain that leaf quota when it exceeds k.
-      int leafK = searchStrategy instanceof KnnSearchStrategy.Seeded seeded
-          ? Math.max(_k, seeded.numberOfEntryPoints()) : _k;
+      int leafK = _k;
+      // Lucene requests an unlimited visit count when the rewritten filter matches all documents.
+      if (_hasFilter && _efSearch > 0 && visitLimit != Integer.MAX_VALUE) {
+        leafK = budgetedLeafK(context);
+      } else if (searchStrategy instanceof KnnSearchStrategy.Seeded seeded) {
+        // A reentrant pass is seeded with the first pass's candidates. Retain that quota when it exceeds k.
+        leafK = Math.max(_k, seeded.numberOfEntryPoints());
+      }
       return newCollector(visitLimit, searchStrategy, leafK);
     }
 
@@ -192,6 +199,17 @@ public final class LuceneHnswRuntimeControlUtils {
       // Lucene checks its leaf quota before accepting filtered ANN results. A seeded second pass can
       // score all entry points before checking its visit limit, so keep it disabled for explicit budgets.
       return _hasFilter && _efSearch <= 0;
+    }
+
+    /// Mirrors Lucene 10.6's private AbstractKnnVectorQuery.perLeafTopKCalculation for budgeted searches.
+    /// Keep at least the query k because Lucene won't run a second pass to recover candidates.
+    private int budgetedLeafK(LeafReaderContext context) {
+      if (context.parent == null) {
+        return _k;
+      }
+      float leafProportion = context.reader().maxDoc() / (float) context.parent.reader().maxDoc();
+      return Math.max(_k, (int) (_k * leafProportion
+          + LUCENE_LEAF_QUOTA_SCALE * Math.sqrt(_k * leafProportion * (1 - leafProportion))));
     }
 
     private KnnCollector newCollector(int visitLimit, KnnSearchStrategy searchStrategy, int leafK) {

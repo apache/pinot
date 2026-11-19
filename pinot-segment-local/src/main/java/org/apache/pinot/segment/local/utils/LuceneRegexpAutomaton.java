@@ -34,49 +34,50 @@ public final class LuceneRegexpAutomaton {
   @SuppressWarnings("deprecation") // Preserve the complement syntax supported by existing FST queries.
   public static Automaton compile(String expression) {
     RegExp regex = new RegExp(expression, RegExp.ALL | RegExp.DEPRECATED_COMPLEMENT);
-    validateConstructionBudget(regex);
+    estimate(regex, MAX_CONSTRUCTION_WORK);
     return Operations.determinize(regex.toAutomaton(), Operations.DEFAULT_DETERMINIZE_WORK_LIMIT);
   }
 
   /// Checks a pattern using Lucene text query syntax before building its automaton.
   public static void validateConstructionBudget(String expression) {
-    validateConstructionBudget(new RegExp(expression, RegExp.ALL));
+    validateConstructionBudget(expression, MAX_CONSTRUCTION_WORK);
   }
 
-  private static void validateConstructionBudget(RegExp regex) {
-    // Lucene expands counted repetitions before determinizing. Estimate that work on the parsed tree first.
-    estimate(regex);
+  static void validateConstructionBudget(String expression, int workLimit) {
+    // Lucene expands repetitions before determinizing. Estimate that work on the parsed tree first.
+    estimate(new RegExp(expression, RegExp.ALL), workLimit);
   }
 
-  private static ConstructionCost estimate(RegExp regex) {
+  private static ConstructionCost estimate(RegExp regex, int workLimit) {
     return switch (regex.kind) {
-      case REGEXP_REPEAT_MIN, REGEXP_REPEAT_MINMAX -> estimateRepetition(regex);
+      case REGEXP_REPEAT_MIN, REGEXP_REPEAT_MINMAX -> estimateRepetition(regex, workLimit);
       case REGEXP_CONCATENATION, REGEXP_UNION, REGEXP_INTERSECTION -> {
-        ConstructionCost left = estimate(regex.exp1);
-        ConstructionCost right = estimate(regex.exp2);
+        ConstructionCost left = estimate(regex.exp1, workLimit);
+        ConstructionCost right = estimate(regex.exp2, workLimit);
         long work = regex.kind == RegExp.Kind.REGEXP_INTERSECTION
             ? left.work() * right.work() : left.work() + right.work();
         boolean acceptsEmpty = regex.kind == RegExp.Kind.REGEXP_UNION
             ? left.acceptsEmpty() || right.acceptsEmpty()
             : left.acceptsEmpty() && right.acceptsEmpty();
-        yield new ConstructionCost(work, acceptsEmpty);
+        yield checkedCost(work, acceptsEmpty, workLimit);
       }
-      case REGEXP_OPTIONAL, REGEXP_REPEAT -> new ConstructionCost(estimate(regex.exp1).work() + 1, true);
+      case REGEXP_OPTIONAL -> checkedCost(estimate(regex.exp1, workLimit).work() + 1, true, workLimit);
+      case REGEXP_REPEAT -> estimateStar(regex.exp1, estimate(regex.exp1, workLimit), workLimit);
       case REGEXP_COMPLEMENT -> {
-        ConstructionCost child = estimate(regex.exp1);
-        yield new ConstructionCost(child.work() + 1, !child.acceptsEmpty());
+        ConstructionCost child = estimate(regex.exp1, workLimit);
+        yield checkedCost(child.work() + 1, !child.acceptsEmpty(), workLimit);
       }
-      case REGEXP_DEPRECATED_COMPLEMENT -> estimateComplement(regex);
-      case REGEXP_STRING -> new ConstructionCost(Math.max(1, regex.s.length()), regex.s.isEmpty());
-      case REGEXP_ANYSTRING -> new ConstructionCost(1, true);
-      case REGEXP_CHAR_CLASS -> new ConstructionCost(Math.max(1, regex.from.length), false);
+      case REGEXP_DEPRECATED_COMPLEMENT -> estimateComplement(regex, workLimit);
+      case REGEXP_STRING -> checkedCost(Math.max(1, regex.s.length()), regex.s.isEmpty(), workLimit);
+      case REGEXP_ANYSTRING -> checkedCost(1, true, workLimit);
+      case REGEXP_CHAR_CLASS -> checkedCost(Math.max(1, regex.from.length), false, workLimit);
       case REGEXP_INTERVAL ->
-          new ConstructionCost(Math.max(regex.digits, Integer.toString(regex.max).length()), false);
-      default -> new ConstructionCost(1, false);
+          checkedCost(Math.max(regex.digits, Integer.toString(regex.max).length()), false, workLimit);
+      default -> checkedCost(1, false, workLimit);
     };
   }
 
-  private static ConstructionCost estimateComplement(RegExp regex) {
+  private static ConstructionCost estimateComplement(RegExp regex, int workLimit) {
     int complements = 0;
     RegExp child = regex;
     do {
@@ -84,7 +85,7 @@ public final class LuceneRegexpAutomaton {
       child = child.exp1;
     } while (child.kind == regex.kind);
 
-    ConstructionCost cost = estimate(child);
+    ConstructionCost cost = estimate(child, workLimit);
     Automaton automaton = child.toAutomaton();
     for (int i = 0; i < complements; i++) {
       // Complement can determinize a small child into a much larger automaton. Measure it before any outer
@@ -92,35 +93,71 @@ public final class LuceneRegexpAutomaton {
       automaton = Operations.complement(automaton, Operations.DEFAULT_DETERMINIZE_WORK_LIMIT);
       long footprint = (long) automaton.getNumStates() + automaton.getNumTransitions();
       boolean acceptsEmpty = automaton.getNumStates() > 0 && automaton.isAccept(0);
-      cost = new ConstructionCost(Math.max(cost.work() + 1, footprint), acceptsEmpty);
+      cost = checkedCost(Math.max(cost.work() + 1, footprint), acceptsEmpty, workLimit);
     }
     return cost;
   }
 
-  private static ConstructionCost estimateRepetition(RegExp regex) {
+  private static ConstructionCost estimateStar(RegExp operand, ConstructionCost child, int workLimit) {
+    long work = child.work() + 1;
+    return switch (operand.kind) {
+      // These operands have one initial transition and no accepting state with outgoing transitions,
+      // or already loop at their only state. Their repetition adds at most one unit of work.
+      case REGEXP_CHAR, REGEXP_CHAR_RANGE, REGEXP_ANYCHAR, REGEXP_STRING, REGEXP_ANYSTRING ->
+          checkedCost(work, true, workLimit);
+      case REGEXP_EMPTY -> checkedCost(work, false, workLimit);
+      default -> {
+        // The child has passed validation, including any nested stars. Measure it before Lucene copies its
+        // initial transitions, once for the new initial state and once for each nonterminal accepting state.
+        Automaton automaton = operand.toAutomaton();
+        int numStates = automaton.getNumStates();
+        long numTransitions = automaton.getNumTransitions();
+        if (numStates > 0 && (!automaton.isAccept(0) || automaton.getAcceptStates().cardinality() != 1)) {
+          int copies = 1;
+          for (int state = 0; state < numStates; state++) {
+            if (automaton.isAccept(state) && automaton.getNumTransitions(state) > 0) {
+              copies++;
+            }
+          }
+          numTransitions += (long) copies * automaton.getNumTransitions(0);
+        }
+        yield checkedCost(Math.max(work, Math.max(numStates + 1L, numTransitions)), numStates > 0, workLimit);
+      }
+    };
+  }
+
+  private static ConstructionCost estimateRepetition(RegExp regex, int workLimit) {
     boolean unbounded = regex.kind == RegExp.Kind.REGEXP_REPEAT_MIN;
     long concatenatedCopies = unbounded ? (long) regex.min + 1 : regex.min;
     long copies = unbounded ? concatenatedCopies : regex.max;
-    checkBudget(copies);
-    ConstructionCost child = estimate(regex.exp1);
+    checkBudget(copies, workLimit);
+    ConstructionCost child = estimate(regex.exp1, workLimit);
     // Lucene constructs the child even for {0}. The mandatory copies can link to every later copy in their
     // concatenation if the child accepts the empty string. Lucene adds a bounded repeat's optional tail linearly.
     long work = child.work() * Math.max(1, copies);
     if (child.acceptsEmpty()) {
       work += child.work() * concatenatedCopies * (concatenatedCopies - 1) / 2;
     }
-    return new ConstructionCost(work, regex.min == 0 || child.acceptsEmpty());
+    if (unbounded) {
+      // Lucene implements both + and {min,} by appending a star of the same operand.
+      ConstructionCost star = estimateStar(regex.exp1, child, workLimit);
+      work += star.work() - child.work();
+      return checkedCost(work, (regex.min == 0 || child.acceptsEmpty()) && star.acceptsEmpty(), workLimit);
+    }
+    return checkedCost(work, regex.min == 0 || child.acceptsEmpty(), workLimit);
   }
 
-  private static void checkBudget(long work) {
-    if (work > MAX_CONSTRUCTION_WORK) {
+  private static ConstructionCost checkedCost(long work, boolean acceptsEmpty, int workLimit) {
+    checkBudget(work, workLimit);
+    return new ConstructionCost(work, acceptsEmpty);
+  }
+
+  private static void checkBudget(long work, int workLimit) {
+    if (work > workLimit) {
       throw new IllegalArgumentException("Regular expression exceeds the automaton construction budget");
     }
   }
 
   private record ConstructionCost(long work, boolean acceptsEmpty) {
-    private ConstructionCost {
-      checkBudget(work);
-    }
   }
 }

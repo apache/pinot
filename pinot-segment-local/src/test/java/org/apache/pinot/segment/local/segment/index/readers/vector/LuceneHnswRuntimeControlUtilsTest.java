@@ -33,8 +33,10 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.NoMergePolicy;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.search.AcceptDocs;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.KnnCollector;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.VectorScorer;
@@ -59,6 +61,7 @@ public class LuceneHnswRuntimeControlUtilsTest {
       throws IOException {
     int topK = 10;
     int leafSize = 1024;
+    AtomicInteger annSearchCount = new AtomicInteger();
     AtomicInteger exactScorerCount = new AtomicInteger();
     try (Directory directory = new ByteBuffersDirectory()) {
       IndexWriterConfig config = new IndexWriterConfig().setMergePolicy(NoMergePolicy.INSTANCE);
@@ -74,7 +77,8 @@ public class LuceneHnswRuntimeControlUtilsTest {
           writer.commit();
         }
       }
-      try (DirectoryReader reader = new ExactScoringTrackingReader(DirectoryReader.open(directory), exactScorerCount)) {
+      try (DirectoryReader reader =
+          new SearchTrackingReader(DirectoryReader.open(directory), annSearchCount, exactScorerCount)) {
         assertEquals(reader.leaves().size(), 2);
         IndexSearcher searcher = new IndexSearcher(reader);
         TermQuery broadFilter = new TermQuery(new Term(SCOPE_FIELD, "broad"));
@@ -86,6 +90,13 @@ public class LuceneHnswRuntimeControlUtilsTest {
           assertTrue(hit.doc % leafSize != 0);
         }
 
+        annSearchCount.set(0);
+        TopDocs budgeted = searcher.search(LuceneHnswRuntimeControlUtils.createQuery(VECTOR_FIELD, new float[]{0},
+            topK, 10_000, true, true, broadFilter), topK);
+        assertEquals(budgeted.scoreDocs.length, topK);
+        assertEquals(exactScorerCount.get(), 0, "A completed budgeted ANN search should satisfy the leaf quota");
+        assertEquals(annSearchCount.get(), 2, "An explicit visit budget should allow only one ANN pass per leaf");
+
         // A filter with only one match in each leaf should still take Lucene's exact path.
         TopDocs narrow = searcher.search(LuceneHnswRuntimeControlUtils.createQuery(VECTOR_FIELD, new float[]{0},
             topK, 0, true, true, new TermQuery(new Term(SCOPE_FIELD, "narrow"))), topK);
@@ -93,23 +104,32 @@ public class LuceneHnswRuntimeControlUtilsTest {
         assertTrue(exactScorerCount.get() > 0);
 
         exactScorerCount.set(0);
-        TopDocs budgeted = searcher.search(LuceneHnswRuntimeControlUtils.createQuery(VECTOR_FIELD, new float[]{0},
+        TopDocs exhausted = searcher.search(LuceneHnswRuntimeControlUtils.createQuery(VECTOR_FIELD, new float[]{0},
             topK, 1, true, true, broadFilter), topK);
-        assertEquals(budgeted.scoreDocs.length, topK);
+        assertEquals(exhausted.scoreDocs.length, topK);
         assertEquals(exactScorerCount.get(), 2, "Explicit visit limits should avoid a redundant seeded pass");
       }
     }
   }
 
-  private static final class ExactScoringTrackingReader extends FilterDirectoryReader {
+  private static final class SearchTrackingReader extends FilterDirectoryReader {
+    private final AtomicInteger _annSearchCount;
     private final AtomicInteger _exactScorerCount;
 
-    ExactScoringTrackingReader(DirectoryReader reader, AtomicInteger exactScorerCount)
+    SearchTrackingReader(DirectoryReader reader, AtomicInteger annSearchCount, AtomicInteger exactScorerCount)
         throws IOException {
       super(reader, new SubReaderWrapper() {
         @Override
         public LeafReader wrap(LeafReader leafReader) {
           return new FilterLeafReader(leafReader) {
+            @Override
+            public void searchNearestVectors(String field, float[] target, KnnCollector collector,
+                AcceptDocs acceptDocs)
+                throws IOException {
+              annSearchCount.incrementAndGet();
+              super.searchNearestVectors(field, target, collector, acceptDocs);
+            }
+
             @Override
             public FloatVectorValues getFloatVectorValues(String field)
                 throws IOException {
@@ -138,13 +158,14 @@ public class LuceneHnswRuntimeControlUtilsTest {
           };
         }
       });
+      _annSearchCount = annSearchCount;
       _exactScorerCount = exactScorerCount;
     }
 
     @Override
     protected DirectoryReader doWrapDirectoryReader(DirectoryReader reader)
         throws IOException {
-      return new ExactScoringTrackingReader(reader, _exactScorerCount);
+      return new SearchTrackingReader(reader, _annSearchCount, _exactScorerCount);
     }
 
     @Override
