@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminNotFoundException;
 import org.apache.pinot.client.admin.PinotAdminValidationException;
+import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableType;
@@ -220,6 +221,29 @@ public class PinotSchemaRestletResourceTest {
     } finally {
       TEST_INSTANCE.setClusterIngestionGroovyConfig(Boolean.toString(originalDisableGroovy));
       TEST_INSTANCE.getHelixResourceManager().deleteSchema(schemaName);
+    }
+  }
+
+  // Empty legacy transforms on virtual map fields must not compile implicit Groovy during REST validation.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testImplicitMapTransformsWithGroovyDisabled()
+      throws Exception {
+    boolean originalDisableGroovy = TEST_INSTANCE.getControllerConfig().isDisableIngestionGroovy();
+    try {
+      TEST_INSTANCE.setClusterIngestionGroovyConfig(null);
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(true);
+      for (String suffix : List.of("__KEYS", "__VALUES")) {
+        Schema schema = new Schema.SchemaBuilder().setSchemaName("implicitMapTransform")
+            .addSingleValueDimension("attrs" + suffix, DataType.STRING).build();
+        DimensionFieldSpec fieldSpec = schema.getDimensionFieldSpecs().get(0);
+        fieldSpec.setTransformFunction("");
+        fieldSpec.setVirtualColumnProvider("test");
+        TEST_INSTANCE.getOrCreateAdminClient().getSchemaClient().validateSchema(schema.toSingleLineJsonString());
+      }
+    } finally {
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
+      TEST_INSTANCE.setClusterIngestionGroovyConfig(Boolean.toString(originalDisableGroovy));
     }
   }
 
