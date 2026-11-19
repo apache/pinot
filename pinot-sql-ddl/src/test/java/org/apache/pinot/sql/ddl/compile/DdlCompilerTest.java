@@ -58,6 +58,17 @@ public class DdlCompilerTest {
   }
 
   @Test
+  public void variantColumnMapsToSingleValueDimension() {
+    CompiledCreateTable compiled =
+        compileCreate("CREATE TABLE events (payload VARIANT) TABLE_TYPE = OFFLINE");
+
+    FieldSpec payload = compiled.getSchema().getFieldSpecFor("payload");
+    assertTrue(payload instanceof DimensionFieldSpec);
+    assertEquals(payload.getDataType(), DataType.VARIANT);
+    assertTrue(payload.isSingleValueField());
+  }
+
+  @Test
   public void databaseQualifiedNamePreservedInTableConfig() {
     CompiledCreateTable c = compileCreate(
         "CREATE TABLE analytics.events (id INT) TABLE_TYPE = OFFLINE");
