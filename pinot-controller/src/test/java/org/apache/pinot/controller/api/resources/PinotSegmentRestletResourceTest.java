@@ -25,11 +25,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.InjectMocks;
@@ -39,11 +44,15 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class PinotSegmentRestletResourceTest {
@@ -215,6 +224,37 @@ public class PinotSegmentRestletResourceTest {
     assertTrue(result.containsKey("seg0"));
     assertTrue(result.containsKey("seg2"));
     assertTrue(result.containsKey("seg3"));
+  }
+
+  /// 1 segment x 3 replicas without columns is 3 entries. Every case is rejected before any server is contacted.
+  @Test
+  public void testGetServerMetadataEntryLimits()
+      throws Exception {
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setProperty(ControllerConf.SEGMENT_METADATA_DEFAULT_ENTRY_LIMIT, 2);
+    controllerConf.setProperty(ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT, 10);
+    _pinotSegmentRestletResource._controllerConf = controllerConf;
+    when(_pinotHelixResourceManager.getExistingTableNamesWithType(eq("testTable"), any()))
+        .thenReturn(List.of("testTable_OFFLINE"));
+    when(_pinotHelixResourceManager.getServerToSegmentsMap("testTable_OFFLINE"))
+        .thenReturn(Map.of("server0", List.of("seg0"), "server1", List.of("seg0"), "server2", List.of("seg0")));
+
+    // Omitted: the configured default applies
+    assertServerMetadataRejected(null, "above the limit of 2");
+    // Explicit: overrides the default, so a smaller value applies too
+    assertServerMetadataRejected(1, "above the limit of 1");
+    // Explicit: must be positive and at most the configured max
+    assertServerMetadataRejected(0, ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT);
+    assertServerMetadataRejected(11, ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT);
+    verify(_pinotHelixResourceManager, never()).getDataInstanceAdminEndpoints(anySet());
+  }
+
+  private void assertServerMetadataRejected(@Nullable Integer maxEntries, String expectedMessage) {
+    ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
+        () -> _pinotSegmentRestletResource.getServerMetadata("testTable", "OFFLINE", List.of(), List.of(), maxEntries,
+            mock(HttpHeaders.class)));
+    assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    assertTrue(e.getMessage().contains(expectedMessage), e.getMessage());
   }
 
   private List<String> getSegmentForPartition(String tableName, int partitionID, int sequenceNumberOffset,

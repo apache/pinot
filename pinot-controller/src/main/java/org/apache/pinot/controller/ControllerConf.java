@@ -338,6 +338,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
   public static final String MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = "minion.request.timeoutSeconds";
+  // Entries the segments metadata API fetches when the maxEntries query param is omitted
+  public static final String SEGMENT_METADATA_DEFAULT_ENTRY_LIMIT = "controller.segment.metadata.default.entry.limit";
+  // Upper bound on the maxEntries query param of the segments metadata API
+  public static final String SEGMENT_METADATA_MAX_ENTRY_LIMIT = "controller.segment.metadata.max.entry.limit";
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
   public static final String CONTROLLER_EXECUTOR_NUM_THREADS = "controller.executor.numThreads";
   public static final String CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS = "controller.executor.rebalance.numThreads";
@@ -421,6 +425,8 @@ public class ControllerConf extends PinotConfiguration {
 
   public static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   public static final int DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
+  public static final int DEFAULT_SEGMENT_METADATA_DEFAULT_ENTRY_LIMIT = 50_000;
+  public static final int DEFAULT_SEGMENT_METADATA_MAX_ENTRY_LIMIT = 100_000;
   public static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   public static final boolean DEFAULT_DELETED_SEGMENTS_PRESERVE_METADATA = false;
   public static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
@@ -1120,6 +1126,23 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getServerAdminRequestTimeoutSeconds() {
     return getProperty(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS);
+  }
+
+  public int getSegmentMetadataDefaultEntryLimit() {
+    return getProperty(SEGMENT_METADATA_DEFAULT_ENTRY_LIMIT, DEFAULT_SEGMENT_METADATA_DEFAULT_ENTRY_LIMIT);
+  }
+
+  public int getSegmentMetadataMaxEntryLimit() {
+    return getProperty(SEGMENT_METADATA_MAX_ENTRY_LIMIT, DEFAULT_SEGMENT_METADATA_MAX_ENTRY_LIMIT);
+  }
+
+  /// Checks `0 < default entry limit <= max entry limit` for the segments metadata API.
+  public void validateSegmentMetadataEntryLimits() {
+    int defaultLimit = getSegmentMetadataDefaultEntryLimit();
+    int maxLimit = getSegmentMetadataMaxEntryLimit();
+    Preconditions.checkState(defaultLimit > 0 && defaultLimit <= maxLimit,
+        "Invalid segments metadata entry limits: %s (%s) must be positive and at most %s (%s)",
+        SEGMENT_METADATA_DEFAULT_ENTRY_LIMIT, defaultLimit, SEGMENT_METADATA_MAX_ENTRY_LIMIT, maxLimit);
   }
 
   public void setMinionAdminRequestTimeoutSeconds(int timeoutSeconds) {
