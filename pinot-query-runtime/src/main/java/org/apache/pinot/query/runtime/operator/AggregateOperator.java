@@ -92,6 +92,19 @@ public class AggregateOperator extends MultiStageOperator {
   private final List<RelFieldCollation> _collations;
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node) {
+    this(context, input, node, new int[0]);
+  }
+
+  @VisibleForTesting
+  @Nullable
+  MultistageGroupByExecutor getGroupByExecutor() {
+    return _groupByExecutor;
+  }
+
+  /// @param mvKeyIndexes the positions of the multi-value keys in the group keys, empty for a plain aggregate. See
+  ///                     [MvAggregateOperator].
+  protected AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node,
+      int[] mvKeyIndexes) {
     super(context);
     _resultSchema = node.getDataSchema();
     _aggFunctions = getAggFunctions(node.getAggCalls());
@@ -145,8 +158,9 @@ public class AggregateOperator extends MultiStageOperator {
       _groupByExecutor = null;
     } else {
       _groupByExecutor =
-          new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), _aggFunctions, filterArgIds, maxFilterArgId, aggType,
-              leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
+          new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), mvKeyIndexes, _aggFunctions, filterArgIds,
+              maxFilterArgId, aggType, leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(),
+              node.getNodeHint());
       _aggregationExecutor = null;
     }
   }
