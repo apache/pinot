@@ -32,6 +32,7 @@ import java.util.function.BooleanSupplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
@@ -393,6 +394,27 @@ public class RealtimeTableReadinessTest {
       BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
       assertFalse(ready.getAsBoolean(), "A transient read failure must hold consumption without terminating it");
       assertTrue(ready.getAsBoolean(), "The same consumer must become ready after the read recovers");
+    }
+  }
+
+  @Test
+  public void testReadinessRetriesHelixReconnectTimeout()
+      throws Exception {
+    try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
+      LLCSegmentName base = name(0, 1);
+      LLCSegmentName consumer = name(0, 2);
+      table.assign(base, ONLINE);
+      table.publishState(base.getSegmentName(), ONLINE);
+      table.assign(consumer, CONSUMING);
+      HelixManager helixManager = table.getHelixManager();
+      HelixDataAccessor accessor = helixManager.getHelixDataAccessor();
+      when(helixManager.getHelixDataAccessor())
+          .thenThrow(new HelixException("HelixManager is not connected within retry timeout for cluster test-cluster"))
+          .thenReturn(accessor);
+
+      BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
+      assertFalse(ready.getAsBoolean(), "A reconnect timeout must hold consumption without terminating it");
+      assertTrue(ready.getAsBoolean(), "The same consumer must become ready after Helix reconnects");
     }
   }
 
