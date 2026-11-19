@@ -256,6 +256,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     }
     ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
     applyCustomConfigs(_config);
+    _config.validateSegmentMetadataEntryLimits();
 
     PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
     PinotMd5Mode.setPinotMd5Disabled(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
