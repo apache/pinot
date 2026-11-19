@@ -39,8 +39,7 @@ import org.slf4j.LoggerFactory;
 
 
 /// This is used to create Lucene based HNSW index.
-/// Used for both offline from [org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator]
-/// and realtime from [org.apache.pinot.segment.local.realtime.impl.vector.MutableVectorIndex]
+/// Builds the HNSW index for immutable segments during generation and index rebuilds.
 public class HnswVectorIndexCreator implements VectorIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(HnswVectorIndexCreator.class);
   public static final String VECTOR_INDEX_DOC_ID_COLUMN_NAME = "DocID";
@@ -74,7 +73,8 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
       indexDirectory = FSDirectory.open(_hnswIndexDir.toPath());
       LOGGER.info("Creating HNSW index for column: {} at path: {} with {} for segment: {}", column,
           _hnswIndexDir.getAbsolutePath(), vectorIndexConfig.getProperties(), segmentIndexDir.getAbsolutePath());
-      indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
+      indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig,
+          vectorIndexConfig.isMmapGraphOnMerge() ? _segmentIndexDir.toPath() : null));
     } catch (Exception e) {
       // IndexWriter does not close the Directory passed to it, so both need to be closed.
       try {

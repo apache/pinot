@@ -205,7 +205,7 @@ function stopServices() {
                                      'exec sleep 60')
         script_dir = self.root / "scripts with spaces"
         script_dir.mkdir()
-        for source in (RUNNER, HELPER, RUNNER.with_name("utils.inc")):
+        for source in (RUNNER, HELPER, RUNNER.with_name("utils.inc"), RUNNER.with_name("server-startup.inc")):
             shutil.copyfile(source, script_dir / source.name)
         copied_config = script_dir / "server-log4j2.xml"
         shutil.copyfile(HELPER.with_name(copied_config.name), copied_config)
