@@ -75,6 +75,8 @@ public class OfflineTableDataManager extends BaseTableDataManager {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager == null) {
       addNewOnlineSegment(zkMetadata, indexLoadingConfig);
+    } else if (hasUninitializedUpsertMetadata(segmentDataManager)) {
+      reloadUninitializedUpsertSegment(segmentDataManager, zkMetadata, indexLoadingConfig);
     } else {
       replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
     }

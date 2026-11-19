@@ -1308,6 +1308,74 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     upsertMetadataManager.close();
   }
 
+  @Test
+  public void testReplaceSegmentAfterFailedAdd()
+      throws IOException {
+    verifyReplaceSegmentAfterFailedAdd(HashFunction.NONE);
+    verifyReplaceSegmentAfterFailedAdd(HashFunction.MD5);
+    verifyReplaceSegmentAfterFailedAdd(HashFunction.MURMUR3);
+  }
+
+  private void verifyReplaceSegmentAfterFailedAdd(HashFunction hashFunction)
+      throws IOException {
+    ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(hashFunction).build());
+    Map<Object, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.RecordLocation> recordLocationMap =
+        upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    // segment1: 0 -> {0, 100}
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap queryableDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegment(1, validDocIds1, queryableDocIds1, getPrimaryKeyList(1, new int[]{0}));
+    upsertMetadataManager.addSegment(segment1, validDocIds1, queryableDocIds1,
+        getRecordInfoList(1, new int[]{0}, new int[]{100}, null).iterator());
+
+    // segment2 deletes key 0. Its add fails on the tombstone, whose comparison value cannot be compared with the one
+    // of key 0 in segment1.
+    int[] primaryKeys = new int[]{1, 0};
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap queryableDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment2 =
+        mockImmutableSegment(2, validDocIds2, queryableDocIds2, getPrimaryKeyList(2, primaryKeys));
+    List<RecordInfo> recordInfos = List.of(
+        new RecordInfo(makePrimaryKey(1), 0, 100, false),
+        new RecordInfo(makePrimaryKey(0), 1, "invalid", true)
+    );
+    expectThrows(ClassCastException.class,
+        () -> upsertMetadataManager.addSegment(segment2, validDocIds2, queryableDocIds2, recordInfos.iterator()));
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, 1, hashFunction);
+
+    // Replace segment2 with a copy that adds all its records. Key 0 is in segment1 and the new copy.
+    // newSegment2: 1 -> {0, 100}, 0 -> {1, 150}
+    ThreadSafeMutableRoaringBitmap newValidDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap newQueryableDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl newSegment2 =
+        mockImmutableSegment(2, newValidDocIds2, newQueryableDocIds2, getPrimaryKeyList(2, primaryKeys));
+    upsertMetadataManager.replaceSegment(newSegment2, newValidDocIds2, newQueryableDocIds2,
+        getRecordInfoList(2, primaryKeys, new int[]{100, 150}, new boolean[]{false, true}).iterator(), segment2);
+    checkRecordLocation(recordLocationMap, 0, newSegment2, 1, 150, 2, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, newSegment2, 0, 100, 1, hashFunction);
+    assertTrue(validDocIds1.getMutableRoaringBitmap().isEmpty());
+    assertEquals(newValidDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(newQueryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
+
+    // The tombstone of key 0 is out of the TTL window, and stays while segment1 still holds key 0
+    MutableSegment segment3 =
+        mockMutableSegment(3, new ThreadSafeMutableRoaringBitmap(), new ThreadSafeMutableRoaringBitmap());
+    upsertMetadataManager.addRecord(segment3, new RecordInfo(makePrimaryKey(2), 0, 200, false));
+    upsertMetadataManager.removeExpiredPrimaryKeys();
+    checkRecordLocation(recordLocationMap, 0, newSegment2, 1, 150, 2, hashFunction);
+    assertEquals(newValidDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+
+    // Stop the metadata manager
+    upsertMetadataManager.stop();
+
+    // Close the metadata manager
+    upsertMetadataManager.close();
+  }
+
   public void verifyGetQueryableDocIds(boolean isDeleteColumnNull, boolean[] deleteFlags,
       MutableRoaringBitmap validDocIdsOnDiskBitmap, MutableRoaringBitmap queryableDocIds) {
     ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes upsertMetadataManager =
