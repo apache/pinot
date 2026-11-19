@@ -148,8 +148,9 @@ public class SegmentCompletionDeadlineIntegrationTest extends BaseClusterIntegra
   }
 
   /// A pauseless commit start moves the segment to COMMITTING and creates the next consuming segment, so no other
-  /// replica can take the commit over. A build time extension that arrives after the commit deadline is accepted, and
-  /// so is the commit end that follows it.
+  /// replica can take the commit over. A build time extension from another server, or for another offset, fails
+  /// without aborting the FSM. A build time extension from the committer that arrives after the commit deadline is
+  /// accepted, and so is the commit end that follows it.
   @Test
   public void testPauselessLateBuildTimeExtension()
       throws Exception {
@@ -163,6 +164,14 @@ public class SegmentCompletionDeadlineIntegrationTest extends BaseClusterIntegra
     assertEquals(commitResponse.getStatus(), ControllerResponseStatus.COMMIT);
     assertEquals(protocolHandler.segmentCommitStart(params(segmentName)).getStatus(),
         ControllerResponseStatus.COMMIT_CONTINUE);
+
+    // Before the commit deadline, an extension from another server or for another offset fails. It does not move the
+    // commit deadline, so the extensions below still arrive after it.
+    assertEquals(protocolHandler.extendBuildTime(
+        extendBuildTimeParams(segmentName).withInstanceId(OTHER_SERVER_INSTANCE)).getStatus(),
+        ControllerResponseStatus.FAILED);
+    assertEquals(protocolHandler.extendBuildTime(extendBuildTimeParams(segmentName).withStreamPartitionMsgOffset(
+        new LongMsgOffset(END_OFFSET.getOffset() + 1).toString())).getStatus(), ControllerResponseStatus.FAILED);
 
     // The server builds the segment and asks for more build time after the commit deadline, e.g. because its commit
     // start took long or the controller handled the request late. It sends the extension again, as a retry after any
