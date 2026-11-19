@@ -205,6 +205,7 @@ public class CommonConstants {
     public static class Instance {
       @Deprecated
       public static final String INSTANCE_ID_KEY = "instanceId";
+      @Deprecated
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
       public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
@@ -2179,6 +2180,7 @@ public class CommonConstants {
   public static class Minion {
     public static final String CONFIG_OF_METRICS_PREFIX = "pinot.minion.";
     public static final String CONFIG_OF_MINION_ID = "pinot.minion.instance.id";
+    public static final String CONFIG_OF_MINION_DATA_DIR = "pinot.minion.instance.dataDir";
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
     // Config keys
