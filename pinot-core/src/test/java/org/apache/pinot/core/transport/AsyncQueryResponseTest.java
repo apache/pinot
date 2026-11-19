@@ -268,7 +268,7 @@ public class AsyncQueryResponseTest {
   public void testReceiveDeserializationErrorSetsFailedServerAndDataTable() {
     AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 10_000L, true);
 
-    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad bytes"), 100, 5);
+    response.receiveDeserializationError(SERVER_1, null, new RuntimeException("bad bytes"), 100, 5);
 
     // The query is not failed globally
     assertNull(response.getException());
@@ -294,7 +294,7 @@ public class AsyncQueryResponseTest {
 
     response.skipServerResponse(SERVER_1);
     // The later deserialization error for the same server must be a no-op for the latch.
-    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad bytes"), 0, 0);
+    response.receiveDeserializationError(SERVER_1, null, new RuntimeException("bad bytes"), 0, 0);
 
     // Only SERVER_1's single slot was released; SERVER_2 never responds, so the query must TIME OUT, not COMPLETE.
     Map<ServerRoutingInstance, ServerResponse> responses = response.getFinalResponses();
@@ -309,7 +309,7 @@ public class AsyncQueryResponseTest {
       throws Exception {
     AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 500L, true);
 
-    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad bytes"), 0, 0);
+    response.receiveDeserializationError(SERVER_1, null, new RuntimeException("bad bytes"), 0, 0);
     // The later channel-inactive report for the same server must be a no-op for the latch.
     assertFalse(response.markServerUnavailable(SERVER_1, new RuntimeException("channel inactive")));
 
@@ -326,7 +326,7 @@ public class AsyncQueryResponseTest {
       throws Exception {
     AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 500L, true);
 
-    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad"), 0, 0);
+    response.receiveDeserializationError(SERVER_1, null, new RuntimeException("bad"), 0, 0);
     response.receiveDataTable(SERVER_1, mock(DataTable.class), 100, 5);
 
     Map<ServerRoutingInstance, ServerResponse> responses = response.getFinalResponses();
@@ -349,8 +349,7 @@ public class AsyncQueryResponseTest {
 
     DataTable dataTable = mock(DataTable.class);
     response.receiveDataTable(SERVER_1, dataTable, 100, 5);
-    response.receiveDeserializationError(SERVER_1, new RuntimeException("bad"), 0, 0);
-
+    response.receiveDeserializationError(SERVER_1, null, new RuntimeException("bad"), 0, 0);
     Map<ServerRoutingInstance, ServerResponse> responses = response.getFinalResponses();
     assertEquals(responses.size(), 2);
     assertEquals(response.getStatus(), QueryResponse.Status.TIMED_OUT);

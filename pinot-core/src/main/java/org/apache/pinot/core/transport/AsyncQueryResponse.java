@@ -216,14 +216,7 @@ public class AsyncQueryResponse implements QueryResponse {
     _responseMap.get(serverRoutingInstance).markRequestSent(requestSentLatencyMs);
   }
 
-  // Handle server DataTable deserialization errors without waiting for query timeout
-  void receiveDeserializationError(ServerRoutingInstance serverRoutingInstance, Exception exception,
-      int responseSize, int deserializationTimeMs) {
-    receiveDeserializationError(serverRoutingInstance, null, exception, responseSize, deserializationTimeMs);
-  }
-
-  void receiveDeserializationError(ServerRoutingInstance serverRoutingInstance, @Nullable Channel channel,
-      Exception exception, int responseSize, int deserializationTimeMs) {
+   void receiveDeserializationError(ServerRoutingInstance serverRoutingInstance, @Nullable Channel channel,      Exception exception, int responseSize, int deserializationTimeMs) {
     if (!shouldActOnServerDown(serverRoutingInstance, channel)) {
       return;
     }

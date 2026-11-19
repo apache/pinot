@@ -98,11 +98,10 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1);
-      // Closing the channel is necessary because broadcasting the deserialization error releases the latch slots of
-      // all in-flight queries on this server channel, preventing future responses on this connection from interfering
-      // with those queries or subsequent requests.
-      try {
-        _queryRouter.markServerDeserializationError(_serverRoutingInstance, ctx.channel(), e, responseSize,
+      // Closing the channel is used as a conservative recovery policy (note that LengthFieldBasedFrameDecoder
+      // has already isolated this frame before DataTable parsing, a deserialization exception does not itself establish
+      // broken TCP framing, and the completion guard handles late responses for requests already completed).
+      try {        _queryRouter.markServerDeserializationError(_serverRoutingInstance, ctx.channel(), e, responseSize,
             (int) (System.currentTimeMillis() - deserializationStartTimeMs));
       } finally {
         ctx.close();
