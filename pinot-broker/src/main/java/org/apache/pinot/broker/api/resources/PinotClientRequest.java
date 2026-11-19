@@ -96,6 +96,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.validate.GroupByDiagnostics;
+import org.apache.pinot.query.validate.GroupByDiagnosticsCollector;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
@@ -1207,7 +1209,13 @@ public class PinotClientRequest {
           + "executing the query. Accepts a non-empty `queries` list. "
           + "For SSE queries, compiles SQL into PinotQuery including rewrites and validation. "
           + "For MSE queries, parses, validates and optimizes the query into a compiled "
-          + "representation.")
+          + "representation. Optional top-level includeGroupByDiagnostics (default false) adds per-query "
+          + "groupByDiagnostics.overlaps: an array only after successful MSE compilation and observation, "
+          + "otherwise null (including SSE). An empty array is not a SQL-safety or compatibility certificate. "
+          + "Observes direct bare GROUP BY entries matching explicit SELECT aliases and visible inputs, "
+          + "then records Calcite's expanded grouping expression. No binding winner or safety verdict is inferred. "
+          + "Grouping constructs and general grouping expressions are outside v1 coverage. "
+          + "Positions are one-based with inclusive ends in the sanitized parser input; SET text counts.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Compilation validation result"),
       @ApiResponse(code = 400, message = "Malformed request body"),
@@ -1220,7 +1228,8 @@ public class PinotClientRequest {
     if (queryNodes == null || queryNodes.isEmpty()) {
       return List.of(
           new SqlCompilationValidationResponse(false, "Request must include non-empty 'queries'",
-              QueryErrorCode.JSON_PARSING, null));
+              QueryErrorCode.JSON_PARSING, null,
+              request.isIncludeGroupByDiagnostics() ? new GroupByDiagnostics(null) : null));
     }
 
     List<TableConfig> tableConfigs =
@@ -1237,10 +1246,15 @@ public class PinotClientRequest {
     List<SqlCompilationValidationResponse> responses = new ArrayList<>(queryNodes.size());
     for (ObjectNode queryNode : queryNodes) {
       String sql = null;
+      GroupByDiagnostics groupByDiagnostics =
+          request.isIncludeGroupByDiagnostics() ? new GroupByDiagnostics(null) : null;
+      boolean compiledSuccessfully = false;
+      String errorMessage = null;
+      QueryErrorCode errorCode = null;
       try {
         if (queryNode == null || !queryNode.has(Request.SQL) || !queryNode.get(Request.SQL).isTextual()) {
           responses.add(new SqlCompilationValidationResponse(false, "Each query must include string field 'sql'",
-              QueryErrorCode.JSON_PARSING, null));
+              QueryErrorCode.JSON_PARSING, null, groupByDiagnostics));
           continue;
         }
 
@@ -1249,22 +1263,30 @@ public class PinotClientRequest {
         Map<String, String> queryOptionsMap = sqlNodeAndOptions.getOptions();
         if (QueryOptionsUtils.isUseMultistageEngine(queryOptionsMap)) {
           String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+          GroupByDiagnosticsCollector diagnostics =
+              request.isIncludeGroupByDiagnostics() ? new GroupByDiagnosticsCollector() : null;
           try (QueryEnvironment.CompiledQuery compiled = new QueryEnvironment(database, tableCache, null)
-              .compile(sql, sqlNodeAndOptions)) {
+              .compileForValidation(sql, sqlNodeAndOptions, diagnostics)) {
             // Validation only needs compilation to succeed; the compiled form is intentionally discarded.
+          }
+          if (diagnostics != null) {
+            groupByDiagnostics = diagnostics.getResult();
           }
         } else {
           CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
         }
-        responses.add(new SqlCompilationValidationResponse(true, null, null, sql));
+        compiledSuccessfully = true;
       } catch (QueryException e) {
         LOGGER.warn("Caught exception while compiling query: {}", e.getMessage());
-        responses.add(new SqlCompilationValidationResponse(false, e.getMessage(), e.getErrorCode(), sql));
+        errorMessage = e.getMessage();
+        errorCode = e.getErrorCode();
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while validating query: {}", e.getMessage());
-        responses.add(new SqlCompilationValidationResponse(false, "Unexpected error: " + e.getMessage(),
-            QueryErrorCode.UNKNOWN, sql));
+        errorMessage = "Unexpected error: " + e.getMessage();
+        errorCode = QueryErrorCode.UNKNOWN;
       }
+      responses.add(new SqlCompilationValidationResponse(compiledSuccessfully, errorMessage, errorCode, sql,
+          groupByDiagnostics));
     }
     return responses;
   }

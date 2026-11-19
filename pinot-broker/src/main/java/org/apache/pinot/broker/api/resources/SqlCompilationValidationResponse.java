@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.broker.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
+import org.apache.pinot.query.validate.GroupByDiagnostics;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 /// Per-query response item for {@code POST /query/sql/validateQueryCompilation}. Reports whether
@@ -31,13 +33,20 @@ public class SqlCompilationValidationResponse {
   private final String _errorMessage;
   private final QueryErrorCode _errorCode;
   private final String _sql;
+  private final GroupByDiagnostics _groupByDiagnostics;
 
   public SqlCompilationValidationResponse(boolean compiledSuccessfully, @Nullable String errorMessage,
       @Nullable QueryErrorCode errorCode, @Nullable String sql) {
+    this(compiledSuccessfully, errorMessage, errorCode, sql, null);
+  }
+
+  public SqlCompilationValidationResponse(boolean compiledSuccessfully, @Nullable String errorMessage,
+      @Nullable QueryErrorCode errorCode, @Nullable String sql, @Nullable GroupByDiagnostics groupByDiagnostics) {
     _compiledSuccessfully = compiledSuccessfully;
     _errorMessage = errorMessage;
     _errorCode = errorCode;
     _sql = sql;
+    _groupByDiagnostics = groupByDiagnostics;
   }
 
   @JsonProperty("compiledSuccessfully")
@@ -61,5 +70,12 @@ public class SqlCompilationValidationResponse {
   @JsonProperty("sql")
   public String getSql() {
     return _sql;
+  }
+
+  @Nullable
+  @JsonProperty("groupByDiagnostics")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public GroupByDiagnostics getGroupByDiagnostics() {
+    return _groupByDiagnostics;
   }
 }

@@ -1458,4 +1458,58 @@ public class PinotClientRequestTest {
     assertNotNull(response.getErrorMessage(), "Failed validation should include an error message");
     assertEquals(response.getSql(), expectedSql);
   }
+  @Test
+  public void testGroupByDiagnosticsJsonContract() throws Exception {
+    String sql = "SELECT 'UNUSED' AS payment_method, SUM(amount) AS amount FROM events GROUP BY payment_method";
+    ObjectNode body = groupByRequestBody(List.of(createQueryNode(sql, "useMultistageEngine=true")));
+    JsonNode disabled = validateCompilationJson(body).get(0);
+    assertTrue(disabled.get("compiledSuccessfully").asBoolean());
+    assertFalse(disabled.has("groupByDiagnostics"));
+
+    body.put("includeGroupByDiagnostics", false);
+    assertEquals(validateCompilationJson(body).get(0), disabled);
+    body.put("includeGroupByDiagnostics", true);
+    JsonNode enabled = validateCompilationJson(body).get(0);
+    assertTrue(enabled.get("compiledSuccessfully").asBoolean());
+    JsonNode overlaps = enabled.get("groupByDiagnostics").get("overlaps");
+    assertEquals(overlaps.size(), 1);
+    assertEquals(overlaps.get(0).get("identifier").asText(), "payment_method");
+    verifyNoInteractions(_requestHandler, _sqlQueryExecutor, _tableCache);
+  }
+
+  @Test
+  public void testGroupByDiagnosticsMixedEngineBatch() throws Exception {
+    String inline = "SET useMultistageEngine=true; SELECT 1";
+    ObjectNode body = groupByRequestBody(List.of(
+        createQueryNode("SELECT 1"), createQueryNode(inline, "useMultistageEngine=false")));
+    body.put("includeGroupByDiagnostics", true);
+    JsonNode responses = validateCompilationJson(body);
+    assertEquals(responses.size(), 2);
+    for (int i = 0; i < responses.size(); i++) {
+      assertTrue(responses.get(i).get("compiledSuccessfully").asBoolean(), responses.get(i).toString());
+      assertEquals(responses.get(i).get("sql"), body.get("queries").get(i).get("sql"));
+    }
+    assertEquals(responses.get(0).get("groupByDiagnostics"), JsonUtils.stringToJsonNode("{\"overlaps\":null}"));
+    assertEquals(responses.get(1).get("groupByDiagnostics"), JsonUtils.stringToJsonNode("{\"overlaps\":[]}"));
+    verifyNoInteractions(_requestHandler, _sqlQueryExecutor);
+  }
+
+  /// Checks request/response JSON around the real compilation endpoint without executing queries.
+  private JsonNode validateCompilationJson(ObjectNode body) throws Exception {
+    SqlCompilationValidationRequest request = JsonUtils.stringToObject(body.toString(),
+        SqlCompilationValidationRequest.class);
+    return JsonUtils.stringToJsonNode(JsonUtils.objectToString(
+        _pinotClientRequest.validateQueryCompilation(request, null)));
+  }
+
+  private static ObjectNode groupByRequestBody(List<ObjectNode> queries) throws Exception {
+    ObjectNode body = JsonUtils.newObjectNode();
+    body.set("queries", JsonUtils.objectToJsonNode(queries));
+    body.set("tableConfigs", JsonUtils.objectToJsonNode(List.of(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("events").build())));
+    body.set("schemas", JsonUtils.objectToJsonNode(List.of(new Schema.SchemaBuilder().setSchemaName("events")
+        .addSingleValueDimension("payment_method", DataType.STRING)
+        .addMetric("amount", DataType.LONG).build())));
+    return body;
+  }
 }

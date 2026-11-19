@@ -38,18 +38,27 @@ public class SqlCompilationValidationRequest {
   private final List<Schema> _schemas;
   private final List<LogicalTableConfig> _logicalTableConfigs;
   private final boolean _ignoreCase;
+  private final boolean _includeGroupByDiagnostics;
+
+  public SqlCompilationValidationRequest(@Nullable List<ObjectNode> queries,
+      @Nullable List<TableConfig> tableConfigs, @Nullable List<Schema> schemas,
+      @Nullable List<LogicalTableConfig> logicalTableConfigs, boolean ignoreCase) {
+    this(queries, tableConfigs, schemas, logicalTableConfigs, ignoreCase, false);
+  }
 
   @JsonCreator
   public SqlCompilationValidationRequest(@JsonProperty("queries") @Nullable List<ObjectNode> queries,
       @JsonProperty("tableConfigs") @Nullable List<TableConfig> tableConfigs,
       @JsonProperty("schemas") @Nullable List<Schema> schemas,
       @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
-      @JsonProperty("ignoreCase") boolean ignoreCase) {
+      @JsonProperty("ignoreCase") boolean ignoreCase,
+      @JsonProperty("includeGroupByDiagnostics") boolean includeGroupByDiagnostics) {
     _queries = queries;
     _tableConfigs = tableConfigs;
     _schemas = schemas;
     _logicalTableConfigs = logicalTableConfigs;
     _ignoreCase = ignoreCase;
+    _includeGroupByDiagnostics = includeGroupByDiagnostics;
   }
 
   @Nullable
@@ -74,5 +83,9 @@ public class SqlCompilationValidationRequest {
 
   public boolean isIgnoreCase() {
     return _ignoreCase;
+  }
+
+  public boolean isIncludeGroupByDiagnostics() {
+    return _includeGroupByDiagnostics;
   }
 }
