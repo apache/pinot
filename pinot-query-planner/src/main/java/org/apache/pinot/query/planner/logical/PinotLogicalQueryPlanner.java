@@ -141,9 +141,6 @@ public class PinotLogicalQueryPlanner {
         false, subPlanRootSenderNode);
 
     if (tracker != null) {
-      RelNode rootRelNode = tracker.getCreatorOf(node);
-      Preconditions.checkState(rootRelNode != null, "Root RelNode not found for PlanNode: %s", node);
-      tracker.trackCreation(rootRelNode, subPlanRootSenderNode);
       Iterator<Map.Entry<? extends BasePlanNode, ExchangeNode>> it = Iterators.concat(
           fragmenter.getMailboxSendToExchangeNodeMap().entrySet().iterator(),
           fragmenter.getMailboxReceiveToExchangeNodeMap().entrySet().iterator()
@@ -155,8 +152,16 @@ public class PinotLogicalQueryPlanner {
         if (originalNode == null) {
           throw new IllegalStateException("Original node not found for exchange node: " + exchangeNode);
         }
-        tracker.trackCreation(originalNode, entry.getKey());
+        // Replace only the sending input when explaining a merge exchange. The receive still owns the global slice.
+        RelNode creator = exchangeNode.isKWayMerge() && entry.getKey() instanceof MailboxSendNode
+            ? originalNode.getInput(0)
+            : originalNode;
+        tracker.trackCreation(creator, entry.getKey());
       }
+      // A split exchange can be the root. Register its receive before looking up its logical node.
+      RelNode rootRelNode = tracker.getCreatorOf(node);
+      Preconditions.checkState(rootRelNode != null, "Root RelNode not found for PlanNode: %s", node);
+      tracker.trackCreation(rootRelNode, subPlanRootSenderNode);
     }
 
     return new PlanFragment(0, rootReceiveNode, List.of(planFragment1));

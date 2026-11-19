@@ -43,6 +43,7 @@ import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -57,12 +58,21 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     Plan.PlanNode proto = PlanNodeSerializer.process(node);
     assertEquals(proto.getNodeCase(), Plan.PlanNode.NodeCase.MAILBOXMERGERECEIVENODE);
     assertEquals(proto.getNodeCase().getNumber(), 20);
+    assertFalse(proto.getMailboxMergeReceiveNode().hasFetch());
+    assertFalse(proto.getMailboxMergeReceiveNode().hasOffset());
     assertEquals(PlanNodeDeserializer.process(proto), node);
     // Emulate a legacy parser retaining tag 20 as unknown: there is no recognized executable node, so fail loudly.
     Plan.PlanNode unknown = proto.toBuilder().clearMailboxMergeReceiveNode().setUnknownFields(
         UnknownFieldSet.newBuilder().addField(20, UnknownFieldSet.Field.newBuilder()
             .addLengthDelimited(proto.getMailboxMergeReceiveNode().toByteString()).build()).build()).build();
     expectThrows(IllegalStateException.class, () -> PlanNodeDeserializer.process(unknown));
+    for (int fetch : new int[]{0, 10}) {
+      MailboxMergeReceiveNode limited = new MailboxMergeReceiveNode(1, schema, 2, PinotRelExchangeType.STREAMING,
+          RelDistribution.Type.SINGLETON, List.of(), List.of(new RelFieldCollation(0)), fetch, 5, null);
+      Plan.PlanNode limitedProto = PlanNodeSerializer.process(limited);
+      assertTrue(limitedProto.getMailboxMergeReceiveNode().hasFetch());
+      assertEquals(PlanNodeDeserializer.process(limitedProto), limited);
+    }
   }
 
   @Test(dataProvider = "testQueryDataProvider")

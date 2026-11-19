@@ -312,7 +312,12 @@ class PlanNodeMerger {
     @Nullable
     @Override
     public PlanNode visitMailboxMergeReceive(MailboxMergeReceiveNode node, PlanNode context) {
-      return context instanceof MailboxMergeReceiveNode ? mergeReceives(node, (MailboxMergeReceiveNode) context) : null;
+      if (!(context instanceof MailboxMergeReceiveNode)) {
+        return null;
+      }
+      MailboxMergeReceiveNode other = (MailboxMergeReceiveNode) context;
+      return node.getFetch() == other.getFetch() && node.getOffset() == other.getOffset()
+          ? mergeReceives(node, other) : null;
     }
 
     private PlanNode mergeReceives(BaseMailboxReceiveNode node, BaseMailboxReceiveNode otherNode) {
@@ -515,7 +520,9 @@ class PlanNodeMerger {
         return null;
       }
       ExchangeNode otherNode = (ExchangeNode) context;
-      if (exchangeNode.isKWayMerge() != otherNode.isKWayMerge()) {
+      if (exchangeNode.isKWayMerge() != otherNode.isKWayMerge()
+          || exchangeNode.getMergeFetch() != otherNode.getMergeFetch()
+          || exchangeNode.getMergeOffset() != otherNode.getMergeOffset()) {
         return null;
       }
       if (exchangeNode.getExchangeType() != otherNode.getExchangeType()) {
