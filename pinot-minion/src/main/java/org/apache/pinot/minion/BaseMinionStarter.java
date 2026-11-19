@@ -23,7 +23,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -308,12 +307,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
     minionContext.setHelixManager(_helixManager);
     LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
-    try {
-      _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
-    } catch (Exception e) {
-      IngestionGroovyConfigListener.applyClusterConfig(Map.of());
-      throw new IllegalStateException("Failed to subscribe to the cluster ingestion Groovy policy", e);
-    }
+    IngestionGroovyConfigListener.subscribeToClusterConfig(_helixManager, _clusterConfigChangeHandler,
+        _executorService::shutdownNow);
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _minionAdminApplication = createMinionAdminApp();
     _minionAdminApplication.start(_listenerConfigs);

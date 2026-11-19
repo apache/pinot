@@ -843,12 +843,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
         TimeUnit.SECONDS);
 
     LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
-    try {
-      _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
-    } catch (Exception e) {
-      IngestionGroovyConfigListener.applyClusterConfig(Map.of());
-      throw new IllegalStateException("Failed to subscribe to the cluster ingestion Groovy policy", e);
-    }
+    IngestionGroovyConfigListener.subscribeToClusterConfig(_helixManager, _clusterConfigChangeHandler,
+        _helixMessageCountScheduler::shutdownNow, _serverInstance::shutDown);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottlerSet);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
     ResourceManager resourceManager = _serverInstance.getQueryScheduler().getResourceManager();

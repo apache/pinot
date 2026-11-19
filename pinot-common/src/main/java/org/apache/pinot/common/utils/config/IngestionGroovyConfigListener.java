@@ -20,6 +20,8 @@ package org.apache.pinot.common.utils.config;
 
 import java.util.Map;
 import java.util.Set;
+import org.apache.helix.HelixManager;
+import org.apache.helix.api.listeners.ClusterConfigChangeListener;
 import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.utils.CommonConstants.Groovy;
@@ -39,5 +41,29 @@ public class IngestionGroovyConfigListener implements PinotClusterConfigChangeLi
   public static void applyClusterConfig(Map<String, String> clusterConfigs) {
     GroovyFunctionEvaluator.setIngestionGroovyDisabled(
         Groovy.isIngestionGroovyDisabled(clusterConfigs.get(Groovy.DISABLE_INGESTION_GROOVY)));
+  }
+
+  /// Subscribes a runtime role to cluster updates. On failure, disables ingestion compilation, disconnects the
+  /// participant, and releases initialized role resources before failing startup with the original cause.
+  public static void subscribeToClusterConfig(HelixManager helixManager, ClusterConfigChangeListener listener,
+      Runnable... failureCleanup) {
+    try {
+      helixManager.addClusterfigChangeListener(listener);
+    } catch (Exception e) {
+      applyClusterConfig(Map.of());
+      try {
+        helixManager.disconnect();
+      } catch (Exception cleanupFailure) {
+        e.addSuppressed(cleanupFailure);
+      }
+      for (Runnable cleanup : failureCleanup) {
+        try {
+          cleanup.run();
+        } catch (Exception cleanupFailure) {
+          e.addSuppressed(cleanupFailure);
+        }
+      }
+      throw new IllegalStateException("Failed to subscribe to the cluster ingestion Groovy policy", e);
+    }
   }
 }

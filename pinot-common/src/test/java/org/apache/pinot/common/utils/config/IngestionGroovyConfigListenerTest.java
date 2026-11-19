@@ -19,6 +19,9 @@
 package org.apache.pinot.common.utils.config;
 
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import org.apache.helix.HelixManager;
+import org.apache.helix.api.listeners.ClusterConfigChangeListener;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
@@ -33,7 +36,13 @@ import org.apache.pinot.spi.utils.CommonConstants.Groovy;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.expectThrows;
 
 
@@ -84,6 +93,55 @@ public class IngestionGroovyConfigListenerTest {
     IngestionGroovyConfigListener.applyClusterConfig(Map.of(KEY, "false"));
     IngestionGroovyConfigListener.applyClusterConfig(Map.of(KEY, "invalid"));
     expectThrows(IllegalStateException.class, () -> new GroovyFunctionEvaluator(EXPRESSION));
+  }
+
+  @Test
+  public void testSubscriptionFailureDisablesCompilationAndCleansUpRuntimeRoles()
+      throws Exception {
+    for (boolean server : new boolean[]{false, true}) {
+      HelixManager manager = mock(HelixManager.class);
+      ClusterConfigChangeListener listener = mock(ClusterConfigChangeListener.class);
+      Exception registrationFailure = new Exception("Subscription failed");
+      doThrow(registrationFailure).when(manager).addClusterfigChangeListener(listener);
+      ExecutorService executor = mock(ExecutorService.class);
+      RuntimeException cleanupFailure = new RuntimeException("Executor cleanup failed");
+      doThrow(cleanupFailure).when(executor).shutdownNow();
+      Runnable serverCleanup = mock(Runnable.class);
+      Runnable[] cleanup = server
+          ? new Runnable[]{executor::shutdownNow, serverCleanup}
+          : new Runnable[]{executor::shutdownNow};
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
+
+      IllegalStateException failure = expectThrows(IllegalStateException.class,
+          () -> IngestionGroovyConfigListener.subscribeToClusterConfig(manager, listener, cleanup));
+      assertSame(failure.getCause(), registrationFailure);
+      assertEquals(registrationFailure.getSuppressed().length, 1);
+      assertSame(registrationFailure.getSuppressed()[0], cleanupFailure);
+      expectThrows(IllegalStateException.class, () -> new GroovyFunctionEvaluator(EXPRESSION));
+      verify(manager).disconnect();
+      verify(executor).shutdownNow();
+      if (server) {
+        verify(serverCleanup).run();
+      } else {
+        verifyNoInteractions(serverCleanup);
+      }
+    }
+  }
+
+  @Test
+  public void testSuccessfulSubscriptionPreservesPolicyAndResources()
+      throws Exception {
+    HelixManager manager = mock(HelixManager.class);
+    ClusterConfigChangeListener listener = mock(ClusterConfigChangeListener.class);
+    Runnable cleanup = mock(Runnable.class);
+    GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
+
+    IngestionGroovyConfigListener.subscribeToClusterConfig(manager, listener, cleanup);
+
+    verify(manager).addClusterfigChangeListener(listener);
+    verify(manager, never()).disconnect();
+    verifyNoInteractions(cleanup);
+    assertEquals(new GroovyFunctionEvaluator(EXPRESSION).evaluate(new Object[]{1}), 2);
   }
 
   @Test
