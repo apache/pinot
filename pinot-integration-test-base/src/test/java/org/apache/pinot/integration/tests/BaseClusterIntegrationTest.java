@@ -988,17 +988,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /// Get current result for "SELECT COUNT(\*) ... OPTION(skipUpsert=true)": every ingested row of an upsert or dedup
   /// table, including the ones upsert replaced or deleted.
   ///
-  /// @throws IllegalStateException when the broker returns no result, with the broker exceptions
+  /// @throws IllegalStateException when the broker returns an exception or no result, since a count from part of the
+  ///   segments is not the table's count
   protected long getCurrentCountStarResultWithoutUpsert(String tableName) {
     ResultSetGroup resultSetGroup =
         getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)");
-    if (resultSetGroup.getResultSetCount() == 0) {
+    if (!resultSetGroup.getExceptions().isEmpty() || resultSetGroup.getResultSetCount() == 0) {
       throw new IllegalStateException(
           "No COUNT(*) result for table " + tableName + ": " + resultSetGroup.getExceptions());
     }
     return Long.parseLong(resultSetGroup.getResultSet(0).getString(0));
   }
-
 
   protected void waitForMinionTaskCompletion(String taskId, long timeout) {
     // The task state (workflow context) and the subtask states (job context) live in different Helix znodes and are
@@ -1026,7 +1026,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected List<String> getSegments(String tableNameWithType) {
-    return _controllerStarter.getHelixResourceManager().getSegmentsFor(tableNameWithType, false);
+    return getHelixResourceManager().getSegmentsFor(tableNameWithType, false);
   }
 
   protected int getSegmentCount(String tableNameWithType) {
@@ -1093,9 +1093,18 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return rendered;
   }
 
+  /// Asserts the rows 10 times, so that every replica group answers: the broker picks the replica group per request
+  /// in a round-robin fashion.
+  protected void assertRowsFromEveryReplica(@Language("sql") String query, List<List<Object>> expectedRows)
+      throws Exception {
+    for (int i = 0; i < 10; i++) {
+      assertRows(query, expectedRows);
+    }
+  }
+
   /// Asserts that the query returns exactly the expected rows, in order. The query should have an `ORDER BY` and a
-  /// `LIMIT` that covers every row. On failure the message shows the rows that are missing and the rows that are
-  /// not expected.
+  /// `LIMIT` that covers every row. Rows are compared as JSON, so an INT and a LONG of the same value match. On failure
+  /// the message shows the rows that are missing and the rows that are not expected.
   protected void assertRows(@Language("sql") String query, List<List<Object>> expectedRows)
       throws Exception {
     List<String> expected = toJsonRows(expectedRows);
@@ -1166,16 +1175,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return message.toString();
   }
 
-  /// Like [#waitForClusterStateSettled(String, int, int, long)] for any number of segments: waits until the
+  /// Like [#waitForClusterStateSettled(String, Integer, int, long)] for any number of segments: waits until the
   /// ExternalView of the table (OFFLINE or REALTIME) equals its IdealState with no OFFLINE segment, so the next row
   /// check reads every segment from where it is assigned.
   protected void waitForClusterStateSettled(String tableNameWithType, long timeoutMs) {
-    waitForClusterStateSettled(tableNameWithType, -1, 5, timeoutMs);
+    waitForClusterStateSettled(tableNameWithType, null, 5, timeoutMs);
   }
 
   /// Waits until the cluster state has settled after a reload, rebalance or restart:
   ///
-  /// - IdealState has `expectedSegments` entries (any number when negative).
+  /// - IdealState has `expectedSegments` entries (any number when null).
   /// - No segment in IdealState has any instance in OFFLINE state.
   /// - ExternalView equals IdealState (queries route via ExternalView, so this is required
   ///   before asserting on IdealState).
@@ -1183,7 +1192,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /// All conditions must hold for `stableSamples` consecutive polls, because IdealState can
   /// transiently look correct between two intermediate states during force-commit +
   /// new-consuming-segment creation.
-  protected void waitForClusterStateSettled(String tableNameWithType, int expectedSegments, int stableSamples,
+  protected void waitForClusterStateSettled(String tableNameWithType, @Nullable Integer expectedSegments,
+      int stableSamples,
       long timeoutMs) {
     AtomicInteger streak = new AtomicInteger(0);
     TestUtils.waitForCondition(aVoid -> {
@@ -1193,7 +1203,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         return false;
       }
       Map<String, Map<String, String>> isMap = idealState.getRecord().getMapFields();
-      if (expectedSegments >= 0 && isMap.size() != expectedSegments) {
+      if (expectedSegments != null && isMap.size() != expectedSegments) {
         streak.set(0);
         return false;
       }
@@ -1222,10 +1232,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /// Every instance the IdealState has in CONSUMING state must report, so a replica that has not reported yet holds
   /// the wait instead of being skipped.
   ///
-  /// @param tableName raw table name; the number of partitions is [#getNumKafkaPartitions()]
+  /// @param tableName table name, with or without the REALTIME suffix; the stream partitions are the ones of the
+  ///   LLC segments in the IdealState
   protected void waitForAllStreamRecordsConsumed(String tableName, long timeoutMs) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    int numPartitions = getNumKafkaPartitions();
     // Consuming segment to the records lag reported by each server
     AtomicReference<Map<String, Map<String, Map<String, String>>>> lastLags = new AtomicReference<>();
     AtomicReference<Exception> lastError = new AtomicReference<>();
@@ -1247,8 +1257,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           if (idealState == null || info._serversFailingToRespond != 0) {
             return false;
           }
-          int numConsumingSegments = 0;
+          // Every stream partition of the table must have a consuming segment
+          Set<Integer> partitions = new HashSet<>();
+          Set<Integer> consumingPartitions = new HashSet<>();
           for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+            LLCSegmentName llcSegmentName = LLCSegmentName.of(entry.getKey());
+            if (llcSegmentName != null) {
+              partitions.add(llcSegmentName.getPartitionGroupId());
+            }
             for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
               if (!SegmentStateModel.CONSUMING.equals(instanceState.getValue())) {
                 continue;
@@ -1258,21 +1274,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               if (lags == null || lags.isEmpty() || !lags.values().stream().allMatch("0"::equals)) {
                 return false;
               }
-            }
-            if (entry.getValue().containsValue(SegmentStateModel.CONSUMING)) {
-              numConsumingSegments++;
+              if (llcSegmentName != null) {
+                consumingPartitions.add(llcSegmentName.getPartitionGroupId());
+              }
             }
           }
-          return numConsumingSegments == numPartitions;
+          return !partitions.isEmpty() && consumingPartitions.equals(partitions);
         } catch (Exception e) {
           lastError.set(e);
           return false;
         }
       }, 100L, timeoutMs, null);
     } catch (AssertionError e) {
-      AssertionError error = new AssertionError("Table " + realtimeTableName + " did not consume all "
-          + numPartitions + " stream partitions on every replica in " + timeoutMs
-          + "ms; last records lag per consuming segment and server: " + lastLags.get(), e);
+      AssertionError error = new AssertionError("Table " + realtimeTableName + " did not consume every stream "
+          + "partition on every replica in " + timeoutMs + "ms; last records lag per consuming segment and server: "
+          + lastLags.get(), e);
       if (lastError.get() != null) {
         error.addSuppressed(lastError.get());
       }
@@ -1302,7 +1318,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   private int getNumConsumingPartitions(String tableNameWithType) {
-    IdealState idealState = _controllerStarter.getHelixResourceManager().getTableIdealState(tableNameWithType);
+    IdealState idealState = getHelixResourceManager().getTableIdealState(tableNameWithType);
     if (idealState == null) {
       return 0;
     }

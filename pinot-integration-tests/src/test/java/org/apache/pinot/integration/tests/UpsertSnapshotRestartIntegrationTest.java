@@ -311,8 +311,10 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
         return false;
       }
     }, 1000L, WAIT_MS, "segments back online after restart");
+    // One row per primary key, from phase 2: a stale or missing snapshot must not bring back phase-1 rows. Check as
+    // soon as every segment is routed to, and again once the cluster has settled.
+    assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
     waitForClusterStateSettled(rtTable, WAIT_MS);
-    // One row per primary key, from phase 2: a stale or missing snapshot must not bring back phase-1 rows
     assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
 
     if (reloadAfterRestart) {

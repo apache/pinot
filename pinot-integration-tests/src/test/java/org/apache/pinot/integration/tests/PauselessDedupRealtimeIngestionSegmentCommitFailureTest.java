@@ -70,9 +70,11 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
   protected void verifyRecoveredRows(String pauselessTableNameWithType)
       throws Exception {
     waitForAllDocsLoaded(pauselessTableNameWithType, 120_000L);
-    for (int i = 0; i < 10; i++) {
-      assertRows(dedupRowsQuery(pauselessTableNameWithType), DEDUP_PAUSELESS_SURVIVORS);
-    }
+    // Dedup keeps the first row per id, so a replica that has not read the duplicates yet already serves these rows:
+    // wait until every replica of both tables consumed the whole stream first
+    waitForAllStreamRecordsConsumed(pauselessTableNameWithType, 120_000L);
+    waitForAllStreamRecordsConsumed(getNonPauselessTableName(), 120_000L);
+    assertRowsFromEveryReplica(dedupRowsQuery(pauselessTableNameWithType), DEDUP_PAUSELESS_SURVIVORS);
     assertRows(dedupRowsQuery(getNonPauselessTableName()), DEDUP_PAUSELESS_SURVIVORS);
   }
 

@@ -67,6 +67,12 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   private static final String PRIMARY_KEY_COL = "playerId";
   private static final String TIME_COL_NAME = "timestampInEpoch";
   public static final String UPSERT_SCHEMA_FILE_NAME = "upsert_table_test.schema";
+  /// Index of the baseline table without commit-time compaction in the array [#createTables] returns
+  private static final int BASELINE = 0;
+  /// Index of the table with commit-time compaction and the row-major segment builder
+  private static final int ROW_MAJOR = 1;
+  /// Index of the table with commit-time compaction and the column-major segment builder
+  private static final int COLUMN_MAJOR = 2;
 
   @BeforeClass
   public void setUp()
@@ -109,7 +115,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
 
     // All three tables serve the latest fixture row per player
     waitForAllDocsLoaded(tables, 60_000L, 10);
-    validateRows(GAME_SCORES_COLUMNS, GAME_SCORES_WINNERS, tables);
+    assertRowsOnTables(GAME_SCORES_COLUMNS, GAME_SCORES_WINNERS, tables);
 
     updateCommitAndValidate(tables, kafkaTopicName,
         List.of("100,Zook-Updated1,counter-strike,1000,1681300000000,false",
@@ -134,7 +140,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         indexingConfig -> indexingConfig.setSortedColumn(List.of("score")));
 
     waitForAllDocsLoaded(tables, 60_000L, 10);
-    validateRows(GAME_SCORES_COLUMNS, GAME_SCORES_WINNERS, tables);
+    assertRowsOnTables(GAME_SCORES_COLUMNS, GAME_SCORES_WINNERS, tables);
 
     // Add more diverse data with different primary keys and varying scores for better sorting validation
     updateCommitAndValidate(tables, kafkaTopicName, List.of("100,Alice Updated,chess,15.5,1681354200000,false",
@@ -169,7 +175,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         indexingConfig -> indexingConfig.setNoDictionaryColumns(List.of("name", "game")));
 
     waitForAllDocsLoaded(tables, 60_000L, 10);
-    validateRows(GAME_SCORES_COLUMNS, GAME_SCORES_WINNERS, tables);
+    assertRowsOnTables(GAME_SCORES_COLUMNS, GAME_SCORES_WINNERS, tables);
 
     updateCommitAndValidate(tables, kafkaTopicName, List.of("100,Alice Raw,chess,95.5,1681354200000,false",
         "101,Bob Raw,poker,88.0,1681354300000,false", "102,Charlie Raw,chess,82.5,1681354400000,false",
@@ -242,7 +248,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // All three tables serve the merged row per player. Out-of-order fixture rows are not merged, and UNION keeps the
     // values sorted.
     waitForAllDocsLoaded(tables, 60_000L, 10);
-    validateRows(GAME_SCORES_COLUMNS, List.of(
+    assertRowsOnTables(GAME_SCORES_COLUMNS, List.of(
         List.of(100, "Zook", List.of("counter-strike"), 2050.0, 1681256400000L, false),
         List.of(101, "Suess", List.of("counter-strike"), 12500.2, 1681258290000L, false),
         List.of(102, "Clifford", List.of("counter-strike"), 102.0, 1681036400000L, false)), tables);
@@ -331,7 +337,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     String levelColumns = "playerId, JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') AS level";
     String levelAboveTen = "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') > 10";
     List<List<Object>> levelsAboveTen = List.of(List.of(400, 12), List.of(401, 18));
-    validateRows(levelColumns, levelAboveTen, levelsAboveTen, tables);
+    assertRowsOnTables(levelColumns, levelAboveTen, levelsAboveTen, tables);
 
     // The push above auto-created the topic with one partition
     commitAndValidate(tables, 1, 5, GAME_SCORES_COLUMNS + ", userAttributes", List.of(
@@ -339,8 +345,8 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         List.of(401, "Player401Updated", "game2", 95.0, 1681154300000L, false, "{\"level\":18}"),
         List.of(402, "Player402", "game3", 78.0, 1681054400000L, false, "{\"level\":8}")));
 
-    validateRows(levelColumns, levelAboveTen, levelsAboveTen, tables);
-    validateRows(levelColumns, "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') IS NOT NULL",
+    assertRowsOnTables(levelColumns, levelAboveTen, levelsAboveTen, tables);
+    assertRowsOnTables(levelColumns, "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') IS NOT NULL",
         List.of(List.of(400, 12), List.of(401, 18), List.of(402, 8)), tables);
 
     cleanupTablesAndSchemas(tables);
@@ -379,13 +385,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // playerId (column 0) is the partition key
     pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
   }
-
-  /// Index of the baseline table without commit-time compaction in the array [#createTables] returns
-  private static final int BASELINE = 0;
-  /// Index of the table with commit-time compaction and the row-major segment builder
-  private static final int ROW_MAJOR = 1;
-  /// Index of the table with commit-time compaction and the column-major segment builder
-  private static final int COLUMN_MAJOR = 2;
 
   /// Creates the three tables every test compares, all consuming the same topic: a baseline table without
   /// commit-time compaction, and two tables with it, built with the row-major and the column-major segment builder.
@@ -493,13 +492,13 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   }
 
   /// Asserts that every table serves exactly the expected rows, ordered by playerId.
-  protected void validateRows(String columns, List<List<Object>> expectedRows, String... tableNames)
+  private void assertRowsOnTables(String columns, List<List<Object>> expectedRows, String... tableNames)
       throws Exception {
-    validateRows(columns, null, expectedRows, tableNames);
+    assertRowsOnTables(columns, null, expectedRows, tableNames);
   }
 
   /// Asserts that every table serves exactly the expected rows that match the filter, ordered by playerId.
-  protected void validateRows(String columns, @Nullable String filter, List<List<Object>> expectedRows,
+  private void assertRowsOnTables(String columns, @Nullable String filter, List<List<Object>> expectedRows,
       String... tableNames)
       throws Exception {
     for (String tableName : tableNames) {
@@ -522,7 +521,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   private void commitAndValidate(String[] tableNames, int numStreamPartitions, long expectedRawDocs, String columns,
       List<List<Object>> expectedRows)
       throws Exception {
-    validateRows(columns, expectedRows, tableNames);
+    assertRowsOnTables(columns, expectedRows, tableNames);
     // One committed and one new consuming segment per partition
     performCommitAndWait(tableNames, 30_000L, 2 * numStreamPartitions, numStreamPartitions);
     validatePostCommitCompaction(tableNames, expectedRawDocs, columns, expectedRows);
@@ -557,7 +556,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     waitForRows(rawRowsQuery(columns, tableNames[COLUMN_MAJOR]), expectedRows, 30_000L);
     assertEquals(getCurrentCountStarResultWithoutUpsert(tableNames[BASELINE]), expectedBaselineRawDocs,
         "Baseline table without commit-time compaction should keep every ingested row");
-    validateRows(columns, expectedRows, tableNames);
+    assertRowsOnTables(columns, expectedRows, tableNames);
   }
 
   protected void cleanupTablesAndSchemas(String[] tableNames) {
@@ -608,7 +607,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         });
 
     waitForAllDocsLoaded(tables, 60_000L, 10);
-    validateRows(GAME_SCORES_COLUMNS, GAME_SCORES_WINNERS, tables);
+    assertRowsOnTables(GAME_SCORES_COLUMNS, GAME_SCORES_WINNERS, tables);
 
     // Updates including deletes of an existing player (101) and of a new player (103)
     pushCsvIntoKafka(List.of("100,Zook-Updated1,counter-strike,1000,1681300000000,false",
@@ -621,9 +620,9 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     List<List<Object>> expectedRows = List.of(
         List.of(100, "Zook-Updated2", "valorant", 1500.0, 1681300003000L, false),
         List.of(102, "Bob-Updated1", "cs2", 3000.0, 1681300002000L, false));
-    validateRows(GAME_SCORES_COLUMNS, expectedRows, tables);
+    assertRowsOnTables(GAME_SCORES_COLUMNS, expectedRows, tables);
     performCommitAndWait(tables, 30_000L, 4, 2);
-    validateRows(GAME_SCORES_COLUMNS, expectedRows, tables);
+    assertRowsOnTables(GAME_SCORES_COLUMNS, expectedRows, tables);
 
     // Compaction keeps the latest row of each player, including the delete rows, and drops the rest
     List<List<Object>> expectedRawRows = List.of(expectedRows.get(0),

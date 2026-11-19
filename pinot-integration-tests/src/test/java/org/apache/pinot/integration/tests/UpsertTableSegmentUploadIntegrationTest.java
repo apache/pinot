@@ -167,12 +167,12 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
         return null;
       }
     }, 100L, timeoutMs, "Failed to load all documents");
-    assertLatestRowPerKey();
+    assertLatestRowPerClientId();
   }
 
   /// The table serves, per clientId, the Avro record with the largest DaysSinceEpoch. The streaming and the uploaded
   /// copies of a record are identical, so it does not matter which copy wins.
-  private void assertLatestRowPerKey()
+  private void assertLatestRowPerClientId()
       throws Exception {
     assertLatestRowPerKey(getTableName(), _avroFiles, PRIMARY_KEY_COL, getTimeColumnName(),
         List.of(PRIMARY_KEY_COL, "city", "description", "salary", getTimeColumnName()));
@@ -191,7 +191,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     // Run the real-time segment validation and check again
     _controllerStarter.getRealtimeSegmentValidationManager().run();
     verifyIdealState(NUM_SEGMENTS);
-    assertLatestRowPerKey();
+    assertLatestRowPerClientId();
     assertEquals(getCurrentCountStarResultWithoutUpsert(getTableName()), getCountStarResultWithoutUpsert());
 
     beforeRestart();

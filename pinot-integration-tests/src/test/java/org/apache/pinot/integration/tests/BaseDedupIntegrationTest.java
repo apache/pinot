@@ -243,19 +243,14 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Validate no change
     assertRows(dedupRowsQuery(getTableName()), DEDUP_SURVIVORS);
-    for (int i = 0; i < 10; i++) {
-      assertRows(dedupRowsQuery(DEDUP_TABLE_WITH_REPLICAS), DEDUP_SURVIVORS);
-    }
+    assertRowsFromEveryReplica(dedupRowsQuery(DEDUP_TABLE_WITH_REPLICAS), DEDUP_SURVIVORS);
   }
 
   //tests the query results when metadataTTL is set with RF>1.
   @Test
   public void testValuesWithReplicas()
       throws Exception {
-    // Query 10 times so that both replica groups answer: the broker picks the replica group by request id in a
-    // round-robin fashion, as the setup checks with getServingServerPort()
-    for (int i = 0; i < 10; i++) {
-      assertRows(dedupRowsQuery(DEDUP_TABLE_WITH_REPLICAS), DEDUP_SURVIVORS);
-    }
+    // Both replica groups answer, as the setup checks with getServingServerPort()
+    assertRowsFromEveryReplica(dedupRowsQuery(DEDUP_TABLE_WITH_REPLICAS), DEDUP_SURVIVORS);
   }
 }

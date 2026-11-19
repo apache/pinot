@@ -184,9 +184,10 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
     // With all its replicas repaired, the lagging server passes the dedup consume gate and catches up, so queries
     // return the deduplicated rows from either replica group.
     waitForAllDocsLoaded(600_000L);
-    for (int i = 0; i < 10; i++) {
-      assertRows(dedupRowsQuery(getTableName()), DEDUP_PAUSELESS_SURVIVORS);
-    }
+    // Dedup keeps the first row per id, so a replica that has not read the duplicates yet already serves these rows:
+    // wait until every replica consumed the whole stream first
+    waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
+    assertRowsFromEveryReplica(dedupRowsQuery(getTableName()), DEDUP_PAUSELESS_SURVIVORS);
   }
 
   private int getNumErrorReplicasInEV(String realtimeTableName) {

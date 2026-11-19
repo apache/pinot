@@ -108,12 +108,15 @@ public class ClusterIntegrationTestUtils {
   ///
   /// This is a test oracle and deliberately does not use the upsert code under test. It covers plain full upsert
   /// only: no delete column, no partial-upsert merge, no null or bytes values. Two records of a key with the same
-  /// comparison value fail it, since which one wins depends on the order of stream partitions and uploaded segments.
+  /// largest comparison value fail it, since which one wins depends on the order of stream partitions and uploaded
+  /// segments.
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static List<List<Object>> latestRowPerKey(List<File> avroFiles, String primaryKeyColumn,
       String comparisonColumn, List<String> columns)
       throws IOException {
     Map<Comparable, GenericRecord> winners = new TreeMap<>();
+    // Keys whose current winner ties with another record on the comparison value
+    Set<Comparable> tiedKeys = new HashSet<>();
     for (File avroFile : avroFiles) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord record : reader) {
@@ -123,16 +126,21 @@ public class ClusterIntegrationTestUtils {
           if (current != null) {
             int comparison =
                 comparisonValue.compareTo(toJavaValue(comparisonColumn, current.get(comparisonColumn)));
-            Preconditions.checkState(comparison != 0, "Records %s and %s tie on %s", current, record,
-                comparisonColumn);
             if (comparison < 0) {
               continue;
             }
+            if (comparison == 0) {
+              tiedKeys.add(key);
+              continue;
+            }
           }
+          tiedKeys.remove(key);
           winners.put(key, record);
         }
       }
     }
+    Preconditions.checkState(tiedKeys.isEmpty(), "Records of keys %s tie on the largest %s", tiedKeys,
+        comparisonColumn);
     List<List<Object>> rows = new ArrayList<>(winners.size());
     for (GenericRecord winner : winners.values()) {
       List<Object> row = new ArrayList<>(columns.size());

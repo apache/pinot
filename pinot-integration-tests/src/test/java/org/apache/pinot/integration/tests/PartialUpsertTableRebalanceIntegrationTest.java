@@ -172,7 +172,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     pushAvroIntoKafka(_avroFiles);
     waitForAllDocsLoaded(600_000L, 300);
-    assertLatestRowPerKey();
+    assertLatestRowPerClientId();
 
     // Partial-upsert tables need PROTECTED consuming segment consistency mode for reload to force-commit
     // consuming segments; RESTRICTED skips force-commit and reload never completes. Set explicitly here
@@ -203,7 +203,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       waitForClusterStateSettled(REALTIME_TABLE_NAME, 4, 5, 60_000L);
       verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
       // The force-committed segments keep the latest row per key
-      assertLatestRowPerKey();
+      assertLatestRowPerClientId();
     } finally {
       deleteClusterConfig(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE);
     }
@@ -419,12 +419,12 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
         return null;
       }
     }, 100L, timeoutMs, "Failed to load all documents");
-    assertLatestRowPerKey();
+    assertLatestRowPerClientId();
   }
 
   /// Every column is non-null and the default strategy is OVERWRITE, so the table serves, per clientId, the Avro
   /// record with the largest DaysSinceEpoch. The streaming and the uploaded copies of a record are identical.
-  private void assertLatestRowPerKey()
+  private void assertLatestRowPerClientId()
       throws Exception {
     assertLatestRowPerKey(getTableName(), _avroFiles, PRIMARY_KEY_COL, getTimeColumnName(),
         List.of(PRIMARY_KEY_COL, "city", "description", "salary", getTimeColumnName()));
