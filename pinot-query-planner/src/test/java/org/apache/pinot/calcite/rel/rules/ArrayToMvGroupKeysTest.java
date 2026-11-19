@@ -29,6 +29,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.type.RelDataType;
@@ -42,6 +43,7 @@ import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -117,6 +119,30 @@ public class ArrayToMvGroupKeysTest {
   @Test
   public void testInputThatIsNotAProjectIsNotDetected() {
     assertTrue(ArrayToMvGroupKeys.detect(groupByAll(_values)).isEmpty());
+  }
+
+  @Test
+  public void testIsArrayToMvColumnTracesFiltersAndPassThroughColumns() {
+    Project project = project(sv(), arrayToMv(arr()));
+    assertTrue(ArrayToMvGroupKeys.isArrayToMvColumn(project, 1));
+    assertFalse(ArrayToMvGroupKeys.isArrayToMvColumn(project, 0));
+
+    RelNode filter = LogicalFilter.create(project,
+        _rexBuilder.makeCall(SqlStdOperatorTable.IS_NOT_NULL, _rexBuilder.makeInputRef(project, 0)));
+    assertTrue(ArrayToMvGroupKeys.isArrayToMvColumn(filter, 1));
+    assertFalse(ArrayToMvGroupKeys.isArrayToMvColumn(filter, 0));
+
+    // The outer Project passes the key on as column 0, and nests it in LOWER as column 2
+    RexNode key = _rexBuilder.makeInputRef(filter, 1);
+    RelNode outer = LogicalProject.create(filter, List.of(),
+        List.of(key, _rexBuilder.makeInputRef(filter, 0), _rexBuilder.makeCall(SqlStdOperatorTable.LOWER, key)),
+        List.of("x", "y", "z"), Set.of());
+    assertTrue(ArrayToMvGroupKeys.isArrayToMvColumn(outer, 0));
+    assertFalse(ArrayToMvGroupKeys.isArrayToMvColumn(outer, 1));
+    assertFalse(ArrayToMvGroupKeys.isArrayToMvColumn(outer, 2));
+
+    // The trace ends at a node that is not a Project or a Filter
+    assertFalse(ArrayToMvGroupKeys.isArrayToMvColumn(_values, 1));
   }
 
   @Test

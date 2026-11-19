@@ -197,6 +197,18 @@ public class MvAggregatePlanTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testFilterOnMvKeyStaysAboveTheAggregateWhenTheKeyComesFromASubquery() {
+    // The filter rule can run while the WHERE of the outer query is still between the aggregate and the Project
+    // with ARRAY_TO_MV. In the plan text, a node comes after its parent.
+    for (String from : List.of("e", "e JOIN a ON e.col1 = a.col1")) {
+      String plan = explain("EXPLAIN PLAN FOR WITH t AS (SELECT ARRAY_TO_MV(e.mcol1) AS x, e.col2 AS c FROM " + from
+          + ") SELECT x, COUNT(*) FROM t WHERE c = 'z' GROUP BY x HAVING x = 'b'");
+      assertTrue(plan.indexOf("'b'") < plan.indexOf("Aggregate"), plan);
+      assertTrue(plan.indexOf("'z'") > plan.lastIndexOf("Aggregate"), plan);
+    }
+  }
+
+  @Test
   public void testFilterOnMvKeyStaysAboveThePlainAggregate() {
     // The same holds when the aggregate reads a table scan and keeps the plain plan
     for (String query : List.of(QUERY, SEMI_JOIN_QUERY)) {

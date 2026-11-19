@@ -24,7 +24,6 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.rules.FilterAggregateTransposeRule;
-import org.apache.calcite.util.ImmutableBitSet;
 
 
 /// Same as [FilterAggregateTransposeRule], except that a filter that reads an MV key of an MV aggregate stays above
@@ -55,10 +54,16 @@ public class PinotFilterAggregateTransposeRule extends FilterAggregateTransposeR
   }
 
   /// Returns whether `filter` reads a group key of `aggregate` that is `ARRAY_TO_MV(expr)`. The group keys are the
-  /// first output columns of the aggregate, and [ArrayToMvGroupKeys#detect] returns positions among them.
+  /// first output columns of the aggregate. This rule can run before the filters under the aggregate are pushed
+  /// down, so the key is traced with [ArrayToMvGroupKeys#isArrayToMvColumn].
   private static boolean readsMvKey(Filter filter, Aggregate aggregate) {
-    List<Integer> mvKeys = ArrayToMvGroupKeys.detect(aggregate);
-    return !mvKeys.isEmpty()
-        && RelOptUtil.InputFinder.bits(filter.getCondition()).intersects(ImmutableBitSet.of(mvKeys));
+    List<Integer> groupColumns = aggregate.getGroupSet().asList();
+    for (int column : RelOptUtil.InputFinder.bits(filter.getCondition())) {
+      if (column < groupColumns.size()
+          && ArrayToMvGroupKeys.isArrayToMvColumn(aggregate.getInput(), groupColumns.get(column))) {
+        return true;
+      }
+    }
+    return false;
   }
 }

@@ -22,9 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
+import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -91,6 +93,22 @@ public final class ArrayToMvGroupKeys {
       columns.add(groupColumns.get(mvKeyIndex));
     }
     return columns;
+  }
+
+  /// Returns whether column `column` of `node` is a call to `ARRAY_TO_MV`, also through `Filter` nodes and through
+  /// `Project` columns that only pass an input column on. The planner rules that run before the filters are pushed
+  /// down see such nodes between an aggregate and the `Project` with the call.
+  public static boolean isArrayToMvColumn(RelNode node, int column) {
+    node = PinotRuleUtils.unboxRel(node);
+    if (node instanceof Filter) {
+      return isArrayToMvColumn(node.getInput(0), column);
+    }
+    if (!(node instanceof Project)) {
+      return false;
+    }
+    RexNode expression = ((Project) node).getProjects().get(column);
+    return isArrayToMvCall(expression) || (expression instanceof RexInputRef && isArrayToMvColumn(node.getInput(0),
+        ((RexInputRef) expression).getIndex()));
   }
 
   /// Returns whether `expression` is a call to `ARRAY_TO_MV` whose operand has the SQL type `ARRAY`.

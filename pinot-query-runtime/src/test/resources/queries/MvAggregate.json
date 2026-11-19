@@ -169,6 +169,24 @@
         "ignoreV2Optimizer": true
       },
       {
+        "description": "A filter on the MV key in HAVING keeps only the matching element when the key comes from a CTE with a WHERE, on a scan",
+        "sql": "WITH t AS (SELECT ARRAY_TO_MV(strMv) AS x, grp FROM {tbl}) SELECT x, COUNT(*) FROM t WHERE grp = 'g1' GROUP BY x HAVING x = 'b'",
+        "outputs": [["b", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "A filter on the MV key in HAVING keeps only the matching element when the key comes from a CTE with a WHERE, above a self-join",
+        "sql": "WITH t AS (SELECT ARRAY_TO_MV(t1.strMv) AS x, t1.grp AS grp FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k) SELECT x, COUNT(*) FROM t WHERE grp = 'g1' GROUP BY x HAVING x = 'b'",
+        "outputs": [["b", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "An outer filter on the MV key of a subquery aggregate with an inner WHERE keeps only the matching element",
+        "sql": "SELECT * FROM (SELECT x, COUNT(*) AS c FROM (SELECT ARRAY_TO_MV(strMv) AS x, sv FROM {tbl}) WHERE sv > 0 GROUP BY x) WHERE x = 'b'",
+        "outputs": [["b", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
         "description": "A filter on the MV key in HAVING keeps only the matching element on a scan with the MV aggregate",
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) = 'b'",
         "outputs": [["b", 2]],
