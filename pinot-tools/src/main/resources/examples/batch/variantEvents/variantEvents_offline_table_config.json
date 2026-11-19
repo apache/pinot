@@ -1,0 +1,39 @@
+{
+  "tableName": "variantEvents",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "replication": "1",
+    "timeColumnName": "eventTime"
+  },
+  "tenants": {},
+  "fieldConfigList": [
+    {
+      "name": "payload",
+      "encodingType": "RAW",
+      "indexes": {
+        "forward": {
+          "compressionCodec": "ZSTANDARD"
+        }
+      }
+    }
+  ],
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "nullHandlingEnabled": true,
+    "invertedIndexColumns": [
+      "eventType"
+    ]
+  },
+  "ingestionConfig": {
+    "transformConfigs": [
+      {
+        "columnName": "eventType",
+        "transformFunction": "variant_get(payload, '$.eventType', 'STRING')"
+      }
+    ]
+  },
+  "metadata": {
+    "customConfigs": {}
+  }
+}

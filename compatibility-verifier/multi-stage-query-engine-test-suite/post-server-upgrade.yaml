@@ -41,3 +41,19 @@ operations:
     useMultiStageQueryEngine: true
     queryFileName: queries/feature-test-multi-stage.queries
     expectedResultsFileName: query-results/feature-test-multi-stage.results
+  - type: queryOp
+    description: Reject the VARIANT wire query without partial rows while the server fleet is mixed
+    runIfSystemProperty: pinot.compat.oldServerSupportsVariant
+    runIfSystemPropertyValue: "false"
+    useMultiStageQueryEngine: true
+    nullHandlingEnabled: true
+    queryFileName: queries/variant-wire-mixed.queries
+    expectedErrorMessageContains: "Caught exception while deserializing stage plan"
+  - type: queryOp
+    description: Run the VARIANT wire query across the mixed fleet when the old server supports the type
+    runIfSystemProperty: pinot.compat.oldServerSupportsVariant
+    runIfSystemPropertyValue: "true"
+    useMultiStageQueryEngine: true
+    nullHandlingEnabled: true
+    queryFileName: queries/variant-wire-mixed.queries
+    expectedResultsFileName: query-results/variant-wire-mixed.results
