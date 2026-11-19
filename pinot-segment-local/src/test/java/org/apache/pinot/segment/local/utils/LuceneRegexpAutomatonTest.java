@@ -38,4 +38,20 @@ public class LuceneRegexpAutomatonTest {
     LuceneRegexpAutomaton.validateConstructionBudget(operand + "*", 20);
     assertTrue(Operations.run(LuceneRegexpAutomaton.compile("prefix.*suffix"), "prefix-suffix"));
   }
+
+  @Test
+  public void testTransitionLinkingBudget() {
+    String operand = "(ab?|cd?|ef?)";
+    assertThrows(IllegalArgumentException.class,
+        () -> LuceneRegexpAutomaton.validateConstructionBudget(operand + "{2}", 20));
+    assertThrows(IllegalArgumentException.class,
+        () -> LuceneRegexpAutomaton.validateConstructionBudget(operand + "{0,2}", 20));
+    assertThrows(IllegalArgumentException.class,
+        () -> LuceneRegexpAutomaton.validateConstructionBudget(operand + operand, 20));
+
+    String optional = operand + "?";
+    assertThrows(IllegalArgumentException.class,
+        () -> LuceneRegexpAutomaton.validateConstructionBudget(optional.repeat(3), 50));
+    assertTrue(Operations.run(LuceneRegexpAutomaton.compile("prefix(ab){2}.*suffix"), "prefixabab-suffix"));
+  }
 }
