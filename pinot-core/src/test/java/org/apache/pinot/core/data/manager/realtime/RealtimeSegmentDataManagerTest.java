@@ -1823,6 +1823,7 @@ public class RealtimeSegmentDataManagerTest {
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     when(instanceDataManagerConfig.getUpsertConfig()).thenReturn(new PinotConfiguration());
     when(instanceDataManagerConfig.getDedupConfig()).thenReturn(new PinotConfiguration());
+    when(instanceDataManagerConfig.getConfig()).thenReturn(new PinotConfiguration());
     TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
     tableDataManagerProvider.init(instanceDataManagerConfig,
         mock(HelixManager.class),

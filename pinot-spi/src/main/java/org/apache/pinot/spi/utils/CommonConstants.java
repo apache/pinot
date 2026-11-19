@@ -2125,6 +2125,11 @@ public class CommonConstants {
         "pinot.server.environmentProvider.factory";
     public static final String ENVIRONMENT_PROVIDER_CLASS_NAME = "pinot.server.environmentProvider.className";
 
+    public static final String CONFIG_OF_PERIODIC_OFFSET_LAG_TRACKING_ENABLED =
+        "periodic.offset.lag.tracking.enabled";
+    // Stream support is checked separately, so true preserves the existing per-stream behavior.
+    public static final boolean DEFAULT_PERIODIC_OFFSET_LAG_TRACKING_ENABLED = true;
+
     /// All the keys should be prefixed with [#INSTANCE_DATA_MANAGER_CONFIG_PREFIX]
     public static class Upsert {
       public static final String CONFIG_PREFIX = "upsert";
