@@ -39,6 +39,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.ConfigChangeListenerConstants;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -534,6 +535,8 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Wait for segments to be committed
     for (String tableName : tableNames) {
       waitForNumQueriedSegmentsToConverge(tableName, waitTimeoutMs, expectedSegments, expectedConsumingSegments);
+      waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(tableName), expectedSegments, 5,
+          waitTimeoutMs);
     }
   }
 

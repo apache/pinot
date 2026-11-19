@@ -238,6 +238,8 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     pushAvroIntoKafka(_avroFiles);
     waitForAllStreamRecordsConsumed(getTableName(), 60_000L);
     waitForAllStreamRecordsConsumed(DEDUP_TABLE_WITH_REPLICAS, 60_000L);
+    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(getTableName()), 60_000L);
+    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(DEDUP_TABLE_WITH_REPLICAS), 60_000L);
 
     // Validate no change
     assertRows(dedupRowsQuery(getTableName()), DEDUP_SURVIVORS);

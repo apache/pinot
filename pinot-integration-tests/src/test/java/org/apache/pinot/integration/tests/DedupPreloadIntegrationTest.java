@@ -39,6 +39,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -134,6 +135,7 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
     restartServers();
     waitForRows(query, DEDUP_SURVIVORS, 600_000L);
     waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
+    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(getTableName()), 600_000L);
     assertRows(query, DEDUP_SURVIVORS);
   }
 

@@ -46,6 +46,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
@@ -153,6 +154,7 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
     waitForAllDocsLoaded(TOTAL_RAW_RECORDS, timeoutMs);
+    waitForClusterStateSettled(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), timeoutMs);
     assertRows(ROWS_QUERY, List.of(ROW_100, ROW_101, ROW_102));
   }
 
@@ -187,9 +189,14 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
     uploadSegments(TABLE_NAME, newTarDir);
 
     waitForAllDocsLoaded(TOTAL_RAW_RECORDS + 1, 600_000L);
+    waitForClusterStateSettled(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), 600_000L);
 
     // The uploaded row replaces player 100; the other players keep their rows
-    assertRows(ROWS_QUERY, List.of(List.of(100, "UpdatedPlayer", "chess", 9999.0, 1691036400000L), ROW_101, ROW_102));
+    List<Object> updatedRow100 = List.of(100, "UpdatedPlayer", "chess", 9999.0, 1691036400000L);
+    assertRows(ROWS_QUERY, List.of(updatedRow100, ROW_101, ROW_102));
+    // Every uploaded row is still stored, the new one included
+    assertRows(RAW_ROWS_QUERY,
+        List.of(ROW_100_OLD, ROW_100, updatedRow100, ROW_101_OLD, ROW_101, ROW_102_OLD, ROW_102));
   }
 
   private void waitForAllDocsLoaded(int expectedRawRecords, long timeoutMs) {

@@ -67,7 +67,6 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.ConsumingSegmentInfo;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap;
@@ -1167,9 +1166,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return message.toString();
   }
 
+  /// Like [#waitForClusterStateSettled(String, int, int, long)] for any number of segments: waits until the
+  /// ExternalView of the table (OFFLINE or REALTIME) equals its IdealState with no OFFLINE segment, so the next row
+  /// check reads every segment from where it is assigned.
+  protected void waitForClusterStateSettled(String tableNameWithType, long timeoutMs) {
+    waitForClusterStateSettled(tableNameWithType, -1, 5, timeoutMs);
+  }
+
   /// Waits until the cluster state has settled after a reload, rebalance or restart:
   ///
-  /// - IdealState has `expectedSegments` entries.
+  /// - IdealState has `expectedSegments` entries (any number when negative).
   /// - No segment in IdealState has any instance in OFFLINE state.
   /// - ExternalView equals IdealState (queries route via ExternalView, so this is required
   ///   before asserting on IdealState).
@@ -1181,13 +1187,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       long timeoutMs) {
     AtomicInteger streak = new AtomicInteger(0);
     TestUtils.waitForCondition(aVoid -> {
-      IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
+      IdealState idealState = getHelixResourceManager().getTableIdealState(tableNameWithType);
       if (idealState == null) {
         streak.set(0);
         return false;
       }
       Map<String, Map<String, String>> isMap = idealState.getRecord().getMapFields();
-      if (isMap.size() != expectedSegments) {
+      if (expectedSegments >= 0 && isMap.size() != expectedSegments) {
         streak.set(0);
         return false;
       }
@@ -1198,8 +1204,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         streak.set(0);
         return false;
       }
-      ExternalView externalView =
-          HelixHelper.getExternalViewForResource(_helixAdmin, getHelixClusterName(), tableNameWithType);
+      ExternalView externalView = getHelixResourceManager().getTableExternalView(tableNameWithType);
       if (externalView == null || !isMap.equals(externalView.getRecord().getMapFields())) {
         streak.set(0);
         return false;
@@ -1227,7 +1232,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     try {
       TestUtils.waitForCondition(aVoid -> {
         try {
-          IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
+          IdealState idealState = getHelixResourceManager().getTableIdealState(realtimeTableName);
           ConsumingSegmentsInfoMap info = getOrCreateAdminClient().getTableClient()
               .getConsumingSegmentsInfo(realtimeTableName, ConsumingSegmentsInfoMap.class);
           Map<String, Map<String, Map<String, String>>> segmentToServerLags = new HashMap<>();

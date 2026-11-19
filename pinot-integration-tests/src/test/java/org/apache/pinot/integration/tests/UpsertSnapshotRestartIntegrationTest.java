@@ -311,6 +311,7 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
         return false;
       }
     }, 1000L, WAIT_MS, "segments back online after restart");
+    waitForClusterStateSettled(rtTable, WAIT_MS);
     // One row per primary key, from phase 2: a stale or missing snapshot must not bring back phase-1 rows
     assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
 
@@ -323,6 +324,7 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
           return false;
         }
       }, 1000L, WAIT_MS, "reload job finished");
+      waitForClusterStateSettled(rtTable, WAIT_MS);
       assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
     }
     dropRealtimeTable(table);
