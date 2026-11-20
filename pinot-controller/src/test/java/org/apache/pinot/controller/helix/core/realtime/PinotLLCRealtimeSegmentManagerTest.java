@@ -72,6 +72,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.BatchConfig;
 import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
@@ -1772,6 +1773,54 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     segmentZKMetadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
     Assert.assertEquals(segmentZKMetadata.getDownloadUrl(), "");
+  }
+
+  @DataProvider(name = "terminalCommitModes")
+  public Object[][] terminalCommitModes() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "terminalCommitModes")
+  public void testCommittedEndOfPartitionStopsEmptySuccessorCommits(boolean pauseless) {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager() {
+      @Override
+      List<StreamMetadata> getNewStreamMetadataList(List<StreamConfig> streamConfigs,
+          List<PartitionGroupConsumptionStatus> statuses, IdealState idealState) {
+        if (statuses.isEmpty()) {
+          return super.getNewStreamMetadataList(streamConfigs, statuses, idealState);
+        }
+        // Simulate a provider that cannot independently verify EOF but honors the persisted terminal checkpoint.
+        List<PartitionGroupMetadata> partitions = statuses.stream().filter(status -> !status.isEndOfPartitionGroup())
+            .map(status -> new PartitionGroupMetadata(status.getPartitionGroupId(), PARTITION_OFFSET)).toList();
+        return List.of(new StreamMetadata(streamConfigs.get(0), partitions.size(), partitions));
+      }
+    };
+    setUpNewTable(segmentManager, 2, 5, 2);
+    segmentManager._streamMetadataList = List.of();
+    String terminalSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String otherSegment = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
+    CommittingSegmentDescriptor terminalCommit = createCommittingSegmentDescriptor(terminalSegment);
+    terminalCommit.setStopReason(SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP);
+    String terminalSuccessor = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    if (pauseless) {
+      segmentManager.commitSegmentMetadataToCommitting(REALTIME_TABLE_NAME, terminalCommit);
+      assertFalse(segmentManager._segmentZKMetadataMap.containsKey(terminalSuccessor));
+      // A retry or an older sender may omit the reason from commit end. The recorded offset still supplies it.
+      terminalCommit.setStopReason(null);
+      segmentManager.commitSegmentMetadataToDone(REALTIME_TABLE_NAME, terminalCommit);
+    } else {
+      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, terminalCommit);
+    }
+    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, createCommittingSegmentDescriptor(otherSegment));
+
+    String otherSuccessor = new LLCSegmentName(RAW_TABLE_NAME, 1, 1, CURRENT_TIME_MS).getSegmentName();
+    assertFalse(segmentManager._segmentZKMetadataMap.containsKey(terminalSuccessor));
+    assertTrue(segmentManager._segmentZKMetadataMap.containsKey(otherSuccessor));
+    SegmentZKMetadata persisted = segmentManager._segmentZKMetadataMap.get(terminalSegment);
+    List<PartitionGroupConsumptionStatus> recovered = segmentManager.buildPartitionGroupConsumptionStatusFromZKMetadata(
+        Map.of(0, new SegmentZKMetadata(persisted.toZNRecord())), segmentManager._streamConfigs);
+    assertTrue(recovered.get(0).isEndOfPartitionGroup());
+    assertEquals(recovered.get(0).getEndOffset().toString(), terminalCommit.getNextOffset());
   }
 
   @Test

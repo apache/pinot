@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
@@ -55,6 +55,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.expectThrows;
 
 
 public class KinesisStreamMetadataProviderTest {
@@ -62,6 +64,7 @@ public class KinesisStreamMetadataProviderTest {
   private static final String AWS_REGION = "us-west-2";
   private static final String SHARD_ID_0 = "0";
   private static final String SHARD_ID_1 = "1";
+  private static final String SHARD_ID_2 = "2";
   private static final String CLIENT_ID = "dummy";
   private static final int TIMEOUT = 1000;
 
@@ -223,23 +226,12 @@ public class KinesisStreamMetadataProviderTest {
     Assert.assertEquals(result.get(0).getPartitionGroupId(), 1);
     Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
 
-    // Closed shard + only empty non-EOP polls: assume ended (parent removed). Previously this incorrectly
-    // kept the parent live and blocked child shards / caused empty commit loops (#17209).
-    when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture()))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0));
-
-    result =
-        _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),
-            currentPartitionGroupMeta, TIMEOUT);
-
-    Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0).getPartitionGroupId(), 1);
+    // An empty fetch with a live iterator may still have unread records ahead.
+    when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture())).thenReturn(
+        new KinesisMessageBatch(List.of(), kinesisPartitionGroupOffset, false, 0));
+    result = _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),
+        currentPartitionGroupMeta, TIMEOUT);
+    assertEquals(result.stream().map(PartitionGroupMetadata::getPartitionGroupId).sorted().toList(), List.of(0, 1));
   }
 
   @Test
@@ -283,64 +275,37 @@ public class KinesisStreamMetadataProviderTest {
   @Test
   public void testClosedShardSequenceNumberShortCircuit()
       throws Exception {
-    // Checkpoint at/beyond ending SN ⇒ fully consumed without GetRecords.
-    KinesisPartitionGroupOffset endOffset = new KinesisPartitionGroupOffset(SHARD_ID_0, "100");
-    List<PartitionGroupConsumptionStatus> currentPartitionGroupMeta = List.of(
-        new PartitionGroupConsumptionStatus(0, 1, endOffset, endOffset, "DONE"));
+    String endingSequence = "999999999999999999999999999999999999999";
+    KinesisPartitionGroupOffset endOffset = new KinesisPartitionGroupOffset(SHARD_ID_0, endingSequence);
+    PartitionGroupConsumptionStatus status = new PartitionGroupConsumptionStatus(0, 1, endOffset, endOffset, "DONE");
+    when(_kinesisConnectionHandler.getShards()).thenReturn(
+        List.of(closedShard(SHARD_ID_0, endingSequence), childShard()));
 
-    Shard closedParent = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(
-        SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("100").build()).build();
-    Shard child = Shard.builder().shardId(SHARD_ID_1).parentShardId(SHARD_ID_0)
-        .sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
-    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(closedParent, child));
-
-    List<PartitionGroupMetadata> result =
-        _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),
-            currentPartitionGroupMeta, TIMEOUT);
-
-    Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0).getPartitionGroupId(), 1);
+    assertEquals(partitionIds(_kinesisStreamMetadataProvider, getStreamConfig(), List.of(status), TIMEOUT), List.of(1));
     verify(_streamConsumerFactory, never()).createPartitionGroupConsumer(anyString(), any());
-
-    // Also true when checkpoint is past ending (defensive).
-    Assert.assertTrue(KinesisStreamMetadataProvider.hasConsumedThroughEndingSequence(
-        new KinesisPartitionGroupOffset(SHARD_ID_0, "150"), "100"));
-    Assert.assertTrue(KinesisStreamMetadataProvider.hasConsumedThroughEndingSequence(
-        new KinesisPartitionGroupOffset(SHARD_ID_0, "100"), "100"));
-    Assert.assertFalse(KinesisStreamMetadataProvider.hasConsumedThroughEndingSequence(
-        new KinesisPartitionGroupOffset(SHARD_ID_0, "99"), "100"));
-    // BigInteger compare — string compare would get "9" > "100" wrong for unequal lengths.
-    Assert.assertFalse(KinesisStreamMetadataProvider.hasConsumedThroughEndingSequence(
-        new KinesisPartitionGroupOffset(SHARD_ID_0, "9"), "100"));
-    Assert.assertTrue(KinesisStreamMetadataProvider.hasConsumedThroughEndingSequence(
-        new KinesisPartitionGroupOffset(SHARD_ID_0, "1000"), "100"));
   }
 
   @Test
-  public void testClosedShardEmptyOnlyProbesAssumeEndedAndAdmitChild()
+  public void testEmptyFetchesRetainParentUntilCommittedTerminalSignal()
       throws Exception {
     KinesisPartitionGroupOffset endOffset = new KinesisPartitionGroupOffset(SHARD_ID_0, "1");
-    List<PartitionGroupConsumptionStatus> currentPartitionGroupMeta = List.of(
-        new PartitionGroupConsumptionStatus(0, 1, endOffset, endOffset, "DONE"));
+    PartitionGroupConsumptionStatus status = new PartitionGroupConsumptionStatus(0, 1, endOffset, endOffset, "DONE");
+    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(closedShard(SHARD_ID_0, "100"), childShard()));
+    when(_streamConsumerFactory.createPartitionGroupConsumer(anyString(), any())).thenReturn(_partitionGroupConsumer);
+    KinesisMessageBatch empty = new KinesisMessageBatch(List.of(), endOffset, false, 0);
+    BytesStreamMessage record = new BytesStreamMessage(new byte[]{1},
+        new StreamMessageMetadata.Builder().setOffset(endOffset, endOffset).setRecordIngestionTimeMs(1L).build());
+    when(_partitionGroupConsumer.fetchMessages(any(), anyInt())).thenReturn(empty, empty, empty, empty, empty,
+        new KinesisMessageBatch(List.of(record), endOffset, true, 1));
 
-    Shard closedParent = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(
-        SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("100").build()).build();
-    Shard child = Shard.builder().shardId(SHARD_ID_1).parentShardId(SHARD_ID_0)
-        .sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
-    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(closedParent, child));
-    when(_streamConsumerFactory.createPartitionGroupConsumer(anyString(), any()))
-        .thenReturn(_partitionGroupConsumer);
-    when(_partitionGroupConsumer.fetchMessages(any(), anyInt()))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), endOffset, false, 0));
+    assertEquals(partitionIds(_kinesisStreamMetadataProvider, getStreamConfig(), List.of(status), TIMEOUT), List.of(0));
+    assertEquals(partitionIds(_kinesisStreamMetadataProvider, getStreamConfig(), List.of(status), TIMEOUT), List.of(0));
+    verify(_partitionGroupConsumer, times(6)).fetchMessages(any(), anyInt());
 
-    List<PartitionGroupMetadata> result =
-        _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),
-            currentPartitionGroupMeta, TIMEOUT);
-
-    Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0).getPartitionGroupId(), 1);
-    verify(_partitionGroupConsumer, times(KinesisStreamMetadataProvider.MAX_END_OF_SHARD_EMPTY_PROBES))
-        .fetchMessages(any(), anyInt());
+    // The next committed segment provides definitive evidence, even if a probe would be throttled again.
+    status.setEndOfPartitionGroup(true);
+    assertEquals(partitionIds(_kinesisStreamMetadataProvider, getStreamConfig(), List.of(status), TIMEOUT), List.of(1));
+    verify(_partitionGroupConsumer, times(6)).fetchMessages(any(), anyInt());
   }
 
   @Test
@@ -361,7 +326,7 @@ public class KinesisStreamMetadataProviderTest {
     BytesStreamMessage remaining = new BytesStreamMessage(new byte[]{1},
         new StreamMessageMetadata.Builder().setOffset(endOffset, endOffset).setRecordIngestionTimeMs(1L).build());
     when(_partitionGroupConsumer.fetchMessages(any(), anyInt()))
-        .thenReturn(new KinesisMessageBatch(List.of(remaining), endOffset, false, 1));
+        .thenReturn(new KinesisMessageBatch(List.of(remaining), endOffset, true, 1));
 
     List<PartitionGroupMetadata> result =
         _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),
@@ -394,124 +359,79 @@ public class KinesisStreamMetadataProviderTest {
   }
 
   @Test
-  public void testThrottleEmptiesThenEopAssumesEnded()
+  public void testOneMillisecondBudgetRetainsParentAfterLiveEmptyAndThrottling()
       throws Exception {
-    // Rate-limit/timeout empties burn most of the fetch timeout and must not exhaust the hard empty-probe
-    // budget before a later real EOP can be observed.
-    KinesisPartitionGroupOffset endOffset = new KinesisPartitionGroupOffset(SHARD_ID_0, "1");
-    List<PartitionGroupConsumptionStatus> currentPartitionGroupMeta = List.of(
-        new PartitionGroupConsumptionStatus(0, 1, endOffset, endOffset, "DONE"));
-
-    Shard closedParent = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(
-        SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("100").build()).build();
-    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(closedParent));
-
-    StreamConfig streamConfig = getStreamConfig(100);
-    AtomicLong nowMs = new AtomicLong(1_000_000L);
-    AtomicInteger fetchCount = new AtomicInteger();
-    KinesisStreamMetadataProvider provider = providerWithClock(streamConfig, nowMs);
-
-    when(_streamConsumerFactory.createPartitionGroupConsumer(anyString(), any()))
-        .thenReturn(_partitionGroupConsumer);
-    when(_partitionGroupConsumer.fetchMessages(any(), anyInt())).thenAnswer(invocation -> {
-      int n = fetchCount.incrementAndGet();
-      int timeoutMs = invocation.getArgument(1);
-      // First several responses simulate throttle/timeout empties (consume most of timeout).
-      if (n <= 6) {
-        nowMs.addAndGet(Math.max(timeoutMs * 3L / 4L, 1L));
-        return new KinesisMessageBatch(List.of(), endOffset, false, 0);
-      }
-      // Then real EOP
-      return new KinesisMessageBatch(List.of(), endOffset, true, 0);
-    });
-
-    List<PartitionGroupMetadata> result =
-        provider.computePartitionGroupMetadata(CLIENT_ID, streamConfig, currentPartitionGroupMeta, TIMEOUT);
-
-    Assert.assertEquals(result.size(), 0);
-    Assert.assertTrue(fetchCount.get() >= 7, "expected throttle empties then EOP, fetches=" + fetchCount.get());
-  }
-
-  @Test
-  public void testOneMsFetchTimeoutFastEmptiesStillEndShard()
-      throws Exception {
-    // fetchTimeoutMs = 1 rounds the 3/4-of-timeout transient threshold down to 0. Without the Math.max(1, ...)
-    // clamp every instant empty batch looks like a throttle, emptyProbes never increments, and the closed parent
-    // is kept live forever (#17209 empty commit loop).
-    KinesisPartitionGroupOffset endOffset = new KinesisPartitionGroupOffset(SHARD_ID_0, "1");
-    List<PartitionGroupConsumptionStatus> currentPartitionGroupMeta = List.of(
-        new PartitionGroupConsumptionStatus(0, 1, endOffset, endOffset, "DONE"));
-
-    Shard closedParent = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(
-        SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("100").build()).build();
-    Shard child = Shard.builder().shardId(SHARD_ID_1).parentShardId(SHARD_ID_0)
-        .sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
-    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(closedParent, child));
-    when(_streamConsumerFactory.createPartitionGroupConsumer(anyString(), any()))
-        .thenReturn(_partitionGroupConsumer);
-
-    AtomicInteger fetchCount = new AtomicInteger();
-    AtomicInteger lastFetchTimeoutMs = new AtomicInteger();
-    // Clock never advances: every empty batch comes back in 0ms, i.e. a hard (non-throttle) empty.
-    when(_partitionGroupConsumer.fetchMessages(any(), anyInt())).thenAnswer(invocation -> {
-      int timeoutMs = invocation.getArgument(1);
-      lastFetchTimeoutMs.set(timeoutMs);
-      fetchCount.incrementAndGet();
-      return new KinesisMessageBatch(List.of(), endOffset, false, 0);
+    KinesisPartitionGroupOffset offset = new KinesisPartitionGroupOffset(SHARD_ID_0, "1");
+    PartitionGroupConsumptionStatus status = new PartitionGroupConsumptionStatus(0, 1, offset, offset, "DONE");
+    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(closedShard(SHARD_ID_0, "100"), childShard()));
+    when(_streamConsumerFactory.createPartitionGroupConsumer(anyString(), any())).thenReturn(_partitionGroupConsumer);
+    AtomicLong nowMs = new AtomicLong(100);
+    KinesisMessageBatch empty = new KinesisMessageBatch(List.of(), offset, false, 0);
+    when(_partitionGroupConsumer.fetchMessages(offset, 1)).thenReturn(empty).thenAnswer(invocation -> {
+      nowMs.incrementAndGet();
+      return empty;
     });
 
     StreamConfig streamConfig = getStreamConfig(1);
-    List<PartitionGroupMetadata> result = providerWithClock(streamConfig, new AtomicLong(1_000_000L))
-        .computePartitionGroupMetadata(CLIENT_ID, streamConfig, currentPartitionGroupMeta, TIMEOUT);
-
-    Assert.assertEquals(lastFetchTimeoutMs.get(), 1);
-    // Closed parent with only hard empties: ends after the probe budget and the child is admitted.
-    Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0).getPartitionGroupId(), 1);
-    Assert.assertEquals(fetchCount.get(), KinesisStreamMetadataProvider.MAX_END_OF_SHARD_EMPTY_PROBES);
+    KinesisStreamMetadataProvider provider = providerWithClock(streamConfig, nowMs);
+    assertEquals(partitionIds(provider, streamConfig, List.of(status), 1), List.of(0));
+    verify(_partitionGroupConsumer, times(2)).fetchMessages(offset, 1);
   }
 
   @Test
-  public void testNearDeadlineShrunkTimeoutStillEndsShard()
+  public void testMalformedAndWrongShardCheckpointsDoNotRetireParent()
       throws Exception {
-    // Same rounding edge on a normal 100ms config: one throttle empty burns the time budget down to 1ms, which
-    // clamps every later fetch timeout to 1ms.
-    KinesisPartitionGroupOffset endOffset = new KinesisPartitionGroupOffset(SHARD_ID_0, "1");
-    List<PartitionGroupConsumptionStatus> currentPartitionGroupMeta = List.of(
-        new PartitionGroupConsumptionStatus(0, 1, endOffset, endOffset, "DONE"));
+    KinesisPartitionGroupOffset start = new KinesisPartitionGroupOffset(SHARD_ID_0, "1");
+    KinesisPartitionGroupOffset malformed = new KinesisPartitionGroupOffset(SHARD_ID_0, "<>");
+    KinesisPartitionGroupOffset wrongShard = new KinesisPartitionGroupOffset(SHARD_ID_1, "999");
+    PartitionGroupConsumptionStatus status = new PartitionGroupConsumptionStatus(0, 1, start, malformed, "DONE");
+    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(closedShard(SHARD_ID_0, "100"), childShard()));
 
-    Shard closedParent = Shard.builder().shardId(SHARD_ID_0).sequenceNumberRange(
-        SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("100").build()).build();
-    Shard child = Shard.builder().shardId(SHARD_ID_1).parentShardId(SHARD_ID_0)
+    assertEquals(partitionIds(_kinesisStreamMetadataProvider, getStreamConfig(), List.of(status), TIMEOUT), List.of(0));
+    status.setEndOfPartitionGroup(true);
+    assertEquals(partitionIds(_kinesisStreamMetadataProvider, getStreamConfig(), List.of(status), TIMEOUT), List.of(1));
+    status.setEndOffset(wrongShard);
+    expectThrows(IOException.class,
+        () -> partitionIds(_kinesisStreamMetadataProvider, getStreamConfig(), List.of(status), TIMEOUT));
+    verify(_streamConsumerFactory, never()).createPartitionGroupConsumer(anyString(), any());
+  }
+
+  @Test
+  public void testMergeWaitsForBothParents()
+      throws Exception {
+    KinesisPartitionGroupOffset first = new KinesisPartitionGroupOffset(SHARD_ID_0, "100");
+    KinesisPartitionGroupOffset second = new KinesisPartitionGroupOffset(SHARD_ID_1, "1");
+    PartitionGroupConsumptionStatus firstStatus = new PartitionGroupConsumptionStatus(0, 1, first, first, "DONE");
+    PartitionGroupConsumptionStatus secondStatus = new PartitionGroupConsumptionStatus(1, 1, second, null, "CONSUMING");
+    Shard merged = Shard.builder().shardId(SHARD_ID_2).parentShardId(SHARD_ID_0).adjacentParentShardId(SHARD_ID_1)
         .sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
-    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(closedParent, child));
-    when(_streamConsumerFactory.createPartitionGroupConsumer(anyString(), any()))
-        .thenReturn(_partitionGroupConsumer);
+    Shard primary = closedShard(SHARD_ID_0, "100");
+    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(primary, closedShard(SHARD_ID_1, "100"), merged));
 
-    int fetchTimeoutMs = 100;
-    StreamConfig streamConfig = getStreamConfig(fetchTimeoutMs);
-    long timeBudgetMs = (long) fetchTimeoutMs * KinesisStreamMetadataProvider.MAX_END_OF_SHARD_EMPTY_PROBES;
-    AtomicLong nowMs = new AtomicLong(1_000_000L);
-    AtomicInteger fetchCount = new AtomicInteger();
-    AtomicInteger lastFetchTimeoutMs = new AtomicInteger();
-    when(_partitionGroupConsumer.fetchMessages(any(), anyInt())).thenAnswer(invocation -> {
-      int timeoutMs = invocation.getArgument(1);
-      lastFetchTimeoutMs.set(timeoutMs);
-      if (fetchCount.incrementAndGet() == 1) {
-        // Throttle empty: burns the whole fetch timeout and leaves 1ms of time budget.
-        nowMs.addAndGet(timeBudgetMs - 1);
-      }
-      return new KinesisMessageBatch(List.of(), endOffset, false, 0);
-    });
+    List<PartitionGroupConsumptionStatus> statuses = List.of(firstStatus, secondStatus);
+    assertEquals(partitionIds(_kinesisStreamMetadataProvider, getStreamConfig(), statuses, TIMEOUT), List.of(1));
+    secondStatus.setEndOffset(second);
+    secondStatus.setEndOfPartitionGroup(true);
+    assertEquals(partitionIds(_kinesisStreamMetadataProvider, getStreamConfig(), statuses, TIMEOUT), List.of(2));
+    when(_kinesisConnectionHandler.getShards()).thenReturn(List.of(primary, merged));
+    assertEquals(partitionIds(_kinesisStreamMetadataProvider, getStreamConfig(), statuses, TIMEOUT), List.of(2));
+  }
 
-    List<PartitionGroupMetadata> result = providerWithClock(streamConfig, nowMs)
-        .computePartitionGroupMetadata(CLIENT_ID, streamConfig, currentPartitionGroupMeta, TIMEOUT);
+  private static Shard closedShard(String id, String endingSequence) {
+    return Shard.builder().shardId(id).sequenceNumberRange(
+        SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber(endingSequence).build()).build();
+  }
 
-    Assert.assertEquals(lastFetchTimeoutMs.get(), 1);
-    Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0).getPartitionGroupId(), 1);
-    // One transient (throttle) empty, then MAX_END_OF_SHARD_EMPTY_PROBES hard empties at the clamped 1ms timeout.
-    Assert.assertEquals(fetchCount.get(), KinesisStreamMetadataProvider.MAX_END_OF_SHARD_EMPTY_PROBES + 1);
+  private static Shard childShard() {
+    return Shard.builder().shardId(SHARD_ID_1).parentShardId(SHARD_ID_0)
+        .sequenceNumberRange(SequenceNumberRange.builder().startingSequenceNumber("1").build()).build();
+  }
+
+  private static List<Integer> partitionIds(KinesisStreamMetadataProvider provider, StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> statuses, int timeoutMs)
+      throws Exception {
+    return provider.computePartitionGroupMetadata(CLIENT_ID, streamConfig, statuses, timeoutMs)
+        .stream().map(PartitionGroupMetadata::getPartitionGroupId).sorted().toList();
   }
 
   @Test
