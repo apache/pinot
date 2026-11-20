@@ -534,7 +534,7 @@ public class AggregationFunctionUtils {
           } else {
             combinedFilterOperator =
                 new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions(),
-                    queryContext.isAndRestrictionPushdownEnabled());
+                    queryContext.getAndRestrictionPushdown());
           }
 
           List<Pair<Predicate, PredicateEvaluator>> subPredicateEvaluators = subFilterPlan.getPredicateEvaluators();

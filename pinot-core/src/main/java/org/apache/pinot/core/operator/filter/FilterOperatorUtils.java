@@ -175,7 +175,7 @@ public class FilterOperatorUtils {
         // Return the AND filter operator with re-ordered child filter operators
         reorderAndFilterChildOperators(queryContext, childFilterOperators);
         return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
-            queryContext.isNullHandlingEnabled(), queryContext.isAndRestrictionPushdownEnabled());
+            queryContext.isNullHandlingEnabled(), queryContext.getAndRestrictionPushdown());
       }
     }
 
@@ -200,7 +200,7 @@ public class FilterOperatorUtils {
       } else {
         // Return the OR filter operator with child filter operators
         return new OrFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
-            queryContext.isNullHandlingEnabled(), queryContext.isAndRestrictionPushdownEnabled());
+            queryContext.isNullHandlingEnabled(), queryContext.getAndRestrictionPushdown());
       }
     }
 

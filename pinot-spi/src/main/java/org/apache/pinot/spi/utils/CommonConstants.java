@@ -1721,16 +1721,23 @@ public class CommonConstants {
     public static final AndRestrictionPushdownMode DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE =
         AndRestrictionPushdownMode.NEVER;
 
-    /// How aggressively an AND pushes the document ids it has matched so far into its composite children.
+    /// How an AND pushes the document ids it has matched so far into its other children.
+    ///
+    /// A query with a row-level security filter always pushes the restriction down: for it, `NEVER` behaves as
+    /// `AUTO`, and only a supported single WHERE predicate can stream.
     public enum AndRestrictionPushdownMode {
-      /// Always push the restriction down.
+      /// Always push the restriction down eagerly: every step materializes its result. Fastest for a query that reads
+      /// every matching document.
       ALWAYS,
       /// Never push the restriction down, keeping the behavior Pinot had before the push-down existed.
       NEVER,
-      /// Push the restriction down unless the query can stop before reading every matching document. The push-down
-      /// materializes the filter result, so applying it to a query that stops at its LIMIT makes it do the full
-      /// filter work instead of only enough to fill the result.
-      AUTO
+      /// Push the restriction down eagerly for aggregation and group-by queries with a positive LIMIT. Other queries
+      /// without row-level security run with push-down off.
+      AUTO,
+      /// Push the restriction down as a stream for eligible unordered finite LIMIT selections whose operators close
+      /// their readers at LIMIT, and eagerly for other queries.
+      /// A server that predates this value rejects a query that sets it.
+      STREAMING
     }
 
     // Group-by query related configs

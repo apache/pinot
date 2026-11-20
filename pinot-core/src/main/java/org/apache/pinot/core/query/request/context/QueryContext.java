@@ -38,6 +38,7 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
@@ -127,9 +128,9 @@ public class QueryContext implements QueryScopedCache {
   private final LongAdder _rowFilterTimeNs = new LongAdder();
   // Entries scanned to materialize the row-level security bitmap, summed over the segments. Kept out of the response.
   private final LongAdder _rowFilterNumEntriesScanned = new LongAdder();
-  // Whether an AND may push the document ids it has matched into its composite (AND/OR/NOT) children.
+  // How an AND pushes the document ids it has matched into its children.
   // Resolved from the query option and the server default by InstancePlanMakerImplV2#applyQueryOptions.
-  private boolean _andRestrictionPushdownEnabled;
+  private AndRestrictionPushdown _andRestrictionPushdown = AndRestrictionPushdown.OFF;
   // Maximum number of threads used to execute the query
   private int _maxExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
   // The following properties apply to group-by queries
@@ -581,19 +582,32 @@ public class QueryContext implements QueryScopedCache {
     _skipScanFilterReorder = skipScanFilterReorder;
   }
 
-  /// Whether an AND may hand the document ids matched by its index-based children to its composite (AND/OR/NOT)
-  /// children, so that a scan-based predicate nested inside an OR is only evaluated on the documents that can still
-  /// match. See [org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode].
+  /// How an AND hands the document ids matched by its index-based children to its other children, so that a
+  /// scan-based predicate, also one nested inside an OR, is only evaluated on the documents that can still match. See
+  /// [org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode].
   ///
-  /// Always `true` for a query with a row-level security filter, whatever the query option and the server default
-  /// say: every nested AND must restrict its composite children to the documents the RLS filter matches, so that no
-  /// user expression is evaluated on a row the RLS filter hides.
-  public boolean isAndRestrictionPushdownEnabled() {
-    return _andRestrictionPushdownEnabled || _rowFilter != null;
+  /// Never [AndRestrictionPushdown#OFF] for a query with a row-level security filter, whatever the query option and
+  /// the server default say: every nested AND must restrict its composite children to the documents the RLS filter
+  /// matches, so that no user expression is evaluated on a row the RLS filter hides. The plan maker picks the
+  /// strategy; if it did not, this falls back to [AndRestrictionPushdown#EAGER].
+  public AndRestrictionPushdown getAndRestrictionPushdown() {
+    AndRestrictionPushdown andRestrictionPushdown = _andRestrictionPushdown;
+    return _rowFilter != null && !andRestrictionPushdown.isEnabled() ? AndRestrictionPushdown.EAGER
+        : andRestrictionPushdown;
   }
 
+  /// Whether an AND may hand its matched document ids to its composite children. See [#getAndRestrictionPushdown()].
+  public boolean isAndRestrictionPushdownEnabled() {
+    return getAndRestrictionPushdown().isEnabled();
+  }
+
+  public void setAndRestrictionPushdown(AndRestrictionPushdown andRestrictionPushdown) {
+    _andRestrictionPushdown = andRestrictionPushdown;
+  }
+
+  /// Sets [AndRestrictionPushdown#EAGER] for `true` and [AndRestrictionPushdown#OFF] for `false`.
   public void setAndRestrictionPushdownEnabled(boolean andRestrictionPushdownEnabled) {
-    _andRestrictionPushdownEnabled = andRestrictionPushdownEnabled;
+    setAndRestrictionPushdown(AndRestrictionPushdown.of(andRestrictionPushdownEnabled));
   }
 
   public int getMaxExecutionThreads() {
