@@ -25,6 +25,7 @@ metadata:
   namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.minionStatelessLabels" . | nindent 4 }}
+  annotations: {{ toYaml .Values.minionStateless.annotations | nindent 4 }}
 spec:
   selector:
     matchLabels:
@@ -57,7 +58,7 @@ spec:
       - name: minion-stateless
         securityContext:
           {{- toYaml .Values.minionStateless.securityContext | nindent 10 }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        image: "{{ .Values.minionImage.repository | default .Values.image.repository }}:{{ .Values.minionImage.tag | default .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [
           "{{ .Values.minionStateless.startCommand }}",

@@ -24,6 +24,7 @@ metadata:
   namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.brokerLabels" . | nindent 4 }}
+  annotations: {{ toYaml .Values.broker.annotations | nindent 4 }}
 spec:
   selector:
     matchLabels:
@@ -65,7 +66,7 @@ spec:
       - name: broker
         securityContext:
           {{- toYaml .Values.broker.securityContext | nindent 10 }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        image: "{{ .Values.brokerImage.repository | default .Values.image.repository }}:{{ .Values.brokerImage.tag | default .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [
           "{{ .Values.broker.startCommand }}",
