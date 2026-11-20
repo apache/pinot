@@ -334,18 +334,37 @@ public class MinionTaskUtils {
   /// - `EQUAL` (default): the bitmap every server agrees on.
   /// - `MOST_VALID_DOCS`: the bitmap with the highest valid-doc count.
   ///
-  /// Returns null if no server produced a usable bitmap. Non-`UNSAFE` modes throw instead of skipping:
-  /// [NotFoundException] when a server has no validDocIds (e.g. snapshot not yet written); [IllegalStateException]
-  /// for other fetch failures, CRC mismatches, non-GOOD status, or `EQUAL`-mode consensus failures.
+  /// Returns null if no server produced a usable bitmap in `UNSAFE` mode. The other modes require every server to
+  /// supply a usable bitmap. A 404 throws [NotFoundException], and other failures throw [IllegalStateException].
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, long expectedCrc, long expectedDataCrc,
       String comparisonModeStr) {
+    return getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsType, minionContext,
+        expectedCrc, expectedDataCrc, comparisonModeStr, false);
+  }
+
+  /// Exposes a confirmed missing snapshot to the compaction executor. In `UNSAFE` mode, check all replicas so the
+  /// executor can try the next eligible replica before treating a missing snapshot as terminal.
+  @Nullable
+  public static RoaringBitmap getValidDocIdsForCompaction(String tableNameWithType, String segmentName,
+      String validDocIdsType, MinionContext minionContext, long expectedCrc, long expectedDataCrc,
+      String comparisonModeStr) {
+    return getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsType, minionContext,
+        expectedCrc, expectedDataCrc, comparisonModeStr, true);
+  }
+
+  @Nullable
+  private static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
+      String validDocIdsType, MinionContext minionContext, long expectedCrc, long expectedDataCrc,
+      String comparisonModeStr, boolean reportMissingSnapshot) {
     MinionConstants.ValidDocIdsConsensusMode consensusMode = parseValidDocIdsConsensusMode(comparisonModeStr);
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
     List<RoaringBitmap> matchingBitmaps = new ArrayList<>();
+    ValidDocIdsSnapshotNotFoundException missingSnapshot = null;
+    int missingSnapshotCount = 0;
 
     for (String server : servers) {
       InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
@@ -360,13 +379,21 @@ public class MinionTaskUtils {
       } catch (Exception e) {
         String errorMessage =
             "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint;
+        if (reportMissingSnapshot && e instanceof NotFoundException notFound
+            && "true".equals(notFound.getResponse().getHeaderString(
+                ValidDocIdsBitmapResponse.MISSING_SNAPSHOT_HEADER))) {
+          missingSnapshot = new ValidDocIdsSnapshotNotFoundException(errorMessage, notFound);
+          if (consensusMode != MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
+            throw missingSnapshot;
+          }
+          missingSnapshotCount++;
+        }
         if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
           LOGGER.warn(errorMessage, e);
           continue;
         }
         if (e instanceof NotFoundException) {
-          // Preserve the type: a 404 means the server has no validDocIds for the segment (e.g. a not-yet-written
-          // snapshot), which callers may handle with a documented fallback, unlike infrastructure failures.
+          // Older servers use the same status for a missing segment and an absent snapshot.
           throw new NotFoundException(errorMessage, e);
         }
         throw new IllegalStateException(errorMessage, e);
@@ -385,7 +412,7 @@ public class MinionTaskUtils {
           LOGGER.warn("CRC mismatch for segment: {} from endpoint {}, skipping", segmentName, endpoint);
           continue;
         } else {
-          throw new IllegalStateException(
+          throw new ValidDocIdsCrcMismatchException(
               "CRC mismatch for segment: " + segmentName + ", expected: " + expectedCrc + ", actual from endpoint "
                   + endpoint + ": " + crcFromValidDocIdsBitmap);
         }
@@ -417,6 +444,9 @@ public class MinionTaskUtils {
     }
 
     if (matchingBitmaps.isEmpty()) {
+      if (missingSnapshot != null && missingSnapshotCount == servers.size()) {
+        throw missingSnapshot;
+      }
       return null;
     }
 
@@ -448,6 +478,20 @@ public class MinionTaskUtils {
           maxCard, segmentName, servers.size());
     }
     return maxCardinalityMap;
+  }
+
+  /// A server explicitly reports that it has the segment but cannot supply the requested snapshot.
+  public static final class ValidDocIdsSnapshotNotFoundException extends NotFoundException {
+    ValidDocIdsSnapshotNotFoundException(String message, NotFoundException cause) {
+      super(message, cause.getResponse(), cause);
+    }
+  }
+
+  /// A replica's bitmap does not match the CRC of the input segment.
+  public static final class ValidDocIdsCrcMismatchException extends IllegalStateException {
+    public ValidDocIdsCrcMismatchException(String message) {
+      super(message);
+    }
   }
 
   /// Picks the replica whose validDocIds the generator should use, or null to skip the segment, applying the same
@@ -547,7 +591,7 @@ public class MinionTaskUtils {
   /// `BaseTableDataManager.hasSameCRC` and is used by both the generator's pre-scheduling check and the executor's
   /// per-server / deepstore checks.
   public static boolean crcMatches(long segmentCrc, long dataCrc, long otherSegmentCrc, long otherDataCrc) {
-    if (segmentCrc == otherSegmentCrc) {
+    if (segmentCrc >= 0 && segmentCrc == otherSegmentCrc) {
       return true;
     }
     return dataCrc >= 0 && otherDataCrc >= 0 && dataCrc == otherDataCrc;

@@ -684,7 +684,8 @@ public class TablesResource {
                 + "reading the validDocIds with validDocIdType %s", tableNameWithType,
             segmentDataManager.getSegmentName(), validDocIdsType);
         LOGGER.warn(msg);
-        throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
+        throw new WebApplicationException(msg, Response.status(Response.Status.NOT_FOUND)
+            .header(ValidDocIdsBitmapResponse.MISSING_SNAPSHOT_HEADER, true).build());
       }
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, Long.toString(indexSegment.getSegmentMetadata().getCrc()),

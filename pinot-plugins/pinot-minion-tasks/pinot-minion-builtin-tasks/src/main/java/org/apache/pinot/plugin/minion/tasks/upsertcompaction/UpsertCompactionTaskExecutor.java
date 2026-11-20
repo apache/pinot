@@ -32,6 +32,8 @@ import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils.ValidDocIdsCrcMismatchException;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils.ValidDocIdsSnapshotNotFoundException;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
@@ -96,7 +98,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
         : MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
     RoaringBitmap validDocIds =
         fetchValidDocIdsWithRetry(pinotTaskConfig, tableNameWithType, segmentName, validDocIdsTypeStr,
-            originalSegmentCrcFromTaskGenerator, segmentMetadata.getDataCrc(), consensusMode);
+            crcFromDeepStorageSegment, segmentMetadata.getDataCrc(), consensusMode);
     if (validDocIds.isEmpty()) {
       // prevents empty segment generation
       String skipMessage =
@@ -165,13 +167,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     throw new IllegalStateException(message);
   }
 
-  /// Check C with a short bounded retry so transient server reload races (segment uploaded while a replica is still
-  /// rebuilding upsert metadata) do not fail the task on the first attempt. Does not re-download the segment.
-  /// Only transient failures are retried: CRC mismatch / server-not-GOOD while a replica reloads surface as
-  /// [IllegalStateException] (or, in UNSAFE mode, as a skipped server yielding `null`). A missing snapshot
-  /// ([NotFoundException]) is not transient within this task - snapshots are written only when the next
-  /// consuming segment starts, which can be unboundedly later - so it fails fast and the periodic task
-  /// generator reschedules the segment in a later cycle.
+  /// Match the bitmap to the downloaded input. A replica can return a stale CRC or be temporarily unavailable during
+  /// a reload, so use a bounded fetch retry without re-downloading the segment. An explicitly missing snapshot can be
+  /// reconsidered by the next generator cycle. Older servers' unclassified 404s can still mean a reload race.
   @VisibleForTesting
   RoaringBitmap fetchValidDocIdsWithRetry(PinotTaskConfig pinotTaskConfig, String tableNameWithType, String segmentName,
       String validDocIdsTypeStr, long expectedSegmentCrc, long expectedDataCrc, String consensusMode)
@@ -183,7 +181,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         RoaringBitmap validDocIds =
-            MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
+            MinionTaskUtils.getValidDocIdsForCompaction(tableNameWithType, segmentName, validDocIdsTypeStr,
                 MINION_CONTEXT, expectedSegmentCrc, expectedDataCrc, consensusMode);
         if (validDocIds != null) {
           if (attempt > 1) {
@@ -196,15 +194,17 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
             "No validDocIds found from all servers. They either failed to download or did not match crc from"
                 + " segment copy obtained from deepstore / servers. Expected crc: " + expectedSegmentCrc);
         LOGGER.warn("validDocIds unavailable for segment: {} on attempt {}/{}", segmentName, attempt, maxAttempts);
-      } catch (NotFoundException e) {
-        // No snapshot yet (e.g. latest segment): retrying here cannot create it, so fail fast instead of
-        // burning the remaining attempts. The task is rescheduled by the periodic generator.
+      } catch (ValidDocIdsSnapshotNotFoundException e) {
         String message = "No validDocIds snapshot found for segment: " + segmentName
-            + ". Snapshots are written only when the next consuming segment starts, so retrying within this"
-            + " task cannot create it; failing fast for reschedule in a later task cycle: " + e.getMessage();
+            + ". The task generator can reconsider the segment in a later cycle. " + e.getMessage();
         LOGGER.error(message);
         _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.VALID_DOC_IDS_UNAVAILABLE, 1L);
+        _eventObserver.notifyProgress(pinotTaskConfig, message);
         throw new IllegalStateException(message, e);
+      } catch (NotFoundException e) {
+        lastFailure = new IllegalStateException(e.getMessage(), e);
+        LOGGER.warn("validDocIds replica unavailable for segment: {} on attempt {}/{}: {}", segmentName, attempt,
+            maxAttempts, e.getMessage());
       } catch (IllegalStateException e) {
         lastFailure = e;
         LOGGER.warn("validDocIds fetch failed for segment: {} on attempt {}/{}: {}", segmentName, attempt, maxAttempts,
@@ -213,8 +213,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
       if (attempt < maxAttempts) {
         String progress = String.format(
-            "Retrying validDocIds fetch for segment: %s (attempt %d/%d) after CRC/server mismatch", segmentName,
-            attempt + 1, maxAttempts);
+            "Retrying validDocIds fetch for segment: %s (attempt %d/%d) after: %s", segmentName,
+            attempt + 1, maxAttempts, lastFailure.getMessage());
         _eventObserver.notifyProgress(pinotTaskConfig, progress);
         if (delayMs > 0L) {
           try {
@@ -230,17 +230,11 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     String message = lastFailure != null ? lastFailure.getMessage()
         : "No validDocIds found from all servers. Expected crc: " + expectedSegmentCrc;
     LOGGER.error(message);
-    MinionMeter meter = classifyValidDocIdsFailureMeter(message);
+    MinionMeter meter = lastFailure instanceof ValidDocIdsCrcMismatchException
+        ? MinionMeter.CRC_MISMATCH_SERVER_BITMAP : MinionMeter.VALID_DOC_IDS_UNAVAILABLE;
     _minionMetrics.addMeteredTableValue(tableNameWithType, meter, 1L);
+    _eventObserver.notifyProgress(pinotTaskConfig, message);
     throw lastFailure != null ? lastFailure : new IllegalStateException(message);
-  }
-
-  @VisibleForTesting
-  static MinionMeter classifyValidDocIdsFailureMeter(String message) {
-    if (message != null && message.contains("CRC mismatch")) {
-      return MinionMeter.CRC_MISMATCH_SERVER_BITMAP;
-    }
-    return MinionMeter.VALID_DOC_IDS_UNAVAILABLE;
   }
 
   /// ZK data CRC for Check B data-CRC fallback. Returns -1 when metadata is missing or data CRC is not reported.

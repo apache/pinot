@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
+import com.sun.net.httpserver.HttpServer;
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Field;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +34,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -39,14 +48,18 @@ import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskTestUtils;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils.ValidDocIdsCrcMismatchException;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils.ValidDocIdsSnapshotNotFoundException;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.Enablement;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
@@ -55,16 +68,26 @@ import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class UpsertCompactionTaskExecutorTest {
@@ -185,6 +208,308 @@ public class UpsertCompactionTaskExecutorTest {
   }
 
   @Test
+  public void testFetchRetriesAnUnclassifiedNotFoundFromTheServer()
+      throws Exception {
+    HelixManager previousHelixManager = MinionContext.getInstance().getHelixManager();
+    RoaringBitmap bitmap = RoaringBitmap.bitmapOf(0, 1, 2);
+    try (BitmapServer server =
+        new BitmapServer(BitmapReply.notFound(false), BitmapReply.success(EXPECTED_CRC, bitmap))) {
+      setReplicaEndpoints(Map.of("server1", server.getPort()));
+      TestableExecutor executor = newExecutor();
+      executor._validDocIdsFetchRetryDelayMs = 0L;
+      assertEquals(executor.fetchValidDocIdsWithRetry(createTaskConfig(false), REALTIME_TABLE_NAME, SEGMENT_NAME,
+          "SNAPSHOT", EXPECTED_CRC, DATA_CRC, "EQUAL"), bitmap);
+      assertEquals(server.getRequests(), 2);
+      verifyNoInteractions(_minionMetrics);
+    } finally {
+      MinionContext.getInstance().setHelixManager(previousHelixManager);
+    }
+  }
+
+  @DataProvider
+  public Object[][] consensusModes() {
+    return new Object[][]{{"EQUAL", true}, {"MOST_VALID_DOCS", true}, {"UNSAFE", false}};
+  }
+
+  @Test(dataProvider = "consensusModes")
+  public void testConfirmedMissingSnapshotsFailOnFirstAttempt(String mode, boolean strict)
+      throws Exception {
+    HelixManager previousHelixManager = MinionContext.getInstance().getHelixManager();
+    try (BitmapServer server = new BitmapServer(BitmapReply.notFound(true))) {
+      setReplicaEndpoints(Map.of("server1", server.getPort(), "server2", server.getPort()));
+      TestableExecutor executor = newExecutor();
+      executor._validDocIdsFetchRetryDelayMs = 0L;
+      MinionEventObserver observer = mock(MinionEventObserver.class);
+      executor.setMinionEventObserver(observer);
+      PinotTaskConfig task = createTaskConfig(false);
+      IllegalStateException failure = expectThrows(IllegalStateException.class,
+          () -> executor.fetchValidDocIdsWithRetry(task, REALTIME_TABLE_NAME, SEGMENT_NAME,
+              "SNAPSHOT", EXPECTED_CRC, DATA_CRC, mode));
+      assertEquals(server.getRequests(), strict ? 1 : 2);
+      assertTrue(failure.getCause() instanceof ValidDocIdsSnapshotNotFoundException);
+      assertTrue(failure.getCause().getCause() instanceof NotFoundException);
+      verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.VALID_DOC_IDS_UNAVAILABLE, 1L);
+      verifyNoMoreInteractions(_minionMetrics);
+      verify(observer).notifyProgress(eq(task), contains("later cycle"));
+      verifyNoMoreInteractions(observer);
+    } finally {
+      MinionContext.getInstance().setHelixManager(previousHelixManager);
+    }
+  }
+
+  @Test(dataProvider = "consensusModes")
+  public void testValidReplicaAlongsideMissingSnapshot(String mode, boolean strict)
+      throws Exception {
+    HelixManager previousHelixManager = MinionContext.getInstance().getHelixManager();
+    RoaringBitmap bitmap = RoaringBitmap.bitmapOf(0, 1, 2);
+    try (BitmapServer server =
+        new BitmapServer(BitmapReply.notFound(true), BitmapReply.success(EXPECTED_CRC, bitmap))) {
+      setReplicaEndpoints(Map.of("server1", server.getPort(), "server2", server.getPort()));
+      TestableExecutor executor = newExecutor();
+      executor._validDocIdsFetchRetryDelayMs = 0L;
+      PinotTaskConfig task = createTaskConfig(false);
+      if (!strict) {
+        assertEquals(executor.fetchValidDocIdsWithRetry(task, REALTIME_TABLE_NAME, SEGMENT_NAME,
+            "SNAPSHOT", EXPECTED_CRC, DATA_CRC, mode), bitmap);
+        assertEquals(server.getRequests(), 2);
+        verifyNoInteractions(_minionMetrics);
+      } else {
+        IllegalStateException failure = expectThrows(IllegalStateException.class,
+            () -> executor.fetchValidDocIdsWithRetry(task, REALTIME_TABLE_NAME, SEGMENT_NAME,
+                "SNAPSHOT", EXPECTED_CRC, DATA_CRC, mode));
+        assertTrue(failure.getCause() instanceof ValidDocIdsSnapshotNotFoundException);
+        assertEquals(server.getRequests(), 1);
+        verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.VALID_DOC_IDS_UNAVAILABLE, 1L);
+        verifyNoMoreInteractions(_minionMetrics);
+      }
+    } finally {
+      MinionContext.getInstance().setHelixManager(previousHelixManager);
+    }
+  }
+
+  @Test
+  public void testUnsafeRetriesWhenOneReplicaIsMissingAndAnotherRecovers()
+      throws Exception {
+    HelixManager previousHelixManager = MinionContext.getInstance().getHelixManager();
+    RoaringBitmap bitmap = RoaringBitmap.bitmapOf(0, 1, 2);
+    try (BitmapServer missingReplica = new BitmapServer(BitmapReply.notFound(true));
+        BitmapServer reloadingReplica =
+            new BitmapServer(BitmapReply.notFound(false), BitmapReply.success(EXPECTED_CRC, bitmap))) {
+      setReplicaEndpoints(Map.of("server1", missingReplica.getPort(), "server2", reloadingReplica.getPort()));
+      TestableExecutor executor = newExecutor();
+      executor._validDocIdsFetchRetryDelayMs = 0L;
+      assertEquals(executor.fetchValidDocIdsWithRetry(createTaskConfig(false), REALTIME_TABLE_NAME, SEGMENT_NAME,
+          "SNAPSHOT", EXPECTED_CRC, DATA_CRC, "UNSAFE"), bitmap);
+      assertEquals(reloadingReplica.getRequests(), 2);
+      verifyNoInteractions(_minionMetrics);
+    } finally {
+      MinionContext.getInstance().setHelixManager(previousHelixManager);
+    }
+  }
+
+  @Test
+  public void testUnclassifiedNotFoundExhaustionPreservesCauseAndProgress()
+      throws Exception {
+    HelixManager previousHelixManager = MinionContext.getInstance().getHelixManager();
+    try (BitmapServer server = new BitmapServer(BitmapReply.notFound(false))) {
+      setReplicaEndpoints(Map.of("server1", server.getPort()));
+      TestableExecutor executor = newExecutor();
+      executor._validDocIdsFetchRetryDelayMs = 0L;
+      MinionEventObserver observer = mock(MinionEventObserver.class);
+      executor.setMinionEventObserver(observer);
+      PinotTaskConfig task = createTaskConfig(false);
+      IllegalStateException failure = expectThrows(IllegalStateException.class,
+          () -> executor.fetchValidDocIdsWithRetry(task, REALTIME_TABLE_NAME, SEGMENT_NAME,
+              "SNAPSHOT", EXPECTED_CRC, DATA_CRC, "EQUAL"));
+      assertEquals(server.getRequests(), 3);
+      assertEquals(failure.getCause().getClass(), NotFoundException.class);
+      assertTrue(failure.getCause().getCause() instanceof NotFoundException);
+      verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.VALID_DOC_IDS_UNAVAILABLE, 1L);
+      verifyNoMoreInteractions(_minionMetrics);
+      verify(observer).notifyProgress(eq(task), contains("attempt 2/3"));
+      verify(observer).notifyProgress(eq(task), contains("attempt 3/3"));
+      verify(observer).notifyProgress(task, failure.getMessage());
+    } finally {
+      MinionContext.getInstance().setHelixManager(previousHelixManager);
+    }
+  }
+
+  /// A scripted response from a replica's bitmap endpoint.
+  @DataProvider
+  public Object[][] downloadedSegmentCrcCases() {
+    return new Object[][]{{false, true}, {true, true}, {true, false}};
+  }
+
+  @Test(dataProvider = "downloadedSegmentCrcCases")
+  public void testConvertValidatesBitmapAgainstDownloadedSegment(boolean ignoreDeepStoreMismatch, boolean crcMatches)
+      throws Exception {
+    long downloadedCrc = 2000L;
+    long serverCrc = crcMatches ? downloadedCrc : EXPECTED_CRC;
+    HelixManager previousHelixManager = MinionContext.getInstance().getHelixManager();
+    try (BitmapServer server = new BitmapServer(BitmapReply.success(serverCrc, new RoaringBitmap()));
+        MockedConstruction<SegmentMetadataImpl> ignored = Mockito.mockConstruction(SegmentMetadataImpl.class,
+            (metadata, context) -> {
+              when(metadata.getCrc()).thenReturn(downloadedCrc);
+              when(metadata.getDataCrc()).thenReturn(DATA_CRC);
+            })) {
+      setReplicaEndpoints(Map.of("server1", server.getPort()));
+      TestableExecutor executor = newExecutor();
+      executor._zkDataCrc = DATA_CRC;
+      executor._validDocIdsFetchRetryDelayMs = 0L;
+      PinotTaskConfig task = createTaskConfig(ignoreDeepStoreMismatch);
+      File indexDir = new File(_tempDir, "downloaded");
+      File workingDir = new File(_tempDir, "compacted");
+      assertTrue(indexDir.mkdir());
+      assertTrue(workingDir.mkdir());
+      if (crcMatches) {
+        SegmentConversionResult result = executor.convert(task, indexDir, workingDir);
+        assertNull(result.getFile());
+        assertEquals(server.getRequests(), 1);
+        verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.COMPACTION_SKIP_EMPTY_VALID_DOCS,
+            1L);
+      } else {
+        expectThrows(ValidDocIdsCrcMismatchException.class, () -> executor.convert(task, indexDir, workingDir));
+        assertEquals(server.getRequests(), 3);
+        assertFalse(new File(workingDir, SEGMENT_NAME).exists());
+        verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.CRC_MISMATCH_SERVER_BITMAP, 1L);
+      }
+      verifyNoMoreInteractions(_minionMetrics);
+    } finally {
+      MinionContext.getInstance().setHelixManager(previousHelixManager);
+    }
+  }
+
+  @Test
+  public void testConvertLeavesNoOutputWhenReplicasDisagree()
+      throws Exception {
+    HelixManager previousHelixManager = MinionContext.getInstance().getHelixManager();
+    try (BitmapServer first = new BitmapServer(BitmapReply.success(EXPECTED_CRC, RoaringBitmap.bitmapOf(0, 1)));
+        BitmapServer second = new BitmapServer(BitmapReply.success(EXPECTED_CRC, RoaringBitmap.bitmapOf(0, 2)));
+        MockedConstruction<SegmentMetadataImpl> ignored = Mockito.mockConstruction(SegmentMetadataImpl.class,
+            (metadata, context) -> when(metadata.getCrc()).thenReturn(EXPECTED_CRC))) {
+      setReplicaEndpoints(Map.of("server1", first.getPort(), "server2", second.getPort()));
+      TestableExecutor executor = newExecutor();
+      executor._validDocIdsFetchRetryDelayMs = 0L;
+      PinotTaskConfig task = createTaskConfig(false);
+      File indexDir = new File(_tempDir, "downloaded");
+      File workingDir = new File(_tempDir, "compacted");
+      assertTrue(indexDir.mkdir());
+      assertTrue(workingDir.mkdir());
+      IllegalStateException failure = expectThrows(IllegalStateException.class,
+          () -> executor.convert(task, indexDir, workingDir));
+      assertTrue(failure.getMessage().contains("No consensus"));
+      assertEquals(first.getRequests(), 3);
+      assertEquals(second.getRequests(), 3);
+      assertFalse(new File(workingDir, SEGMENT_NAME).exists());
+      verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.VALID_DOC_IDS_UNAVAILABLE, 1L);
+      verifyNoMoreInteractions(_minionMetrics);
+    } finally {
+      MinionContext.getInstance().setHelixManager(previousHelixManager);
+    }
+  }
+
+  @Test
+  public void testInterruptedBackoffStopsFurtherAttempts()
+      throws Exception {
+    HelixManager previousHelixManager = MinionContext.getInstance().getHelixManager();
+    try (BitmapServer server = new BitmapServer(BitmapReply.notFound(false))) {
+      setReplicaEndpoints(Map.of("server1", server.getPort()));
+      TestableExecutor executor = newExecutor();
+      MinionEventObserver observer = mock(MinionEventObserver.class);
+      executor.setMinionEventObserver(observer);
+      PinotTaskConfig task = createTaskConfig(false);
+      doAnswer(invocation -> {
+        Thread.currentThread().interrupt();
+        return null;
+      }).when(observer).notifyProgress(eq(task), contains("attempt 2/3"));
+      try {
+        expectThrows(InterruptedException.class,
+            () -> executor.fetchValidDocIdsWithRetry(task, REALTIME_TABLE_NAME, SEGMENT_NAME,
+                "SNAPSHOT", EXPECTED_CRC, DATA_CRC, "EQUAL"));
+        assertTrue(Thread.currentThread().isInterrupted());
+        assertEquals(server.getRequests(), 1);
+        verifyNoInteractions(_minionMetrics);
+      } finally {
+        Thread.interrupted();
+      }
+    } finally {
+      MinionContext.getInstance().setHelixManager(previousHelixManager);
+    }
+  }
+
+  private record BitmapReply(int status, boolean missingSnapshot, byte[] body) {
+    static BitmapReply notFound(boolean missingSnapshot) {
+      // Both 404s deliberately use the same body. Only the header identifies a confirmed missing snapshot.
+      return new BitmapReply(404, missingSnapshot,
+          "{\"message\":\"No validDocIds snapshot\"}".getBytes(StandardCharsets.UTF_8));
+    }
+
+    static BitmapReply success(long crc, RoaringBitmap bitmap)
+        throws IOException {
+      byte[] body = JsonUtils.objectToString(new ValidDocIdsBitmapResponse(SEGMENT_NAME, Long.toString(crc),
+          null, ValidDocIdsType.SNAPSHOT, RoaringBitmapUtils.serialize(bitmap), "server1", ServiceStatus.Status.GOOD))
+          .getBytes(StandardCharsets.UTF_8);
+      return new BitmapReply(200, false, body);
+    }
+  }
+
+  /// A loopback HTTP replica that replays responses in request order.
+  private static final class BitmapServer implements AutoCloseable {
+    private final HttpServer _server;
+    private final AtomicInteger _requests = new AtomicInteger();
+
+    BitmapServer(BitmapReply... replies)
+        throws IOException {
+      _server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+      String path = "/segments/" + REALTIME_TABLE_NAME + "/" + SEGMENT_NAME + "/validDocIdsBitmap";
+      _server.createContext(path, exchange -> {
+        try (exchange) {
+          BitmapReply reply = replies[Math.min(_requests.getAndIncrement(), replies.length - 1)];
+          if (reply.missingSnapshot()) {
+            exchange.getResponseHeaders().set(ValidDocIdsBitmapResponse.MISSING_SNAPSHOT_HEADER, "true");
+          }
+          exchange.getResponseHeaders().set("Content-Type", "application/json");
+          exchange.sendResponseHeaders(reply.status(), reply.body().length);
+          exchange.getResponseBody().write(reply.body());
+        }
+      });
+      _server.start();
+    }
+
+    int getPort() {
+      return _server.getAddress().getPort();
+    }
+
+    int getRequests() {
+      return _requests.get();
+    }
+
+    @Override
+    public void close() {
+      _server.stop(0);
+    }
+  }
+
+  private static void setReplicaEndpoints(Map<String, Integer> replicaPorts) {
+    HelixAdmin admin = mock(HelixAdmin.class);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    Map<String, String> assignment = new HashMap<>();
+    replicaPorts.forEach((replica, port) -> {
+      assignment.put(replica, SegmentStateModel.ONLINE);
+      InstanceConfig instanceConfig = new InstanceConfig(replica);
+      instanceConfig.setHostName("127.0.0.1");
+      instanceConfig.getRecord().setIntField(Helix.Instance.ADMIN_PORT_KEY, port);
+      when(admin.getInstanceConfig(CLUSTER_NAME, replica)).thenReturn(instanceConfig);
+    });
+    externalView.getRecord().getMapFields().put(SEGMENT_NAME, assignment);
+    when(admin.getResourceExternalView(CLUSTER_NAME, REALTIME_TABLE_NAME)).thenReturn(externalView);
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.getClusterName()).thenReturn(CLUSTER_NAME);
+    when(helixManager.getClusterManagmentTool()).thenReturn(admin);
+    MinionContext.getInstance().setHelixManager(helixManager);
+  }
+
+  @Test
   public void testFetchValidDocIdsRetrySucceedsAfterTransientCrcMismatch()
       throws Exception {
     TestableExecutor executor = newExecutor();
@@ -195,11 +520,11 @@ public class UpsertCompactionTaskExecutorTest {
     AtomicInteger calls = new AtomicInteger();
     try (MockedStatic<MinionTaskUtils> mocked = Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS)) {
       mocked.when(
-              () -> MinionTaskUtils.getValidDocIdFromServerMatchingCrc(anyString(), anyString(), anyString(), any(),
+              () -> MinionTaskUtils.getValidDocIdsForCompaction(anyString(), anyString(), anyString(), any(),
                   anyLong(), anyLong(), anyString()))
           .thenAnswer(inv -> {
             if (calls.getAndIncrement() == 0) {
-              throw new IllegalStateException("CRC mismatch for segment: " + SEGMENT_NAME);
+              throw new ValidDocIdsCrcMismatchException("CRC mismatch for segment: " + SEGMENT_NAME);
             }
             return bitmap;
           });
@@ -224,9 +549,9 @@ public class UpsertCompactionTaskExecutorTest {
 
     try (MockedStatic<MinionTaskUtils> mocked = Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS)) {
       mocked.when(
-              () -> MinionTaskUtils.getValidDocIdFromServerMatchingCrc(anyString(), anyString(), anyString(), any(),
+              () -> MinionTaskUtils.getValidDocIdsForCompaction(anyString(), anyString(), anyString(), any(),
                   anyLong(), anyLong(), anyString()))
-          .thenThrow(new IllegalStateException("CRC mismatch for segment: " + SEGMENT_NAME + ", expected: 1000"));
+          .thenThrow(new ValidDocIdsCrcMismatchException("CRC mismatch for segment: " + SEGMENT_NAME));
 
       try {
         executor.fetchValidDocIdsWithRetry(createTaskConfig(false), REALTIME_TABLE_NAME, SEGMENT_NAME, "SNAPSHOT",
@@ -249,7 +574,7 @@ public class UpsertCompactionTaskExecutorTest {
 
     try (MockedStatic<MinionTaskUtils> mocked = Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS)) {
       mocked.when(
-              () -> MinionTaskUtils.getValidDocIdFromServerMatchingCrc(anyString(), anyString(), anyString(), any(),
+              () -> MinionTaskUtils.getValidDocIdsForCompaction(anyString(), anyString(), anyString(), any(),
                   anyLong(), anyLong(), anyString()))
           .thenReturn(null);
 
@@ -264,53 +589,6 @@ public class UpsertCompactionTaskExecutorTest {
       }
       verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.VALID_DOC_IDS_UNAVAILABLE, 1L);
     }
-  }
-
-  /// A missing snapshot (404) cannot appear within the in-task retry window: snapshots are written only
-  /// when the next consuming segment starts. The fetch must fail fast after a single attempt with an
-  /// explicit message and the unavailable meter; the periodic task generator reschedules it next cycle.
-  @Test
-  public void testFetchValidDocIdsNotFoundFailsFastWithoutRetry() {
-    TestableExecutor executor = newExecutor();
-    executor._validDocIdsFetchMaxAttempts = 3;
-    executor._validDocIdsFetchRetryDelayMs = 0L;
-
-    AtomicInteger calls = new AtomicInteger();
-    try (MockedStatic<MinionTaskUtils> mocked = Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS)) {
-      mocked.when(
-              () -> MinionTaskUtils.getValidDocIdFromServerMatchingCrc(anyString(), anyString(), anyString(), any(),
-                  anyLong(), anyLong(), anyString()))
-          .thenAnswer(inv -> {
-            calls.getAndIncrement();
-            throw new NotFoundException(
-                "Unable to retrieve validDocIds bitmap for segment: " + SEGMENT_NAME + " from endpoint: x");
-          });
-
-      try {
-        executor.fetchValidDocIdsWithRetry(createTaskConfig(false), REALTIME_TABLE_NAME, SEGMENT_NAME, "SNAPSHOT",
-            EXPECTED_CRC, DATA_CRC, "EQUAL");
-        Assert.fail("expected IllegalStateException");
-      } catch (IllegalStateException e) {
-        Assert.assertTrue(e.getMessage().contains("No validDocIds snapshot"),
-            "unexpected message: " + e.getMessage());
-        Assert.assertTrue(e.getMessage().contains(SEGMENT_NAME), "unexpected message: " + e.getMessage());
-        Assert.assertTrue(e.getCause() instanceof NotFoundException);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-      Assert.assertEquals(calls.get(), 1);
-      verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.VALID_DOC_IDS_UNAVAILABLE, 1L);
-    }
-  }
-
-  @Test
-  public void testClassifyValidDocIdsFailureMeter() {
-    Assert.assertEquals(UpsertCompactionTaskExecutor.classifyValidDocIdsFailureMeter("CRC mismatch for segment: x"),
-        MinionMeter.CRC_MISMATCH_SERVER_BITMAP);
-    Assert.assertEquals(UpsertCompactionTaskExecutor.classifyValidDocIdsFailureMeter("No validDocIds found"),
-        MinionMeter.VALID_DOC_IDS_UNAVAILABLE);
-    Assert.assertEquals(UpsertCompactionTaskExecutor.classifyValidDocIdsFailureMeter(null),
-        MinionMeter.VALID_DOC_IDS_UNAVAILABLE);
   }
 
   @Test
@@ -333,9 +611,9 @@ public class UpsertCompactionTaskExecutorTest {
         });
         MockedStatic<MinionTaskUtils> mocked = Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS)) {
       mocked.when(() -> MinionTaskUtils.getValidDocIdsType(any(), any(), anyString()))
-          .thenReturn(org.apache.pinot.common.restlet.resources.ValidDocIdsType.SNAPSHOT);
+          .thenReturn(ValidDocIdsType.SNAPSHOT);
       mocked.when(
-              () -> MinionTaskUtils.getValidDocIdFromServerMatchingCrc(anyString(), anyString(), anyString(), any(),
+              () -> MinionTaskUtils.getValidDocIdsForCompaction(anyString(), anyString(), anyString(), any(),
                   anyLong(), anyLong(), anyString()))
           .thenReturn(new RoaringBitmap());
 
@@ -365,7 +643,7 @@ public class UpsertCompactionTaskExecutorTest {
         });
         MockedStatic<MinionTaskUtils> mocked = Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS)) {
       mocked.when(() -> MinionTaskUtils.getValidDocIdsType(any(), any(), anyString()))
-          .thenReturn(org.apache.pinot.common.restlet.resources.ValidDocIdsType.SNAPSHOT);
+          .thenReturn(ValidDocIdsType.SNAPSHOT);
 
       try {
         executor.convert(createTaskConfig(false), indexDir, workingDir);
@@ -375,7 +653,7 @@ public class UpsertCompactionTaskExecutorTest {
       }
       verify(_minionMetrics).addMeteredTableValue(REALTIME_TABLE_NAME, MinionMeter.CRC_MISMATCH_DEEPSTORE, 1L);
       mocked.verify(
-          () -> MinionTaskUtils.getValidDocIdFromServerMatchingCrc(anyString(), anyString(), anyString(), any(),
+          () -> MinionTaskUtils.getValidDocIdsForCompaction(anyString(), anyString(), anyString(), any(),
               anyLong(), anyLong(), anyString()), never());
     }
   }
@@ -401,9 +679,9 @@ public class UpsertCompactionTaskExecutorTest {
         });
         MockedStatic<MinionTaskUtils> mocked = Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS)) {
       mocked.when(() -> MinionTaskUtils.getValidDocIdsType(any(), any(), anyString()))
-          .thenReturn(org.apache.pinot.common.restlet.resources.ValidDocIdsType.SNAPSHOT);
+          .thenReturn(ValidDocIdsType.SNAPSHOT);
       mocked.when(
-              () -> MinionTaskUtils.getValidDocIdFromServerMatchingCrc(anyString(), anyString(), anyString(), any(),
+              () -> MinionTaskUtils.getValidDocIdsForCompaction(anyString(), anyString(), anyString(), any(),
                   anyLong(), anyLong(), anyString()))
           .thenReturn(new RoaringBitmap());
 

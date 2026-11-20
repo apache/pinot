@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.collect.ImmutableBiMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,11 +27,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
+import org.apache.pinot.controller.util.ServerSegmentMetadataReader.ValidDocIdsMetadataResult;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -44,12 +49,17 @@ import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.MockedConstruction;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -157,6 +167,54 @@ public class UpsertCompactionTaskGeneratorTest {
     List<PinotTaskConfig> pinotTaskConfigs = _taskGenerator.generateTasks(Lists.newArrayList(_tableConfig));
 
     assertEquals(pinotTaskConfigs.size(), 0);
+  }
+
+  @Test
+  public void testGenerateTasksReconsidersSegmentWhenSnapshotAppears()
+      throws Exception {
+    String segmentName = "testTable__snapshot";
+    SegmentZKMetadata segment = new SegmentZKMetadata(segmentName);
+    segment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    segment.setEndTime(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1));
+    segment.setTimeUnit(TimeUnit.MILLISECONDS);
+    segment.setCrc(1000L);
+    segment.setDownloadUrl("http://localhost:9000/segments/testTable/snapshot");
+    Map<String, String> config = getCompactionConfigs("1", "10");
+    config.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "0s");
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig)
+            .setTaskConfig(new TableTaskConfig(Map.of(UpsertCompactionTask.TASK_TYPE, config))).build();
+
+    ClusterInfoAccessor clusterInfo = mock(ClusterInfoAccessor.class);
+    when(clusterInfo.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(List.of(segment));
+    when(clusterInfo.getTaskStates(UpsertCompactionTask.TASK_TYPE)).thenReturn(Map.of("previous", TaskState.FAILED));
+    when(clusterInfo.getDataDir()).thenReturn("file:///tmp/");
+    when(clusterInfo.getVipUrlForLeadController(REALTIME_TABLE_NAME)).thenReturn("http://localhost:9000");
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(clusterInfo.getPinotHelixResourceManager()).thenReturn(resourceManager);
+    Map<String, List<String>> assignment = Map.of("server1", List.of(segmentName));
+    when(resourceManager.getServerToOnlineSegmentsMapFromEV(REALTIME_TABLE_NAME, true)).thenReturn(assignment);
+    when(resourceManager.getDataInstanceAdminEndpoints(assignment.keySet()))
+        .thenReturn(ImmutableBiMap.of("server1", "http://localhost:8097"));
+
+    Map<String, Integer> expectedReplicas = Map.of(segmentName, 1);
+    ValidDocIdsMetadataResult absent = new ValidDocIdsMetadataResult(Map.of(), expectedReplicas);
+    ValidDocIdsMetadataResult available = new ValidDocIdsMetadataResult(Map.of(segmentName,
+        List.of(meta(segmentName, 50, 50, 100, segment.getCrc(), ServiceStatus.Status.GOOD, "server1"))),
+        expectedReplicas);
+    UpsertCompactionTaskGenerator generator = new UpsertCompactionTaskGenerator();
+    generator.init(clusterInfo);
+    try (MockedConstruction<ServerSegmentMetadataReader> ignored = mockConstruction(ServerSegmentMetadataReader.class,
+        (reader, context) -> when(reader.getSegmentToValidDocIdsMetadataFromServer(eq(REALTIME_TABLE_NAME),
+            eq(assignment), any(), any(), anyInt(), eq(ValidDocIdsType.SNAPSHOT.name()), anyInt()))
+            .thenReturn(context.getCount() == 1 ? absent : available))) {
+      assertTrue(generator.generateTasks(List.of(tableConfig)).isEmpty());
+      List<PinotTaskConfig> tasks = generator.generateTasks(List.of(tableConfig));
+      assertEquals(tasks.size(), 1);
+      assertEquals(tasks.getFirst().getConfigs().get(MinionConstants.SEGMENT_NAME_KEY), segmentName);
+    }
   }
 
   @Test
