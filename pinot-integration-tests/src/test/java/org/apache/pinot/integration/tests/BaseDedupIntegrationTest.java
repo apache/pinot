@@ -47,12 +47,12 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.DEDUP_SURVIVORS;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.dedupRowsQuery;
 
 
 public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -88,6 +88,8 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     TableConfig tableConfig = createDedupTableConfig(_avroFiles.get(0), "id", getNumKafkaPartitions());
     addTableConfig(tableConfig);
     waitForAllDocsLoaded(600_000L);
+    // Dedup keeps the first row per id, so the count is right before the duplicates are read: wait for them too
+    waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
   }
 
   protected void createDedupTableWithReplicas()
@@ -117,6 +119,7 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
       }
       return true;
     }, 600_000L, "Failed to load " + countStarResult + " documents to both servers");
+    waitForAllStreamRecordsConsumed(DEDUP_TABLE_WITH_REPLICAS, 600_000L);
   }
 
   @Nullable
@@ -217,51 +220,40 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
 
   //Tests the query results for table with RF=1
   @Test
-  public void testValues() {
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
-
-    // Validate the older value persist
-    for (int i = 0; i < getCountStarResult(); i++) {
-      Assert.assertEquals(getPinotConnection()
-          .execute("SELECT name FROM " + getTableName() + " WHERE id = " + i)
-          .getResultSet(0)
-          .getString(0),
-          "" + i);
-    }
+  public void testValues()
+      throws Exception {
+    assertRows(dedupRowsQuery(getTableName()), DEDUP_SURVIVORS);
   }
 
   @Test
   public void testSegmentReload()
       throws Exception {
-    getOrCreateAdminClient().getSegmentClient().reloadTable(getTableName(), null, false);
+    String reloadJobId = reloadTableAndValidateResponse(getTableName(), TableType.REALTIME, false);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return isReloadJobCompleted(reloadJobId);
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000L, 600_000L, "Reload job " + reloadJobId + " did not finish");
 
-    // wait for reload to finish
-    Thread.sleep(1000);
-
-    // Push data again
+    // Push data again. Dedup drops every re-pushed row, so wait until both tables have consumed them before checking.
     pushAvroIntoKafka(_avroFiles);
+    waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
+    waitForAllStreamRecordsConsumed(DEDUP_TABLE_WITH_REPLICAS, 600_000L);
+    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(getTableName()), 600_000L);
+    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(DEDUP_TABLE_WITH_REPLICAS), 600_000L);
 
     // Validate no change
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
-    for (int i = 0; i < getCountStarResult(); i++) {
-      Assert.assertEquals(getPinotConnection()
-              .execute("SELECT name FROM " + getTableName() + " WHERE id = " + i)
-              .getResultSet(0)
-              .getString(0),
-          "" + i);
-    }
+    assertRows(dedupRowsQuery(getTableName()), DEDUP_SURVIVORS);
+    assertRowsFromEveryReplica(dedupRowsQuery(DEDUP_TABLE_WITH_REPLICAS), DEDUP_SURVIVORS);
   }
 
   //tests the query results when metadataTTL is set with RF>1.
   @Test
-  public void testValuesWithReplicas() {
-    assertEquals(getCurrentCountStarResult(DEDUP_TABLE_WITH_REPLICAS), getCountStarResult());
-
-    // Validate the older value persist
-    for (int i = 0; i < getCountStarResult(); i++) {
-      Assert.assertEquals(
-          getPinotConnection().execute("SELECT name FROM " + DEDUP_TABLE_WITH_REPLICAS + " WHERE id = " + i)
-              .getResultSet(0).getString(0), "" + i);
-    }
+  public void testValuesWithReplicas()
+      throws Exception {
+    // Both replica groups answer, as the setup checks with getServingServerPort()
+    assertRowsFromEveryReplica(dedupRowsQuery(DEDUP_TABLE_WITH_REPLICAS), DEDUP_SURVIVORS);
   }
 }

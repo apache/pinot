@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -40,10 +41,15 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
 
+/// Uploads segments to a full-upsert real-time table that also consumes the same records from the stream, and checks
+/// that each uploaded segment is assigned with its partition and that the table serves the latest row per key, before
+/// and after a server restart. [UpsertTableSegmentPreloadIntegrationTest] runs the same flow with snapshots and
+/// preload.
 public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final int NUM_SERVERS = 2;
   private static final String PRIMARY_KEY_COL = "clientId";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME);
+  /// 3 uploaded segments and 2 consuming segments
+  protected static final int NUM_SEGMENTS = 5;
 
   // Segment 1 contains records of pk value 100000 (partition 0)
   private static final String UPLOADED_SEGMENT_1 = "mytable_10027_19736_0 %";
@@ -51,6 +57,8 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   private static final String UPLOADED_SEGMENT_2 = "mytable_10072_19919_1 %";
   // Segment 3 contains records of pk value 100002 (partition 1)
   private static final String UPLOADED_SEGMENT_3 = "mytable_10158_19938_2 %";
+
+  private List<File> _avroFiles;
 
   @BeforeClass
   public void setUp()
@@ -62,25 +70,28 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
-    startServers(NUM_SERVERS);
+    startServers(getNumServers());
+    startKafka();
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
-
-    // Start Kafka and push data into Kafka
-    startKafka();
-    pushAvroIntoKafka(avroFiles);
+    _avroFiles = unpackAvroData(_tempDir);
+    if (pushBeforeUpload()) {
+      pushAvroIntoKafka(_avroFiles);
+    }
 
     // Create and upload schema and table config
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig tableConfig =
-        createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
+        createUpsertTableConfig(_avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
     addTableConfig(tableConfig);
 
-    // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
+    // Create and upload segments with the same records as the stream
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(_avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(getTableName(), TableType.REALTIME, _tarDir);
+    if (!pushBeforeUpload()) {
+      pushAvroIntoKafka(_avroFiles);
+    }
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
@@ -115,6 +126,16 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     FileUtils.deleteDirectory(_tempDir);
   }
 
+  protected int getNumServers() {
+    return 2;
+  }
+
+  /// Whether the records are pushed into the stream before the table is created, so that the uploaded segments take
+  /// over keys the consuming segments already hold. Otherwise they are pushed after the segments are uploaded.
+  protected boolean pushBeforeUpload() {
+    return true;
+  }
+
   @Override
   protected String getSchemaFileName() {
     return "upsert_upload_segment_test.schema";
@@ -141,17 +162,20 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getCurrentCountStarResultWithoutUpsert() == getCountStarResultWithoutUpsert();
+        return getCurrentCountStarResultWithoutUpsert(getTableName()) == getCountStarResultWithoutUpsert();
       } catch (Exception e) {
         return null;
       }
     }, 100L, timeoutMs, "Failed to load all documents");
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    assertLatestRowPerClientId();
   }
 
-  private long getCurrentCountStarResultWithoutUpsert() {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName() + " OPTION(skipUpsert=true)")
-        .getResultSet(0).getLong(0);
+  /// The table serves, per clientId, the Avro record with the largest DaysSinceEpoch. The streaming and the uploaded
+  /// copies of a record are identical, so it does not matter which copy wins.
+  private void assertLatestRowPerClientId()
+      throws Exception {
+    assertLatestRowPerKey(getTableName(), _avroFiles, PRIMARY_KEY_COL, getTimeColumnName(),
+        List.of(PRIMARY_KEY_COL, "city", "description", "salary", getTimeColumnName()));
   }
 
   private long getCountStarResultWithoutUpsert() {
@@ -162,27 +186,54 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   @Test
   public void testSegmentAssignment()
       throws Exception {
-    verifyIdealState();
+    verifyIdealState(NUM_SEGMENTS);
 
     // Run the real-time segment validation and check again
     _controllerStarter.getRealtimeSegmentValidationManager().run();
-    verifyIdealState();
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
-    assertEquals(getCurrentCountStarResultWithoutUpsert(), getCountStarResultWithoutUpsert());
+    verifyIdealState(NUM_SEGMENTS);
+    assertLatestRowPerClientId();
+    assertEquals(getCurrentCountStarResultWithoutUpsert(getTableName()), getCountStarResultWithoutUpsert());
+
+    beforeRestart();
 
     // Restart the servers and check again
     restartServers();
-    verifyIdealState();
+    verifyIdealState(getNumSegmentsAfterRestart());
+    // The row check runs once, so first wait for every segment to be served again
+    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(getTableName()),
+        getNumSegmentsAfterRestart(), 5, 600_000L);
     waitForAllDocsLoaded(600_000L);
   }
 
-  private void verifyIdealState() {
+  /// Runs before the servers restart in [#testSegmentAssignment()].
+  protected void beforeRestart()
+      throws Exception {
+  }
+
+  protected int getNumSegmentsAfterRestart() {
+    return NUM_SEGMENTS;
+  }
+
+  /// Verifies the segment states (uploaded and committed segments ONLINE, the latest LLC segment of each partition
+  /// CONSUMING), and that all segments of a partition are on the same server.
+  private void verifyIdealState(int numSegmentsExpected) {
     IdealState idealState = HelixHelper.getTableIdealState(_helixManager, REALTIME_TABLE_NAME);
     Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
-    assertEquals(segmentAssignment.size(), 5);
+    assertEquals(segmentAssignment.size(), numSegmentsExpected);
 
     String serverForPartition0 = null;
     String serverForPartition1 = null;
+
+    // Latest LLC sequence number of each partition: that segment is CONSUMING, the earlier ones ONLINE
+    Map<Integer, Integer> partitionToMaxSequenceNumber = new HashMap<>();
+    for (String segmentName : segmentAssignment.keySet()) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName != null) {
+        partitionToMaxSequenceNumber.merge(llcSegmentName.getPartitionGroupId(), llcSegmentName.getSequenceNumber(),
+            Math::max);
+      }
+    }
+
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> instanceStateMap = entry.getValue();
@@ -191,8 +242,14 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
       assertEquals(instanceStateMap.size(), 1);
       Map.Entry<String, String> instanceIdAndState = instanceStateMap.entrySet().iterator().next();
       String state = instanceIdAndState.getValue();
-      if (LLCSegmentName.isLLCSegment(segmentName)) {
-        assertEquals(state, SegmentStateModel.CONSUMING);
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName != null) {
+        if (llcSegmentName.getSequenceNumber() < partitionToMaxSequenceNumber.get(
+            llcSegmentName.getPartitionGroupId())) {
+          assertEquals(state, SegmentStateModel.ONLINE);
+        } else {
+          assertEquals(state, SegmentStateModel.CONSUMING);
+        }
       } else {
         assertEquals(state, SegmentStateModel.ONLINE);
       }

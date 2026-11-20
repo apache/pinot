@@ -27,7 +27,6 @@ import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
@@ -158,6 +157,20 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     return rows;
   }
 
+  /// Rows the table serves after the given phase: one row per primary key, from that phase.
+  private static List<List<Object>> expectedRows(long baseTs) {
+    List<List<Object>> rows = new ArrayList<>();
+    for (int pk = 1; pk <= NUM_KEYS; pk++) {
+      rows.add(List.of(pk, "name" + pk, "game", (double) pk, baseTs + pk, false));
+    }
+    return rows;
+  }
+
+  private static String rowsQuery(String table) {
+    return "SELECT playerId, name, game, score, timestampInEpoch, deleted FROM " + table
+        + " ORDER BY playerId LIMIT 100";
+  }
+
   private RealtimeTableDataManager tdm(String realtimeTable) {
     return (RealtimeTableDataManager) _serverStarters.get(0).getServerInstance().getInstanceDataManager()
         .getTableDataManager(realtimeTable);
@@ -197,19 +210,6 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     return found[0];
   }
 
-  private long countStar(String table)
-      throws Exception {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + table).getResultSet(0).getLong(0, 0);
-  }
-
-  private int duplicatePkCount(String table)
-      throws Exception {
-    ResultSet dups = getPinotConnection().execute(
-        "SELECT playerId, COUNT(*) FROM " + table + " GROUP BY playerId HAVING COUNT(*) > 1 LIMIT 100")
-        .getResultSet(0);
-    return dups.getRowCount();
-  }
-
   /// Returns the last finished snapshot pass of the only partition. A snapshot pass runs when a consuming segment
   /// starts, except the first one, which starts before any record is consumed.
   @Nullable
@@ -241,22 +241,6 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     }
   }
 
-  private String summary(String table)
-      throws Exception {
-    return "count(*)=" + countStar(table) + ", pks with >1 rows=" + duplicatePkCount(table);
-  }
-
-  private void waitForRowCount(String table, long expected)
-      throws Exception {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return countStar(table) == expected;
-      } catch (Exception e) {
-        return false;
-      }
-    }, 500L, WAIT_MS, "expected " + expected + " rows in " + table);
-  }
-
   private void waitForLlcSegments(String realtimeTable, int minSegments)
       throws Exception {
     TestUtils.waitForCondition(aVoid -> sortedLlcSegmentNames(realtimeTable).size() >= minSegments, 500L, WAIT_MS,
@@ -282,7 +266,7 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     addTableConfig(tableConfig);
 
     pushCsvIntoKafka(rows(PHASE1_BASE_TS), topic, 0);
-    waitForRowCount(table, NUM_KEYS);
+    waitForRows(rowsQuery(table), expectedRows(PHASE1_BASE_TS), WAIT_MS);
     waitForLlcSegments(rtTable, 2);
     String seg0Name = sortedLlcSegmentNames(rtTable).get(0);
     // The first snapshot pass runs when the second consuming segment starts
@@ -312,7 +296,8 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     // up-to-date one otherwise
     assertEquals(isSnapshotUpToDate(rtTable, seg0Name), !holdLock,
         name + ": unexpected state of the validDocIds snapshot of " + seg0Name + " before restart");
-    assertEquals(countStar(table), (long) NUM_KEYS, "pre-restart count");
+    // The snapshot pass above ran after the phase-2 rows replaced all the rows of seg0
+    assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
 
     _serverStarters.set(0, restartServer(_serverStarters.get(0)));
     // A segment is routed to only after its state transition, which adds it to the upsert metadata, so the result is
@@ -326,12 +311,11 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
         return false;
       }
     }, 1000L, WAIT_MS, "segments back online after restart");
-    String afterRestart = summary(table);
-
-    assertEquals(countStar(table), (long) NUM_KEYS,
-        name + ": expected one row per primary key after restart, got " + afterRestart);
-    assertEquals(duplicatePkCount(table), 0,
-        name + ": found duplicate primary keys after restart, got " + afterRestart);
+    // One row per primary key, from phase 2: a stale or missing snapshot must not bring back phase-1 rows. Check as
+    // soon as every segment is routed to, and again once the cluster has settled.
+    assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
+    waitForClusterStateSettled(rtTable, WAIT_MS);
+    assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
 
     if (reloadAfterRestart) {
       String jobId = reloadTableAndValidateResponse(table, TableType.REALTIME, false);
@@ -342,9 +326,10 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
           return false;
         }
       }, 1000L, WAIT_MS, "reload job finished");
-      String afterReload = summary(table);
-      assertEquals(countStar(table), (long) NUM_KEYS, "reload should keep one row per PK, got " + afterReload);
-      assertEquals(duplicatePkCount(table), 0, "duplicate PKs after reload, got " + afterReload);
+      // Check as soon as the reload finished, and again once the cluster has settled
+      assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
+      waitForClusterStateSettled(rtTable, WAIT_MS);
+      assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
     }
     dropRealtimeTable(table);
   }

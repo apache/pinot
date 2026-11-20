@@ -19,12 +19,14 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -44,6 +46,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -98,6 +101,86 @@ public class ClusterIntegrationTestUtils {
   public static final int MAX_NUM_ROWS_TO_COMPARE = 10000;
 
   private static final Random RANDOM = new Random();
+
+  /// Computes the rows a full-upsert table keyed on `primaryKeyColumn` serves after ingesting the given Avro files:
+  /// for each key, the record with the largest `comparisonColumn` value. Returns the selected `columns` of each
+  /// winner, ordered by key, ready for [BaseClusterIntegrationTest#assertRows].
+  ///
+  /// Values are compared as the Avro values render, so each Avro field type must match the Pinot stored type of the
+  /// column (e.g. an Avro float in a DOUBLE column fails with a confusing diff).
+  ///
+  /// This is a test oracle and deliberately does not use the upsert code under test. It covers full upsert, and
+  /// partial upsert when every selected column uses OVERWRITE (out-of-order records are not merged, and the latest
+  /// record per key carries every value): no delete column, no null or bytes values. Two records of a key with the same
+  /// largest comparison value fail it, since which one wins depends on the order of stream partitions and uploaded
+  /// segments.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static List<List<Object>> latestRowPerKey(List<File> avroFiles, String primaryKeyColumn,
+      String comparisonColumn, List<String> columns)
+      throws IOException {
+    Map<Comparable, GenericRecord> winners = new TreeMap<>();
+    // Keys whose current winner ties with another record on the comparison value
+    Set<Comparable> tiedKeys = new HashSet<>();
+    for (File avroFile : avroFiles) {
+      try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
+        for (GenericRecord record : reader) {
+          Comparable key = toComparable(primaryKeyColumn, record.get(primaryKeyColumn));
+          Comparable comparisonValue = toComparable(comparisonColumn, record.get(comparisonColumn));
+          GenericRecord current = winners.get(key);
+          if (current != null) {
+            int comparison =
+                comparisonValue.compareTo(toJavaValue(comparisonColumn, current.get(comparisonColumn)));
+            if (comparison < 0) {
+              continue;
+            }
+            if (comparison == 0) {
+              tiedKeys.add(key);
+              continue;
+            }
+          }
+          tiedKeys.remove(key);
+          winners.put(key, record);
+        }
+      }
+    }
+    Preconditions.checkState(tiedKeys.isEmpty(), "Records of keys %s tie on the largest %s", tiedKeys,
+        comparisonColumn);
+    List<List<Object>> rows = new ArrayList<>(winners.size());
+    for (GenericRecord winner : winners.values()) {
+      List<Object> row = new ArrayList<>(columns.size());
+      for (String column : columns) {
+        row.add(toJavaValue(column, winner.get(column)));
+      }
+      rows.add(row);
+    }
+    return rows;
+  }
+
+  @SuppressWarnings("rawtypes")
+  private static Comparable toComparable(String column, @Nullable Object avroValue) {
+    Object value = toJavaValue(column, avroValue);
+    Preconditions.checkState(value instanceof Comparable, "Column %s is not single-value comparable: %s", column,
+        value);
+    return (Comparable) value;
+  }
+
+  /// Converts an Avro value to the value the broker returns for it. Strings and multi-value columns are converted;
+  /// null and bytes values fail, since the broker renders them differently (default value, hex string).
+  private static Object toJavaValue(String column, @Nullable Object avroValue) {
+    Preconditions.checkState(avroValue != null, "Null value in column: %s", column);
+    Preconditions.checkState(!(avroValue instanceof ByteBuffer), "Bytes column is not supported: %s", column);
+    if (avroValue instanceof Utf8) {
+      return avroValue.toString();
+    }
+    if (avroValue instanceof Collection) {
+      List<Object> values = new ArrayList<>();
+      for (Object value : (Collection<?>) avroValue) {
+        values.add(toJavaValue(column, value));
+      }
+      return values;
+    }
+    return avroValue;
+  }
 
   /// Set up an H2 table with records from the given Avro files inserted.
   ///

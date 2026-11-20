@@ -28,7 +28,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider;
-import org.apache.pinot.integration.tests.realtime.utils.PauselessRealtimeTestUtils;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -45,6 +44,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.DEDUP_PAUSELESS_SURVIVORS;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.dedupRowsQuery;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -168,7 +169,7 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
     // The runs are spaced out so a pass does not re-trigger resets still in flight from the previous pass.
     long[] lastValidationRunMs = new long[1];
     TestUtils.waitForCondition(aVoid -> {
-      if (PauselessRealtimeTestUtils.isExternalViewConverged(_helixResourceManager, realtimeTableName)) {
+      if (isExternalViewConverged(realtimeTableName)) {
         return true;
       }
       long nowMs = System.currentTimeMillis();
@@ -180,8 +181,12 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
     }, 1000L, 600_000L, "ERROR replicas were not repaired without the disaster recovery override");
 
     // With all its replicas repaired, the lagging server passes the dedup consume gate and catches up, so queries
-    // return the deduplicated count from either replica group.
+    // return the deduplicated rows from either replica group.
     waitForAllDocsLoaded(600_000L);
+    // Dedup keeps the first row per id, so a replica that has not read the duplicates yet already serves these rows:
+    // wait until every replica consumed the whole stream first
+    waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
+    assertRowsFromEveryReplica(dedupRowsQuery(getTableName()), DEDUP_PAUSELESS_SURVIVORS);
   }
 
   private int getNumErrorReplicasInEV(String realtimeTableName) {

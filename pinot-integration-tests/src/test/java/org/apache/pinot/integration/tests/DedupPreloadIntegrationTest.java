@@ -39,12 +39,14 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.DEDUP_SURVIVORS;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.dedupRowsQuery;
 
 
 public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -73,6 +75,8 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
     addTableConfig(tableConfig);
 
     waitForAllDocsLoaded(600_000L);
+    // Dedup keeps the first row per id, so the count is right before the duplicates are read: wait for them too
+    waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
   }
 
   @Override
@@ -118,32 +122,23 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Override
   protected long getCountStarResult() {
-    // Three distinct records are expected with pk values of 100000, 100001, 100002
+    // 5 distinct records are expected with pk values of 0, 1, 2, 3, 4
     return 5;
   }
 
   @Test
   public void testValues()
       throws Exception {
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    String query = dedupRowsQuery(getTableName());
+    assertRows(query, DEDUP_SURVIVORS);
 
-    // Validate the older value persist
-    for (int i = 0; i < getCountStarResult(); i++) {
-      assertEquals(
-          getPinotConnection().execute("SELECT name FROM " + getTableName() + " WHERE id = " + i).getResultSet(0)
-              .getString(0), "" + i);
-    }
-
-    // Restart the servers and check again
+    // Restart the servers. The committed segments serve the expected rows as soon as they load, so also wait until
+    // the duplicates past the last commit are consumed again: the preloaded dedup metadata must drop them.
     restartServers();
-    waitForAllDocsLoaded(600_000L);
-
-    // Validate the older value persist
-    for (int i = 0; i < getCountStarResult(); i++) {
-      assertEquals(
-          getPinotConnection().execute("SELECT name FROM " + getTableName() + " WHERE id = " + i).getResultSet(0)
-              .getString(0), "" + i);
-    }
+    waitForRows(query, DEDUP_SURVIVORS, 600_000L);
+    waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
+    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(getTableName()), 600_000L);
+    assertRows(query, DEDUP_SURVIVORS);
   }
 
   @Override

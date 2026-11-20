@@ -176,6 +176,9 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
 
       // Keyed on the manager's columns these are the same record, so the second must have been deduped away.
       Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 1);
+      // The first record is the one kept
+      Assert.assertEquals(_mutableSegmentImpl.getValue(0, DEDUP_TIME_COLUMN), 1L);
+      Assert.assertEquals(_mutableSegmentImpl.getValue(0, TIME_COLUMN), 1567205396L);
     } finally {
       partitionDedupMetadataManager.stop();
       partitionDedupMetadataManager.close();
