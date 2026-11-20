@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.fasterxml.jackson.databind.JsonNode;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -275,27 +274,6 @@ public class LeafOperatorTest {
     assertEquals(rows.get(1), new Object[]{0, 1600000000000L, 0});
     assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 2 blocks");
 
-    operator.close();
-  }
-
-  /// A key the plan types as VARCHAR (an undeclared OPEN_STRUCT key) can come back from a segment as BOOLEAN or
-  /// TIMESTAMP; it must read as the single-stage engine renders it, not as the stored 1/0 or epoch millis.
-  @Test
-  public void shouldConvertLogicalTypesToVarcharAsTheSingleStageEngineRendersThem() {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT boolCol, tsCol FROM tbl");
-    DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "tsCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP});
-    DataSchema desiredSchema = new DataSchema(new String[]{"boolCol", "tsCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
-    List<BaseResultsBlock> dataBlocks = List.of(new SelectionResultsBlock(resultSchema,
-        Arrays.asList(new Object[]{1, 0L}, new Object[]{0, 1000L}), queryContext));
-    LeafOperator operator = new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), desiredSchema,
-        mockQueryExecutor(dataBlocks, new InstanceResponseBlock(new MetadataResultsBlock())), _executorService);
-    _operatorRef.set(operator);
-
-    List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
-    assertEquals(rows.get(0), new Object[]{"true", new Timestamp(0L).toString()});
-    assertEquals(rows.get(1), new Object[]{"false", new Timestamp(1000L).toString()});
     operator.close();
   }
 

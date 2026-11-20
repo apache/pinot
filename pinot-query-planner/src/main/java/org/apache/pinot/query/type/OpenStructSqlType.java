@@ -20,6 +20,7 @@ package org.apache.pinot.query.type;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
@@ -29,9 +30,8 @@ import org.apache.calcite.sql.type.MapSqlType;
 /// Calcite type of an OPEN_STRUCT column.
 ///
 /// It is a `MAP<VARCHAR, VARCHAR>` so that `col['key']` validates as a map lookup, and it carries the column's
-/// declared child field specs as Calcite types. [PinotItemOperator] uses them to type a key read: a declared key has
-/// its declared type, an undeclared key is VARCHAR (the single-stage engine reads it as STRING). Selecting the whole
-/// column returns JSON text, as in the single-stage engine.
+/// declared child field specs as Calcite types. The `ITEM` operator uses a key's declared type or VARCHAR for an
+/// undeclared key. Selecting the whole column returns JSON text.
 ///
 /// The declared types are part of the digest, so two OPEN_STRUCT columns with different declarations are different
 /// types after canonicalization. Instances are immutable.
@@ -57,6 +57,17 @@ public class OpenStructSqlType extends MapSqlType {
   }
 
   @Override
+  public boolean deepEquals(@Nullable Object obj) {
+    return obj instanceof OpenStructSqlType other && super.deepEquals(other)
+        && Objects.equals(_declaredKeyTypes, other._declaredKeyTypes);
+  }
+
+  @Override
+  public int deepHashCode() {
+    return 31 * super.deepHashCode() + Objects.hashCode(_declaredKeyTypes);
+  }
+
+  @Override
   protected void generateTypeString(StringBuilder sb, boolean withDetail) {
     sb.append("OPEN_STRUCT");
     // Null while the super constructor computes its first digest.
@@ -68,7 +79,8 @@ public class OpenStructSqlType extends MapSqlType {
           sb.append(", ");
         }
         first = false;
-        sb.append(entry.getKey()).append(' ')
+        // A key can contain a type name, a separator, or a quote.
+        sb.append('"').append(entry.getKey().replace("\"", "\"\"")).append("\" ")
             .append(withDetail ? entry.getValue().getFullTypeString() : entry.getValue().toString());
       }
       sb.append(')');

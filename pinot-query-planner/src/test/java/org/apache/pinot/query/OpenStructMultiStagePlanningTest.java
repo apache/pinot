@@ -71,6 +71,12 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
     }
   }
 
+  private DispatchableSubPlan planQuery(String sql) {
+    try (QueryEnvironment.CompiledQuery query = _env.compile(sql)) {
+      return query.planQuery(0).getQueryPlan();
+    }
+  }
+
   @Test
   public void testDeclaredKeyIsTypedByItsChildFieldSpec() {
     RelDataType rowType = validatedRowType("SELECT v['n'], v['price'] FROM d");
@@ -90,13 +96,13 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
   public void testNumericFilterAndAggregationOnDeclaredKeyPlan() {
     RelDataType rowType = validatedRowType("SELECT SUM(v['n']), COUNT(*) FROM d WHERE v['n'] > 50");
     assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.BIGINT);
-    assertNotNull(_env.planQuery("SELECT SUM(v['n']), COUNT(*) FROM d WHERE v['n'] > 50"));
-    assertNotNull(_env.planQuery("SELECT CAST(v['name'] AS BIGINT) FROM d"));
+    assertNotNull(planQuery("SELECT SUM(v['n']), COUNT(*) FROM d WHERE v['n'] > 50"));
+    assertNotNull(planQuery("SELECT CAST(v['name'] AS BIGINT) FROM d"));
   }
 
   @Test
   public void testWholeColumnIsJsonText() {
-    DispatchableSubPlan plan = _env.planQuery("SELECT col1, v FROM d");
+    DispatchableSubPlan plan = planQuery("SELECT col1, v FROM d");
     DataSchema schema = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot().getDataSchema();
     assertEquals(schema.getColumnDataTypes()[1], ColumnDataType.JSON);
   }
@@ -111,7 +117,7 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
   /// declare with the same type keeps it while a key they declare differently is VARCHAR.
   @Test
   public void testUnionAllKeepsOpenStruct() {
-    DispatchableSubPlan plan = _env.planQuery("SELECT v FROM d UNION ALL SELECT v FROM d WHERE col3 > 0");
+    DispatchableSubPlan plan = planQuery("SELECT v FROM d UNION ALL SELECT v FROM d WHERE col3 > 0");
     DataSchema schema = plan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot().getDataSchema();
     assertEquals(schema.getColumnDataTypes()[0], ColumnDataType.JSON);
     // d2 has no segments, so only validate across the two declarations.
@@ -128,23 +134,35 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
     for (String sql : List.of("SELECT CASE WHEN col3 > 0 THEN v ELSE NULL END FROM d",
         "SELECT COALESCE(v, NULL) FROM d")) {
       DataSchema schema =
-          _env.planQuery(sql).getQueryStageMap().get(0).getPlanFragment().getFragmentRoot().getDataSchema();
+          planQuery(sql).getQueryStageMap().get(0).getPlanFragment().getFragmentRoot().getDataSchema();
       assertEquals(schema.getColumnDataTypes()[0], ColumnDataType.JSON, sql);
     }
   }
 
   @Test
   public void testNonLiteralKeyIsRejected() {
-    Exception e = expectThrows(Exception.class, () -> _env.planQuery("SELECT v[col1] FROM d"));
+    Exception e = expectThrows(Exception.class, () -> planQuery("SELECT v[col1] FROM d"));
     assertTrue(e.getMessage().contains("must be a literal"), e.getMessage());
   }
 
-  /// Unlike the single-stage engine, which compares an undeclared (STRING) key to a number as text, the multi-stage
-  /// engine applies SQL coercion: the key is cast to the literal's type and compared numerically.
+  @Test
+  public void testComputedOpenStructKeyLookupIsRejectedDuringPlanning() {
+    String computed = "CASE WHEN col3 > 0 THEN v ELSE NULL END";
+    for (String sql : List.of("SELECT (" + computed + ")['n'] FROM d",
+        "SELECT x['n'] FROM (SELECT " + computed + " AS x FROM d)")) {
+      Exception e = expectThrows(Exception.class, () -> planQuery(sql));
+      assertTrue(e.getMessage().contains("OPEN_STRUCT key lookup requires a column reference"), e.getMessage());
+    }
+  }
+
+  /// The multi-stage engine casts an undeclared VARCHAR key when comparing it to a numeric literal.
   @Test
   public void testUndeclaredKeyComparedToNumberIsCast() {
-    String plan = _env.explainQuery("EXPLAIN PLAN FOR SELECT COUNT(*) FROM d WHERE v['x'] > 5", 0L);
-    assertTrue(plan.contains("CAST(ITEM("), plan);
+    String sql = "EXPLAIN PLAN FOR SELECT COUNT(*) FROM d WHERE v['x'] > 5";
+    try (QueryEnvironment.CompiledQuery query = _env.compile(sql)) {
+      String plan = query.explain(0, null).getExplainPlan();
+      assertTrue(plan.contains("CAST(ITEM("), plan);
+    }
   }
 
   /// The physical optimizer converts the table scan's row type through its own converter; the column is JSON there
@@ -152,12 +170,12 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
   @Test
   public void testPhysicalOptimizerPlansTheColumnAsJson() {
     String options = "SET usePhysicalOptimizer=true; ";
-    DataSchema schema = _env.planQuery(options + "SELECT col1, v FROM d").getQueryStageMap().get(0).getPlanFragment()
+    DataSchema schema = planQuery(options + "SELECT col1, v FROM d").getQueryStageMap().get(0).getPlanFragment()
         .getFragmentRoot().getDataSchema();
     assertEquals(schema.getColumnDataTypes()[1], ColumnDataType.JSON);
     for (String sql : List.of("SELECT SUM(v['n']), COUNT(*) FROM d WHERE v['n'] > 50", "SELECT v['name'] FROM d",
         "SELECT v['n'], COUNT(*) FROM d GROUP BY v['n']")) {
-      assertNotNull(_env.planQuery(options + sql), sql);
+      assertNotNull(planQuery(options + sql), sql);
     }
   }
 
@@ -168,7 +186,7 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
     RelDataType rowType = validatedRowType("SELECT mcol1[1], mcol2[1] FROM e");
     assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
     assertEquals(rowType.getFieldList().get(1).getType().getSqlTypeName(), SqlTypeName.BIGINT);
-    assertNotNull(_env.planQuery("SELECT mcol1[1], mcol2[1] FROM e WHERE mcol2[1] > 5"));
+    assertNotNull(planQuery("SELECT mcol1[1], mcol2[1] FROM e WHERE mcol2[1] > 5"));
   }
 
   /// A key is looked up in the operand's own declared keys, so the same key name on another OPEN_STRUCT column with a
@@ -183,7 +201,7 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
   @Test
   public void testQueriesThatDoNotReadTheColumnPlan() {
     for (String sql : List.of("SELECT COUNT(*) FROM d", "SELECT SUM(col3) FROM d", "SELECT * FROM d LIMIT 1")) {
-      assertNotNull(_env.planQuery(sql), sql);
+      assertNotNull(planQuery(sql), sql);
     }
   }
 }

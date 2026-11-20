@@ -171,6 +171,24 @@ public class TypeFactoryTest {
         eventType);
   }
 
+  @Test
+  public void testOpenStructKeysCannotCollideInTypeCache() {
+    String combinedKey = "a INTEGER, b";
+    Schema schema = new Schema.SchemaBuilder().setEnableColumnBasedNullHandling(true)
+        .addOpenStruct("split", Map.of("a", new DimensionFieldSpec("a", FieldSpec.DataType.INT, true),
+            "b", new DimensionFieldSpec("b", FieldSpec.DataType.LONG, true)))
+        .addOpenStruct("combined", Map.of(combinedKey, new DimensionFieldSpec(combinedKey, FieldSpec.DataType.LONG,
+            true)))
+        .build();
+    RelDataType row = new TypeFactory().createRelDataTypeFromSchema(schema);
+    OpenStructSqlType split = (OpenStructSqlType) row.getField("split", true, false).getType();
+    OpenStructSqlType combined = (OpenStructSqlType) row.getField("combined", true, false).getType();
+    Assert.assertNotEquals(split.getFullTypeString(), combined.getFullTypeString());
+    Assert.assertFalse(split.deepEquals(combined));
+    Assert.assertEquals(split.getDeclaredKeyType("a").getSqlTypeName(), SqlTypeName.INTEGER);
+    Assert.assertEquals(combined.getDeclaredKeyType(combinedKey).getSqlTypeName(), SqlTypeName.BIGINT);
+  }
+
   /// Child specs map by shape: a multi-value child is an array of its type, and a complex child (a nested OPEN_STRUCT,
   /// MAP or LIST) has no Calcite counterpart as a key read, so it is VARCHAR, the JSON text the leaf returns.
   /// With null handling on, every declared key is nullable since any row may lack it.

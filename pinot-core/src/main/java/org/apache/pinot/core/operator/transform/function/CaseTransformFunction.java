@@ -116,6 +116,10 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     TransformResultMetadata newMetadata = newFunction.getResultMetadata();
     Preconditions.checkArgument(newMetadata.isSingleValue(), "Unsupported multi-value expression in THEN/ELSE clause");
     DataType newType = newMetadata.getDataType();
+    // A whole OPEN_STRUCT branch supplies its JSON document through transformToStringValuesSV.
+    if (newType == DataType.OPEN_STRUCT) {
+      newType = DataType.STRING;
+    }
     if (newType == DataType.UNKNOWN) {
       return;
     }

@@ -678,7 +678,6 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     DataSchema inputDataSchema = block.getDataSchema();
     assert resultRows != null && inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
-    ColumnDataType[] inputTypes = inputDataSchema.getColumnDataTypes();
     ColumnDataType[] outputStoredTypes = _dataSchema.getStoredColumnDataTypes();
     List<Object[]> convertedRows = new ArrayList<>(resultRows.size());
     boolean needConvert = false;
@@ -691,7 +690,7 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     }
     if (needConvert) {
       for (Object[] row : resultRows) {
-        convertedRows.add(reorderAndConvertRow(row, inputStoredTypes, inputTypes, outputStoredTypes, columnIndices));
+        convertedRows.add(reorderAndConvertRow(row, inputStoredTypes, outputStoredTypes, columnIndices));
       }
     } else {
       for (Object[] row : resultRows) {
@@ -702,7 +701,7 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
   }
 
   private static Object[] reorderAndConvertRow(Object[] row, ColumnDataType[] inputStoredTypes,
-      ColumnDataType[] inputTypes, ColumnDataType[] outputStoredTypes, int[] columnIndices) {
+      ColumnDataType[] outputStoredTypes, int[] columnIndices) {
     int numColumns = columnIndices.length;
     Object[] resultRow = new Object[numColumns];
     for (int colId = 0; colId < numColumns; colId++) {
@@ -710,7 +709,7 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
       Object value = row[inputColId];
       if (value != null) {
         if (inputStoredTypes[inputColId] != outputStoredTypes[colId]) {
-          resultRow[colId] = TypeUtils.convert(value, inputTypes[inputColId], outputStoredTypes[colId]);
+          resultRow[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
         } else {
           resultRow[colId] = value;
         }
@@ -733,7 +732,6 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     DataSchema inputDataSchema = block.getDataSchema();
     assert resultRows != null && inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
-    ColumnDataType[] inputTypes = inputDataSchema.getColumnDataTypes();
     ColumnDataType[] outputStoredTypes = _dataSchema.getStoredColumnDataTypes();
     QueryContext queryContext = _requests.get(0).getQueryContext();
     // Convert the columns whose stored types differ, and the STRING final aggregation results, which can be objects
@@ -754,7 +752,7 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
           int colId = colIdsToConvert[i];
           Object value = row[colId];
           if (value != null) {
-            row[colId] = TypeUtils.convert(value, inputTypes[colId], outputStoredTypes[colId]);
+            row[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
           }
         }
       }

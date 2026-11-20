@@ -24,7 +24,6 @@ import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.fun.SqlItemOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
-import org.apache.calcite.sql.type.SqlSingleOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.Static;
 import org.apache.pinot.query.type.OpenStructSqlType;
@@ -35,15 +34,13 @@ import org.apache.pinot.query.type.OpenStructSqlType;
 /// Every operand type behaves as Calcite's standard ITEM. When the operand is an [OpenStructSqlType] and the key is a
 /// literal, the result is the key's declared type, so `v['n'] > 50` and `SUM(v['n'])` are numeric when `n` is
 /// declared numeric; an undeclared key is VARCHAR. Either way the result is nullable, since any row may lack the key.
-/// This matches the single-stage engine, which reads a declared key with its declared type and an undeclared key as
-/// STRING. The key must be a literal: the leaf stage resolves it once per segment, so `col[otherCol]` is rejected at
-/// validation. Stateless and thread-safe.
+/// The leaf resolves a column reference and a literal key once per segment. The planner rejects computed operands
+/// that cannot be evaluated this way. Stateless and thread-safe.
 public class PinotItemOperator extends SqlItemOperator {
-  public static final PinotItemOperator INSTANCE = new PinotItemOperator();
+  public static final PinotItemOperator INSTANCE = new PinotItemOperator((SqlItemOperator) SqlStdOperatorTable.ITEM);
 
-  private PinotItemOperator() {
-    // Calcite's ITEM is built with a single-operand checker (the operand-type rules for MAP, ARRAY and ROW).
-    super("ITEM", (SqlSingleOperandTypeChecker) SqlStdOperatorTable.ITEM.getOperandTypeChecker(), 0, false);
+  private PinotItemOperator(SqlItemOperator standard) {
+    super(standard.getName(), standard.getOperandTypeChecker(), standard.offset, standard.safe);
   }
 
   @Override

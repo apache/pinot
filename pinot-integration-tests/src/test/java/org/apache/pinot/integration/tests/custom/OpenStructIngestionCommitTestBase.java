@@ -141,8 +141,9 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
   public List<File> createAvroFiles()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("OpenStructRecord", null, null, false);
-    org.apache.avro.Schema mapSchema =
-        org.apache.avro.Schema.createMap(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING));
+    org.apache.avro.Schema mapSchema = org.apache.avro.Schema.createMap(org.apache.avro.Schema.createUnion(
+        org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
+        org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT)));
     List<org.apache.avro.Schema.Field> fields = Arrays.asList(
         new org.apache.avro.Schema.Field(METRICS, mapSchema, null, null),
         new org.apache.avro.Schema.Field(TIMESTAMP_FIELD_NAME,
@@ -153,12 +154,14 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
     try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
       List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       for (int i = 0; i < NUM_DOCS; i++) {
-        Map<String, String> metrics = new HashMap<>();
+        Map<String, Object> metrics = new HashMap<>();
         metrics.put("views", String.valueOf(i));            // LONG, high cardinality (dict + inverted)
         metrics.put("cpu", String.valueOf(i * 0.5));         // DOUBLE (dict)
         metrics.put("host", "host-" + (i % 5));              // STRING, small set (raw forward)
         metrics.put("region", "region-" + (i % 4));          // sparse
         metrics.put("latencyMs", String.valueOf(i % 100));   // sparse
+        metrics.put("rank", i % 2 == 0 ? 2 : 10);            // undeclared INT, exposed as VARCHAR in MSE
+        metrics.put("", "empty key");                       // a NULL subscript must not read this key
         metrics.put("debug", "noise-" + i);                  // ignoredKeys: dropped at ingestion
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(METRICS, metrics);
@@ -225,6 +228,25 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
       JsonNode document = JsonUtils.stringToJsonNode(whole.get("resultTable").get("rows").get(0).get(0).asText());
       assertEquals(document.get("views").asLong(), 7);
       assertEquals(document.get("region").asText(), "region-3");
+
+      String documentOrNull = "CASE WHEN " + m + "['views'] = 0 THEN " + m + " ELSE NULL END";
+      JsonNode conditional = postQuery("SET enableNullHandling = true; SELECT " + documentOrNull + ", COALESCE("
+          + documentOrNull + ", " + m + "), " + m + "[NULL] FROM " + t + " ORDER BY " + TIMESTAMP_FIELD_NAME
+          + " LIMIT 2");
+      assertEquals(conditional.get("exceptions").size(), 0, conditional.toString());
+      JsonNode rows = conditional.get("resultTable").get("rows");
+      assertEquals(JsonUtils.stringToJsonNode(rows.get(0).get(0).asText()).get("views").asInt(), 0);
+      assertTrue(rows.get(1).get(0).isNull());
+      assertEquals(JsonUtils.stringToJsonNode(rows.get(1).get(1).asText()).get("views").asInt(), 1);
+      assertTrue(rows.get(0).get(2).isNull());
+
+      // The segment stores rank numerically, but both the predicate and top-N must use string ordering.
+      JsonNode filtered = postQuery("SELECT COUNT(*) FROM " + t + " WHERE " + m + "['rank'] > '2'");
+      assertEquals(filtered.get("exceptions").size(), 0, filtered.toString());
+      assertEquals(filtered.get("resultTable").get("rows").get(0).get(0).asLong(), 0L);
+      JsonNode sorted = postQuery("SELECT " + m + "['rank'] FROM " + t + " ORDER BY " + m + "['rank'] LIMIT 1");
+      assertEquals(sorted.get("exceptions").size(), 0, sorted.toString());
+      assertEquals(sorted.get("resultTable").get("rows").get(0).get(0).textValue(), "10");
     } finally {
       setUseMultiStageQueryEngine(multiStage);
     }
