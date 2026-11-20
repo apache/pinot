@@ -45,6 +45,7 @@ import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -68,6 +69,7 @@ public class HelixSetupUtils {
   ///   the config doesn't already exist.
   public static void setupHelixClusterWithDefaultConfigs(String zkAddress, String clusterName,
       Map<String, String> defaultConfigs) {
+    ZooKeeperSslContextSupplier.initialize();
     HelixAdmin admin = new ZKHelixAdmin.Builder().setZkAddress(zkAddress).build();
     try {
       if (admin.getClusters().contains(clusterName)) {

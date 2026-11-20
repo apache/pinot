@@ -129,8 +129,10 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
       Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, List.of(segmentName)));
       configs.putAll(MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs, _clusterInfoAccessor));
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
+      // Refresh can reuse the original index directory, whose metadata may name the source table. Other conversion
+      // tasks use v1 because they regenerate destination-bound metadata; any future artifact-reuse path must use v2.
       configs.put(MinionConstants.UPLOAD_URL_KEY,
-          _clusterInfoAccessor.getVipUrlForLeadController(tableNameWithType) + "/segments");
+          _clusterInfoAccessor.getVipUrlForLeadController(tableNameWithType) + "/v2/segments");
       configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
       pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
       tableNumTasks++;

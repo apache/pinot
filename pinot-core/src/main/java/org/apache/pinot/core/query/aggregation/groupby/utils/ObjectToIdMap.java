@@ -36,9 +36,10 @@ public class ObjectToIdMap implements ValueToIdMap {
   @Override
   public int put(Object value) {
     int numValues = _valueToIdMap.size();
-    int id = _valueToIdMap.computeIntIfAbsent(value, k -> numValues);
-    if (id == numValues) {
+    int id = _valueToIdMap.putIfAbsent(value, numValues);
+    if (id == INVALID_KEY) {
       _idToValueMap.add(value);
+      return numValues;
     }
     return id;
   }

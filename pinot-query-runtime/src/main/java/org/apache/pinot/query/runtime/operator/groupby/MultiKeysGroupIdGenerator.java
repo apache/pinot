@@ -28,6 +28,11 @@ import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory
 import org.apache.pinot.spi.utils.FixedIntArray;
 
 
+/// [GroupIdGenerator] for 3 or more key columns, where each key value is converted into a key id and the resulting
+/// key ids are wrapped into a [FixedIntArray] used as the map key.
+///
+/// This class is not thread-safe. It keeps a reusable [FixedIntArray] to look up the group id without allocating on
+/// every row, so a single instance must be accessed by a single thread at a time.
 public class MultiKeysGroupIdGenerator implements GroupIdGenerator {
   private final Object2IntOpenHashMap<FixedIntArray> _groupIdMap;
   /// A function to generate the next group ID based on the current size of the map.
@@ -35,6 +40,10 @@ public class MultiKeysGroupIdGenerator implements GroupIdGenerator {
   private final ToIntFunction<FixedIntArray> _groupIdGenerator;
   private final ValueToIdMap[] _keyToIdMaps;
   private final int _numGroupsLimit;
+
+  /// Reusable key holding the key ids of the row being processed. It is replaced with a new instance whenever it is
+  /// inserted into [#_groupIdMap], which takes ownership of the key.
+  private FixedIntArray _currentKey;
 
   public MultiKeysGroupIdGenerator(ColumnDataType[] keyTypes, int numKeyColumns,
       int numGroupsLimit, int initialCapacity) {
@@ -47,19 +56,27 @@ public class MultiKeysGroupIdGenerator implements GroupIdGenerator {
       _keyToIdMaps[i] = ValueToIdMapFactory.get(keyTypes[i].toDataType());
     }
     _numGroupsLimit = numGroupsLimit;
+    _currentKey = new FixedIntArray(new int[numKeyColumns]);
   }
 
   @Override
   public int getGroupId(Object key) {
     Object[] keyValues = (Object[]) key;
-    int numKeyColumns = keyValues.length;
-    int[] keyIds = new int[numKeyColumns];
-    if (_groupIdMap.size() < _numGroupsLimit) {
+    int numKeyColumns = _keyToIdMaps.length;
+    FixedIntArray currentKey = _currentKey;
+    int[] keyIds = currentKey.elements();
+    int numGroups = _groupIdMap.size();
+    if (numGroups < _numGroupsLimit) {
       for (int i = 0; i < numKeyColumns; i++) {
         Object keyValue = keyValues[i];
         keyIds[i] = keyValue != null ? _keyToIdMaps[i].put(keyValue) : NULL_ID;
       }
-      return _groupIdMap.computeIfAbsent(new FixedIntArray(keyIds), _groupIdGenerator);
+      int groupId = _groupIdMap.computeIfAbsent(currentKey, _groupIdGenerator);
+      if (_groupIdMap.size() != numGroups) {
+        // A new group is created and the map holds a reference to the current key, so allocate a new one
+        _currentKey = new FixedIntArray(new int[numKeyColumns]);
+      }
+      return groupId;
     } else {
       for (int i = 0; i < numKeyColumns; i++) {
         Object keyValue = keyValues[i];
@@ -73,7 +90,7 @@ public class MultiKeysGroupIdGenerator implements GroupIdGenerator {
           keyIds[i] = keyId;
         }
       }
-      return _groupIdMap.getInt(new FixedIntArray(keyIds));
+      return _groupIdMap.getInt(currentKey);
     }
   }
 

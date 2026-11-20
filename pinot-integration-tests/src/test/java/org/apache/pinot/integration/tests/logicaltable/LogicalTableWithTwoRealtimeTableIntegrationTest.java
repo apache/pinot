@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests.logicaltable;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -37,11 +36,9 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
-import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
-import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -49,7 +46,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 
 
 public class LogicalTableWithTwoRealtimeTableIntegrationTest extends BaseLogicalTableIntegrationTest {
@@ -126,42 +122,6 @@ public class LogicalTableWithTwoRealtimeTableIntegrationTest extends BaseLogical
     assertEquals(_table1RecordCount,
         getCurrentCountStarResult(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME_1)));
     assertEquals(_table0RecordCount + _table1RecordCount, getCurrentCountStarResult(LOGICAL_TABLE_NAME));
-  }
-
-  @Override
-  @Test
-  public void testQueryTimeOut()
-      throws Exception {
-    String starQuery = "SELECT * from " + getLogicalTableName();
-    QueryConfig queryConfig = new QueryConfig(1L, null, null, null, null, null);
-    var logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    JsonNode response = postQuery(starQuery);
-    JsonNode exceptions = response.get("exceptions");
-    if (!exceptions.isEmpty()) {
-      int errorCode = exceptions.get(0).get("errorCode").asInt();
-      assertTrue(errorCode == QueryErrorCode.BROKER_TIMEOUT.getId()
-          || errorCode == QueryErrorCode.SERVER_NOT_RESPONDING.getId()
-          || errorCode == QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId(),
-          "Unexpected error code: " + errorCode);
-    }
-
-    // Query succeeds with a high limit.
-    queryConfig = new QueryConfig(1000000L, null, null, null, null, null);
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    response = postQuery(starQuery);
-    exceptions = response.get("exceptions");
-    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
-
-    // Reset to null.
-    queryConfig = new QueryConfig(null, null, null, null, null, null);
-    logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(logicalTableConfig);
-    response = postQuery(starQuery);
-    exceptions = response.get("exceptions");
-    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
   }
 
   @Override

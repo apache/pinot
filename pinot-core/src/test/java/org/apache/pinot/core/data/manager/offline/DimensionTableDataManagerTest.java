@@ -40,7 +40,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -65,6 +64,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -76,7 +76,8 @@ import static org.testng.Assert.*;
 
 @SuppressWarnings("unchecked")
 public class DimensionTableDataManagerTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), LoaderTest.class.getName());
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), DimensionTableDataManagerTest.class.getName());
   private static final String RAW_TABLE_NAME = "dimBaseballTeams";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String CSV_DATA_PATH = "data/dimBaseballTeams.csv";
@@ -121,7 +122,24 @@ public class DimensionTableDataManagerTest {
     _indexDir = new File(tableDataDir, segmentName);
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(_indexDir);
     _segmentZKMetadata = new SegmentZKMetadata(segmentName);
-    _segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    _segmentZKMetadata.setCrc(segmentMetadata.getCrc());
+  }
+
+  @AfterMethod(alwaysRun = true)
+  public void tearDownMethod() {
+    // DimensionTableDataManager is a process-wide singleton keyed by table name (see the static
+    // INSTANCES map in DimensionTableDataManager). Every test method loads the same
+    // dimBaseballTeams_OFFLINE table, so without an explicit teardown the singleton (and its
+    // property-store mock, loaded segments, and reload executor) leaks from one method into the
+    // next. A stale async reload from a prior method could then read a _propertyStore that a
+    // concurrent init() had swapped out, surfacing as an intermittent
+    // "Failed to find schema for table: dimBaseballTeams_OFFLINE". Shutting the singleton down
+    // removes it from INSTANCES so each method starts from a clean, freshly-initialized instance.
+    DimensionTableDataManager tableDataManager =
+        DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME);
+    if (tableDataManager != null) {
+      tableDataManager.shutDown();
+    }
   }
 
   @AfterClass

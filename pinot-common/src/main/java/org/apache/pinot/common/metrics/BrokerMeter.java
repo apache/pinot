@@ -42,6 +42,7 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   ///
   /// At this moment this counter does not include queries executed in multi-stage mode.
   public static final BrokerMeter QUERIES = create("QUERIES", "queries", false);
+
   /// Number of single-stage queries that have been started.
   ///
   /// Unlike [#QUERIES], this metric is global and not attached to a particular table.
@@ -139,6 +140,15 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED = create(
       "SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED", "badResponses", false);
 
+  // This metric tracks the number of times an in-flight server was skipped (its channel went inactive or a request
+  // send to it failed) because the query was submitted with skipUnavailableServers=true.
+  public static final BrokerMeter SERVER_MARKED_DOWN_SKIPPED =
+      create("SERVER_MARKED_DOWN_SKIPPED", "count", true);
+
+  // This metric tracks the number of broker responses carrying a BROKER_REQUEST_SEND (425) error
+  public static final BrokerMeter BROKER_RESPONSES_WITH_SEND_EXCEPTIONS = create(
+      "BROKER_RESPONSES_WITH_SEND_EXCEPTIONS", "badResponses", false);
+
   public static final BrokerMeter BROKER_RESPONSES_WITH_TIMEOUTS = create(
       "BROKER_RESPONSES_WITH_TIMEOUTS", "badResponses", false);
 
@@ -152,6 +162,11 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
   public static final BrokerMeter BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED = create(
       "BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED", "badResponses", false);
+
+  // This metric tracks the number of broker responses with an approximated result: a function that can answer exactly,
+  // such as a SMART function past its conversion threshold, returned an approximate result.
+  public static final BrokerMeter BROKER_RESPONSES_WITH_APPROXIMATED_RESULT = create(
+      "BROKER_RESPONSES_WITH_APPROXIMATED_RESULT", "badResponses", false);
 
   public static final BrokerMeter BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED = create(
       "BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED", "badResponses", false);
@@ -187,6 +202,21 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter SERVER_MISSING_FOR_ROUTING = create(
       "SERVER_MISSING_FOR_ROUTING", "badResponses", false);
 
+  /// Number of times the broker updated the routing of a table after a change to its ideal state or external view.
+  /// Failed updates are counted in [#ROUTING_TABLE_UPDATE_FAILURE] instead.
+  ///
+  /// This metric is not global and is attached to a particular table.
+  public static final BrokerMeter ROUTING_TABLE_UPDATE_SUCCESS =
+      create("ROUTING_TABLE_UPDATE_SUCCESS", "updates", false);
+
+  /// Number of times the broker failed to update the routing of a table after a change to its ideal state or external
+  /// view. The broker retries the update on the next change. Failed updates are not counted in
+  /// [#ROUTING_TABLE_UPDATE_SUCCESS].
+  ///
+  /// This metric is not global and is attached to a particular table.
+  public static final BrokerMeter ROUTING_TABLE_UPDATE_FAILURE =
+      create("ROUTING_TABLE_UPDATE_FAILURE", "failures", false);
+
   // Netty connection metrics
   public static final BrokerMeter NETTY_CONNECTION_REQUESTS_SENT = create(
       "NETTY_CONNECTION_REQUESTS_SENT", "nettyConnection", true);
@@ -196,6 +226,33 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "NETTY_CONNECTION_BYTES_RECEIVED", "nettyConnection", true);
   public static final BrokerMeter NETTY_CONNECTION_SEND_REQUEST_FAILURES = create(
       "NETTY_CONNECTION_SEND_REQUEST_FAILURES", "nettyConnection", true);
+  // These track server channels transitioning to active/inactive on the broker (Netty channelActive/channelInactive).
+  // Non-global: emitted per server and tagged with the server short name (see DataTableHandler).
+  public static final BrokerMeter NETTY_CONNECTION_CHANNEL_ACTIVE = create(
+      "NETTY_CONNECTION_CHANNEL_ACTIVE", "nettyConnection", false);
+  public static final BrokerMeter NETTY_CONNECTION_CHANNEL_INACTIVE = create(
+      "NETTY_CONNECTION_CHANNEL_INACTIVE", "nettyConnection", false);
+  // The three meters below are tagged with the server's short name, like NETTY_CONNECTION_CHANNEL_INACTIVE.
+  // Queries rejected because the channel's outbound queue was above its high watermark, i.e. the send window to the
+  // server is closed (see NettyConfig.WRITE_BUFFER_HIGH_WATER_MARK_BYTES). Each one is a query failed fast instead of
+  // being queued in direct memory behind a stalled socket.
+  public static final BrokerMeter NETTY_CONNECTION_UNWRITABLE_REJECTIONS = create(
+      "NETTY_CONNECTION_UNWRITABLE_REJECTIONS", "nettyConnection", false);
+  // Connections closed after pending writes made no positive socket byte progress for NettyConfig.WRITE_TIMEOUT_MS.
+  // Progressing requests can take longer overall; a stalled or half-open socket can still report isActive().
+  public static final BrokerMeter NETTY_CONNECTION_WRITE_TIMEOUTS = create(
+      "NETTY_CONNECTION_WRITE_TIMEOUTS", "nettyConnection", false);
+  // Live cached channels closed and dropped because the routing manager enabled their server again, which usually
+  // means the server was restarted and the cached channel points at the old process, or because the server left the
+  // cluster or moved to another address. Entries whose channel had already closed are dropped without being counted.
+  public static final BrokerMeter NETTY_CONNECTION_CHANNEL_EVICTIONS = create(
+      "NETTY_CONNECTION_CHANNEL_EVICTIONS", "nettyConnection", false);
+  // Channels marked suspect because the server left the configured number of consecutive queries unanswered on them
+  // (see CommonConstants.Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD); the next query replaces each.
+  // With CONFIG_OF_REPORT_UNANSWERED_SERVERS on and pings off, each is also a report to the failure detector. Tagged
+  // with the server's short name.
+  public static final BrokerMeter NETTY_CONNECTION_SUSPECT_CHANNELS = create(
+      "NETTY_CONNECTION_SUSPECT_CHANNELS", "nettyConnection", false);
 
   public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
       "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);
@@ -218,6 +275,16 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   /// For each query with at least one window function, this meter is increased as many times as window functions in the
   /// query.
   public static final BrokerMeter WINDOW_COUNT = create("WINDOW_COUNT", "queries", true);
+  /// How many multi-stage queries group by a name that is both a column and the alias of a different `SELECT`
+  /// expression, as in `SELECT CASE WHEN c = 'a' THEN 'x' ELSE c END AS c, COUNT(*) FROM t GROUP BY c`.
+  ///
+  /// Since Calcite 1.42 (CALCITE-7052) such a name resolves to the column. Before, it resolved to the alias. The query
+  /// can then fail with `Expression '...' is not being grouped` or return different groups. The broker config
+  /// `pinot.broker.multistage.prefer.select.alias.in.group.by` and the query option `preferSelectAliasInGroupBy`
+  /// restore the old resolution. This meter is marked at most once per query, whether that option is set or not, and
+  /// also when the query then fails.
+  public static final BrokerMeter QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN =
+      create("QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN", "queries", true);
 
   public static final BrokerMeter MSE_STAGES_STARTED = create("MSE_STAGES_STARTED", "stages", true);
   public static final BrokerMeter MSE_STAGES_COMPLETED = create("MSE_STAGES_COMPLETED", "stages", true);
@@ -239,6 +306,17 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   /// this counter to detect that condition.
   public static final BrokerMeter MSE_STREAM_STATS_CANCEL_FANOUTS =
       create("MSE_STREAM_STATS_CANCEL_FANOUTS", "broadcasts", true);
+
+  /// Number of mailbox streams this broker rejected because they were addressed to another instance and reached this
+  /// one through a stale connection of the sender.
+  public static final BrokerMeter MULTI_STAGE_MISROUTED_REQUESTS_REJECTED =
+      create("MULTI_STAGE_MISROUTED_REQUESTS_REJECTED", "requests", true);
+
+  /// Number of requests this broker sent (stage plans, cancel and explain requests, and mailbox streams) that the
+  /// receiving instance rejected as addressed to another instance. Each one makes the broker reset its connection to
+  /// that address, at most once a second.
+  public static final BrokerMeter MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER =
+      create("MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER", "requests", true);
 
   /// How many MSE queries have encountered segments with invalid partitions.
   ///

@@ -18,20 +18,22 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
-import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseArrayAggStringFunction<I extends ObjectCollection<String>>
-    extends BaseArrayAggFunction<I, ObjectArrayList<String>> {
+    extends BaseArrayAggFunction<I, String[]> {
   public BaseArrayAggStringFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, FieldSpec.DataType.STRING, nullHandlingEnabled);
+    super(expression, DataType.STRING, nullHandlingEnabled);
   }
 
   abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, String value);
@@ -40,6 +42,22 @@ public abstract class BaseArrayAggStringFunction<I extends ObjectCollection<Stri
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to the group's accumulator.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          Set<String> set = ObjectSerDeUtils.STRING_SET_SER_DE.deserialize(
+              starTreeSetPayload(bytesValues[i], ElementType.STRING));
+          for (String v : set) {
+            setGroupByResult(groupByResultHolder, groupKey, v);
+          }
+        }
+      });
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       String[] values = blockValSet.getStringValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -65,6 +83,23 @@ public abstract class BaseArrayAggStringFunction<I extends ObjectCollection<Stri
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to every group the row belongs to.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          Set<String> set = ObjectSerDeUtils.STRING_SET_SER_DE.deserialize(
+              starTreeSetPayload(bytesValues[i], ElementType.STRING));
+          for (int groupKey : groupKeysArray[i]) {
+            for (String v : set) {
+              setGroupByResult(groupByResultHolder, groupKey, v);
+            }
+          }
+        }
+      });
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       String[] values = blockValSet.getStringValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -104,13 +139,10 @@ public abstract class BaseArrayAggStringFunction<I extends ObjectCollection<Stri
   }
 
   @Override
-  public ObjectArrayList<String> extractFinalResult(I strings) {
+  public String[] extractFinalResult(I strings) {
     if (strings == null) {
-      return new ObjectArrayList<>();
+      return new String[0];
     }
-    // NOTE: Wrap a String[] to work around the bug of ObjectArrayList constructor creating Object[] internally.
-    String[] stringArray = new String[strings.size()];
-    ObjectIterators.unwrap(strings.iterator(), stringArray);
-    return ObjectArrayList.wrap(stringArray);
+    return strings.toArray(new String[0]);
   }
 }

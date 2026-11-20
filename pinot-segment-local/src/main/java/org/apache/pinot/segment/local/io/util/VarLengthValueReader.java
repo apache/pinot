@@ -84,17 +84,7 @@ public class VarLengthValueReader implements ValueReader {
 
   @Override
   public int readUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
-    assert buffer.length >= numBytesPerValue;
-
-    // Read the offset of the byte array first and then read the actual byte array.
-    int offsetPosition = _dataSectionStartOffSet + Integer.BYTES * index;
-    int startOffset = _dataBuffer.getInt(offsetPosition);
-    int endOffset = _dataBuffer.getInt(offsetPosition + Integer.BYTES);
-    int length = endOffset - startOffset;
-
-    assert numBytesPerValue >= length;
-    _dataBuffer.copyTo(startOffset, buffer, 0, length);
-    return length;
+    return readBytes(index, numBytesPerValue, buffer);
   }
 
   public void recordOffsetRanges(int index, long baseOffset, List<ForwardIndexReader.ByteRange> rangeList) {
@@ -107,8 +97,18 @@ public class VarLengthValueReader implements ValueReader {
   }
 
   @Override
-  public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
-    throw new UnsupportedOperationException();
+  public int readBytes(int index, int numBytesPerValue, byte[] buffer) {
+    assert buffer.length >= numBytesPerValue;
+
+    // Read the offset of the byte array first and then read the actual byte array.
+    int offsetPosition = _dataSectionStartOffSet + Integer.BYTES * index;
+    int startOffset = _dataBuffer.getInt(offsetPosition);
+    int endOffset = _dataBuffer.getInt(offsetPosition + Integer.BYTES);
+    int length = endOffset - startOffset;
+
+    assert numBytesPerValue >= length;
+    _dataBuffer.copyTo(startOffset, buffer, 0, length);
+    return length;
   }
 
   @Override

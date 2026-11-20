@@ -38,8 +38,11 @@ public interface FilterAwareVectorIndexReader extends VectorIndexReader {
   /// @param vector the query vector
   /// @param topK number of closest vectors to return
   /// @param preFilterBitmap bitmap of document IDs to restrict the search to;
-  ///                        must not be null (use [#getDocIds(float[], int)] for unfiltered search)
+  ///                        must not be null (use [#getDocIds(float[], int)] for unfiltered search).
+  ///                        An empty bitmap admits no documents and yields an empty result.
   /// @return bitmap of top-K closest vectors from the filtered document set
+  /// @throws NullPointerException if preFilterBitmap is null. Implementations must reject null rather than
+  ///         silently searching unfiltered, which would return documents outside the caller's filter.
   ImmutableRoaringBitmap getDocIds(float[] vector, int topK, ImmutableRoaringBitmap preFilterBitmap);
 
   /// Returns true if this reader supports efficient pre-filter search.

@@ -539,7 +539,9 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
               + "    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[COUNT() FILTER $1], aggType=[LEAF])\n"
               + "      LogicalProject(city=[$10], $f1=[IS TRUE(=($12, _UTF-8'unknown'))])\n"
               + "        PinotLogicalTableScan(table=[[default, mytable]])\n");
-      // IS_TRUE should be trimmed off, then the filter becomes always false in the server execution plan
+      // IS_TRUE should be trimmed off. The predicate matches no value, but the column has null rows, which are UNKNOWN
+      // under null handling rather than false, so the server plan keeps a bitmap filter over them instead of an empty
+      // one: its negation must leave them out too
       explainAskingServers(query,
           "Execution Plan\n"
               + "PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], agg#1=[COUNT($2)], aggType=[FINAL])\n"
@@ -550,7 +552,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
               + "          GroupByFiltered(groupKeys=[[city]], aggregations=[[count(*), count(*)]])\n"
               + "            Project(columns=[[city]])\n"
               + "              DocIdSet(maxDocs=[20000])\n"
-              + "                FilterEmpty\n"
+              + "                FilterBitmap\n"
               + "            Project(columns=[[city]])\n"
               + "              DocIdSet(maxDocs=[20000])\n"
               + "                FilterMatchEntireSegment(numDocs=[100])\n"

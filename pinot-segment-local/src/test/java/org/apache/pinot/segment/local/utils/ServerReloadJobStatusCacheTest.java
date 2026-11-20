@@ -279,6 +279,26 @@ public class ServerReloadJobStatusCacheTest {
     assertThat(status.getFailedSegmentDetails().get(0).getSegmentName()).isEqualTo(segmentName);
   }
 
+  @Test
+  public void testRecordSkippedAccumulates() {
+    ServerReloadJobStatusCache cache = new ServerReloadJobStatusCache("testServer");
+
+    cache.recordSkipped("job-skip", List.of());
+    assertThat(cache.getJobStatus("job-skip")).isNull();
+
+    cache.recordSkipped("job-skip", List.of("segment_1", "segment_2"));
+    cache.recordSkipped("job-skip", List.of("segment_2", "segment_3"));
+    cache.recordFailure("job-skip", "segment_4", new IOException("Test error"));
+    ReloadJobStatus status = cache.getJobStatus("job-skip");
+    assertThat(status).isNotNull();
+    assertThat(status.hasSkippedSegments()).isTrue();
+    assertThat(status.isSkipped("segment_1")).isTrue();
+    assertThat(status.isSkipped("segment_2")).isTrue();
+    assertThat(status.isSkipped("segment_3")).isTrue();
+    assertThat(status.isSkipped("segment_4")).isFalse();
+    assertThat(status.getFailureCount()).isEqualTo(1);
+  }
+
   @org.testng.annotations.DataProvider(name = "failureLimits")
   public Object[][] failureLimitsProvider() {
     return new Object[][] {

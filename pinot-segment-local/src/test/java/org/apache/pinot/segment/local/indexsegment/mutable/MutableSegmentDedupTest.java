@@ -58,6 +58,8 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
   private static final String DATA_FILE_PATH = "data/test_dedup_data.json";
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String TIME_COLUMN = "secondsSinceEpoch";
+  private static final String PRIMARY_KEY_COLUMN = "event_id";
+  private static final String DEDUP_TIME_COLUMN = "dedupTime";
 
   private MutableSegmentImpl _mutableSegmentImpl;
 
@@ -145,6 +147,48 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
     for (int i = 0; i < 2; i++) {
       verifyGeneratedSegmentDataAgainstRawData(i, i, rawData);
     }
+  }
+
+  /// The dedup metadata manager captures the primary key columns once, when the server starts, while a consuming
+  /// segment created later picks up whatever schema is current. Both must key records identically, otherwise the
+  /// same record hashes under two different keys and duplicates go undetected.
+  @Test
+  public void testPrimaryKeyColumnsTakenFromDedupContext()
+      throws Exception {
+    FileUtils.forceMkdir(TEMP_DIR);
+    URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
+    Assert.assertNotNull(schemaResourceUrl);
+    // Schema as it was when the metadata manager was created: a single primary key column.
+    Schema managerSchema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
+    // Schema the consuming segment was created with: a second column has since joined the primary key.
+    Schema segmentSchema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
+    segmentSchema.setPrimaryKeyColumns(List.of(PRIMARY_KEY_COLUMN, DEDUP_TIME_COLUMN));
+
+    PartitionDedupMetadataManager partitionDedupMetadataManager =
+        getTableDedupMetadataManager(managerSchema, new DedupConfig()).getOrCreatePartitionManager(0);
+    try {
+      _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(segmentSchema, true, TIME_COLUMN, null,
+          partitionDedupMetadataManager);
+      // Two records sharing event_id, differing only on the column that the segment schema treats as part of the
+      // key but the metadata manager does not.
+      _mutableSegmentImpl.index(createRow("aa", 1L, 1567205396L), null);
+      _mutableSegmentImpl.index(createRow("aa", 2L, 1567205397L), null);
+
+      // Keyed on the manager's columns these are the same record, so the second must have been deduped away.
+      Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 1);
+    } finally {
+      partitionDedupMetadataManager.stop();
+      partitionDedupMetadataManager.close();
+    }
+  }
+
+  private static GenericRow createRow(String eventId, long dedupTime, long timeValue) {
+    GenericRow row = new GenericRow();
+    row.putValue(PRIMARY_KEY_COLUMN, eventId);
+    row.putValue("description", "d");
+    row.putValue(DEDUP_TIME_COLUMN, dedupTime);
+    row.putValue(TIME_COLUMN, timeValue);
+    return row;
   }
 
   @Test

@@ -293,7 +293,7 @@ public class ArithmeticFunctions {
   /// @param numBuckets number of equal-width buckets
   /// @return bucket number (0 to numBuckets + 1)
   /// @throws IllegalArgumentException if lo >= hi or numBuckets <= 0
-  @ScalarFunction(names = {"widthBucket", "width_bucket"})
+  @ScalarFunction
   public static int widthBucket(double value, double lo, double hi, int numBuckets) {
     if (Double.isNaN(value) || Double.isNaN(lo) || Double.isNaN(hi)) {
       throw new IllegalArgumentException("widthBucket does not accept NaN values");

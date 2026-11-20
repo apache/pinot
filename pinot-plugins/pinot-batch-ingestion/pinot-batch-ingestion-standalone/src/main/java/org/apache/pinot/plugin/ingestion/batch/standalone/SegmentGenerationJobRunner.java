@@ -42,7 +42,9 @@ import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunne
 import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
@@ -230,9 +232,17 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     File localOutputTempDir = new File(localTempDir, "output");
     FileUtils.forceMkdir(localOutputTempDir);
 
-    //copy input path to local
-    File localInputDataFile = createLocalInputDateFile(inputFileURI, localInputTempDir);
-    _inputDirFS.copyToLocalFile(inputFileURI, localInputDataFile);
+    // Gzip readers can unpack beside the input, so keep those writes inside an owned staging directory.
+    File inputFile = new File(URIUtils.decode(inputFileURI.getRawPath()));
+    boolean borrowedInputFile = PinotFSFactory.isFileSystemInstanceOf(_inputDirFS, LocalPinotFS.class)
+        && !RecordReaderUtils.isGZippedFile(inputFile);
+    File localInputDataFile;
+    if (borrowedInputFile) {
+      localInputDataFile = inputFile;
+    } else {
+      localInputDataFile = createLocalInputDateFile(inputFileURI, localInputTempDir);
+      _inputDirFS.copyToLocalFile(inputFileURI, localInputDataFile);
+    }
 
     //create task spec
     SegmentGenerationTaskSpec taskSpec = new SegmentGenerationTaskSpec();
@@ -265,7 +275,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         String segmentName = taskRunner.run();
         // Tar segment directory to compress file
         localSegmentDir = new File(localOutputTempDir, segmentName);
-        String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
+        String segmentTarFileName = URIUtils.encode(
+            segmentName + Constants.SEGMENT_TAR_FILE_EXTENSIONS.get(_spec.getSegmentTarCompressionCodec()));
         localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
         LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
         TarCompressionUtils.createCompressedTarFile(localSegmentDir, localSegmentTarFile);
@@ -295,7 +306,9 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         _segmentCreationTaskCountDownLatch.countDown();
         FileUtils.deleteQuietly(localSegmentDir);
         FileUtils.deleteQuietly(localSegmentTarFile);
-        FileUtils.deleteQuietly(localInputDataFile);
+        if (!borrowedInputFile) {
+          FileUtils.deleteQuietly(localInputDataFile);
+        }
       }
     });
   }

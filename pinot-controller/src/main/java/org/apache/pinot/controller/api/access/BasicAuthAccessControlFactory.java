@@ -24,12 +24,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -44,6 +42,10 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 /// controller.admin.access.control.principals.user456.tables=stuff,lessImportantStuff
 /// controller.admin.access.control.principals.user456.permissions=read,update
 /// ```
+///
+/// Setting `tables` or `excludeTables` scopes a principal to those tables and withholds every endpoint that names no
+/// table, because such a request is cluster-wide. `*` means unrestricted, as does omitting the key. A principal used
+/// as a service identity — realtime segment completion, minion task callbacks — must therefore be left unrestricted.
 public class BasicAuthAccessControlFactory implements AccessControlFactory {
   private static final String PREFIX = "controller.admin.access.control.principals";
 
@@ -63,7 +65,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
   }
 
   /// Access Control using header-based basic http authentication
-  private static class BasicAuthAccessControl implements AccessControl {
+  private static class BasicAuthAccessControl extends BaseBasicAuthAccessControl<BasicAuthPrincipal> {
     private final Map<String, BasicAuthPrincipal> _token2principal;
 
     public BasicAuthAccessControl(Collection<BasicAuthPrincipal> principals) {
@@ -71,30 +73,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean protectAnnotatedOnly() {
-      return false;
-    }
-
-    @Override
-    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders)
-          .filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
-    }
-
-    @Override
-    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      if (getPrincipal(httpHeaders).isEmpty()) {
-        throw new NotAuthorizedException("Basic");
-      }
-      return true;
-    }
-
-    @Override
-    public boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType) {
-      return getPrincipal(httpHeaders).isPresent();
-    }
-
-    private Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
+    protected Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
       if (headers == null) {
         return Optional.empty();
       }
@@ -107,11 +86,6 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
       return authHeaders.stream().map(BasicAuthTokenUtils::normalizeBase64Token)
           .map(_token2principal::get)
           .filter(Objects::nonNull).findFirst();
-    }
-
-    @Override
-    public AuthWorkflowInfo getAuthWorkflowInfo() {
-      return new AuthWorkflowInfo(AccessControl.WORKFLOW_BASIC);
     }
   }
 }

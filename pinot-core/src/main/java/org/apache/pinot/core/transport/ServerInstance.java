@@ -59,8 +59,13 @@ public final class ServerInstance {
 
   /// By default (auto joined instances), server instance name is of format: `Server_<hostname>_<port>`, e.g.
   /// `Server_localhost_12345`, hostname is of format: `Server_<hostname>`, e.g. `Server_localhost`.
+  ///
+  /// The instance id is interned. The same id is repeated as a key across many long-lived routing structures, and
+  /// Jackson already interns it when decoding the map fields of `IdealState` / `ExternalView`, so joining the JVM pool
+  /// lets all of them share one `String` and lets hash lookups hit the identity fast path. It also keeps the instances
+  /// rebuilt on every instance config refresh from each retaining a separate copy of the id.
   public ServerInstance(InstanceConfig instanceConfig) {
-    _instanceId = instanceConfig.getInstanceName();
+    _instanceId = instanceConfig.getInstanceName().intern();
     _hostname = extractHostnameFromConfig(instanceConfig);
     _port = extractPortFromConfig(instanceConfig);
     _grpcPort = instanceConfig.getRecord().getIntField(Helix.Instance.GRPC_PORT_KEY, INVALID_PORT);
@@ -113,7 +118,7 @@ public final class ServerInstance {
 
   @VisibleForTesting
   ServerInstance(String hostname, int port) {
-    _instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
+    _instanceId = (Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port).intern();
     _hostname = hostname;
     _port = port;
     _grpcPort = INVALID_PORT;
@@ -124,6 +129,7 @@ public final class ServerInstance {
     _pool = FALLBACK_POOL_ID;
   }
 
+  /// Returns the interned instance id.
   public String getInstanceId() {
     return _instanceId;
   }

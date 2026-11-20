@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMetadata;
@@ -119,6 +120,17 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       SegmentDirectory.Writer segmentWriter, TableConfig tableConfig, String columnName,
       FieldIndexConfigs fieldIndexConfigs, boolean isTemporaryForwardIndex)
       throws IOException {
+    this(segmentDirectory, segmentWriter, tableConfig, columnName, fieldIndexConfigs, isTemporaryForwardIndex, null);
+  }
+
+  /// Same, for a column the segment directory's metadata does not list yet. A column created during the current
+  /// segment load is only visible in `metadata.properties`, so its metadata has to be handed in; passing `null`
+  /// keeps the usual lookup.
+  public InvertedIndexAndDictionaryBasedForwardIndexCreator(SegmentDirectory segmentDirectory,
+      SegmentDirectory.Writer segmentWriter, TableConfig tableConfig, String columnName,
+      FieldIndexConfigs fieldIndexConfigs, boolean isTemporaryForwardIndex,
+      @Nullable ColumnMetadata columnMetadata)
+      throws IOException {
     _segmentDirectory = segmentDirectory;
     _segmentWriter = segmentWriter;
     _tableConfig = tableConfig;
@@ -128,7 +140,10 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     _isTemporaryForwardIndex = isTemporaryForwardIndex;
 
     _segmentMetadata = segmentDirectory.getSegmentMetadata();
-    _columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
+    _columnMetadata =
+        columnMetadata != null ? columnMetadata : _segmentMetadata.getColumnMetadataFor(columnName);
+    Preconditions.checkState(_columnMetadata != null, "Found no metadata for column: %s of segment: %s", columnName,
+        _segmentMetadata.getName());
     _singleValue = _columnMetadata.isSingleValue();
     _numDocs = _columnMetadata.getTotalDocs();
     _cardinality = _columnMetadata.getCardinality();

@@ -34,7 +34,20 @@ public class SegmentReloadMessageTest {
     SegmentReloadMessage message = new SegmentReloadMessage("testTable_OFFLINE", false);
 
     assertFalse(message.shouldForceDownload());
+    assertFalse(message.shouldReloadOnlyIfNeeded());
     assertEquals(message.getReloadJobId(), message.getMsgId());
+  }
+
+  @Test
+  public void testOnlyIfNeededSurvivesRoundTrip() {
+    SegmentReloadMessage message =
+        new SegmentReloadMessage("testTable_OFFLINE", List.of("seg_1"), false, true, "job-123");
+    SegmentReloadMessage received = new SegmentReloadMessage(new Message(message.getRecord()));
+
+    assertTrue(received.shouldReloadOnlyIfNeeded());
+    assertFalse(received.shouldForceDownload());
+    assertEquals(received.getSegmentList(), List.of("seg_1"));
+    assertEquals(received.getReloadJobId(), "job-123");
   }
 
   @Test

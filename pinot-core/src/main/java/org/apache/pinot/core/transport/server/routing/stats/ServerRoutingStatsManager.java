@@ -133,14 +133,11 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     if (changedConfigs.contains(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT)) {
+      // A removed key restores the default. The broker config is no fallback: the cluster config present at startup
+      // was folded into it, so it may still hold the value being removed
       String value = clusterConfigs.get(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT);
-      if (value != null) {
-        _enableStatsMetricExport = Boolean.parseBoolean(value);
-      } else {
-        // Key was removed from cluster config — fall back to the static broker config value.
-        _enableStatsMetricExport = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT,
-            AdaptiveServerSelector.DEFAULT_ENABLE_STATS_METRIC_EXPORT);
-      }
+      _enableStatsMetricExport =
+          value != null ? Boolean.parseBoolean(value) : AdaptiveServerSelector.DEFAULT_ENABLE_STATS_METRIC_EXPORT;
       LOGGER.info("Updated enableStatsMetricExport to {} from cluster config.", _enableStatsMetricExport);
       if (!_enableStatsMetricExport) {
         removeAllServerStatsGauges();
@@ -163,8 +160,7 @@ public class ServerRoutingStatsManager implements PinotClusterConfigChangeListen
           return;
         }
       } else {
-        newIntervalMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS,
-            AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS);
+        newIntervalMs = AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS;
       }
       if (newIntervalMs != _statsMetricExportIntervalMs) {
         _statsMetricExportIntervalMs = newIntervalMs;

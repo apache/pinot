@@ -31,8 +31,8 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 
 public class FunnelMaxStepAggregationFunction extends FunnelBaseAggregationFunction<Integer> {
 
-  public FunnelMaxStepAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public FunnelMaxStepAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override
@@ -51,6 +51,7 @@ public class FunnelMaxStepAggregationFunction extends FunnelBaseAggregationFunct
     if (stepEvents == null || stepEvents.isEmpty()) {
       return finalMaxStep;
     }
+    stepEvents = new PriorityQueue<>(stepEvents);
     ArrayDeque<FunnelStepEvent> slidingWindow = new ArrayDeque<>();
     while (!stepEvents.isEmpty()) {
       fillWindow(stepEvents, slidingWindow);

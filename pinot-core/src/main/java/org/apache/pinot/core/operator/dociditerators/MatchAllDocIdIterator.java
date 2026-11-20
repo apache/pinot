@@ -42,6 +42,20 @@ public final class MatchAllDocIdIterator implements BlockDocIdIterator {
   }
 
   @Override
+  public int nextBatch(int[] output, int maxDocs) {
+    int nextDocId = _nextDocId;
+    if (nextDocId >= _numDocs) {
+      return 0;
+    }
+    int size = Math.min(maxDocs, _numDocs - nextDocId);
+    for (int i = 0; i < size; i++) {
+      output[i] = nextDocId + i;
+    }
+    _nextDocId += size;
+    return size;
+  }
+
+  @Override
   public int advance(int targetDocId) {
     _nextDocId = targetDocId;
     return next();

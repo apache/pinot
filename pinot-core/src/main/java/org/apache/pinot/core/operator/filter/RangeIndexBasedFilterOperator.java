@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.traits.DoubleRange;
 import org.apache.pinot.core.operator.filter.predicate.traits.DoubleValue;
@@ -85,7 +86,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
     if (_rangeIndexReader.isExact()) {
       ImmutableRoaringBitmap matches = getMatchingDocIds();
       recordFilter(matches);
-      return new BitmapDocIdSet(matches, _numDocs);
+      return BitmapDocIdSet.create(matches, _numDocs);
     }
     return evaluateLegacyRangeFilter();
   }
@@ -98,7 +99,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
     ImmutableRoaringBitmap partialMatches = getPartiallyMatchingDocIds();
     // this branch is likely until RangeIndexReader reimplemented and enabled by default
     if (partialMatches == null) {
-      return new BitmapDocIdSet(matches == null ? new MutableRoaringBitmap() : matches, _numDocs);
+      return matches != null ? BitmapDocIdSet.create(matches, _numDocs) : EmptyDocIdSet.unscanned();
     }
     // Need to scan the first and last range as they might be partially matched
     ScanBasedFilterOperator scanBasedFilterOperator =
@@ -109,13 +110,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
       docIds.or(matches);
     }
     recordFilter(matches);
-    return new BitmapDocIdSet(docIds, _numDocs) {
-      // Override this method to reflect the entries scanned
-      @Override
-      public long getNumEntriesScannedInFilter() {
-        return scanBasedDocIdSet.getNumEntriesScannedInFilter();
-      }
-    };
+    return BitmapDocIdSet.create(docIds, _numDocs, scanBasedDocIdSet.getNumEntriesScannedInFilter());
   }
 
   ImmutableRoaringBitmap getMatchingDocIds() {
@@ -182,8 +177,41 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
     return _rangeIndexReader.isExact();
   }
 
+  /// The index counts the documents whose stored value satisfies the predicate. A null row stores the column's default
+  /// null value, so the null rows are either all among those documents or all outside them, depending on whether that
+  /// value satisfies the predicate: the index's count is kept, and the null rows are subtracted when it does.
   @Override
   public int getNumMatchingDocs() {
+    int numMatchingDocs = getNumMatchingDocsFromIndex();
+    ImmutableRoaringBitmap nullBitmap = getNullBitmap();
+    if (nullBitmap != null && matchesDefaultNullValue()) {
+      numMatchingDocs -= nullBitmap.getCardinality();
+    }
+    return numMatchingDocs;
+  }
+
+  /// Returns whether the predicate holds for the column's default null value, the value a null row is stored under.
+  private boolean matchesDefaultNullValue() {
+    Object defaultNullValue = _dataSource.getDataSourceMetadata().getFieldSpec().getDefaultNullValue();
+    if (_predicateEvaluator.isDictionaryBased()) {
+      int dictId = _dataSource.getDictionary().indexOf(FieldSpec.getStringValue(defaultNullValue));
+      return dictId >= 0 && _predicateEvaluator.applySV(dictId);
+    }
+    switch (_parameterType) {
+      case INT:
+        return _predicateEvaluator.applySV(((Number) defaultNullValue).intValue());
+      case LONG:
+        return _predicateEvaluator.applySV(((Number) defaultNullValue).longValue());
+      case FLOAT:
+        return _predicateEvaluator.applySV(((Number) defaultNullValue).floatValue());
+      case DOUBLE:
+        return _predicateEvaluator.applySV(((Number) defaultNullValue).doubleValue());
+      default:
+        throw unsupportedDataType(_parameterType);
+    }
+  }
+
+  private int getNumMatchingDocsFromIndex() {
     switch (_parameterType) {
       case INT:
         if (_predicateEvaluator instanceof IntValue) {
@@ -225,7 +253,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    return new BitmapCollection(_numDocs, false, getMatchingDocIds());
+    return new BitmapCollection(_numDocs, false, getMatchingDocIds()).excludingNulls(getNullBitmap());
   }
 
   @Override

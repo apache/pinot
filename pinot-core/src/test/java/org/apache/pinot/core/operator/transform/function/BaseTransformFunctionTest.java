@@ -123,7 +123,8 @@ public abstract class BaseTransformFunctionTest {
   /// index sitting on the column doesn't perturb the predicate evaluator's path selection.
   protected static final String INT_MV_DICT_RAW_INV_COLUMN = "intMVDictRawInv";
   private static final String SEGMENT_NAME = "testSegment";
-  private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
+  private static final String INDEX_DIR_PATH =
+      FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME + "-" + UUID.randomUUID();
   private static final Random RANDOM = new Random();
   protected final int[] _intSVValues = new int[NUM_ROWS];
   protected final long[] _longSVValues = new long[NUM_ROWS];
@@ -167,8 +168,9 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       _intSVValues[i] = RANDOM.nextInt();
       _longSVValues[i] = RANDOM.nextLong();
-      _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
-      _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
+      // Match ingestion's signed-zero normalization before these arrays are used as expected values.
+      _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat() + 0.0f;
+      _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble() + 0.0d;
       _bigDecimalSVValues[i] =
           BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(_intSVValues[i])).stripTrailingZeros();
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());

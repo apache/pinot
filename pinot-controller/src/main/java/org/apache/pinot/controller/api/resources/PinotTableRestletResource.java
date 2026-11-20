@@ -120,7 +120,9 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils.ValidationType;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
@@ -136,6 +138,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -216,11 +219,12 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
   @ManualAuthorization // performed after parsing table configs
   public ConfigSuccessResponse addTable(String tableConfigStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = TableConfigValidationUtils.VALIDATION_TYPES_TO_SKIP_DESCRIPTION)
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders httpHeaders, @Context Request request)
       throws IOException {
+    EnumSet<ValidationType> skipTypes = TableConfigValidationUtils.parseValidationTypesToSkip(typesToSkip);
     // TODO introduce a table config ctor with json string.
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
@@ -250,7 +254,7 @@ public class PinotTableRestletResource {
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Map.of());
 
       TableConfigValidationUtils.validateTableConfig(
-          tableConfig, schema, typesToSkip, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
+          tableConfig, schema, skipTypes, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
     } catch (TableAlreadyExistsException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
@@ -264,7 +268,8 @@ public class PinotTableRestletResource {
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of
       // the validation manager)
-      LOGGER.info("Successfully added table: {} with config: {}", tableNameWithType, tableConfig);
+      LOGGER.info("Successfully added table: {} with config: {}", tableNameWithType,
+          Obfuscator.DEFAULT.toJsonString(tableConfig));
       return new ConfigSuccessResponse("Table " + tableNameWithType + " successfully added",
           tableConfigAndUnrecognizedProperties.getRight());
     } catch (Exception e) {
@@ -284,7 +289,7 @@ public class PinotTableRestletResource {
 
   @POST
   @Path("/tables/{tableName}/copy")
-  @Authorize(targetType = TargetType.TABLE, action = Actions.Table.CREATE_TABLE)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.CREATE_TABLE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Copy a table's schema and config from another cluster", notes = "Non upsert table only")
   public CopyTableResponse copyTable(
@@ -503,15 +508,7 @@ public class PinotTableRestletResource {
                       : _pinotHelixResourceManager.getAllOfflineTables(database));
 
       if (StringUtils.isNotBlank(taskType)) {
-        Set<String> tableNamesForTaskType = new HashSet<>();
-        for (String tableNameWithType : tableNamesWithType) {
-          TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-          if (tableConfig != null && tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
-              .isTaskTypeEnabled(taskType)) {
-            tableNamesForTaskType.add(tableNameWithType);
-          }
-        }
-        tableNamesWithType.retainAll(tableNamesForTaskType);
+        tableNamesWithType.retainAll(_pinotTaskManager.getTablesForTaskType(taskType, tableNamesWithType));
       }
 
       List<String> tableNames;
@@ -768,13 +765,14 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public ConfigSuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = TableConfigValidationUtils.VALIDATION_TYPES_TO_SKIP_DESCRIPTION)
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @ApiParam(value = "Force config changes")
       @QueryParam("force") @DefaultValue("false") boolean force,
       @Context HttpHeaders headers,
       String tableConfigString)
       throws Exception {
+    EnumSet<ValidationType> skipTypes = TableConfigValidationUtils.parseValidationTypesToSkip(typesToSkip);
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
     String tableNameWithType;
@@ -795,9 +793,8 @@ public class PinotTableRestletResource {
 
       schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
-      TableConfigValidationUtils.validateTableConfig(
-          tableConfig, schema, typesToSkip, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager,
-          _pinotHelixResourceManager.getTableConfig(tableNameWithType));
+      TableConfigValidationUtils.validateTableConfig(tableConfig, schema, skipTypes, _pinotHelixResourceManager,
+          _controllerConf, _pinotTaskManager, _pinotHelixResourceManager.getTableConfig(tableNameWithType));
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
@@ -821,7 +818,8 @@ public class PinotTableRestletResource {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw e;
     }
-    LOGGER.info("Successfully updated table: {} with new config: {}", tableNameWithType, tableConfig);
+    LOGGER.info("Successfully updated table: {} with new config: {}", tableNameWithType,
+        Obfuscator.DEFAULT.toJsonString(tableConfig));
     return new ConfigSuccessResponse("Table config updated for " + tableName,
         tableConfigAndUnrecognizedProperties.getRight());
   }
@@ -834,7 +832,7 @@ public class PinotTableRestletResource {
           + " This allows us to validate table config before apply.")
   @ManualAuthorization // performed after parsing TableConfig
   public ObjectNode checkTableConfig(String tableConfigStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = TableConfigValidationUtils.VALIDATION_TYPES_TO_SKIP_DESCRIPTION)
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
@@ -850,25 +848,28 @@ public class PinotTableRestletResource {
     tableConfig.setTableName(tableNameWithType);
 
     // validate permission
-    ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
-        AccessType.READ, Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
+    ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders, AccessType.READ,
+        Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
 
-    ObjectNode validationResponse = validateConfig(tableConfig, typesToSkip);
+    ObjectNode validationResponse =
+        validateConfig(tableConfig, TableConfigValidationUtils.parseValidationTypesToSkip(typesToSkip));
     validationResponse.set("unrecognizedProperties",
         JsonUtils.objectToJsonNode(tableConfigAndUnrecognizedProperties.getRight()));
     return validationResponse;
   }
 
-  private ObjectNode validateConfig(TableConfig tableConfig, @Nullable String typesToSkip) {
+  @VisibleForTesting
+  ObjectNode validateConfig(TableConfig tableConfig, @Nullable EnumSet<ValidationType> skipTypes) {
     String tableNameWithType = tableConfig.getTableName();
     try {
       Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       if (schema == null) {
         throw new SchemaNotFoundException("Failed to find schema for table: " + tableNameWithType);
       }
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip,
+      TableConfigUtils.validate(tableConfig, schema, skipTypes,
           _pinotHelixResourceManager.getTableConfig(tableNameWithType));
-      TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
+      TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, skipTypes);
+      TableConfigValidatorRegistry.validate(tableConfig, schema);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
@@ -1098,7 +1099,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Authenticate(AccessType.UPDATE)
+  @Authenticate(AccessType.READ)
   @Path("/rebalanceStatus/{jobId}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_REBALANCE_STATUS)
   @ApiOperation(value = "Gets detailed stats of a rebalance operation",
@@ -1430,7 +1431,8 @@ public class PinotTableRestletResource {
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints.inverse(),
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
 
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
@@ -1598,7 +1600,8 @@ public class PinotTableRestletResource {
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints.inverse(),
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {

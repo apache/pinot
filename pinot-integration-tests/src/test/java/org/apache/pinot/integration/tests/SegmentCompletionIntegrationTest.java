@@ -37,8 +37,11 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
+import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
+import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
@@ -48,10 +51,11 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest {
@@ -64,6 +68,11 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
   @Override
   protected int getNumKafkaPartitions() {
     return NUM_KAFKA_PARTITIONS;
+  }
+
+  @Override
+  public BaseControllerStarter createControllerStarter() {
+    return new FailureInjectingControllerStarter();
   }
 
   @BeforeClass
@@ -141,7 +150,7 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
     params.withStreamPartitionMsgOffset(new LongMsgOffset(45688L).toString()).withSegmentName(_currentSegment)
         .withReason("RandomReason").withInstanceId(_serverInstance);
     SegmentCompletionProtocol.Response response = protocolHandler.segmentStoppedConsuming(params);
-    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
+    assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
 
     // Check if segment get into OFFLINE state
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
@@ -185,6 +194,36 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
         }
       }
     }, 60_000L, "Failed to get a new segment reaching CONSUMING state");
+  }
+
+  /// The commit start of a segment whose FSM exists must not wait for a table config read. The read goes to ZooKeeper,
+  /// where it can wait behind other requests on the controller's ZooKeeper session for longer than the server's
+  /// request timeout. Runs after [#testStopConsumingAndAutoFix()], on the consuming segment that test leaves behind.
+  @Test(dependsOnMethods = "testStopConsumingAndAutoFix")
+  public void testCommitStartDoesNotWaitForTableConfigRead() {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    ServerSegmentCompletionProtocolHandler protocolHandler =
+        new ServerSegmentCompletionProtocolHandler(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
+            realtimeTableName);
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params()
+        .withInstanceId(_serverInstance)
+        .withSegmentName(_currentSegment)
+        .withStreamPartitionMsgOffset(new LongMsgOffset(1000L).toString());
+
+    // The server is the only replica, so its first report creates the FSM and makes the server the committer
+    assertEquals(protocolHandler.segmentConsumed(params).getStatus(),
+        SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+
+    // The commit start gets NOT_SENT if it waits for the table config read longer than the server's request timeout
+    FailureInjectingPinotLLCRealtimeSegmentManager segmentManager =
+        (FailureInjectingPinotLLCRealtimeSegmentManager) _helixResourceManager.getRealtimeSegmentManager();
+    segmentManager.blockTableConfigReads();
+    try {
+      assertEquals(protocolHandler.segmentCommitStart(params).getStatus(),
+          SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
+    } finally {
+      segmentManager.unblockTableConfigReads();
+    }
   }
 
   @AfterClass

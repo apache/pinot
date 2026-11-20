@@ -80,10 +80,23 @@ public final class TierConfigUtils {
     return null;
   }
 
+  /// Returns the instance partitions assigned to the given tier, falling back to a default placement over the tier's
+  /// tagged instances when the tier has no assigned instance partitions.
+  ///
+  /// The assigned instance partitions must win over a default placement: they are what the table was rebalanced
+  /// against, so recomputing a default here would place segments added after that rebalance on different instances
+  /// than the ones already holding the table's segments for this tier.
   public static InstancePartitions getTieredInstancePartitions(TableConfig tableConfig, Tier tier,
       HelixManager helixManager) {
+    String tierName = tier.getName();
+    InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
+        helixManager.getHelixPropertyStore(),
+        InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(), tierName));
+    if (instancePartitions != null) {
+      return instancePartitions;
+    }
     PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
-    return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(helixManager, tableConfig, tier.getName(),
+    return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(helixManager, tableConfig, tierName,
         storage.getServerTag());
   }
 

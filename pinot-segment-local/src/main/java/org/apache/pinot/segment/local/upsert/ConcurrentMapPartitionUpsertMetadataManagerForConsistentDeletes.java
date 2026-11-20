@@ -308,7 +308,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         }
         _logger.warn("Found {} primary keys not replaced for segment: {}",
             validDocIdsForOldSegment.getCardinality(), segmentName);
-        updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
+        updateInconsistentRowsMetric(validDocIdsForOldSegment.getCardinality());
       }
       // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
       // this is to account for the removal of primary-key in the to-be-removed segment and reduce
@@ -365,41 +365,56 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               }
               // Revert to previous segment location
               IndexSegment prevSegment = prevLocation.getSegment();
-              ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
-              if (prevValidDocIds != null) {
-                try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
-                    _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
-                  int prevDocId = prevLocation.getDocId();
-                  RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
-                  replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
-                      prevDocId, recordInfo);
-                  if (!uniquePrimaryKeys.add(pk)) {
-                    return prevLocation;
+              // Read lock: prevSegment cannot be destroyed while its columns are read
+              if (!tryAcquireSegmentReadLock(prevSegment)) {
+                _logger.debug("Previous segment: {} is destroyed while reconciling metadata for segment: {}, "
+                    + "dropping primary key instead of reverting to it", prevSegment.getSegmentName(),
+                    segment.getSegmentName());
+                return null;
+              }
+              try {
+                ThreadSafeMutableRoaringBitmap prevValidDocIds = prevSegment.getValidDocIds();
+                if (prevValidDocIds != null) {
+                  try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(prevSegment,
+                      _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+                    int prevDocId = prevLocation.getDocId();
+                    RecordInfo recordInfo = recordInfoReader.getRecordInfo(prevDocId);
+                    replaceDocId(prevSegment, prevValidDocIds, prevSegment.getQueryableDocIds(), segment, docId,
+                        prevDocId, recordInfo);
+                    if (!uniquePrimaryKeys.add(pk)) {
+                      return prevLocation;
+                    }
+                    return new RecordLocation(prevLocation.getSegment(), prevLocation.getDocId(),
+                        prevLocation.getComparisonValue(),
+                        RecordLocation.decrementSegmentCount(prevLocation.getDistinctSegmentCount()));
+                  } catch (Exception e) {
+                    _logger.error("UPSERT_METADATA_REVERT_FAILED: segment={}. Failed to revert to previous segment: "
+                        + "{}, removing key", segment.getSegmentName(), prevSegment.getSegmentName(), e);
+                    _serverMetrics.addMeteredTableValue(_tableNameWithType,
+                        ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
+                    return null;
                   }
-                  return new RecordLocation(prevLocation.getSegment(), prevLocation.getDocId(),
-                      prevLocation.getComparisonValue(),
-                      RecordLocation.decrementSegmentCount(prevLocation.getDistinctSegmentCount()));
-                } catch (Exception e) {
-                  _logger.error("Failed to revert to previous segment: {}, removing key", prevSegment.getSegmentName(),
-                      e);
+                } else {
+                  // Should not happen
+                  _logger.error("UPSERT_METADATA_REVERT_FAILED: segment={}. Failed to find valid doc ids in previous "
+                      + "segment: {}, removing key", segment.getSegmentName(), prevSegment.getSegmentName());
+                  _serverMetrics.addMeteredTableValue(_tableNameWithType,
+                      ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
                   return null;
                 }
-              } else {
-                // Should not happen
-                _logger.error("Failed to find valid doc ids in previous segment: {}, removing key",
-                    prevSegment.getSegmentName());
-                return null;
+              } finally {
+                releaseSegmentReadLock(prevSegment);
               }
             } else if (recordLocation.getSegment() instanceof ImmutableSegmentImpl) {
               // The consuming segment's key is in a different immutable segment
               _previousKeyToRecordLocationMap.remove(pk);
             } else {
-              _logger.warn(
-                  "Consuming segment: {} has added the primary key for docId: {} from the segment: {}, suggesting"
-                      + " that consumption is occurring concurrently with segment replacement, which is undesirable "
-                      + "for consistency between replicas for the table: {}.",
-                  recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(), segment.getSegmentName(),
+              _logger.warn("UPSERT_METADATA_REVERT_FAILED: segment={}. Consuming segment: {} has added the primary "
+                      + "key for docId: {}, suggesting that consumption is occurring concurrently with segment "
+                      + "replacement, which is undesirable for consistency between replicas for the table: {}.",
+                  segment.getSegmentName(), recordLocation.getSegment().getSegmentName(), primaryKeyEntry.getKey(),
                   _tableNameWithType);
+              _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
             }
             if (!uniquePrimaryKeys.add(pk)) {
               return recordLocation;
@@ -490,12 +505,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     int newDocId = recordInfo.getDocId();
     Comparable newComparisonValue = recordInfo.getComparisonValue();
 
-    // When TTL is enabled, update largestSeenComparisonValue when adding new record
-    if (_deletedKeysTTL > 0) {
-      double comparisonValue = ((Number) newComparisonValue).doubleValue();
-      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
-    }
-
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
           if (currentRecordLocation != null) {
@@ -540,6 +549,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
             return new RecordLocation(segment, newDocId, newComparisonValue, 1);
           }
         });
+    // Bump after the record is installed; see ConcurrentMapPartitionUpsertMetadataManager#doAddRecord.
+    if (_deletedKeysTTL > 0) {
+      updateLargestSeenComparisonValue(((Number) newComparisonValue).doubleValue());
+    }
 
     updatePrimaryKeyGauge();
     return !isOutOfOrderRecord.get();
@@ -557,15 +570,26 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
           if (!recordInfo.isDeleteRecord()
               && recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) >= 0) {
             IndexSegment currentSegment = recordLocation.getSegment();
-            ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
             int currentDocId = recordLocation.getDocId();
+            // queryableDocIds is heap backed and outlives destroy(), so a deleted predecessor needs no lock at all.
+            ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
             if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-              try {
-                _reusePreviousRow.init(currentSegment, currentDocId);
-                _partialUpsertHandler.merge(_reusePreviousRow, record, _reuseMergeResultHolder);
-              } finally {
-                _reuseMergeResultHolder.clear();
-                _reusePreviousRow.clear();
+              // Read lock: currentSegment cannot be destroyed while LazyRow reads its columns. A consuming segment
+              // needs no lock while the table runs: it is destroyed only after replaceSegment()/removeSegment() has
+              // moved or dropped every location pointing at it, and those run under the same per-key compute as this
+              // read. Shutdown is the exception, since removeSegment() skips that cleanup once the manager is stopped.
+              if (tryAcquireSegmentReadLock(currentSegment)) {
+                try {
+                  _reusePreviousRow.init(currentSegment, currentDocId);
+                  _partialUpsertHandler.merge(_reusePreviousRow, record, _reuseMergeResultHolder);
+                } finally {
+                  _reuseMergeResultHolder.clear();
+                  _reusePreviousRow.clear();
+                  releaseSegmentReadLock(currentSegment);
+                }
+              } else {
+                _logger.debug("Current segment: {} is destroyed, storing record without merging the previous row",
+                    currentSegment.getSegmentName());
               }
             }
           }

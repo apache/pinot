@@ -60,8 +60,10 @@ public class QueryServerEnclosure {
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
     _queryRunner = new QueryRunner();
-    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager.getInstanceId(), instanceDataManager,
-        null, () -> true, () -> true);
+    // The instance id the test routing gives this server (see MockRoutingManagerFactory), so that the mailbox server
+    // checks that every stream it receives is meant for it
+    _queryRunner.init(new PinotConfiguration(runnerConfig), "Server_localhost_" + _queryRunnerPort,
+        instanceDataManager, null, () -> true, () -> true);
   }
 
   public int getPort() {
@@ -82,7 +84,14 @@ public class QueryServerEnclosure {
 
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadataMap) {
-    QueryExecutionContext executionContext = QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId");
+    return processQuery(workerMetadata, stagePlan, requestMetadataMap,
+        QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId"));
+  }
+
+  /// Like [#processQuery(WorkerMetadata, StagePlan, Map)], but runs the stage in the given execution context. Like the
+  /// query server, callers can share one context between all the stages of a query on this server.
+  public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> requestMetadataMap, QueryExecutionContext executionContext) {
     QueryThreadContext.MseWorkerInfo mseWorkerInfo =
         new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,

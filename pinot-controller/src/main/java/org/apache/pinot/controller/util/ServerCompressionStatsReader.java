@@ -44,6 +44,7 @@ import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.util.Timeout;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.compression.ColumnCompressionStatsAccumulator;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestBufferedResponse;
@@ -53,6 +54,7 @@ import org.apache.pinot.common.restlet.resources.CompressionStatsSummary;
 import org.apache.pinot.common.restlet.resources.SegmentCompressionStatsContribution;
 import org.apache.pinot.common.restlet.resources.ServerCompressionStatsResponse;
 import org.apache.pinot.common.restlet.resources.TableSegments;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.UrlBuilderUtils;
 import org.slf4j.Logger;
@@ -75,10 +77,18 @@ final class ServerCompressionStatsReader {
 
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
+  @Nullable
+  private final AuthProvider _authProvider;
 
   ServerCompressionStatsReader(Executor executor, HttpClientConnectionManager connectionManager) {
+    this(executor, connectionManager, null);
+  }
+
+  ServerCompressionStatsReader(Executor executor, HttpClientConnectionManager connectionManager,
+      @Nullable AuthProvider authProvider) {
     _executor = executor;
     _connectionManager = connectionManager;
+    _authProvider = authProvider;
   }
 
   CompressionStatsResult read(String tableNameWithType, Map<String, List<String>> serverToSegments,
@@ -217,6 +227,7 @@ final class ServerCompressionStatsReader {
         batch._endpoint);
     HttpPost request = new HttpPost(url);
     request.setHeader("Content-Type", "application/json");
+    AuthProviderUtils.makeAuthHeadersMap(_authProvider).forEach(request::setHeader);
     request.setConfig(RequestConfig.custom()
         .setConnectionRequestTimeout(Timeout.of(timeoutMs, TimeUnit.MILLISECONDS))
         .setResponseTimeout(Timeout.of(timeoutMs, TimeUnit.MILLISECONDS))

@@ -26,7 +26,8 @@ import org.apache.commons.lang3.tuple.Pair;
 /// processing. The decision is made based on stats recorded for each server during query processing.
 public interface AdaptiveServerSelector {
 
-  /// Picks the best server to route a query from the list of candidate servers.
+  /// Picks the best server to route a query from the list of candidate servers. Implementations must neither retain
+  /// nor modify the given list.
   ///
   /// @param serverCandidates Candidate servers from which the best server should be chosen.
   /// @return server identifier

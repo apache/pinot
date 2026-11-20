@@ -35,10 +35,13 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public class MultiColumnDistinctTable extends DistinctTable {
+  private static final String MERGE_SCOPE = "MultiColumnDistinctTable#mergeDistinctTable";
+
   private final HashSet<Record> _recordSet;
   private final List<OrderByExpressionContext> _orderByExpressions;
 
@@ -184,13 +187,16 @@ public class MultiColumnDistinctTable extends DistinctTable {
   @Override
   public void mergeDistinctTable(DistinctTable distinctTable) {
     MultiColumnDistinctTable multiColumnDistinctTable = (MultiColumnDistinctTable) distinctTable;
+    int numRecordsMerged = 0;
     if (hasLimit()) {
       if (hasOrderBy()) {
         for (Record record : multiColumnDistinctTable._recordSet) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRecordsMerged++, MERGE_SCOPE);
           addWithOrderBy(record);
         }
       } else {
         for (Record record : multiColumnDistinctTable._recordSet) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRecordsMerged++, MERGE_SCOPE);
           if (addWithoutOrderBy(record)) {
             return;
           }
@@ -199,6 +205,7 @@ public class MultiColumnDistinctTable extends DistinctTable {
     } else {
       // NOTE: Do not use _valueSet.addAll() to avoid unnecessary resize when most values are common.
       for (Record record : multiColumnDistinctTable._recordSet) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRecordsMerged++, MERGE_SCOPE);
         addUnbounded(record);
       }
     }

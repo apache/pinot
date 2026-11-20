@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
@@ -48,13 +49,34 @@ public class TimeSeriesExchangeReceiveOperatorTest {
   private static final SimpleTimeSeriesBuilderFactory SERIES_BUILDER_FACTORY = new SimpleTimeSeriesBuilderFactory();
 
   @Test
+  public void testNoServerQueriedReturnsEmptyBlockWithoutWaiting() {
+    // A plan node no server holds segments for: nothing will arrive, so the operator must not wait for the deadline.
+    BlockingQueue<Object> blockingQueue = new ArrayBlockingQueue<>(1);
+    long deadlineMs = System.currentTimeMillis() + 60_000L;
+    for (AggInfo aggInfo : new AggInfo[]{SUM_AGG_INFO, null}) {
+      TimeSeriesExchangeReceiveOperator operator = new TimeSeriesExchangeReceiveOperator(blockingQueue, deadlineMs, 0,
+          aggInfo, SERIES_BUILDER_FACTORY, TIME_BUCKETS);
+      long startMs = System.currentTimeMillis();
+
+      TimeSeriesBlock block = operator.nextBlock();
+
+      assertTrue(System.currentTimeMillis() - startMs < 10_000L, "must not wait for the deadline");
+      assertEquals(block.getTimeBuckets(), TIME_BUCKETS);
+      assertTrue(block.getSeriesMap().isEmpty());
+      assertTrue(block.getExceptions().isEmpty());
+    }
+    assertThrows(IllegalArgumentException.class, () -> new TimeSeriesExchangeReceiveOperator(blockingQueue,
+        deadlineMs, 0, SUM_AGG_INFO, SERIES_BUILDER_FACTORY, null));
+  }
+
+  @Test
   public void testGetNextBlockWithAggregation() {
     // Setup test
     long deadlineMs = Long.MAX_VALUE;
     ArrayBlockingQueue<Object> blockingQueue = new ArrayBlockingQueue<>(NUM_SERVERS_QUERIED);
     blockingQueue.addAll(generateTimeSeriesBlocks());
     TimeSeriesExchangeReceiveOperator operator = new TimeSeriesExchangeReceiveOperator(blockingQueue, deadlineMs,
-        NUM_SERVERS_QUERIED, SUM_AGG_INFO, SERIES_BUILDER_FACTORY);
+        NUM_SERVERS_QUERIED, SUM_AGG_INFO, SERIES_BUILDER_FACTORY, TIME_BUCKETS);
     // Run test
     TimeSeriesBlock block = operator.nextBlock();
     // Validate results
@@ -78,7 +100,7 @@ public class TimeSeriesExchangeReceiveOperatorTest {
     ArrayBlockingQueue<Object> blockingQueue = new ArrayBlockingQueue<>(NUM_SERVERS_QUERIED);
     blockingQueue.addAll(generateTimeSeriesBlocks());
     TimeSeriesExchangeReceiveOperator operator = new TimeSeriesExchangeReceiveOperator(blockingQueue, deadlineMs,
-        NUM_SERVERS_QUERIED, null, SERIES_BUILDER_FACTORY);
+        NUM_SERVERS_QUERIED, null, SERIES_BUILDER_FACTORY, TIME_BUCKETS);
     // Run test
     TimeSeriesBlock block = operator.nextBlock();
     // Validate results
@@ -106,7 +128,7 @@ public class TimeSeriesExchangeReceiveOperatorTest {
     // Run test with aggregation
     try {
       TimeSeriesExchangeReceiveOperator operator = new TimeSeriesExchangeReceiveOperator(blockingQueue, deadlineMs,
-          NUM_SERVERS_QUERIED, SUM_AGG_INFO, SERIES_BUILDER_FACTORY);
+          NUM_SERVERS_QUERIED, SUM_AGG_INFO, SERIES_BUILDER_FACTORY, TIME_BUCKETS);
       TimeSeriesBlock block = operator.nextBlock();
       fail();
     } catch (Throwable t) {
@@ -115,7 +137,7 @@ public class TimeSeriesExchangeReceiveOperatorTest {
     blockingQueue.add(new TimeoutException("Test error"));
     try {
       TimeSeriesExchangeReceiveOperator operator = new TimeSeriesExchangeReceiveOperator(blockingQueue, deadlineMs,
-          NUM_SERVERS_QUERIED, null, SERIES_BUILDER_FACTORY);
+          NUM_SERVERS_QUERIED, null, SERIES_BUILDER_FACTORY, TIME_BUCKETS);
       TimeSeriesBlock block = operator.nextBlock();
       fail();
     } catch (Throwable t) {

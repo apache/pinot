@@ -51,6 +51,12 @@ public class CompressionStatsMetadataTest {
     assertNull(
         properties.get(getKeyFor(COLUMN, FORWARD_INDEX_DICTIONARY_ENCODED_UNCOMPRESSED_VALUE_SIZE_IN_BYTES)));
 
+    CompressionStatsMetadata.forRawForwardIndex(64, null).applyTo(properties, COLUMN);
+    assertEquals(properties.get(getKeyFor(COLUMN, FORWARD_INDEX_RAW_UNCOMPRESSED_VALUE_SIZE_IN_BYTES)), "64");
+    assertNull(properties.get(getKeyFor(COLUMN, FORWARD_INDEX_RAW_CHUNK_COMPRESSION_TYPE)));
+    assertNull(
+        properties.get(getKeyFor(COLUMN, FORWARD_INDEX_DICTIONARY_ENCODED_UNCOMPRESSED_VALUE_SIZE_IN_BYTES)));
+
     CompressionStatsMetadata.unavailable().applyTo(properties, COLUMN);
     assertNull(properties.get(getKeyFor(COLUMN, FORWARD_INDEX_RAW_UNCOMPRESSED_VALUE_SIZE_IN_BYTES)));
     assertNull(properties.get(getKeyFor(COLUMN, FORWARD_INDEX_RAW_CHUNK_COMPRESSION_TYPE)));

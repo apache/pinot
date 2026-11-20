@@ -19,22 +19,29 @@
 package org.apache.pinot.integration.tests.custom;
 
 import java.io.File;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -102,6 +109,12 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
 
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(PRIMARY_KEY_COL, new ColumnPartitionConfig("Murmur", NUM_PARTITIONS));
+    InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig(
+        TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME), false, 0, null);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, 2, 0, NUM_PARTITIONS, 1, false, null);
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false);
 
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME)
@@ -111,7 +124,9 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
         .setRoutingConfig(new RoutingConfig(null, null,
             RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PRIMARY_KEY_COL, 1))
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.name(), instanceAssignmentConfig))
+        .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.name(),
+            new SegmentAssignmentConfig(null, PRIMARY_KEY_COL)))
         .build();
   }
 
@@ -130,13 +145,7 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
   @Override
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return queryCountStarWithoutUpsert() == TOTAL_RAW_RECORDS;
-      } catch (Exception e) {
-        return null;
-      }
-    }, 100L, timeoutMs, "Failed to load all documents");
+    waitForAllDocsLoaded(TOTAL_RAW_RECORDS, timeoutMs);
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
   }
 
@@ -186,13 +195,7 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
     buildSegment(tableConfig, schema, "segment_update_0", rows, newSegmentDir, newTarDir);
     uploadSegments(TABLE_NAME, newTarDir);
 
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return queryCountStarWithoutUpsert() == TOTAL_RAW_RECORDS + 1;
-      } catch (Exception e) {
-        return null;
-      }
-    }, 100L, 600_000L, "Failed to load updated segment");
+    waitForAllDocsLoaded(TOTAL_RAW_RECORDS + 1, 600_000L);
 
     assertEquals(getCurrentCountStarResult(), UNIQUE_PRIMARY_KEYS);
 
@@ -200,6 +203,24 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
         "SELECT score FROM " + TABLE_NAME + " WHERE playerId = 100").getResultSet(0);
     assertEquals(rs.getRowCount(), 1);
     assertEquals(rs.getFloat(0, 0), 9999.0f, 0.01f);
+  }
+
+  private void waitForAllDocsLoaded(int expectedRawRecords, long timeoutMs) {
+    int numServers = getSharedServerStarters().size();
+    AtomicInteger consecutiveSuccesses = new AtomicInteger();
+    TestUtils.waitForCondition(() -> {
+      try {
+        if (queryCountStarWithoutUpsert() != expectedRawRecords) {
+          consecutiveSuccesses.set(0);
+          return false;
+        }
+        return consecutiveSuccesses.incrementAndGet() >= numServers;
+      } catch (Exception e) {
+        consecutiveSuccesses.set(0);
+        throw e;
+      }
+    }, 100L, timeoutMs, "Failed to load " + expectedRawRecords + " documents on all servers",
+        Duration.ofMillis(timeoutMs / 10));
   }
 
   private void buildAndUploadTestSegments(TableConfig tableConfig, Schema schema)

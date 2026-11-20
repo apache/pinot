@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.pinot.common.utils.ArrowAllocators;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -84,7 +85,7 @@ public class ArrowMessageDecoder implements StreamMessageDecoder<byte[]> {
 
     // Initialize Arrow allocator with configurable memory limit
     long allocatorLimit = Long.parseLong(props.getOrDefault(ARROW_ALLOCATOR_LIMIT, DEFAULT_ALLOCATOR_LIMIT));
-    _allocator = new RootAllocator(allocatorLimit);
+    _allocator = ArrowAllocators.newRootAllocator(allocatorLimit);
 
     LOGGER.info("Initialized ArrowMessageDecoder for topic: {} with allocator limit: {} bytes", topicName,
         allocatorLimit);

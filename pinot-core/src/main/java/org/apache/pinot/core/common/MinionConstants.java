@@ -53,6 +53,10 @@ public class MinionConstants {
   public static final String INITIAL_RETRY_DELAY_MS_KEY = "initialRetryDelayMs";
   public static final String RETRY_SCALE_FACTOR_KEY = "retryScaleFactor";
 
+  /// Per-task socket timeout (ms) for the minion -> controller segment upload request. Defaults to
+  /// [org.apache.pinot.common.utils.http.HttpClient#DEFAULT_SOCKET_TIMEOUT_MS] when unset.
+  public static final String SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS_KEY = "segmentUploadRequestTimeoutMs";
+
   /// Cluster level configs
   public static final String TIMEOUT_MS_KEY_SUFFIX = ".timeoutMs";
   public static final String NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX = ".numConcurrentTasksPerInstance";

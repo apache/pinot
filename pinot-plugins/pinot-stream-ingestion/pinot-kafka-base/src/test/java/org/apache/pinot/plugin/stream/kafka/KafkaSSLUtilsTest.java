@@ -34,6 +34,7 @@ import java.security.SecureRandom;
 import java.security.Security;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.Properties;
@@ -141,6 +142,76 @@ public class KafkaSSLUtilsTest {
     validateTrustStoreCertificateCount(1);
   }
 
+  @Test
+  public void testInitSSLRejectsConfigProviderTrustStorePassword() {
+    Properties consumerProps = new Properties();
+    consumerProps.setProperty("ssl.truststore.location", _trustStorePath);
+    consumerProps.setProperty("ssl.truststore.password", "${file:/vault/secrets/kafka.properties:password}");
+    consumerProps.setProperty("stream.kafka.ssl.server.certificate", "certificate");
+
+    IllegalArgumentException exception =
+        Assert.expectThrows(IllegalArgumentException.class, () -> KafkaSSLUtils.initSSL(consumerProps));
+
+    Assert.assertEquals(exception.getMessage(), "Kafka ConfigProvider references are not supported for "
+        + "'ssl.truststore.password' when Pinot auto-generates Kafka SSL stores; use a prebuilt keystore or "
+        + "truststore file instead");
+  }
+
+  @Test
+  public void testInitSSLRejectsConfigProviderKeyStorePassword()
+      throws CertificateException, NoSuchAlgorithmException, OperatorCreationException, NoSuchProviderException {
+    Properties consumerProps = new Properties();
+    setTrustStoreProps(consumerProps);
+    setKeyStoreProps(consumerProps);
+    consumerProps.setProperty("ssl.keystore.password", "${file:/vault/secrets/kafka.properties:password}");
+
+    IllegalArgumentException exception =
+        Assert.expectThrows(IllegalArgumentException.class, () -> KafkaSSLUtils.initSSL(consumerProps));
+
+    Assert.assertEquals(exception.getMessage(), "Kafka ConfigProvider references are not supported for "
+        + "'ssl.keystore.password' when Pinot auto-generates Kafka SSL stores; use a prebuilt keystore or truststore "
+        + "file instead");
+  }
+
+  @Test
+  public void testInitSSLRejectsConfigProviderKeyPassword()
+      throws CertificateException, NoSuchAlgorithmException, OperatorCreationException, NoSuchProviderException {
+    Properties consumerProps = new Properties();
+    setTrustStoreProps(consumerProps);
+    setKeyStoreProps(consumerProps);
+    consumerProps.setProperty("ssl.key.password", "${file:/vault/secrets/kafka.properties:password}");
+
+    IllegalArgumentException exception =
+        Assert.expectThrows(IllegalArgumentException.class, () -> KafkaSSLUtils.initSSL(consumerProps));
+
+    Assert.assertEquals(exception.getMessage(), "Kafka ConfigProvider references are not supported for "
+        + "'ssl.key.password' when Pinot auto-generates Kafka SSL stores; use a prebuilt keystore or truststore file "
+        + "instead");
+  }
+
+  @Test
+  public void testInitSSLRejectsConfigProviderBeforeRenewingExistingStore()
+      throws CertificateException, NoSuchAlgorithmException, OperatorCreationException, NoSuchProviderException,
+             IOException {
+    Properties consumerProps = new Properties();
+    setTrustStoreProps(consumerProps);
+    KafkaSSLUtils.initSSL(consumerProps);
+    byte[] originalTrustStore = Files.readAllBytes(Paths.get(_trustStorePath));
+
+    setTrustStoreProps(consumerProps);
+    setKeyStoreProps(consumerProps);
+    consumerProps.setProperty("stream.kafka.ssl.client.key.algorithm",
+        "${file:/vault/secrets/kafka.properties:algorithm}");
+
+    IllegalArgumentException exception =
+        Assert.expectThrows(IllegalArgumentException.class, () -> KafkaSSLUtils.initSSL(consumerProps));
+
+    Assert.assertEquals(exception.getMessage(), "Kafka ConfigProvider references are not supported for "
+        + "'stream.kafka.ssl.client.key.algorithm' when Pinot auto-generates Kafka SSL stores; use a prebuilt "
+        + "keystore or truststore file instead");
+    Assert.assertTrue(Arrays.equals(Files.readAllBytes(Paths.get(_trustStorePath)), originalTrustStore));
+  }
+
   @Test (expectedExceptions = java.io.FileNotFoundException.class)
   public void testInitSSLKeyStoreOnly()
       throws CertificateException, NoSuchAlgorithmException, OperatorCreationException, NoSuchProviderException,
@@ -163,7 +234,6 @@ public class KafkaSSLUtilsTest {
     setTrustStoreProps(consumerProps);
     setKeyStoreProps(consumerProps);
     KafkaSSLUtils.initSSL(consumerProps);
-
     // renew the truststore and keystore
     setTrustStoreProps(consumerProps);
     setKeyStoreProps(consumerProps);

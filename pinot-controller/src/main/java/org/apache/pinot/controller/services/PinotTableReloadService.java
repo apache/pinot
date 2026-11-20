@@ -81,13 +81,14 @@ public class PinotTableReloadService {
   }
 
   public SuccessResponse reloadSegment(String tableName, String segmentName, boolean forceDownload,
-      String targetInstance, HttpHeaders headers) {
+      boolean onlyIfNeeded, String targetInstance, HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     long startTimeMs = System.currentTimeMillis();
     segmentName = URIUtils.decode(segmentName);
     String tableNameWithType = getExistingTable(tableName, segmentName);
     Pair<Integer, String> msgInfo =
-        _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload, targetInstance);
+        _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload, onlyIfNeeded,
+            targetInstance);
     boolean zkJobMetaWriteSuccess = false;
     int numReloadMsgSent = msgInfo.getLeft();
     if (numReloadMsgSent > 0) {
@@ -113,7 +114,7 @@ public class PinotTableReloadService {
   }
 
   public SuccessResponse reloadAllSegments(String tableName, @Nullable String tableTypeStr, boolean forceDownload,
-      @Nullable String targetInstance, @Nullable String instanceToSegmentsMapInJson,
+      boolean onlyIfNeeded, @Nullable String targetInstance, @Nullable String instanceToSegmentsMapInJson,
       @Nullable String startTimestampStr, @Nullable String endTimestampStr, boolean excludeOverlapping,
       HttpHeaders headers)
       throws IOException {
@@ -128,7 +129,7 @@ public class PinotTableReloadService {
             Response.Status.BAD_REQUEST);
       }
       return reloadSegmentsInTimeRange(tableName, tableTypeStr, startTimestampStr, endTimestampStr,
-          excludeOverlapping, forceDownload, null, headers);
+          excludeOverlapping, forceDownload, onlyIfNeeded, null, headers);
     } else if (excludeOverlapping) {
       throw new ControllerApplicationException(LOG,
           "excludeOverlapping can only be used together with startTimestamp/endTimestamp.",
@@ -144,7 +145,7 @@ public class PinotTableReloadService {
       boolean hasAnyMessages = false;
       for (String tableNameWithType : tableNamesWithType) {
         Map<String, Map<String, String>> instanceMsgData =
-            reloadSegmentsForTable(tableNameWithType, forceDownload, instanceToSegmentsMap);
+            reloadSegmentsForTable(tableNameWithType, forceDownload, onlyIfNeeded, instanceToSegmentsMap);
         tableInstanceMsgData.put(tableNameWithType, instanceMsgData);
         if (!instanceMsgData.isEmpty()) {
           hasAnyMessages = true;
@@ -161,7 +162,7 @@ public class PinotTableReloadService {
     Map<String, Map<String, String>> perTableMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
       Pair<Integer, String> msgInfo =
-          _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload, targetInstance);
+          _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload, onlyIfNeeded, targetInstance);
       int numReloadMsgSent = msgInfo.getLeft();
       if (numReloadMsgSent <= 0) {
         continue;
@@ -194,7 +195,7 @@ public class PinotTableReloadService {
 
   public SuccessResponse reloadSegmentsInTimeRange(String tableName, @Nullable String tableTypeStr,
       @Nullable String startTimestampStr, @Nullable String endTimestampStr, boolean excludeOverlapping,
-      boolean forceDownload, @Nullable String targetInstance, HttpHeaders headers) {
+      boolean forceDownload, boolean onlyIfNeeded, @Nullable String targetInstance, HttpHeaders headers) {
     long startTimestamp = Long.MIN_VALUE;
     long endTimestamp = Long.MAX_VALUE;
     if (Strings.isNullOrEmpty(startTimestampStr) && Strings.isNullOrEmpty(endTimestampStr)) {
@@ -251,8 +252,8 @@ public class PinotTableReloadService {
       String reloadJobId = UUID.randomUUID().toString();
       long startTimeMs = System.currentTimeMillis();
       Map<String, Integer> instanceMsgCountMap =
-          _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, filteredInstanceToSegmentsMap,
-              reloadJobId);
+          _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, onlyIfNeeded,
+              filteredInstanceToSegmentsMap, reloadJobId);
       int numReloadMsgSent = 0;
       for (int instanceMsgCount : instanceMsgCountMap.values()) {
         numReloadMsgSent += instanceMsgCount;
@@ -362,14 +363,15 @@ public class PinotTableReloadService {
   }
 
   private Map<String, Map<String, String>> reloadSegmentsForTable(String tableNameWithType, boolean forceDownload,
-      Map<String, List<String>> instanceToSegmentsMap) {
+      boolean onlyIfNeeded, Map<String, List<String>> instanceToSegmentsMap) {
     long startTimeMs = System.currentTimeMillis();
     // Use a single shared job ID across all instances so the logical reload operation can be tracked
     // via a single ZK entry, consistent with the time-range reload path.
     String reloadJobId = UUID.randomUUID().toString();
     String targetInstance = instanceToSegmentsMap.size() == 1 ? instanceToSegmentsMap.keySet().iterator().next() : null;
     Map<String, Integer> instanceMsgCountMap =
-        _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, instanceToSegmentsMap, reloadJobId);
+        _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, onlyIfNeeded, instanceToSegmentsMap,
+            reloadJobId);
     int totalNumReloadMsgSent = 0;
     Map<String, Map<String, String>> instanceMsgData = new HashMap<>();
     for (Map.Entry<String, Integer> instanceMsgInfo : instanceMsgCountMap.entrySet()) {

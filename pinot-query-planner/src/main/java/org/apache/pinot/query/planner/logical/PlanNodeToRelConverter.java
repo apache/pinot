@@ -25,12 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Uncollect;
@@ -39,16 +41,22 @@ import org.apache.calcite.rel.logical.LogicalIntersect;
 import org.apache.calcite.rel.logical.LogicalMinus;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
+import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCorrelVariable;
+import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.rex.RexWindowBounds;
 import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalMvAggregate;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
@@ -61,6 +69,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -108,12 +117,30 @@ public final class PlanNodeToRelConverter {
       visitChildren(node);
 
       try {
-        int[] groupKeyArr = node.getGroupKeys().stream().mapToInt(Integer::intValue).toArray();
-        RelBuilder.GroupKey groupKey = _builder.groupKey(groupKeyArr);
+        List<Integer> groupKeys = node.getGroupKeys();
+        RelBuilder.GroupKey groupKey;
+        if (node.isGroupingSets()) {
+          // Each grouping set holds indexes into the group keys, not input field indexes
+          List<ImmutableBitSet> groupSets = new ArrayList<>(node.getGroupingSets().size());
+          for (List<Integer> groupingSet : node.getGroupingSets()) {
+            groupSets.add(ImmutableBitSet.of(groupingSet.stream().map(groupKeys::get).collect(Collectors.toList())));
+          }
+          groupKey = _builder.groupKey(ImmutableBitSet.of(groupKeys), groupSets);
+        } else {
+          groupKey = _builder.groupKey(groupKeys.stream().mapToInt(Integer::intValue).toArray());
+        }
 
-        List<RelBuilder.AggCall> aggCalls =
-            node.getAggCalls().stream().map(functionCall -> RexExpressionUtils.toAggCall(_builder, functionCall))
-                .collect(Collectors.toList());
+        List<RexExpression.FunctionCall> functionCalls = node.getAggCalls();
+        List<Integer> filterArgs = node.getFilterArgs();
+        List<RelBuilder.AggCall> aggCalls = new ArrayList<>(functionCalls.size());
+        for (int i = 0; i < functionCalls.size(); i++) {
+          RelBuilder.AggCall aggCall = RexExpressionUtils.toAggCall(_builder, functionCalls.get(i));
+          int filterArg = filterArgs.get(i);
+          if (filterArg >= 0) {
+            aggCall = aggCall.filter(_builder.field(filterArg));
+          }
+          aggCalls.add(aggCall);
+        }
 
         _builder.aggregate(groupKey, aggCalls);
       } catch (RuntimeException e) {
@@ -360,7 +387,7 @@ public final class PlanNodeToRelConverter {
 
         List<Window.RexWinAggCall> aggCalls = new ArrayList<>();
         for (RexExpression.FunctionCall funCall : node.getAggCalls()) {
-          SqlAggFunction aggFunction = RexExpressionUtils.getAggFunction(funCall, _builder.getCluster());
+          SqlAggFunction aggFunction = RexExpressionUtils.getAggFunction(funCall);
           List<RexExpression> functionOperands = funCall.getFunctionOperands();
           List<RexNode> operands = new ArrayList<>(functionOperands.size());
           for (RexExpression functionOperand : functionOperands) {
@@ -484,6 +511,13 @@ public final class PlanNodeToRelConverter {
         if (arrayProjects.isEmpty()) {
           arrayProjects.add(_builder.field(0));
         }
+        // CROSS JOIN UNNEST also outputs the input columns, which parent nodes may reference
+        int numPassthrough =
+            node.getDataSchema().size() - arrayProjects.size() - (node.isWithOrdinality() ? 1 : 0);
+        if (numPassthrough > 0) {
+          pushCorrelatedUncollect(node, input, arrayProjects);
+          return null;
+        }
         _builder.project(arrayProjects);
         RelNode project = _builder.build();
 
@@ -497,6 +531,80 @@ public final class PlanNodeToRelConverter {
             node.getDataSchema(), inputs));
       }
       return null;
+    }
+
+    @Override
+    public Void visitMvAggregate(MvAggregateNode node, Void context) {
+      visitChildren(node);
+      // Pop the input so that a failure below cannot pop a node that belongs to the parent or a sibling
+      RelNode input = _builder.build();
+
+      try {
+        // Build a plain aggregate first to resolve the aggregate calls, then carry its fields to the MV aggregate.
+        // Use a separate builder without the simplifications that would return a Project instead of an Aggregate.
+        RelBuilder aggregateBuilder =
+            _builder.transform(config -> config.withDedupAggregateCalls(false).withAggregateUnique(true));
+        aggregateBuilder.push(input);
+        List<RexExpression.FunctionCall> functionCalls = node.getAggCalls();
+        List<Integer> filterArgs = node.getFilterArgs();
+        List<RelBuilder.AggCall> aggCalls = new ArrayList<>(functionCalls.size());
+        for (int i = 0; i < functionCalls.size(); i++) {
+          RelBuilder.AggCall aggCall = RexExpressionUtils.toAggCall(aggregateBuilder, functionCalls.get(i));
+          int filterArg = filterArgs.get(i);
+          if (filterArg >= 0) {
+            aggCall = aggCall.filter(aggregateBuilder.field(filterArg));
+          }
+          aggCalls.add(aggCall);
+        }
+        RelBuilder.GroupKey groupKey =
+            aggregateBuilder.groupKey(node.getGroupKeys().stream().mapToInt(Integer::intValue).toArray());
+        RelNode relNode = aggregateBuilder.aggregate(groupKey, aggCalls).build();
+        Preconditions.checkState(relNode instanceof Aggregate, "Expected an Aggregate, got: %s", relNode);
+        Aggregate aggregate = (Aggregate) relNode;
+        _builder.push(new PinotLogicalMvAggregate(aggregate.getCluster(), aggregate.getTraitSet(), List.of(),
+            aggregate.getInput(), aggregate.getGroupSet(), null, aggregate.getAggCallList(), node.getAggType(),
+            node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(), node.getMvKeyIndexes()));
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert MV aggregate node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownMvAggregate", Map.of(),
+            node.getDataSchema(), List.of(input)));
+      }
+
+      return null;
+    }
+
+    /// Replaces the input on top of the builder stack with the logical plan shape of CROSS JOIN UNNEST: a Correlate of
+    /// the input with an Uncollect that reads the arrays through the correlation variable. Like the [UnnestNode], it
+    /// outputs the input columns followed by the element (and ordinality) columns.
+    private void pushCorrelatedUncollect(UnnestNode node, RelNode input, List<RexNode> arrayProjects) {
+      RexBuilder rexBuilder = _builder.getRexBuilder();
+      RexCorrelVariable correlVariable =
+          (RexCorrelVariable) rexBuilder.makeCorrel(input.getRowType(), _builder.getCluster().createCorrel());
+      RexShuttle toCorrelated = new RexShuttle() {
+        @Override
+        public RexNode visitInputRef(RexInputRef inputRef) {
+          return rexBuilder.makeFieldAccess(correlVariable, inputRef.getIndex());
+        }
+      };
+      List<String> inputNames = input.getRowType().getFieldNames();
+      List<String> arrayNames = new ArrayList<>(arrayProjects.size());
+      for (RexNode arrayProject : arrayProjects) {
+        arrayNames.add(
+            arrayProject instanceof RexInputRef ? inputNames.get(((RexInputRef) arrayProject).getIndex()) : null);
+      }
+      List<RexNode> requiredColumns = _builder.fields(RelOptUtil.InputFinder.bits(arrayProjects, null));
+      _builder.push(LogicalValues.createOneRow(_builder.getCluster()))
+          .project(toCorrelated.apply(arrayProjects), arrayNames)
+          .uncollect(List.of(), node.isWithOrdinality())
+          .correlate(JoinRelType.INNER, correlVariable.id, requiredColumns);
+
+      if (node.isPrunedPassthrough()) {
+        // Keep only the passthrough input columns, followed by the element (and ordinality) columns
+        List<RexNode> fields = _builder.fields();
+        List<RexNode> projects = new ArrayList<>(_builder.fields(node.getPassthroughInputIndexes()));
+        projects.addAll(fields.subList(inputNames.size(), fields.size()));
+        _builder.project(projects);
+      }
     }
 
     @Override

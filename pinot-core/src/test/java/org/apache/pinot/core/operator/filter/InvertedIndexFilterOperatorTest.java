@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
@@ -30,10 +32,13 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
-/// Targeted tests for [InvertedIndexFilterOperator#getNumMatchingDocs()]. Five tests cover every
-/// distinct code branch (SV loop, MV switch arms {0, 2, default}, and exclusive arithmetic)
+/// Targeted tests for [InvertedIndexFilterOperator#getNumMatchingDocs()]. The two-valued tests cover every
+/// distinct code branch (SV loop, MV switch arms {0, 2, default}, and exclusive arithmetic); the null handling ones
+/// check that null rows are left out of the count and the bitmaps.
 public class InvertedIndexFilterOperatorTest {
   private static final int NUM_DOCS = 1000;
 
@@ -89,6 +94,47 @@ public class InvertedIndexFilterOperatorTest {
     assertEquals(operator.getNumMatchingDocs(), NUM_DOCS);
   }
 
+  // Null handling: null rows are UNKNOWN, so they are left out of the count and the bitmaps on both sides of exclusive
+  @Test
+  public void testNullRowsAreExcluded() {
+    ImmutableRoaringBitmap b0 = bitmap(0, 1, 2, 3);
+    ImmutableRoaringBitmap b1 = bitmap(4, 5, 6);
+    ImmutableRoaringBitmap nullBitmap = bitmap(3, 100);
+    InvertedIndexFilterOperator operator =
+        newOperator(true, false, new int[]{0, 1}, new ImmutableRoaringBitmap[]{b0, b1}, nullBitmap);
+    assertTrue(operator.mayHaveNulls());
+    assertEquals(operator.getNumMatchingDocs(), 6);
+    assertEquals(operator.getBitmaps().reduce().toArray(), new int[]{0, 1, 2, 4, 5, 6});
+
+    operator = newOperator(true, true, new int[]{0, 1}, new ImmutableRoaringBitmap[]{b0, b1}, nullBitmap);
+    assertEquals(operator.getNumMatchingDocs(), NUM_DOCS - 8);
+    assertFalse(operator.getBitmaps().reduce().contains(100));
+  }
+
+  // Multi-value postings overlap, so the null rows among the matches are counted on the union
+  @Test
+  public void testNullRowsAreExcludedOnMultiValueColumn() {
+    ImmutableRoaringBitmap b0 = bitmap(0, 1, 2, 3, 4);
+    ImmutableRoaringBitmap b1 = bitmap(3, 4, 5, 6);
+    ImmutableRoaringBitmap nullBitmap = bitmap(3, 100);
+    InvertedIndexFilterOperator operator =
+        newOperator(false, false, new int[]{0, 1}, new ImmutableRoaringBitmap[]{b0, b1}, nullBitmap);
+    assertEquals(operator.getNumMatchingDocs(), 6);
+
+    operator = newOperator(false, true, new int[]{0, 1}, new ImmutableRoaringBitmap[]{b0, b1}, nullBitmap);
+    assertEquals(operator.getNumMatchingDocs(), NUM_DOCS - 8);
+  }
+
+  // An empty null vector leaves the two-valued shortcuts in place
+  @Test
+  public void testEmptyNullBitmapIsIgnored() {
+    ImmutableRoaringBitmap b0 = bitmap(0, 1, 2, 3);
+    InvertedIndexFilterOperator operator =
+        newOperator(true, false, new int[]{0}, new ImmutableRoaringBitmap[]{b0}, bitmap());
+    assertFalse(operator.mayHaveNulls());
+    assertEquals(operator.getNumMatchingDocs(), 4);
+  }
+
   // ----- helpers -----
 
   private static ImmutableRoaringBitmap bitmap(int... docIds) {
@@ -99,11 +145,16 @@ public class InvertedIndexFilterOperatorTest {
     return bitmap;
   }
 
-  @SuppressWarnings({"unchecked", "rawtypes"})
   private static InvertedIndexFilterOperator newOperator(boolean singleValue, boolean exclusive, int[] dictIds,
       ImmutableRoaringBitmap[] perDictIdBitmaps) {
+    return newOperator(singleValue, exclusive, dictIds, perDictIdBitmaps, null);
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static InvertedIndexFilterOperator newOperator(boolean singleValue, boolean exclusive, int[] dictIds,
+      ImmutableRoaringBitmap[] perDictIdBitmaps, @Nullable ImmutableRoaringBitmap nullBitmap) {
     QueryContext queryContext = mock(QueryContext.class);
-    when(queryContext.isNullHandlingEnabled()).thenReturn(false);
+    when(queryContext.isNullHandlingEnabled()).thenReturn(nullBitmap != null);
 
     DataSourceMetadata metadata = mock(DataSourceMetadata.class);
     when(metadata.isSingleValue()).thenReturn(singleValue);
@@ -116,6 +167,11 @@ public class InvertedIndexFilterOperatorTest {
     DataSource dataSource = mock(DataSource.class);
     when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
     when(dataSource.getInvertedIndex()).thenReturn(reader);
+    if (nullBitmap != null) {
+      NullValueVectorReader nullValueVector = mock(NullValueVectorReader.class);
+      when(nullValueVector.getNullBitmap()).thenReturn(nullBitmap);
+      when(dataSource.getNullValueVector()).thenReturn(nullValueVector);
+    }
 
     PredicateEvaluator predicateEvaluator = mock(PredicateEvaluator.class);
     when(predicateEvaluator.isExclusive()).thenReturn(exclusive);

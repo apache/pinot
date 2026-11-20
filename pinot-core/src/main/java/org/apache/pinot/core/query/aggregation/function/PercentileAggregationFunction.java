@@ -19,6 +19,8 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -26,15 +28,18 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.memory.PrimitiveArrays;
 
 
-public class PercentileAggregationFunction extends NullableSingleInputAggregationFunction<DoubleArrayList, Double> {
+public class PercentileAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, Double> {
+  private static final int DOUBLE_ARRAY_LIST_TYPE = 3;
+
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   //version 0 functions specified in the of form PERCENTILE<2-digits>(column)
@@ -207,9 +212,39 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubleArrayList));
+  public DoubleArrayList mergeSerializedIntermediateResult(@Nullable DoubleArrayList intermediateResult,
+      CustomObject serialized) {
+    if (intermediateResult == null) {
+      return deserializeIntermediateResult(serialized);
+    }
+    // Reads the values in bulk straight into the merged list, in the format of
+    // ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE: an int count, then the doubles, in the buffer's byte order. Same
+    // growth as addAll(), without the incoming list.
+    ByteBuffer buffer = serialized.getBuffer();
+    int numValues = buffer.getInt();
+    if (numValues < 0) {
+      throw new IllegalArgumentException("Negative number of values: " + numValues);
+    }
+    if (numValues > buffer.remaining() / Double.BYTES) {
+      throw new BufferUnderflowException();
+    }
+    int size = intermediateResult.size();
+    int newSize = Math.addExact(size, numValues);
+    int capacity = intermediateResult.elements().length;
+    if (newSize > capacity) {
+      // Grow by half like addAll(), capped below the maximum array size, but never below the size set next.
+      int grownCapacity = (int) Math.min((long) capacity + (capacity >> 1), Integer.MAX_VALUE - 8);
+      intermediateResult.ensureCapacity(Math.max(newSize, grownCapacity));
+    }
+    // size() zero-fills the new range, so it must run before the values are copied in.
+    intermediateResult.size(newSize);
+    PrimitiveArrays.readDoubles(buffer, intermediateResult.elements(), size, numValues);
+    return intermediateResult;
+  }
+
+  @Override
+  public SerializedResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
+    return new SerializedValue<>(DOUBLE_ARRAY_LIST_TYPE, doubleArrayList, ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE);
   }
 
   @Override

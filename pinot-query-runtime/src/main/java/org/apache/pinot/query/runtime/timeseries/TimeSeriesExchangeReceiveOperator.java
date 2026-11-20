@@ -68,7 +68,11 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
       DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID,
       DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT,
-      DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE
+      DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE,
+      DataTable.MetadataKey.NUM_REMOTE_ACCESSES,
+      DataTable.MetadataKey.REMOTE_ACCESS_BYTES,
+      DataTable.MetadataKey.NUM_DIRECT_REMOTE_ACCESSES,
+      DataTable.MetadataKey.DIRECT_REMOTE_ACCESS_BYTES
   );
 
   private static final List<DataTable.MetadataKey> MIN_STATS_KEYS = List.of(
@@ -83,20 +87,31 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
   @Nullable
   private final AggInfo _aggInfo;
   private final TimeSeriesBuilderFactory _factory;
+  @Nullable
+  private final TimeBuckets _timeBuckets;
 
+  /// @param numServersQueried servers that send a block; 0 when no server holds segments for the plan node, in which
+  ///     case the operator returns an empty block over `timeBuckets` without waiting
   public TimeSeriesExchangeReceiveOperator(BlockingQueue<Object> receiver, long deadlineMs, int numServersQueried,
-      @Nullable AggInfo aggInfo, TimeSeriesBuilderFactory seriesBuilderFactory) {
+      @Nullable AggInfo aggInfo, TimeSeriesBuilderFactory seriesBuilderFactory, @Nullable TimeBuckets timeBuckets) {
     super(List.of());
-    Preconditions.checkArgument(numServersQueried > 0, "No servers to query in receive operator");
+    Preconditions.checkArgument(numServersQueried >= 0, "Negative number of servers in receive operator");
+    Preconditions.checkArgument(numServersQueried > 0 || timeBuckets != null,
+        "Time buckets are required when no server is queried");
     _receiver = receiver;
     _deadlineMs = deadlineMs;
     _numServersQueried = numServersQueried;
     _aggInfo = aggInfo;
     _factory = seriesBuilderFactory;
+    _timeBuckets = timeBuckets;
   }
 
   @Override
   public TimeSeriesBlock getNextBlock() {
+    if (_numServersQueried == 0) {
+      // No server holds segments for this plan node: it has no data.
+      return new TimeSeriesBlock(_timeBuckets, new HashMap<>());
+    }
     try {
       if (_aggInfo == null) {
         return getNextBlockNoAggregation();

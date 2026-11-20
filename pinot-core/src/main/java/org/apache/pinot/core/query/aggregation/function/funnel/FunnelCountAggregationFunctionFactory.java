@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -62,7 +63,10 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
   final boolean _thetaSketchSetting;
   final boolean _setSetting;
 
-  public FunnelCountAggregationFunctionFactory(List<ExpressionContext> expressions) {
+  private final boolean _nullHandlingEnabled;
+
+  public FunnelCountAggregationFunctionFactory(List<ExpressionContext> expressions, boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
     _expressions = expressions;
     Option.validate(expressions);
     _correlateByExpressions = Option.CORRELATE_BY.getInputExpressions(expressions);
@@ -120,7 +124,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
       MergeStrategy<List<Long>> mergeStrategy) {
     if (_sortingSetting) {
       return new FunnelCountSortedAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-          aggregationStrategy, resultExtractionStrategy, mergeStrategy);
+          aggregationStrategy, resultExtractionStrategy, mergeStrategy, _nullHandlingEnabled);
     } else {
       return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
           aggregationStrategy, resultExtractionStrategy, mergeStrategy);
@@ -128,11 +132,12 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
   }
 
   AggregationStrategy<UpdatableThetaSketch[]> thetaSketchAggregationStrategy() {
-    return new ThetaSketchAggregationStrategy(_stepExpressions, _correlateByExpressions, _nominalEntries);
+    return new ThetaSketchAggregationStrategy(_stepExpressions, _correlateByExpressions, _nominalEntries,
+        _nullHandlingEnabled);
   }
 
   AggregationStrategy<DictIdsWrapper> bitmapAggregationStrategy() {
-    return new BitmapAggregationStrategy(_stepExpressions, _correlateByExpressions);
+    return new BitmapAggregationStrategy(_stepExpressions, _correlateByExpressions, _nullHandlingEnabled);
   }
 
   MergeStrategy<List<ThetaSketch>> thetaSketchMergeStrategy() {
@@ -172,7 +177,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
       if (dictIdsWrapper == null) {
         return Collections.nCopies(_numSteps, 0L);
       }
-      return bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps));
+      return LongArrayList.wrap(bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps)));
     };
   }
 
@@ -182,7 +187,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
       if (sketches == null) {
         return Collections.nCopies(_numSteps, 0L);
       }
-      return thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches));
+      return LongArrayList.wrap(thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches)));
     };
   }
 

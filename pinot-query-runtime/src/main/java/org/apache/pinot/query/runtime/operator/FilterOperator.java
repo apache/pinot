@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
@@ -62,7 +63,8 @@ public class FilterOperator extends MultiStageOperator {
     super(context);
     _input = input;
     _dataSchema = node.getDataSchema();
-    _filterOperand = TransformOperandFactory.getTransformOperand(node.getCondition(), _dataSchema);
+    _filterOperand = TransformOperandFactory.getTransformOperand(node.getCondition(), _dataSchema,
+        QueryOptionsUtils.isNullHandlingEnabled(context.getOpChainMetadata()));
     Preconditions.checkState(_filterOperand.getResultType() == ColumnDataType.BOOLEAN,
         "Filter operand must return BOOLEAN, got: %s", _filterOperand.getResultType());
   }

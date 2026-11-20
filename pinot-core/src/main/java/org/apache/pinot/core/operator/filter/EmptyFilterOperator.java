@@ -58,7 +58,7 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    return EmptyDocIdSet.getInstance();
+    return EmptyDocIdSet.unscanned();
   }
 
 

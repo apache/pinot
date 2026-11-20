@@ -87,6 +87,32 @@ public class AccessControlUserCache {
     return _userControllerConfigMap.values().stream().collect(Collectors.toList());
   }
 
+  /// Returns the cache-owned controller user config for the given raw username, or `null` when no such user exists.
+  /// Callers must treat the returned config as read-only.
+  @Nullable
+  public UserConfig getControllerUserConfigForUsername(String rawUsername) {
+    if (rawUsername == null || !rawUsername.equals(rawUsername.trim())) {
+      return null;
+    }
+    String normalizedUsername = rawUsername;
+    UserConfig userConfig = _userControllerConfigMap.get(normalizedUsername + "_" + ComponentType.CONTROLLER);
+    if (userConfig != null) {
+      return userConfig;
+    }
+    // Principal names were historically trimmed after loading all users. Retain that compatibility on the uncommon
+    // slow path where a stored username itself contains leading or trailing whitespace.
+    UserConfig matchedUserConfig = null;
+    for (UserConfig candidate : _userControllerConfigMap.values()) {
+      if (candidate.getUserName().trim().equals(normalizedUsername)) {
+        if (matchedUserConfig != null) {
+          return null;
+        }
+        matchedUserConfig = candidate;
+      }
+    }
+    return matchedUserConfig;
+  }
+
   public List<UserConfig> getAllBrokerUserConfig() {
     return _userBrokerConfigMap.values().stream().collect(Collectors.toList());
   }

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVForwardIndexWriter;
@@ -39,7 +40,8 @@ import static org.testng.Assert.assertEquals;
 
 
 public class FixedBitMVForwardIndexTest implements PinotBuffersAfterMethodCheckRule {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "FixedBitMVForwardIndexTest");
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), "FixedBitMVForwardIndexTest-" + UUID.randomUUID());
   private static final File INDEX_FILE =
       new File(TEMP_DIR, "testColumn" + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
   private static final int NUM_DOCS = 100;
@@ -109,6 +111,75 @@ public class FixedBitMVForwardIndexTest implements PinotBuffersAfterMethodCheckR
 
       FileUtils.forceDelete(INDEX_FILE);
     }
+  }
+
+  /// Mixes getNumValuesMV() and getDictIdMV() calls on one context, in sequential, skipping and random doc order.
+  /// Few values per doc give about a thousand docs per chunk, so the calls cross chunks and also move inside one.
+  @Test
+  public void testNumValuesMVSharesContextWithDictIdMV()
+      throws Exception {
+    int numDocs = 5000;
+    int numBitsPerValue = 8;
+    int[][] valuesArray = new int[numDocs][];
+    int totalNumValues = 0;
+    for (int i = 0; i < numDocs; i++) {
+      int[] values = new int[RANDOM.nextInt(3) + 1];
+      for (int j = 0; j < values.length; j++) {
+        values[j] = RANDOM.nextInt(1 << numBitsPerValue);
+      }
+      valuesArray[i] = values;
+      totalNumValues += values.length;
+    }
+    try (FixedBitMVForwardIndexWriter writer = new FixedBitMVForwardIndexWriter(INDEX_FILE, numDocs, totalNumValues,
+        numBitsPerValue)) {
+      for (int[] values : valuesArray) {
+        writer.putDictIds(values);
+      }
+    }
+
+    int[] randomOrder = new int[numDocs];
+    for (int i = 0; i < numDocs; i++) {
+      randomOrder[i] = RANDOM.nextInt(numDocs);
+    }
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
+        FixedBitMVForwardIndexReader reader = new FixedBitMVForwardIndexReader(dataBuffer, numDocs, totalNumValues,
+            numBitsPerValue)) {
+      int[] valueBuffer = new int[3];
+      // Sequential, counting only
+      try (FixedBitMVForwardIndexReader.Context context = reader.createContext()) {
+        for (int i = 0; i < numDocs; i++) {
+          assertEquals(reader.getNumValuesMV(i, context), valuesArray[i].length, "docId: " + i);
+        }
+      }
+      // Sequential, counting and then reading the same doc
+      try (FixedBitMVForwardIndexReader.Context context = reader.createContext()) {
+        for (int i = 0; i < numDocs; i++) {
+          assertEquals(reader.getNumValuesMV(i, context), valuesArray[i].length, "docId: " + i);
+          assertEquals(reader.getDictIdMV(i, context), valuesArray[i], "docId: " + i);
+        }
+      }
+      // Skipping docs, alternating the two calls
+      try (FixedBitMVForwardIndexReader.Context context = reader.createContext()) {
+        for (int i = 0; i < numDocs; i += 3) {
+          if (i % 2 == 0) {
+            assertEquals(reader.getNumValuesMV(i, context), valuesArray[i].length, "docId: " + i);
+          } else {
+            int numValues = reader.getDictIdMV(i, valueBuffer, context);
+            assertEquals(numValues, valuesArray[i].length, "docId: " + i);
+          }
+        }
+      }
+      // Random order, including going backwards
+      try (FixedBitMVForwardIndexReader.Context context = reader.createContext()) {
+        for (int docId : randomOrder) {
+          assertEquals(reader.getNumValuesMV(docId, context), valuesArray[docId].length, "docId: " + docId);
+          if (docId % 2 == 0) {
+            assertEquals(reader.getDictIdMV(docId, context), valuesArray[docId], "docId: " + docId);
+          }
+        }
+      }
+    }
+    FileUtils.forceDelete(INDEX_FILE);
   }
 
   @AfterClass

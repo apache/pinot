@@ -22,6 +22,7 @@ version: 2
 updates:
   - package-ecosystem: "maven"
     directory: "/"
+    labels: [dependencies]
     schedule:
       interval: "daily"
     open-pull-requests-limit: 20
@@ -36,6 +37,7 @@ updates:
 
   - package-ecosystem: "npm"
     directory: "/pinot-controller/src/main/resources"
+    labels: [dependencies]
     schedule:
       interval: "daily"
     # Disable version updates for npm dependencies
@@ -43,5 +45,6 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    labels: [dependencies]
     schedule:
       interval: "daily"

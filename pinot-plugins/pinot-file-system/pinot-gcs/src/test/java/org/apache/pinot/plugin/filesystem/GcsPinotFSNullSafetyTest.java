@@ -22,11 +22,14 @@ import com.google.api.gax.paging.Page;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -42,6 +45,7 @@ import static org.testng.Assert.fail;
 /// Unit tests verifying null-safety fixes in GcsPinotFS:
 /// - open() throws FileNotFoundException (not NPE) when the blob does not exist
 /// - copy() throws FileNotFoundException (not NPE) when the source blob does not exist
+/// - copyToLocalFile() throws FileNotFoundException when the source blob does not exist
 public class GcsPinotFSNullSafetyTest {
 
   private Storage _mockStorage;
@@ -132,5 +136,23 @@ public class GcsPinotFSNullSafetyTest {
 
     // Must throw FileNotFoundException, not NullPointerException
     assertThrows(FileNotFoundException.class, () -> _gcsPinotFS.copyDir(srcUri, dstUri));
+  }
+
+  @Test
+  public void testCopyToLocalFileThrowsFileNotFoundExceptionWhenBlobDoesNotExist()
+      throws Exception {
+    URI srcUri = URI.create("gs://test-bucket/missing-file");
+    File tempDir = Files.createTempDirectory("GcsPinotFSNullSafetyTest").toFile();
+    File dstFile = new File(tempDir, "missing-file");
+    when(_mockStorage.get(any(BlobId.class))).thenReturn(null);
+
+    try {
+      _gcsPinotFS.copyToLocalFile(srcUri, dstFile);
+      fail("Expected FileNotFoundException");
+    } catch (FileNotFoundException ex) {
+      assertEquals(ex.getMessage(), "File '" + srcUri + "' does not exist");
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
   }
 }

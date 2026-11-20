@@ -25,6 +25,7 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -123,6 +124,39 @@ public class FunctionUtilsTest {
     FunctionInfo workerId = FunctionRegistry.lookupFunctionInfo("workerid", 1);
     assertTrue(workerId.isDeterministic());
     assertEquals(workerId.getVolatility(), FunctionVolatility.VOLATILE);
+  }
+
+  /// The [FunctionInfo] volatility above is per-arity, but the [PinotSqlFunction] the planner sees is per-operator.
+  /// Both determinism and volatility are therefore aggregated conservatively across every registered overload.
+  @Test
+  public void testOperatorLevelVolatilityAggregatesAcrossOverloads() {
+    // rand() is VOLATILE and non-deterministic at 0 args, IMMUTABLE and deterministic at 1 arg. The single operator
+    // has to report the more restrictive of each.
+    PinotSqlFunction rand = toSqlFunction("rand");
+    assertFalse(rand.isDeterministic());
+    assertTrue(rand.isVolatile());
+
+    // now() stays deterministic so it can be constant-folded, but must still report volatile.
+    PinotSqlFunction now = toSqlFunction("now");
+    assertTrue(now.isDeterministic());
+    assertTrue(now.isVolatile());
+
+    // STABLE is constant within a query, so it must NOT be reported as volatile.
+    PinotSqlFunction reqId = toSqlFunction("reqid");
+    assertTrue(reqId.isDeterministic());
+    assertFalse(reqId.isVolatile());
+
+    PinotSqlFunction upper = toSqlFunction("upper");
+    assertTrue(upper.isDeterministic());
+    assertFalse(upper.isVolatile());
+  }
+
+  private static PinotSqlFunction toSqlFunction(String canonicalName) {
+    PinotScalarFunction scalarFunction = FunctionRegistry.getFunctions().get(canonicalName);
+    assertNotNull(scalarFunction, "Failed to find function: " + canonicalName);
+    PinotSqlFunction sqlFunction = scalarFunction.toPinotSqlFunction();
+    assertNotNull(sqlFunction, "Function is not registered as a PinotSqlFunction: " + canonicalName);
+    return sqlFunction;
   }
 
   @Test

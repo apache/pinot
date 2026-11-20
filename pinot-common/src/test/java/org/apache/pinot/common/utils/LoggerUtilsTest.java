@@ -24,6 +24,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -125,6 +126,70 @@ public class LoggerUtilsTest {
     } catch (RuntimeException e) {
       assertEquals(e.getMessage(), "Unrecognized logger level - NotALevel");
     }
+  }
+
+  @Test
+  public void testToSingleLineWithoutEscaping() {
+    assertNull(LoggerUtils.toSingleLine(null));
+    // Nothing to escape: the same instance is returned (a tab is not a line ending)
+    for (String text : List.of("", "SELECT 'a' FROM t", "a\tb", "a \"b\" 'c' /* d */")) {
+      assertSame(LoggerUtils.toSingleLine(text), text);
+    }
+  }
+
+  @DataProvider
+  public Object[][] textToEscape() {
+    return new Object[][]{
+        {"a\\b", "a\\\\b"},
+        {"a\nb", "a\\nb"},
+        {"a\rb", "a\\rb"},
+        {"a\r\nb", "a\\r\\nb"},
+        {"\n", "\\n"},
+        {"a\n\nb\n", "a\\n\\nb\\n"},
+        // Backslashes are escaped first, so that a literal escape sequence stays apart from an encoded line ending
+        {"a\\nb", "a\\\\nb"},
+        {"a\\\nb", "a\\\\\\nb"},
+        {"a\n\\b", "a\\n\\\\b"},
+        {"a\\\r\nb", "a\\\\\\r\\nb"},
+        {"-- comment\nSELECT 1", "-- comment\\nSELECT 1"}
+    };
+  }
+
+  @Test(dataProvider = "textToEscape")
+  public void testToSingleLine(String text, String expected) {
+    String escaped = LoggerUtils.toSingleLine(text);
+    assertEquals(escaped, expected);
+    assertFalse(escaped.contains("\n") || escaped.contains("\r"), escaped);
+    // The three escape sequences decode in a single pass back to the text
+    assertEquals(decodeSingleLine(escaped), text);
+  }
+
+  /// Decodes `\\`, `\r` and `\n` in one pass, as a reader of the log would.
+  private static String decodeSingleLine(String escaped) {
+    StringBuilder decoded = new StringBuilder(escaped.length());
+    int i = 0;
+    while (i < escaped.length()) {
+      char c = escaped.charAt(i++);
+      if (c != '\\') {
+        decoded.append(c);
+        continue;
+      }
+      char next = escaped.charAt(i++);
+      switch (next) {
+        case '\\':
+          decoded.append('\\');
+          break;
+        case 'r':
+          decoded.append('\r');
+          break;
+        case 'n':
+          decoded.append('\n');
+          break;
+        default:
+          throw new IllegalArgumentException("Unexpected escape sequence: \\" + next);
+      }
+    }
+    return decoded.toString();
   }
 
   private void checkLogLevel(String level) {

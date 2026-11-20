@@ -28,6 +28,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 ///   auto-detects via the file's `avro.schema` metadata (Avro reader if present, native otherwise).
 /// - `extractRawTimeValues` — opt out of TIMESTAMP / DATE / TIME conversion at the extractor boundary,
 ///   surfacing the raw underlying integer in the column's declared unit instead of the contract Java type.
+///   Raw INT96 values are signed `long` epoch nanoseconds; timestamps outside that range are rejected.
 ///   DECIMAL and UUID always convert. See [ParquetAvroRecordExtractor] / [ParquetNativeRecordExtractor] for
 ///   the per-type matrix.
 public class ParquetRecordReaderConfig implements RecordReaderConfig {

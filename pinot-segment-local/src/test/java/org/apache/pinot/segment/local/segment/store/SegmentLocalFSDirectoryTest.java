@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -33,9 +35,15 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+
 
 public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckRule {
-  private static final File TEST_DIRECTORY = new File(SingleFileIndexDirectoryTest.class.toString());
+  // Self-scoped unique dir (was derived from SingleFileIndexDirectoryTest.class) so parallel forks
+  // never share a directory.
+  private static final File TEST_DIRECTORY = new File(FileUtils.getTempDirectoryPath(),
+      SegmentLocalFSDirectoryTest.class.getSimpleName() + "-" + UUID.randomUUID());
   private SegmentDirectory _segmentDirectory;
   private SegmentMetadataImpl _metadata;
 
@@ -114,6 +122,27 @@ public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckR
       Assert.assertNotNull(reader);
       PinotDataBuffer newDataBuffer = reader.getIndexFor("newColumn", StandardIndexes.forward());
       verifyData(newDataBuffer);
+    }
+  }
+
+  @Test
+  public void testCopyExcludesMappedMetadataTemporaryFile()
+      throws Exception {
+    File source = Files.createTempDirectory("segment-copy-source").toFile();
+    File destination = Files.createTempDirectory("segment-copy-destination").toFile();
+    try {
+      Files.writeString(new File(source, "metadata.properties").toPath(), "segment.name = test\n");
+      Files.writeString(new File(source, "segment_metadata.bin").toPath(), "cached sidecar");
+      Files.writeString(new File(source, ".segment_metadata.abandoned.tmp").toPath(), "incomplete sidecar");
+
+      new SegmentLocalFSDirectory(source).copyTo(destination);
+
+      assertTrue(new File(destination, "metadata.properties").exists());
+      assertTrue(new File(destination, "segment_metadata.bin").exists());
+      assertFalse(new File(destination, ".segment_metadata.abandoned.tmp").exists());
+    } finally {
+      FileUtils.deleteQuietly(source);
+      FileUtils.deleteQuietly(destination);
     }
   }
 

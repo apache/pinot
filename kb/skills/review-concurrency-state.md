@@ -1,17 +1,17 @@
 # review-concurrency-state
 
-You are a specialized reviewer for **Apache Pinot domain 2: State Management & Concurrency**. Read `kb/code-review-principles.md` section 2 and `CLAUDE.md` before analyzing.
+Review **Apache Pinot domain 2: State Management & Concurrency**. Read the applicable parts of section 2 in
+`kb/code-review-principles.md` and relevant repository conventions not already loaded. Reuse material already read.
 
-Severity:
-- **CRITICAL** — data race, atomicity violation (wipe-before-install), IdealState write without version check, visibility bug on shared mutable state.
-- **MAJOR** — unnecessary lock widening, striped lock without measured contention, check-then-act race even if rare.
-- **MINOR** — over-synchronization, missing `volatile` where `final` would be safer, comment omission on thread-safety contract.
+Use the canonical severity definitions and Review Delivery rules in `kb/code-review-principles.md`. Assess demonstrated
+impact; pattern matches are investigation triggers, not findings or automatic severity assignments.
 
 ## 1. Broad scan
 
 - Added/removed `synchronized`, `volatile`, `AtomicReference`, `AtomicLong`, `ReentrantLock`, `StampedLock`, `ConcurrentHashMap`, `CopyOnWriteArrayList`.
 - `get` followed by `put` / `remove` on concurrent maps (check-then-act pattern).
-- Helix `IdealState` / `ExternalView` reads without version checks, or `setIdealState` without `dataAccessor.getProperty(...).getStat()`.
+- Helix read-modify-write paths: check that writes validate the version read, directly or through the update helper.
+  Ordinary `IdealState` / `ExternalView` reads do not require version checks.
 - `@GuardedBy` annotations added or removed.
 - Registration of observers / listeners (callbacks, MetricsRegistry, segment lifecycle listeners) without clear lifetime documentation.
 - Background threads: `Executors.new*`, `ScheduledExecutorService`, `Thread`. Check shutdown path (`awaitTermination` then `shutdownNow`).
@@ -22,10 +22,14 @@ Severity:
 For each hit, apply the KB's concurrency principles:
 
 - **C2.1 — Atomic transitions.** Never wipe old metadata before the new state is durably installed. Pattern: prepare-new → swap-reference → cleanup-old. Flag eager deletes.
-- **C2.2 — Thread-safety conservatism.** Default to explicit synchronization. If replacing `synchronized` with `AtomicReference` or `CHM.compute`, verify the visibility story holds across all callers.
-- **C2.3 — Race analysis for lock changes.** When a lock's scope is narrowed or removed, walk through interleavings with other threads that touch the same state. Flag if the walk-through isn't in the PR description.
-- **C2.4 — Version-checked writes.** Shared state in ZK (IdealState, IdealStateConfig, TableConfig, Schema) must be written with optimistic locking (ZK node version); reject blind writes.
-- **C2.5 — Check-then-act on atomics is still racy.** `if (!map.containsKey(k)) map.put(k, v)` is a bug — must be `putIfAbsent` / `computeIfAbsent`.
+- **C2.2 — Thread-safety conservatism.** Establish ownership, thread confinement, publication, and lifecycle contracts
+  before proposing synchronization. For lock or atomic-operation changes, verify visibility and atomicity across callers.
+- **C2.3 — Race analysis for lock changes.** Walk through the key interleavings with other threads touching the same state.
+  Report reachable unsafe interleavings as findings and unresolved contracts as coverage limits; missing PR prose alone is not a race finding.
+- **C2.4 — Version-checked writes.** Shared ZK read-modify-write operations (IdealState, IdealStateConfig, TableConfig,
+  Schema) must preserve concurrent updates through version checks or an equivalent update helper; flag unprotected writes.
+- **C2.5 — Check-then-act on atomics is still racy.** For concurrent access, verify whether
+  `if (!map.containsKey(k)) map.put(k, v)` requires `putIfAbsent` / `computeIfAbsent` or is protected by a wider invariant.
 - **C2.6 — Shared observers.** When an observer is registered from multiple paths or called concurrently, the handler must be idempotent and its mutable state must be published safely.
 
 Also check lifecycle: every `new ExecutorService` needs a clear shutdown path in `close()` / stop hook.
