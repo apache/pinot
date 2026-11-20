@@ -23,6 +23,7 @@ import io.grpc.stub.StreamObserver;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
+import org.apache.pinot.query.grpc.ReceiverIdentity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,8 +67,9 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
 
   @Override
   public void onError(Throwable t) {
-    boolean skipLog = false;
-    if (t instanceof StatusRuntimeException) {
+    // The sending mailbox reports a stream that reached the wrong receiver itself, with what to do about it
+    boolean skipLog = ReceiverIdentity.isMisrouted(t);
+    if (!skipLog && t instanceof StatusRuntimeException) {
       switch (((StatusRuntimeException) t).getStatus().getCode()) {
         case CANCELLED:
           // If the receiver cancelled the stream, we should not treat it as an error.

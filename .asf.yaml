@@ -20,10 +20,20 @@
 # Please refer https://cwiki.apache.org/confluence/display/INFRA/Git+-+.asf.yaml+features
 
 github:
-  description: "Apache Pinot - A realtime distributed OLAP datastore"
+  description: "Apache Pinot: a real-time analytics database for low-latency SQL and vector search, serving user-facing and agent-facing applications"
   homepage: https://pinot.apache.org/
   labels:
     - java
+    - database
+    - sql
+    - olap
+    - analytics
+    - real-time-analytics
+    - kafka
+    - distributed-database
+    - vector-search
+    - vector-database
+    - ai-agents
   del_branch_on_merge: true
   enabled_merge_buttons:
     squash: true

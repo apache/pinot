@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
@@ -220,7 +221,8 @@ public class QueryRunner {
 
     _opChainScheduler = new OpChainSchedulerService(instanceId, _executorService, serverConf);
     if (_mailboxService == null) {
-      _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
+      _mailboxService =
+          new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig, null, instanceId);
     }
 
     if (instanceDataManager != null) {
@@ -426,7 +428,7 @@ public class QueryRunner {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext(metadata.get(Request.MetadataKeys.TimeSeries.LANGUAGE),
               extractTimeBuckets(metadata), deadlineMs, metadata, extractPlanToSegmentMap(metadata),
-              Map.of());
+              extractPlanToOptionalSegmentMap(metadata), Map.of());
       final List<BaseTimeSeriesOperator> fragmentOpChains = fragmentRoots.stream().map(x -> {
         return _timeSeriesPhysicalPlanVisitor.compile(x, context);
       }).collect(Collectors.toList());
@@ -667,10 +669,27 @@ public class QueryRunner {
     for (var entry : metadataMap.entrySet()) {
       if (Request.MetadataKeys.TimeSeries.isKeySegmentList(entry.getKey())) {
         String planId = Request.MetadataKeys.TimeSeries.decodeSegmentListKey(entry.getKey());
-        String[] segments = entry.getValue().split(",");
-        result.put(planId, Stream.of(segments).map(String::strip).collect(Collectors.toList()));
+        result.put(planId, decodeSegmentList(entry.getValue()));
       }
     }
     return result;
+  }
+
+  private Map<String, List<String>> extractPlanToOptionalSegmentMap(Map<String, String> metadataMap) {
+    Map<String, List<String>> result = new HashMap<>();
+    for (var entry : metadataMap.entrySet()) {
+      if (Request.MetadataKeys.TimeSeries.isKeyOptionalSegmentList(entry.getKey())) {
+        String planId = Request.MetadataKeys.TimeSeries.decodeOptionalSegmentListKey(entry.getKey());
+        result.put(planId, decodeSegmentList(entry.getValue()));
+      }
+    }
+    return result;
+  }
+
+  /// An empty value is an empty list, not one segment named "".
+  @VisibleForTesting
+  static List<String> decodeSegmentList(String encoded) {
+    return Stream.of(encoded.split(",")).map(String::strip).filter(segment -> !segment.isEmpty())
+        .collect(Collectors.toList());
   }
 }

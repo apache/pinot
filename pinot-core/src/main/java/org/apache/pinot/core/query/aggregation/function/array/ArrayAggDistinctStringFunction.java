@@ -24,14 +24,16 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
 import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 
 
 public class ArrayAggDistinctStringFunction extends BaseArrayAggStringFunction<ObjectSet<String>> {
+  private static final int STRING_SET_TYPE = 18;
+
   public ArrayAggDistinctStringFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }
@@ -92,9 +94,8 @@ public class ArrayAggDistinctStringFunction extends BaseArrayAggStringFunction<O
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ObjectSet<String> stringSet) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringSet.getValue(),
-        ObjectSerDeUtils.STRING_SET_SER_DE.serialize(stringSet));
+  public SerializedResult serializeIntermediateResult(ObjectSet<String> stringSet) {
+    return new SerializedValue<>(STRING_SET_TYPE, stringSet, ObjectSerDeUtils.STRING_SET_SER_DE);
   }
 
   @Override

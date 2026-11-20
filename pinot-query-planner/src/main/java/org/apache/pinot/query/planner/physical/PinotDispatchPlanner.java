@@ -77,7 +77,7 @@ public class PinotDispatchPlanner {
     // 4. compute the mailbox assignment for each stage.
     rootNode.visit(MailboxAssignmentVisitor.INSTANCE, context);
     // 5. Run validations
-    runValidations(rootFragment, context);
+    runValidations(rootFragment, context, ArrayToMvValidationVisitor.hasMvAggregate(rootFragment));
     // 6. convert it into query plan.
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
@@ -108,7 +108,7 @@ public class PinotDispatchPlanner {
       context.getDispatchablePlanStageRootMap().put(entry.getKey(), entry.getValue().getFragmentRoot());
     }
     trackEmptyLeafStages(context);
-    runValidations(rootFragment, context);
+    runValidations(rootFragment, context, ArrayToMvValidationVisitor.hasMvAggregate(rootFragment));
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
 
@@ -153,13 +153,13 @@ public class PinotDispatchPlanner {
   }
 
   /// Run validations on the plan. Since there is only one validator right now, don't try to over-engineer it.
-  private void runValidations(PlanFragment planFragment, DispatchablePlanContext context) {
+  private void runValidations(PlanFragment planFragment, DispatchablePlanContext context, boolean planHasMvAggregate) {
     PlanNode rootPlanNode = planFragment.getFragmentRoot();
-    boolean isIntermediateStage =
-        context.getDispatchablePlanMetadataMap().get(rootPlanNode.getStageId()).getScannedTables().isEmpty();
-    rootPlanNode.visit(ArrayToMvValidationVisitor.INSTANCE, isIntermediateStage);
+    boolean scansTables =
+        !context.getDispatchablePlanMetadataMap().get(rootPlanNode.getStageId()).getScannedTables().isEmpty();
+    ArrayToMvValidationVisitor.validate(rootPlanNode, scansTables, planHasMvAggregate);
     for (PlanFragment child : planFragment.getChildren()) {
-      runValidations(child, context);
+      runValidations(child, context, planHasMvAggregate);
     }
   }
 

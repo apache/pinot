@@ -25,7 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -51,17 +50,17 @@ import org.roaringbitmap.IntIterator;
 public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
     extends BaseSingleInputAggregationFunction<ValueLongPair<V>, V> {
   protected final ExpressionContext _timeCol;
-  private final ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> _objectSerDe;
 
-  public LastWithTimeAggregationFunction(ExpressionContext dataCol,
-      ExpressionContext timeCol,
-      ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe, boolean nullHandlingEnabled) {
+  public LastWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      boolean nullHandlingEnabled) {
     super(dataCol, nullHandlingEnabled);
     _timeCol = timeCol;
-    _objectSerDe = objectSerDe;
   }
 
   public abstract ValueLongPair<V> constructValueLongPair(V value, long time);
+
+  /// Deserializes a value-time pair from the bytes of a pre-aggregated value.
+  public abstract ValueLongPair<V> deserializeValueLongPair(byte[] bytes);
 
   public abstract ValueLongPair<V> getDefaultValueTimePair();
 
@@ -136,7 +135,7 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
       // Serialized LastPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        ValueLongPair<V> lastWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+        ValueLongPair<V> lastWithTimePair = deserializeValueLongPair(bytesValues[i]);
         V data = lastWithTimePair.getValue();
         long time = lastWithTimePair.getTime();
         if (time >= lastTime) {
@@ -167,7 +166,7 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
       // Serialized LastPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        ValueLongPair<V> lastWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+        ValueLongPair<V> lastWithTimePair = deserializeValueLongPair(bytesValues[i]);
         setGroupByResult(groupKeyArray[i],
             groupByResultHolder,
             lastWithTimePair.getValue(),
@@ -187,7 +186,7 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
       // Serialized ValueTimePair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        ValueLongPair<V> lastWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+        ValueLongPair<V> lastWithTimePair = deserializeValueLongPair(bytesValues[i]);
         V data = lastWithTimePair.getValue();
         long time = lastWithTimePair.getTime();
         for (int groupKey : groupKeysArray[i]) {

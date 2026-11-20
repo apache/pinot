@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.lang.foreign.MemorySegment;
 import java.util.Map;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -42,7 +42,7 @@ public class DistinctCountCPCSketchAggregator implements ValueAggregator {
     if (bytes1.length == 0 && bytes2.length == 0) {
       String lgKParam = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
       int lgK = lgKParam != null ? Integer.parseInt(lgKParam) : CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
-      return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(new CpcSketch(lgK));
+      return new CpcSketch(lgK).toByteArray();
     }
     if (bytes1.length == 0) {
       return bytes2;
@@ -51,8 +51,8 @@ public class DistinctCountCPCSketchAggregator implements ValueAggregator {
       return bytes1;
     }
 
-    CpcSketch first = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes1);
-    CpcSketch second = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes2);
+    CpcSketch first = CpcSketch.heapify(MemorySegment.ofArray(bytes1));
+    CpcSketch second = CpcSketch.heapify(MemorySegment.ofArray(bytes2));
     CpcUnion union;
 
     String lgKParam = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
@@ -65,6 +65,6 @@ public class DistinctCountCPCSketchAggregator implements ValueAggregator {
     }
     union.update(first);
     union.update(second);
-    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(union.getResult());
+    return union.getResult().toByteArray();
   }
 }

@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -43,12 +44,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// The ConsumerCoordinator coordinates the offline->consuming helix transitions.
+/// Coordinates consumer admission and exclusive consumption for one table partition. History readiness replaces
+/// predecessor registration for tables that require their assigned history. Other tables retain optional registration
+/// ordering. Consumer and Helix threads share this coordinator; readiness callbacks run outside coordination locks.
 public class ConsumerCoordinator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerCoordinator.class);
   private static final long WAIT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(3);
 
-  private final boolean _enforceConsumptionInOrder;
+  private final boolean _requirePreviousSegmentRegistration;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final boolean _useIdealStateToCalculatePreviousSegment;
   private final ServerMetrics _serverMetrics;
@@ -57,6 +60,10 @@ public class ConsumerCoordinator {
   // released by a different thread than the one that acquired it. There is no out-of-box Lock implementation that
   // allows releasing the lock from a different thread.
   private final Semaphore _semaphore = new Semaphore(1);
+  private final Object _readinessMonitor = new Object();
+  private volatile long _releaseVersion;
+  // Guarded by _readinessMonitor, including publication of the corresponding partition gauge.
+  private long _readinessWaiters;
   private final Lock _lock = new ReentrantLock();
   private final Condition _condition = _lock.newCondition();
   private final AtomicBoolean _firstTransitionProcessed = new AtomicBoolean(false);
@@ -71,7 +78,8 @@ public class ConsumerCoordinator {
   }
 
   public ConsumerCoordinator(boolean enforceConsumptionInOrder, RealtimeTableDataManager realtimeTableDataManager) {
-    _enforceConsumptionInOrder = enforceConsumptionInOrder;
+    _requirePreviousSegmentRegistration =
+        enforceConsumptionInOrder && !realtimeTableDataManager.requiresHistoryForConsumption();
     _realtimeTableDataManager = realtimeTableDataManager;
     StreamIngestionConfig streamIngestionConfig = realtimeTableDataManager.getStreamIngestionConfig();
     _useIdealStateToCalculatePreviousSegment =
@@ -79,36 +87,38 @@ public class ConsumerCoordinator {
     _serverMetrics = ServerMetrics.get();
   }
 
-  /// Acquires the consumer semaphore for the given LLC segment. When consumption order is enforced, it waits for the
-  /// previous segment to be registered.
-  ///
-  /// TODO: Revisit if we want to handle the following corner case:
-  ///   - Seg 100 (OFFLINE -> CONSUMING pending)
-  ///   - Seg 101 (OFFLINE -> CONSUMING returned because of status change)
-  ///   - Seg 101 (CONSUMING -> ONLINE processed)
-  ///   - Seg 102 (OFFLINE -> CONSUMING started consuming while 100 is not registered)
-  ///   It should be extremely rare because there has to be multiple CONSUMING state transitions pending, which means
-  ///   state transition for Seg 100 has been delayed for at least the consumption time of Seg 101. Since we are not
-  ///   blocking the state transition of OFFLINE -> CONSUMING, the chance of this happening is very low.
-  public void acquire(LLCSegmentName llcSegmentName)
+  /// Waits for server/history readiness, then acquires the consumer permit. Readiness checks are deferred when the
+  /// permit is observed held, and repeated after the release when another consumer holds the permit at acquisition.
+  /// Required history readiness supersedes predecessor registration; other tables retain registration ordering when
+  /// configured.
+  /// @return true if the caller owns the permit and must release it, or false if stopped before admission
+  public boolean acquire(LLCSegmentName llcSegmentName, BooleanSupplier isReadyToConsume, BooleanSupplier shouldStop)
       throws InterruptedException, ShouldNotConsumeException {
-    String segmentName = llcSegmentName.getSegmentName();
-    if (_enforceConsumptionInOrder) {
-      long startTimeMs = System.currentTimeMillis();
-      waitForPreviousSegment(llcSegmentName);
-      _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(), ServerTimer.PREV_SEGMENT_WAIT_TIME_MS,
-          System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
-    }
-
-    long startTimeMs = System.currentTimeMillis();
     try {
-      while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
-        checkSegmentStatus(segmentName);
-        long waitTimeMs = System.currentTimeMillis() - startTimeMs;
-        LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName,
-            waitTimeMs);
-        _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
-            llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, waitTimeMs);
+      if (!waitUntilReadyToConsume(llcSegmentName, isReadyToConsume, shouldStop)) {
+        return false;
+      }
+      if (_requirePreviousSegmentRegistration) {
+        long startTimeMs = System.currentTimeMillis();
+        waitForPreviousSegment(llcSegmentName);
+        _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
+            ServerTimer.PREV_SEGMENT_WAIT_TIME_MS, System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
+      }
+      while (!_semaphore.tryAcquire()) {
+        // Another consumer took the permit after the readiness check. Wait for its release, then check again.
+        if (!waitUntilReadyToConsume(llcSegmentName, isReadyToConsume, shouldStop)) {
+          return false;
+        }
+      }
+      // Cancellation may race with release/acquisition. Do not transfer a permit to a stopped consumer.
+      boolean admitted = false;
+      try {
+        admitted = !shouldStop.getAsBoolean();
+        return admitted;
+      } finally {
+        if (!admitted) {
+          release();
+        }
       }
     } finally {
       _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
@@ -116,14 +126,118 @@ public class ConsumerCoordinator {
     }
   }
 
+  /// Waits until the consumer may compete for the permit. When the permit is observed held, the readiness check
+  /// is deferred: its result cannot be acted on before the release, which wakes this wait. Such a permit wait is
+  /// reported through `CONSUMER_LOCK_WAIT_TIME_MS` every permit wait interval, and ends if the segment should no
+  /// longer be consumed. A consumer counts as waiting for readiness only after a check fails following an observation
+  /// that the permit was free.
+  ///
+  /// Helix assignment and state changes are picked up by the periodic check. Readiness can perform ZooKeeper reads,
+  /// so it must run outside the monitor. The version prevents losing a release between observing the permit or
+  /// checking readiness and the wait.
+  /// @return whether readiness passed, or false if consumption was stopped
+  private boolean waitUntilReadyToConsume(LLCSegmentName llcSegmentName, BooleanSupplier isReadyToConsume,
+      BooleanSupplier shouldStop)
+      throws InterruptedException, ShouldNotConsumeException {
+    int partitionGroupId = llcSegmentName.getPartitionGroupId();
+    long permitWaitIntervalNs = TimeUnit.MILLISECONDS.toNanos(getPermitWaitIntervalMs());
+    boolean counted = false;
+    boolean waitingForPermit = false;
+    long permitWaitStartNs = 0;
+    long lastPermitWaitReportNs = 0;
+    boolean permitWaitReported = false;
+    try {
+      while (!shouldStop.getAsBoolean()) {
+        long releaseVersion = _releaseVersion;
+        long waitMs = RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS;
+        boolean permitHeld = _semaphore.availablePermits() == 0;
+        if (permitHeld) {
+          long nowNs = System.nanoTime();
+          if (!waitingForPermit) {
+            waitingForPermit = true;
+            permitWaitStartNs = nowNs;
+            lastPermitWaitReportNs = nowNs;
+          } else if (nowNs - lastPermitWaitReportNs >= permitWaitIntervalNs) {
+            reportPermitWait(llcSegmentName, TimeUnit.NANOSECONDS.toMillis(nowNs - permitWaitStartNs));
+            permitWaitReported = true;
+            lastPermitWaitReportNs = nowNs;
+          }
+          long remainingNs = permitWaitIntervalNs - (nowNs - lastPermitWaitReportNs);
+          waitMs = Math.max(1, Math.min(waitMs, TimeUnit.NANOSECONDS.toMillis(remainingNs)));
+        } else {
+          waitingForPermit = false;
+          if (permitWaitReported) {
+            permitWaitReported = false;
+            _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(), partitionGroupId,
+                ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, 0);
+          }
+          // A release wakes this loop; permit availability never substitutes for the required history check.
+          if (isReadyToConsume.getAsBoolean()) {
+            return !shouldStop.getAsBoolean();
+          }
+        }
+        synchronized (_readinessMonitor) {
+          if (!permitHeld && !counted) {
+            counted = true;
+            updateReadinessWaiters(partitionGroupId, 1);
+          }
+          if (releaseVersion == _releaseVersion && !shouldStop.getAsBoolean()) {
+            _readinessMonitor.wait(waitMs);
+          }
+        }
+      }
+      return false;
+    } finally {
+      if (counted) {
+        synchronized (_readinessMonitor) {
+          updateReadinessWaiters(partitionGroupId, -1);
+        }
+      }
+    }
+  }
+
+  /// Stops the wait if the segment should no longer be consumed; otherwise reports how long the consumer has waited
+  /// for the permit.
+  private void reportPermitWait(LLCSegmentName llcSegmentName, long waitTimeMs)
+      throws ShouldNotConsumeException {
+    String segmentName = llcSegmentName.getSegmentName();
+    checkSegmentStatus(segmentName);
+    LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName, waitTimeMs);
+    _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
+        llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, waitTimeMs);
+  }
+
+  @VisibleForTesting
+  long getPermitWaitIntervalMs() {
+    return WAIT_INTERVAL_MS;
+  }
+
+  /// Called under _readinessMonitor so concurrent arrivals and exits cannot publish gauge values out of order.
+  private void updateReadinessWaiters(int partitionGroupId, int delta) {
+    _readinessWaiters += delta;
+    long waiters = _readinessWaiters;
+    if (waiters == 0) {
+      // Remove the idle gauge before this partition or table is discarded. A later waiter recreates it.
+      _serverMetrics.removePartitionGauge(_realtimeTableDataManager.getTableName(), partitionGroupId,
+          ServerGauge.CONSUMERS_WAITING_FOR_READINESS);
+    } else {
+      _serverMetrics.setOrUpdatePartitionGauge(_realtimeTableDataManager.getTableName(), partitionGroupId,
+          ServerGauge.CONSUMERS_WAITING_FOR_READINESS, () -> waiters);
+    }
+  }
+
   public void release() {
     _semaphore.release();
+    synchronized (_readinessMonitor) {
+      _releaseVersion++;
+      _readinessMonitor.notifyAll();
+    }
   }
 
   /// Releases the semaphore while the segment is still mutable, recording the offset it stopped at (exclusive).
   public void releaseUnsealed(String segmentName, StreamPartitionMsgOffset stoppedAtOffset) {
     _unsealedRelease.set(new UnsealedRelease(segmentName, stoppedAtOffset));
-    _semaphore.release();
+    release();
   }
 
   /// Clears the unsealed release recorded by the given segment, once that segment is offloaded.
@@ -143,7 +257,7 @@ public class ConsumerCoordinator {
   }
 
   public void register(LLCSegmentName llcSegmentName) {
-    if (!_enforceConsumptionInOrder) {
+    if (!_requirePreviousSegmentRegistration) {
       return;
     }
     _lock.lock();
@@ -166,8 +280,16 @@ public class ConsumerCoordinator {
     }
   }
 
-  /// Waits for the previous segment to be registered to the server. Returns the segment ZK metadata fetched during the
-  /// wait to reduce unnecessary ZK read.
+  /// Waits for the previous segment to be registered to the server. Used only when history readiness is not required.
+  ///
+  /// TODO: Legacy registration ordering can miss earlier segments in the following corner case:
+  ///   - Seg 100 (OFFLINE -> CONSUMING pending)
+  ///   - Seg 101 (OFFLINE -> CONSUMING returned because of status change)
+  ///   - Seg 101 (CONSUMING -> ONLINE processed)
+  ///   - Seg 102 (OFFLINE -> CONSUMING started consuming while 100 is not registered)
+  ///   It should be extremely rare because there has to be multiple CONSUMING state transitions pending, which means
+  ///   state transition for Seg 100 has been delayed for at least the consumption time of Seg 101. Since we are not
+  ///   blocking the state transition of OFFLINE -> CONSUMING, the chance of this happening is very low.
   private void waitForPreviousSegment(LLCSegmentName currentSegment)
       throws InterruptedException, ShouldNotConsumeException {
     if (!_firstTransitionProcessed.get() || _useIdealStateToCalculatePreviousSegment) {
@@ -182,8 +304,7 @@ public class ConsumerCoordinator {
     }
   }
 
-  /// Waits for the previous segment with the sequence number to be registered to the server. Returns the segment ZK
-  /// metadata fetched during the wait to reduce unnecessary ZK read..
+  /// Waits for the previous segment with the given sequence number to be registered to the server.
   @VisibleForTesting
   void waitForPreviousSegment(LLCSegmentName currentSegment, int previousSegmentSequenceNumber)
       throws InterruptedException, ShouldNotConsumeException {

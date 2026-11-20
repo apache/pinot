@@ -18,40 +18,79 @@
  */
 package org.apache.pinot.segment.local.realtime.writer;
 
+import java.io.File;
+import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.BytesStreamMessage;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.RetriableDecodeException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
-/// Tests how [StatelessRealtimeSegmentWriter] stops consuming.
+/// Tests how [StatelessRealtimeSegmentWriter] consumes and stops consuming.
 public class StatelessRealtimeSegmentWriterTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String STREAM_TYPE = "test";
   // Counted down when the stream is fetched, so that consumption can be stopped while it is in progress
   private static final CountDownLatch FETCHED = new CountDownLatch(1);
+  private static final int OFFSET_STREAM_BATCH_SIZE = 10;
+  private static final long FAILING_OFFSET = 5;
 
   @Test(timeOut = 30_000)
   public void testStopConsumptionWithStreamIgnoringInterrupts()
@@ -81,6 +120,506 @@ public class StatelessRealtimeSegmentWriterTest {
       writer.stopConsumption();
       assertThat(writer.isSuccess()).isFalse();
       assertThat(writer.getConsumptionException()).hasMessageStartingWith("Consumption stopped at offset");
+    }
+  }
+
+  @BeforeClass
+  public void registerMetrics() {
+    ServerMetrics.register(mock(ServerMetrics.class));
+  }
+
+  /// A batch without unfiltered messages never moves the writer, whatever next offset it reports: a Kafka consumer
+  /// reports its position there, past skipped transaction markers or aborted records, and the writer polls again from
+  /// its own offset. Fetched records, filtered ones included, move it as usual. Every such replay completes with
+  /// exactly the records below the end, including one whose empty batches report a position at or past the end: the
+  /// next batch with records completes it.
+  @DataProvider
+  public Object[][] validReplays() {
+    return new Object[][]{
+        {"records", List.of(records(0, 120)), 120, List.of(0L)},
+        {"nonmoving", List.of(records(0, 100), empty(100, 0, false), records(100, 120)), 120, List.of(0L, 100L, 100L)},
+        // Commit marker at 100: the empty poll moves the consumer to 101, the writer asks for 100 again and gets
+        // 101..119
+        {"marker", List.of(records(0, 100), empty(101, 0, false), records(101, 120)), 119, List.of(0L, 100L, 100L)},
+        {"markerThenFiltered", List.of(records(0, 100), empty(101, 0, false), empty(106, 5, false), records(106, 120)),
+            114, List.of(0L, 100L, 100L, 106L)},
+        // Five fetched tombstones/filtered records legitimately advance the position without decoded rows
+        {"filtered", List.of(records(0, 100), empty(105, 5, false), records(105, 120)), 115, List.of(0L, 100L, 105L)},
+        // Markers fill the tail of the range: the empty batches report positions below, at and past the end, and the
+        // record at the end completes the replay
+        {"markerTail", List.of(records(0, 100), empty(110, 0, false), empty(120, 0, false), empty(150, 0, false),
+            records(120, 121)), 100, List.of(0L, 100L, 100L, 100L, 100L)},
+        {"alreadyAtEnd", List.of(), 0, List.of()}
+    };
+  }
+
+  @Test(dataProvider = "validReplays")
+  public void testValidReplayCompletes(String kind, List<MessageBatch<byte[]>> batches, int expectedRows,
+      List<Long> expectedRequestedOffsets)
+      throws Exception {
+    try (Replay replay = replay("alreadyAtEnd".equals(kind) ? 0 : 120, batches)) {
+      replay.writer().startConsumption();
+      awaitDone(replay.writer());
+      assertNull(replay.writer().getConsumptionException(), kind);
+      assertTrue(replay.writer().isSuccess(), kind);
+      assertEquals(indexedRows(replay.writer()), expectedRows, kind);
+      assertEquals(replay.requestedOffsets(), expectedRequestedOffsets, kind);
+      verify(replay.consumer(), times(1)).close();
+      if (expectedRows > 0) {
+        assertTrue(replay.writer().buildSegment().isFile());
+      }
+    }
+  }
+
+  /// An empty batch that reports data loss (the consumer saw its position jump past deleted records) fails the replay
+  /// at once, wherever the reported next offset is, and the writer's offset stays where the loss was detected.
+  @DataProvider
+  public Object[][] emptyBatchesWithLoss() {
+    return new Object[][]{{100}, {110}, {120}, {150}};
+  }
+
+  @Test(dataProvider = "emptyBatchesWithLoss")
+  public void testEmptyBatchReportingLossFailsReplay(int nextOffset)
+      throws Exception {
+    try (Replay replay = replay(120, List.of(records(0, 100), empty(nextOffset, 0, true), records(110, 120)))) {
+      replay.writer().startConsumption();
+      awaitDone(replay.writer());
+      assertFalse(replay.writer().isSuccess());
+      assertTrue(replay.writer().getConsumptionException() instanceof IllegalStateException);
+      String message = replay.writer().getConsumptionException().getMessage();
+      assertTrue(message.contains("data loss"), message);
+      assertTrue(message.contains("delete the segment to accept the loss"), message);
+      assertEquals(indexedRows(replay.writer()), 100);
+      assertEquals(((LongMsgOffset) field(replay.writer(), "_currentOffset")).getOffset(), 100L);
+      assertEquals(replay.requestedOffsets(), List.of(0L, 100L));
+      verify(replay.consumer(), times(1)).close();
+    }
+  }
+
+  /// A non-empty batch that reports data loss is not indexed, including the case where an empty poll moved the
+  /// consumer first (the writer stays at its own offset, so the loss check of the data poll covers the gap from
+  /// there).
+  @DataProvider
+  public Object[][] lossAfterMarker() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "lossAfterMarker")
+  public void testDataLossFailsBeforeIndexing(boolean afterMarker)
+      throws Exception {
+    List<MessageBatch<byte[]>> batches = new ArrayList<>();
+    batches.add(records(0, 100));
+    if (afterMarker) {
+      batches.add(empty(101, 0, false));
+    }
+    batches.add(records(afterMarker ? 101 : 100, 120, true));
+    try (Replay replay = replay(120, batches)) {
+      replay.writer().startConsumption();
+      awaitDone(replay.writer());
+      assertFalse(replay.writer().isSuccess());
+      assertEquals(indexedRows(replay.writer()), 100, "The loss batch must not be indexed");
+      assertTrue(replay.writer().getConsumptionException().getMessage().contains("data loss"));
+      assertEquals(((LongMsgOffset) field(replay.writer(), "_currentOffset")).getOffset(), 100L);
+      assertEquals(replay.requestedOffsets(), afterMarker ? List.of(0L, 100L, 100L) : List.of(0L, 100L));
+      verify(replay.consumer(), times(1)).close();
+    }
+  }
+
+  private static Replay replay(int endOffset, List<MessageBatch<byte[]>> batches)
+      throws Exception {
+    File root = Files.createTempDirectory(StatelessRealtimeSegmentWriterTest.class.getSimpleName()).toFile();
+    TableConfig table = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName("ts")
+        .setStreamConfigs(Map.of(StreamConfigProperties.STREAM_TYPE, STREAM_TYPE,
+            StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
+            "testTopic",
+            StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
+                StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), ScriptedConsumerFactory.class.getName(),
+            StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
+            IntegerDecoder.class.getName(), StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "1000"))
+        .build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("value", DataType.INT)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    IndexLoadingConfig config = new IndexLoadingConfig(table, schema);
+    config.setTableDataDir(root.getAbsolutePath());
+    SegmentZKMetadata metadata =
+        new SegmentZKMetadata(new LLCSegmentName(RAW_TABLE_NAME, 0, 0, System.nanoTime()).getSegmentName());
+    metadata.setStartOffset("0");
+    metadata.setEndOffset(Integer.toString(endOffset));
+    PartitionGroupConsumer consumer = mock(PartitionGroupConsumer.class);
+    List<Long> requestedOffsets = new ArrayList<>();
+    LinkedList<MessageBatch<byte[]>> remaining = new LinkedList<>(batches);
+    when(consumer.fetchMessages(any(), anyInt())).thenAnswer(invocation -> {
+      requestedOffsets.add(((LongMsgOffset) invocation.getArgument(0)).getOffset());
+      return remaining.removeFirst();
+    });
+    ScriptedConsumerFactory.CONSUMER.set(consumer);
+    try {
+      return new Replay(new StatelessRealtimeSegmentWriter(metadata, config, null), consumer, requestedOffsets, root);
+    } finally {
+      ScriptedConsumerFactory.CONSUMER.remove();
+    }
+  }
+
+  private static void awaitDone(StatelessRealtimeSegmentWriter writer)
+      throws Exception {
+    TestUtils.waitForCondition(ignored -> writer.isDoneConsuming(), 10_000L, "writer thread did not finish");
+    assertTrue(writer.isDoneConsuming());
+  }
+
+  private static int indexedRows(StatelessRealtimeSegmentWriter writer)
+      throws Exception {
+    return ((MutableSegmentImpl) field(writer, "_realtimeSegment")).getNumDocsIndexed();
+  }
+
+  private static Object field(StatelessRealtimeSegmentWriter writer, String name)
+      throws Exception {
+    Field field = StatelessRealtimeSegmentWriter.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(writer);
+  }
+
+  private static MessageBatch<byte[]> records(int start, int end) {
+    return records(start, end, false);
+  }
+
+  private static MessageBatch<byte[]> records(int start, int end, boolean hasDataLoss) {
+    List<StreamMessage<byte[]>> messages = new ArrayList<>();
+    for (int offset = start; offset < end; offset++) {
+      messages.add(new BytesStreamMessage(Integer.toString(offset).getBytes(StandardCharsets.UTF_8),
+          new StreamMessageMetadata.Builder()
+              .setOffset(new LongMsgOffset(offset), new LongMsgOffset(offset + 1)).build()));
+    }
+    return new MessageBatch<>() {
+      @Override
+      public int getMessageCount() {
+        return messages.size();
+      }
+
+      @Override
+      public StreamMessage<byte[]> getStreamMessage(int index) {
+        return messages.get(index);
+      }
+
+      @Override
+      public StreamPartitionMsgOffset getOffsetOfNextBatch() {
+        return new LongMsgOffset(end);
+      }
+
+      @Override
+      public long getSizeInBytes() {
+        return 0;
+      }
+
+      @Override
+      public boolean hasDataLoss() {
+        return hasDataLoss;
+      }
+    };
+  }
+
+  private static MessageBatch<byte[]> empty(int nextOffset, int unfiltered, boolean hasDataLoss) {
+    return new EmptyMessageBatch(new LongMsgOffset(nextOffset)) {
+      @Override
+      public int getUnfilteredMessageCount() {
+        return unfiltered;
+      }
+
+      @Override
+      public boolean hasDataLoss() {
+        return hasDataLoss;
+      }
+
+      @Override
+      public StreamPartitionMsgOffset getFirstMessageOffset() {
+        return unfiltered > 0 ? new LongMsgOffset(nextOffset - unfiltered) : null;
+      }
+    };
+  }
+
+  private record Replay(StatelessRealtimeSegmentWriter writer, PartitionGroupConsumer consumer,
+      List<Long> requestedOffsets, File root) implements AutoCloseable {
+    @Override
+    public void close()
+        throws Exception {
+      try {
+        writer.close();
+      } finally {
+        FileUtils.deleteDirectory(root);
+      }
+    }
+  }
+
+  /// Supplies a consumer from the constructing test thread; ThreadLocal isolates parallel constructor calls.
+  public static class ScriptedConsumerFactory extends InterruptIgnoringConsumerFactory {
+    private static final ThreadLocal<PartitionGroupConsumer> CONSUMER = new ThreadLocal<>();
+
+    @Override
+    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+      return CONSUMER.get();
+    }
+  }
+
+  /// Stateless integer decoder, exercised through the writer's real StreamDataDecoderImpl and indexing pipeline.
+  public static class IntegerDecoder extends NoOpDecoder {
+    @Override
+    public GenericRow decode(byte[] payload, GenericRow destination) {
+      return decode(payload, 0, payload.length, destination);
+    }
+
+    @Override
+    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+      int value = Integer.parseInt(new String(payload, offset, length, StandardCharsets.UTF_8));
+      destination.putValue("value", value);
+      destination.putValue("ts", 1_700_000_000_000L + value);
+      return destination;
+    }
+  }
+
+  @DataProvider
+  public Object[][] fetchAfterStartOffset() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(timeOut = 30_000, dataProvider = "fetchAfterStartOffset")
+  public void testRetriableDecodeErrorFetchesTheMessageAgainInsteadOfDroppingIt(boolean fetchAfterStartOffset)
+      throws Exception {
+    OffsetPayloadDecoder.reset(3);
+    OffsetPayloadConsumerFactory.FETCH_AFTER_START_OFFSET.set(fetchAfterStartOffset);
+    List<Long> sleeps = new CopyOnWriteArrayList<>();
+    try (StatelessRealtimeSegmentWriter writer = createOffsetPayloadWriter("250", sleeps, null)) {
+      writer.startConsumption();
+      TestUtils.waitForCondition(aVoid -> writer.isDoneConsuming(), 10_000L, "Consumption did not finish");
+      writer.stopConsumption();
+
+      assertThat(writer.isSuccess()).isTrue();
+      assertThat(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS).containsExactly(FAILING_OFFSET, FAILING_OFFSET,
+          FAILING_OFFSET);
+      // Every message was decoded once, and each refetch started at the failing message
+      long firstOffset = fetchAfterStartOffset ? 1 : 0;
+      assertThat(OffsetPayloadDecoder.DECODED_OFFSETS).containsExactlyElementsOf(
+          LongStream.range(firstOffset, 20).boxed().collect(Collectors.toList()));
+      long failingMessageFetchOffset = fetchAfterStartOffset ? FAILING_OFFSET - 1 : FAILING_OFFSET;
+      assertThat(OffsetPayloadConsumerFactory.FETCH_START_OFFSETS).startsWith(0L, failingMessageFetchOffset,
+          failingMessageFetchOffset, failingMessageFetchOffset);
+      // The backoff doubled up to the cap
+      assertThat(sleeps).containsExactly(100L, 200L, 250L);
+    }
+  }
+
+  @Test(timeOut = 30_000)
+  public void testStopConsumptionInterruptsTheDecodeRetryBackoff()
+      throws Exception {
+    OffsetPayloadDecoder.reset(Integer.MAX_VALUE);
+    // The backoff sleeps until interrupted
+    CountDownLatch backoffStarted = new CountDownLatch(1);
+    try (StatelessRealtimeSegmentWriter writer = createOffsetPayloadWriter("250", new CopyOnWriteArrayList<>(),
+        backoffStarted)) {
+      writer.startConsumption();
+      assertThat(backoffStarted.await(10, TimeUnit.SECONDS)).isTrue();
+      writer.stopConsumption();
+
+      assertThat(writer.isSuccess()).isFalse();
+      assertThat(writer.getConsumptionException()).hasMessage(
+          "Consumption stopped at offset: " + FAILING_OFFSET + " before reaching end offset: 20");
+      assertThat(OffsetPayloadDecoder.DECODED_OFFSETS).containsExactly(0L, 1L, 2L, 3L, 4L);
+    }
+  }
+
+  @Test(timeOut = 30_000)
+  public void testDecodeRetryMaxDurationBoundsAnOutageOfInterleavedFailures()
+      throws Exception {
+    // Failures less than the limit apart, with messages decoding in between, then one after a quiet period
+    OffsetPayloadDecoder.reset(Integer.MAX_VALUE);
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(FAILING_OFFSET + 2, new AtomicInteger(Integer.MAX_VALUE));
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(FAILING_OFFSET + 4, new AtomicInteger(Integer.MAX_VALUE));
+    long nextOutageOffset = 15;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(nextOutageOffset, new AtomicInteger(1));
+    // Failures happen 600ms apart, except the last one, 2s after the previous one
+    AtomicLong clock = new AtomicLong();
+    OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(() -> clock.addAndGet(
+        OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS.get(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS.size() - 1)
+            == nextOutageOffset ? 2000 : 600));
+    List<Long> sleeps = new CopyOnWriteArrayList<>();
+    try (StatelessRealtimeSegmentWriter writer = createOffsetPayloadWriter("250", sleeps, null,
+        Map.of(StreamConfigProperties.DECODE_RETRY_MAX_DURATION_MILLIS, "1000"), clock)) {
+      writer.startConsumption();
+      TestUtils.waitForCondition(aVoid -> writer.isDoneConsuming(), 10_000L, "Consumption did not finish");
+      writer.stopConsumption();
+
+      assertThat(writer.isSuccess()).isTrue();
+      // The first message is retried until the outage has lasted 1s, then dropped; later failures of that outage are
+      // dropped at once. The failure 2s later starts a new outage and is retried.
+      assertThat(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS).containsExactly(FAILING_OFFSET, FAILING_OFFSET,
+          FAILING_OFFSET, FAILING_OFFSET + 2, FAILING_OFFSET + 4, nextOutageOffset);
+      assertThat(OffsetPayloadConsumerFactory.FETCH_START_OFFSETS).containsExactly(0L, FAILING_OFFSET, FAILING_OFFSET,
+          nextOutageOffset, nextOutageOffset);
+      assertThat(sleeps).containsExactly(100L, 200L, 100L);
+      assertThat(OffsetPayloadDecoder.DECODED_OFFSETS).containsExactlyElementsOf(LongStream.range(0, 20)
+          .filter(offset -> offset != FAILING_OFFSET && offset != FAILING_OFFSET + 2 && offset != FAILING_OFFSET + 4)
+          .boxed().collect(Collectors.toList()));
+    }
+  }
+
+  /// Creates a writer re-ingesting offsets [0, 20). It records backoffs without sleeping, unless `backoffStarted` is
+  /// given: then the first backoff counts it down and sleeps until interrupted.
+  private static StatelessRealtimeSegmentWriter createOffsetPayloadWriter(String decodeRetryMaxBackoffMillis,
+      List<Long> sleeps, @Nullable CountDownLatch backoffStarted)
+      throws Exception {
+    return createOffsetPayloadWriter(decodeRetryMaxBackoffMillis, sleeps, backoffStarted, Map.of(), null);
+  }
+
+  private static StatelessRealtimeSegmentWriter createOffsetPayloadWriter(String decodeRetryMaxBackoffMillis,
+      List<Long> sleeps, @Nullable CountDownLatch backoffStarted, Map<String, String> streamConfigs,
+      @Nullable AtomicLong clock)
+      throws Exception {
+    Map<String, String> streamConfigMap = new HashMap<>(Map.of(StreamConfigProperties.STREAM_TYPE, STREAM_TYPE,
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
+        "testTopic",
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
+            StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), OffsetPayloadConsumerFactory.class.getName(),
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
+        OffsetPayloadDecoder.class.getName(),
+        StreamConfigProperties.DECODE_RETRY_MAX_BACKOFF_MILLIS, decodeRetryMaxBackoffMillis));
+    streamConfigMap.putAll(streamConfigs);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("col", DataType.STRING)
+        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setStreamConfigs(streamConfigMap)
+            .build();
+    SegmentZKMetadata segmentZKMetadata =
+        new SegmentZKMetadata(new LLCSegmentName(RAW_TABLE_NAME, 0, 0, System.currentTimeMillis()).getSegmentName());
+    segmentZKMetadata.setStartOffset("0");
+    segmentZKMetadata.setEndOffset("20");
+    return new StatelessRealtimeSegmentWriter(segmentZKMetadata, new IndexLoadingConfig(tableConfig, schema), null) {
+      @Override
+      protected long now() {
+        return clock != null ? clock.get() : super.now();
+      }
+
+      @Override
+      void sleepBeforeDecodeRetry(long backoffMs)
+          throws InterruptedException {
+        sleeps.add(backoffMs);
+        if (backoffStarted != null) {
+          backoffStarted.countDown();
+          super.sleepBeforeDecodeRetry(Long.MAX_VALUE);
+        }
+      }
+    };
+  }
+
+  /// Endless stream whose message at offset `n` has payload `n`.
+  public static class OffsetPayloadConsumerFactory extends StreamConsumerFactory {
+    static final List<Long> FETCH_START_OFFSETS = new CopyOnWriteArrayList<>();
+    // Like Kinesis, fetch from after the given offset, and give each message its own offset as next offset
+    static final AtomicBoolean FETCH_AFTER_START_OFFSET = new AtomicBoolean();
+
+    @Nullable
+    @Override
+    public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+      return null;
+    }
+
+    @Override
+    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+      return new PartitionGroupConsumer() {
+        @Override
+        public MessageBatch<byte[]> fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
+          long start = ((LongMsgOffset) startOffset).getOffset();
+          FETCH_START_OFFSETS.add(start);
+          boolean fetchAfterStartOffset = FETCH_AFTER_START_OFFSET.get();
+          long firstOffset = fetchAfterStartOffset ? start + 1 : start;
+          List<BytesStreamMessage> messages = new ArrayList<>(OFFSET_STREAM_BATCH_SIZE);
+          for (long offset = firstOffset; offset < firstOffset + OFFSET_STREAM_BATCH_SIZE; offset++) {
+            long nextOffset = fetchAfterStartOffset ? offset : offset + 1;
+            messages.add(new BytesStreamMessage(Long.toString(offset).getBytes(StandardCharsets.UTF_8),
+                new StreamMessageMetadata.Builder().setOffset(new LongMsgOffset(offset), new LongMsgOffset(nextOffset))
+                    .build()));
+          }
+          return new MessageBatch<>() {
+            @Override
+            public int getMessageCount() {
+              return messages.size();
+            }
+
+            @Override
+            public BytesStreamMessage getStreamMessage(int index) {
+              return messages.get(index);
+            }
+
+            @Override
+            public StreamPartitionMsgOffset getOffsetOfNextBatch() {
+              return messages.get(messages.size() - 1).getMetadata().getNextOffset();
+            }
+
+            @Override
+            public long getSizeInBytes() {
+              return 0;
+            }
+          };
+        }
+
+        @Override
+        public void close() {
+        }
+      };
+    }
+  }
+
+  /// Throws [RetriableDecodeException] for [#RETRIABLE_FAILURES], as many times as given, then decodes.
+  public static class OffsetPayloadDecoder implements StreamMessageDecoder<byte[]> {
+    // Offset -> number of attempts that throw RetriableDecodeException before the message decodes
+    static final Map<Long, AtomicInteger> RETRIABLE_FAILURES = new ConcurrentHashMap<>();
+    static final List<Long> RETRIABLE_FAILURE_OFFSETS = new CopyOnWriteArrayList<>();
+    static final List<Long> DECODED_OFFSETS = new CopyOnWriteArrayList<>();
+    // Run before each RetriableDecodeException is thrown
+    static final AtomicReference<Runnable> ON_RETRIABLE_FAILURE = new AtomicReference<>();
+
+    static void reset(int retriableFailures) {
+      RETRIABLE_FAILURES.clear();
+      RETRIABLE_FAILURES.put(FAILING_OFFSET, new AtomicInteger(retriableFailures));
+      RETRIABLE_FAILURE_OFFSETS.clear();
+      DECODED_OFFSETS.clear();
+      ON_RETRIABLE_FAILURE.set(() -> {
+      });
+      OffsetPayloadConsumerFactory.FETCH_START_OFFSETS.clear();
+      OffsetPayloadConsumerFactory.FETCH_AFTER_START_OFFSET.set(false);
+    }
+
+    @Override
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
+    }
+
+    @Nullable
+    @Override
+    public GenericRow decode(byte[] payload, GenericRow destination) {
+      String value = new String(payload, StandardCharsets.UTF_8);
+      long offset = Long.parseLong(value);
+      AtomicInteger retriableFailures = RETRIABLE_FAILURES.get(offset);
+      if (retriableFailures != null && retriableFailures.getAndDecrement() > 0) {
+        RETRIABLE_FAILURE_OFFSETS.add(offset);
+        ON_RETRIABLE_FAILURE.get().run();
+        throw new RetriableDecodeException("Schema registry unavailable");
+      }
+      DECODED_OFFSETS.add(offset);
+      destination.putValue("col", value);
+      return destination;
+    }
+
+    @Nullable
+    @Override
+    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+      return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
     }
   }
 

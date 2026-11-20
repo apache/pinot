@@ -29,7 +29,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -82,6 +81,8 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes"})
 public class DistinctCountCPCSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<CpcSketchAccumulator, Comparable> {
+  private static final int CPC_SKETCH_ACCUMULATOR_TYPE = 49;
+
   private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
   protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
   protected int _lgNominalEntries;
@@ -597,8 +598,6 @@ public class DistinctCountCPCSketchAggregationFunction
     if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
-    intermediateResult1.setLgNominalEntries(_lgNominalEntries);
-    intermediateResult1.setThreshold(_accumulatorThreshold);
     intermediateResult1.merge(intermediateResult2);
     return intermediateResult1;
   }
@@ -609,14 +608,14 @@ public class DistinctCountCPCSketchAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(CpcSketchAccumulator cpcSketchAccumulator) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.CpcSketchAccumulator.getValue(),
-        ObjectSerDeUtils.DATA_SKETCH_CPC_ACCUMULATOR_SER_DE.serialize(cpcSketchAccumulator));
+  public SerializedResult serializeIntermediateResult(CpcSketchAccumulator cpcSketchAccumulator) {
+    return new SerializedBytes(CPC_SKETCH_ACCUMULATOR_TYPE, cpcSketchAccumulator.getResult().toByteArray());
   }
 
   @Override
   public CpcSketchAccumulator deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.DATA_SKETCH_CPC_ACCUMULATOR_SER_DE.deserialize(customObject.getBuffer());
+    return new CpcSketchAccumulator(_lgNominalEntries, _accumulatorThreshold,
+        CpcSketch.heapify(MemorySegment.ofBuffer(customObject.getBuffer())));
   }
 
   @Override
@@ -629,8 +628,6 @@ public class DistinctCountCPCSketchAggregationFunction
     if (intermediateResult == null) {
       return 0L;
     }
-    intermediateResult.setLgNominalEntries(_lgNominalEntries);
-    intermediateResult.setThreshold(_accumulatorThreshold);
     return Math.round(intermediateResult.getResult().getEstimate());
   }
 

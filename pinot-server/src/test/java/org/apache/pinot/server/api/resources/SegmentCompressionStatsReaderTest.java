@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import javax.ws.rs.WebApplicationException;
 import org.apache.commons.io.FileUtils;
@@ -209,6 +210,18 @@ public class SegmentCompressionStatsReaderTest {
         () -> TablesResource.addColumnContributions(
             ServerCompressionStatsResponse.MAX_COLUMN_CONTRIBUTIONS_PER_RESPONSE, segment, null));
     assertEquals(exception.getResponse().getStatus(), 413);
+  }
+
+  @Test
+  public void testColumnContributionCountExcludesVirtualColumns() {
+    SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
+    ImmutableSegment segment = mock(ImmutableSegment.class);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(segment.getPhysicalColumnNames()).thenReturn(Set.of("physical"));
+
+    assertEquals(TablesResource.addColumnContributions(0, segment, null), 1);
+    assertEquals(TablesResource.addColumnContributions(0, segment, Set.of("virtual")), 0);
+    assertEquals(TablesResource.addColumnContributions(0, segment, Set.of("physical", "virtual")), 1);
   }
 
   private static void assertCompleteZeroByteStats(SegmentCompressionStatsContribution contribution) {

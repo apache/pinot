@@ -247,6 +247,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
     _config = new ControllerConf(pinotConfiguration.toMap());
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener((changedConfigs, clusterConfigs) -> {
+      boolean disabled =
+          CommonConstants.Groovy.isIngestionGroovyDisabled(clusterConfigs.get(ControllerConf.DISABLE_GROOVY));
+      TableConfigUtils.setDisableGroovy(disabled);
+      _config.setClusterIngestionGroovyDisabled(disabled);
+    });
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
     _controllerMode = _config.getControllerMode();
@@ -255,7 +262,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       HelixSetupUtils.setupHelixClusterWithDefaultConfigs(_helixZkURL, _helixClusterName, getDefaultClusterConfigs());
     }
     ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
+    // Preserve the authoritative cluster policy across custom instance configuration hooks.
+    boolean ingestionGroovyDisabled = _config.getProperty(ControllerConf.DISABLE_GROOVY,
+        ControllerConf.DEFAULT_DISABLE_GROOVY);
     applyCustomConfigs(_config);
+    _config.setClusterIngestionGroovyDisabled(ingestionGroovyDisabled);
 
     PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
     PinotMd5Mode.setPinotMd5Disabled(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
@@ -654,14 +665,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
 
-    // Initialize cluster config change handler
-    LOGGER.info("Initializing cluster config change handler");
-    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
     try {
       // Register cluster config change handler with Helix
       _helixParticipantManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to register cluster config change handler", e);
+      TableConfigUtils.setDisableGroovy(true);
+      _config.setClusterIngestionGroovyDisabled(true);
+      throw new IllegalStateException("Failed to register cluster config change handler", e);
     }
 
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);

@@ -194,7 +194,7 @@ public abstract class BaseQueriesTest {
   /// different index segments in the test and overriding getDistinctInstances.
   /// This can be particularly useful to test statistical aggregation functions.
   /// @see StatisticalQueriesTest for an example use case.
-  private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
+  protected BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
     List<List<IndexSegment>> instances = getDistinctInstances();
     if (instances.size() == 2) {
       return getBrokerResponseDistinctInstances(pinotQuery, planMaker);
