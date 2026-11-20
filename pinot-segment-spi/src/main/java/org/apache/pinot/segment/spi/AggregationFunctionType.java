@@ -156,6 +156,10 @@ public enum AggregationFunctionType {
 
   COVARPOP("covarPop", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   COVARSAMP("covarSamp", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  // Unlike covarPop/covarSamp, CORR is not a Calcite built-in, so it is registered with an explicit return type and a
+  // two-operand numeric signature for the multi-stage engine to resolve it.
+  CORR("corr", ReturnTypes.DOUBLE, OperandTypes.family(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC),
+      SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   VARPOP("varPop", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   VARSAMP("varSamp", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   STDDEVPOP("stdDevPop", SqlTypeName.OTHER, SqlTypeName.DOUBLE),

@@ -292,7 +292,7 @@ public class AggregationFunctionNullContractTest {
       AggregationFunctionType.LASTWITHTIME, AggregationFunctionType.ARRAYAGG, AggregationFunctionType.LISTAGG,
       AggregationFunctionType.IDSET, AggregationFunctionType.HISTOGRAM,
       // Given the option so they can skip null rows; a row counts only when both input columns are non-null
-      AggregationFunctionType.COVARPOP, AggregationFunctionType.COVARSAMP,
+      AggregationFunctionType.COVARPOP, AggregationFunctionType.COVARSAMP, AggregationFunctionType.CORR,
       // Given the option so they can skip null rows. These two were in this set once before, on the strength of an
       // identity comparison that reported every serializer-valued function as honouring it; they belong here now
       // because they genuinely do.
