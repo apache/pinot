@@ -57,9 +57,6 @@ public class AvgValueIntegerTupleSketchAggregationFunction
     if (accumulator == null) {
       return null;
     }
-    accumulator.setNominalEntries(_nominalEntries);
-    accumulator.setSetOperations(_setOps);
-    accumulator.setThreshold(_accumulatorThreshold);
     TupleSketch<IntegerSummary> result = accumulator.getResult();
     if (result.isEmpty() || result.getRetainedEntries() == 0) {
       // there is nothing to average, return null
@@ -72,5 +69,11 @@ public class AvgValueIntegerTupleSketchAggregationFunction
     }
     double estimate = retainedTotal / result.getRetainedEntries();
     return Math.round(estimate);
+  }
+
+  /// Averages cannot be merged.
+  @Override
+  public Comparable mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    throw new UnsupportedOperationException("Cannot merge final results for function: " + getType());
   }
 }

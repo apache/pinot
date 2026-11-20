@@ -23,12 +23,12 @@ import java.util.Comparator;
 import java.util.List;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.TDigestTestUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
@@ -39,16 +39,17 @@ import static org.testng.Assert.assertTrue;
 
 /// Tests the legacy byte format and reader capacity contract of `percentileRawTDigest`.
 public class PercentileRawTDigestAggregationFunctionTest {
+  private static final int TDIGEST_TYPE = 10;
+
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
 
   @Test
   public void testHistoricalUnknownQuantileOrdering() {
     TDigest finiteDigest = TDigestAccumulator.forLegacyAggregation(100.0);
     finiteDigest.add(0.5);
-    TDigest infinityDigest = new PercentileTDigestValueAggregator(List.of())
-        .getInitialAggregatedValue(Double.POSITIVE_INFINITY);
-    byte[] corruptBytes = TDigestCodec.serializeCentroids(100.0, 0.0, 1.0,
-        new double[]{100.0}, new double[]{1.0}, 1);
+    TDigest infinityDigest =
+        new PercentileTDigestValueAggregator(List.of()).getInitialAggregatedValue(Double.POSITIVE_INFINITY);
+    byte[] corruptBytes = TDigestCodec.serializeCentroids(100.0, 0.0, 1.0, new double[]{100.0}, new double[]{1.0}, 1);
     TDigest unknownDigest = TDigestAccumulator.fromBytes(corruptBytes);
     assertTrue(Double.isNaN(unknownDigest.quantile(0.5)));
 
@@ -79,8 +80,8 @@ public class PercentileRawTDigestAggregationFunctionTest {
 
     PercentileRawTDigestAggregationFunction function =
         new PercentileRawTDigestAggregationFunction(EXPRESSION, 50.0, (int) compression, false);
-    TDigest intermediateResult = function.deserializeIntermediateResult(
-        new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(small)));
+    TDigest intermediateResult =
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(small)));
     assertTrue(intermediateResult instanceof TDigestAccumulator);
 
     SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
@@ -93,8 +94,8 @@ public class PercentileRawTDigestAggregationFunctionTest {
     assertUnitCentroidDigest(roundTripped, numCentroids);
 
     // Also cover the materialized (merged) accumulator state, not just the serialized pass-through.
-    TDigest merged = function.merge(intermediateResult, function.deserializeIntermediateResult(
-        new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(small))));
+    TDigest merged = function.merge(intermediateResult,
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(small))));
     byte[] mergedSerialized = BytesUtils.toBytes(function.extractFinalResult(merged).toString());
     assertLegacyCompatibleShape(mergedSerialized, compression);
     TDigest mergedRoundTripped = TDigestAccumulator.fromBytes(ByteBuffer.wrap(mergedSerialized));
@@ -113,8 +114,8 @@ public class PercentileRawTDigestAggregationFunctionTest {
 
     PercentileRawTDigestAggregationFunction function =
         new PercentileRawTDigestAggregationFunction(EXPRESSION, 50.0, (int) compression, false);
-    TDigest intermediateResult = function.deserializeIntermediateResult(
-        new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(bytes)));
+    TDigest intermediateResult =
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(bytes)));
 
     SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
     byte[] serialized = BytesUtils.toBytes(finalResult.toString());
@@ -130,8 +131,8 @@ public class PercentileRawTDigestAggregationFunctionTest {
     PercentileRawTDigestAggregationFunction function =
         new PercentileRawTDigestAggregationFunction(EXPRESSION, 50.0, 20, false);
     byte[] verbose = createVerboseUnitCentroidDigest(51, 20.0);
-    TDigest intermediateResult = function.deserializeIntermediateResult(
-        new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(verbose)));
+    TDigest intermediateResult =
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(verbose)));
     assertTrue(intermediateResult instanceof TDigestAccumulator);
 
     SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);

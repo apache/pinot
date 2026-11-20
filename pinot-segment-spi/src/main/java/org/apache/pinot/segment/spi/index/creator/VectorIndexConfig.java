@@ -58,6 +58,9 @@ public class VectorIndexConfig extends IndexConfig {
   public static final String STORE_IN_SEGMENT_FILE = "storeInSegmentFile";
   public static final boolean DEFAULT_STORE_IN_SEGMENT_FILE = false;
 
+  /// HNSW property controlling mmap-backed graph construction during the immutable index's final merge.
+  public static final String MMAP_GRAPH_ON_MERGE = "mmapGraphOnMerge";
+
   private String _vectorIndexType;
   private int _vectorDimension;
   private int _version;
@@ -168,6 +171,14 @@ public class VectorIndexConfig extends IndexConfig {
     }
     String value = _properties.get(STORE_IN_SEGMENT_FILE);
     return value == null ? DEFAULT_STORE_IN_SEGMENT_FILE : Boolean.parseBoolean(value);
+  }
+
+  /// Whether to use mmap-backed graph construction during the immutable HNSW index's final merge.
+  /// Defaults to true and uses scratch space in the segment build directory. Set to false in the
+  /// `properties` map to use Lucene's heap-backed merge.
+  @JsonIgnore
+  public boolean isMmapGraphOnMerge() {
+    return _properties == null || Boolean.parseBoolean(_properties.getOrDefault(MMAP_GRAPH_ON_MERGE, "true"));
   }
 
   /// Resolves the [VectorBackendType] for this config. If `vectorIndexType` is null or empty,

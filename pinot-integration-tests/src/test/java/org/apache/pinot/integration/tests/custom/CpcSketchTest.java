@@ -20,13 +20,13 @@ package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.datasketches.cpc.CpcSketch;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
@@ -56,7 +56,7 @@ public class CpcSketchTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
-    CpcSketch deserializedSketch = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(rawSketchBytes);
+    CpcSketch deserializedSketch = CpcSketch.heapify(MemorySegment.ofArray(rawSketchBytes));
 
     assertTrue(distinctCount > 0);
     assertEquals(Math.round(deserializedSketch.getEstimate()), distinctCount);
@@ -121,7 +121,7 @@ public class CpcSketchTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
-    CpcSketch deserializedSketch = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(rawSketchBytes);
+    CpcSketch deserializedSketch = CpcSketch.heapify(MemorySegment.ofArray(rawSketchBytes));
 
     assertTrue(distinctCount > 0);
     assertEquals(Math.round(deserializedSketch.getEstimate()), distinctCount);
@@ -140,13 +140,13 @@ public class CpcSketchTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
-    CpcSketch deserializedSketch = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(rawSketchBytes);
+    CpcSketch deserializedSketch = CpcSketch.heapify(MemorySegment.ofArray(rawSketchBytes));
     assertTrue(distinctCount > 0);
     assertEquals(Math.round(deserializedSketch.getEstimate()), distinctCount);
 
     distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(2).asLong();
     rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(3).asText());
-    deserializedSketch = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(rawSketchBytes);
+    deserializedSketch = CpcSketch.heapify(MemorySegment.ofArray(rawSketchBytes));
     assertTrue(distinctCount > 0);
     assertEquals(Math.round(deserializedSketch.getEstimate()), distinctCount);
   }
@@ -189,6 +189,6 @@ public class CpcSketchTest extends CustomDataQueryClusterIntegrationTest {
   private byte[] getRandomRawValue() {
     CpcSketch sketch = new CpcSketch(4);
     sketch.update(RANDOM.nextInt(100));
-    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(sketch);
+    return sketch.toByteArray();
   }
 }

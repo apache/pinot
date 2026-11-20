@@ -110,7 +110,7 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
 
   @Override
   public boolean supportsRecordPresenceCheck() {
-    return true;
+    return getClass() == ConcurrentMapPartitionDedupMetadataManager.class;
   }
 
   @Override
@@ -120,14 +120,15 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
       return true;
     }
     try {
-      // Duplicates never reach checkRecordPresentOrUpdate. Advance the TTL watermark here so a high-duplication
-      // stream still expires stale keys (same as the old check-or-update path).
-      if (_metadataTTL > 0) {
-        _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
-      }
       Pair<IndexSegment, Double> segmentAndTime = _primaryKeyToSegmentAndTimeMap.get(
           HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction));
-      return segmentAndTime != null && !isOutOfMetadataTTL(segmentAndTime.getRight());
+      if (segmentAndTime == null || isOutOfMetadataTTL(segmentAndTime.getRight())) {
+        // The writer advances the watermark when it successfully claims the new key.
+        return false;
+      }
+      // As in checkRecordPresentOrUpdate(), check TTL before advancing the watermark for a duplicate.
+      updateLargestSeenTime(dedupRecordInfo.getDedupTime());
+      return true;
     } finally {
       finishOperation();
     }

@@ -23,7 +23,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.customobject.AvgPair;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -243,13 +242,12 @@ public class AggregateMetricsFailureTest implements PinotBuffersAfterMethodCheck
       assertEquals(after.getValue(METRIC_2), 10L);
       assertTrue(segment.canAddMore());
       segment._indexWriteInterceptor = null;
-      row.putValue("input", 30L);
       segment.index(row, METADATA);
       GenericRow afterRetry = segment.getRecord(0, new GenericRow());
-      AvgPair average = CustomSerDeUtils.AVG_PAIR_SER_DE.deserialize((byte[]) afterRetry.getValue(METRIC_1));
-      assertEquals(average.getSum(), 40D);
+      AvgPair average = AvgPair.fromBytes((byte[]) afterRetry.getValue(METRIC_1));
+      assertEquals(average.getSum(), 30D);
       assertEquals(average.getCount(), 2L);
-      assertEquals(afterRetry.getValue(METRIC_2), 40L);
+      assertEquals(afterRetry.getValue(METRIC_2), 30L);
     } finally {
       segment.destroy();
     }

@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -42,6 +44,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -622,6 +625,31 @@ public class ExprMinMaxTest extends BaseQueriesTest {
       assertTrue(
           e.getMessage().contains("Aggregation function: EXPRMAX is only supported in selection without alias."));
     }
+  }
+
+  /// The grouping-sets base aggregation merges the deserialized intermediate results of different base groups into each
+  /// grouping set, and returns the same rows as the per-row expansion.
+  @Test
+  public void testGroupingSetsBaseAggregationMatchesExpansion() {
+    String query = "SELECT groupByIntColumn, groupByIntColumn2, expr_max(longColumn, intColumn), "
+        + "expr_min(stringColumn, intColumn) FROM testTable GROUP BY ROLLUP(groupByIntColumn, groupByIntColumn2) "
+        + "LIMIT 1000";
+    List<List<Object>> baseAggregation =
+        sortedRows(getBrokerResponse(query, Map.of(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION, "true")));
+    List<List<Object>> expansion =
+        sortedRows(getBrokerResponse(query, Map.of(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION, "false")));
+    assertEquals(baseAggregation, expansion);
+    // The groupByIntColumn subtotals and the grand total come on top of the base groups
+    assertTrue(baseAggregation.size() > 6, "Unexpected number of rows: " + baseAggregation.size());
+  }
+
+  private static List<List<Object>> sortedRows(BrokerResponseNative brokerResponse) {
+    List<List<Object>> rows = new ArrayList<>();
+    for (Object[] row : brokerResponse.getResultTable().getRows()) {
+      rows.add(Arrays.asList(row));
+    }
+    rows.sort(Comparator.comparing(Object::toString));
+    return rows;
   }
 
   @AfterClass

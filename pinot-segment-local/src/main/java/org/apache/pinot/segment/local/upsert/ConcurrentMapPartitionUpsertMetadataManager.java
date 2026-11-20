@@ -377,6 +377,11 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
+  public boolean supportsOutOfOrderRecordCheck() {
+    return getClass() == ConcurrentMapPartitionUpsertMetadataManager.class;
+  }
+
+  @Override
   public boolean isOutOfOrderRecord(RecordInfo recordInfo) {
     if (!startOperation()) {
       return true;

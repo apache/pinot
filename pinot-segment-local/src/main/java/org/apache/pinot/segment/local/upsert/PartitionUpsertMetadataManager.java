@@ -68,6 +68,12 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /// read-compare-update.
   void preloadSegment(ImmutableSegment segment);
 
+  /// Whether the manager supports checking record order before indexing. Legacy managers retain the original
+  /// `addRecord()`-based drop and marking behavior unless they opt in.
+  default boolean supportsOutOfOrderRecordCheck() {
+    return false;
+  }
+
   /// Returns true if a newer record already exists for this primary key. Does not mutate metadata.
   ///
   /// Used to drop or mark out-of-order records before the physical write so a failed write cannot wipe the previous
@@ -76,7 +82,7 @@ public interface PartitionUpsertMetadataManager extends Closeable {
     return false;
   }
 
-  /// Returns false when [addRecord] will no-op because the manager is stopped.
+  /// Returns false when [#addRecord] will no-op because the manager is stopped.
   default boolean isAcceptingRecords() {
     return true;
   }

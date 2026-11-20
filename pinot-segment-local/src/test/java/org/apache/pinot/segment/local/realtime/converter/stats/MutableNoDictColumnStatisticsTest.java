@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
-import com.google.common.base.Utf8;
 import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -28,6 +27,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -304,12 +304,12 @@ public class MutableNoDictColumnStatisticsTest {
     when(metadata.getMinValue()).thenReturn("hello");
     when(metadata.getMaxValue()).thenReturn("héllo");
     when(metadata.getMaxNumValuesPerMVEntry()).thenReturn(0);
-    when(metadata.getMaxRowLengthInBytes()).thenReturn(Utf8.encodedLength("héllo"));
+    when(metadata.getMaxRowLengthInBytes()).thenReturn(Utf8Utils.encodedLength("héllo"));
 
     MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
     when(forwardIndex.isSingleValue()).thenReturn(true);
     when(forwardIndex.getLengthOfShortestElement()).thenReturn(5);
-    when(forwardIndex.getLengthOfLongestElement()).thenReturn(Utf8.encodedLength("héllo"));
+    when(forwardIndex.getLengthOfLongestElement()).thenReturn(Utf8Utils.encodedLength("héllo"));
     when(forwardIndex.isAscii()).thenReturn(false);
     when(forwardIndex.getString(0)).thenReturn("hello");
     when(forwardIndex.getString(1)).thenReturn("héllo");

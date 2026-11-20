@@ -42,9 +42,27 @@ public class QuotaConfig extends BaseJsonConfig {
   private transient final long _storageInBytes;
   private transient final double _maxQPS;
 
+  // Optional per-table enforcement modes. Null means ENFORCED. They are omitted from the serialized form when null,
+  // so configs that do not use them are unchanged and stay readable by binaries that predate these fields.
+  @JsonPropertyDescription("How the storage quota is enforced: DISABLED, SHADOW (breaches are metered and logged but "
+      + "not acted on) or ENFORCED. Defaults to ENFORCED")
+  private final QuotaEnforcementMode _storageQuotaEnforcementMode;
+
+  @JsonPropertyDescription("How the query QPS quota is enforced: DISABLED, SHADOW (breaches are metered and logged "
+      + "but queries are not rejected) or ENFORCED. Defaults to ENFORCED")
+  private final QuotaEnforcementMode _queryQuotaEnforcementMode;
+
+  public QuotaConfig(@Nullable String storage, @Nullable String maxQueriesPerSecond) {
+    this(storage, maxQueriesPerSecond, null, null);
+  }
+
   @JsonCreator
   public QuotaConfig(@JsonProperty("storage") @Nullable String storage,
-      @JsonProperty("maxQueriesPerSecond") @Nullable String maxQueriesPerSecond) {
+      @JsonProperty("maxQueriesPerSecond") @Nullable String maxQueriesPerSecond,
+      @JsonProperty("storageQuotaEnforcementMode") @Nullable QuotaEnforcementMode storageQuotaEnforcementMode,
+      @JsonProperty("queryQuotaEnforcementMode") @Nullable QuotaEnforcementMode queryQuotaEnforcementMode) {
+    _storageQuotaEnforcementMode = storageQuotaEnforcementMode;
+    _queryQuotaEnforcementMode = queryQuotaEnforcementMode;
     // Validate and standardize the value
     if (storage != null) {
       try {
@@ -90,5 +108,17 @@ public class QuotaConfig extends BaseJsonConfig {
   @JsonIgnore
   public double getMaxQPS() {
     return _maxQPS;
+  }
+
+  /// Enforcement mode of the storage quota for this table. Null means [QuotaEnforcementMode#ENFORCED].
+  @Nullable
+  public QuotaEnforcementMode getStorageQuotaEnforcementMode() {
+    return _storageQuotaEnforcementMode;
+  }
+
+  /// Enforcement mode of the query QPS quota for this table. Null means [QuotaEnforcementMode#ENFORCED].
+  @Nullable
+  public QuotaEnforcementMode getQueryQuotaEnforcementMode() {
+    return _queryQuotaEnforcementMode;
   }
 }

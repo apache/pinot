@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -96,9 +97,6 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private static final int SIZE_OF_INT = 4;
   private static final int NUM_COLS_IN_HEADER = 3;
 
-  private static final int INCREMENT_PERCENTAGE = 100;
-  //Increments the Initial size by 100% of initial capacity every time we runs out of capacity
-
   // Conservative figure to not breach 2GB size limit for immutable index
   private final static int DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN = 450_000_000;
 
@@ -147,9 +145,11 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
 
     _headerSize = numRowsPerChunk * SIZE_OF_INT * NUM_COLS_IN_HEADER;
     addHeaderBuffer();
-    int initialCapacity = Math.max(maxNumMultiValues, numRowsPerChunk * avgNumMultiValues);
+    // Size for expected data at creation. Larger allowed entries only need more space when they arrive.
+    int initialCapacity = Math.max(Math.min(maxNumMultiValues, ForwardIndexConfig.DEFAULT_MAX_NUM_MULTI_VALUES),
+        numRowsPerChunk * avgNumMultiValues);
     addDataBuffer(initialCapacity);
-    _incrementalCapacity = Math.max(maxNumMultiValues, (int) ((double) initialCapacity * INCREMENT_PERCENTAGE / 100));
+    _incrementalCapacity = initialCapacity;
   }
 
   private void addHeaderBuffer() {
@@ -207,8 +207,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
         "Row %s has %s multi-values, exceeding the maximum of %s", row, numValues, _maxNumMultiValues);
     _numValues += numValues;
     int newStartIndex = _prevRowStartIndex + _prevRowLength;
-    if (newStartIndex + numValues > _currentCapacity) {
-      addDataBuffer(_incrementalCapacity);
+    if (numValues > _currentCapacity - newStartIndex) {
+      addDataBuffer(Math.max(_incrementalCapacity, numValues));
       _prevRowStartIndex = 0;
       _prevRowLength = 0;
       newStartIndex = 0;

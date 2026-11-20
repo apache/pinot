@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.lang.foreign.MemorySegment;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -29,7 +30,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -62,6 +62,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 ///   There is a variation of the function (**FREQUENT_STRINGS_SKETCH**) which accepts STRING type input columns.
 public class FrequentLongsSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<FrequentLongsSketch, Comparable<?>> {
+  private static final int FREQUENT_LONGS_SKETCH_TYPE = 39;
+
   protected static final int DEFAULT_MAX_MAP_SIZE = 256;
 
   protected int _maxMapSize;
@@ -274,14 +276,13 @@ public class FrequentLongsSketchAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(FrequentLongsSketch longsSketch) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FrequentLongsSketch.getValue(),
-        ObjectSerDeUtils.FREQUENT_LONGS_SKETCH_SER_DE.serialize(longsSketch));
+  public SerializedResult serializeIntermediateResult(FrequentLongsSketch longsSketch) {
+    return new SerializedBytes(FREQUENT_LONGS_SKETCH_TYPE, longsSketch.toByteArray());
   }
 
   @Override
   public FrequentLongsSketch deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.FREQUENT_LONGS_SKETCH_SER_DE.deserialize(customObject.getBuffer());
+    return FrequentLongsSketch.getInstance(MemorySegment.ofBuffer(customObject.getBuffer()));
   }
 
   @Override
@@ -302,5 +303,14 @@ public class FrequentLongsSketchAggregationFunction
     // has never substituted an empty accumulator during extraction, so NULL is the answer in both modes and there is
     // no disabled-mode identity to preserve here.
     return sketch != null ? new SerializedFrequentLongsSketch(sketch) : null;
+  }
+
+  /// Merges two final results, which are serialized sketches in string form, into the string form of the merged
+  /// sketch.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    FrequentLongsSketch sketch1 = deserializeSketch(Base64.getDecoder().decode((String) finalResult1));
+    FrequentLongsSketch sketch2 = deserializeSketch(Base64.getDecoder().decode((String) finalResult2));
+    return new SerializedFrequentLongsSketch(merge(sketch1, sketch2)).toString();
   }
 }

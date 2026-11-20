@@ -27,11 +27,11 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -43,6 +43,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregationFunction<UltraLogLog, Comparable> {
+  private static final int ULTRA_LOG_LOG_TYPE = 46;
+
   protected final int _p;
 
   public DistinctCountULLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
@@ -96,11 +98,11 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
               return;
             }
             // The first UltraLogLog read becomes the accumulator instead of being merged into a fresh one
-            ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i++]);
+            ull = ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(bytesValues[i++]);
             aggregationResultHolder.setValue(ull);
           }
           for (; i < to; i++) {
-            ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]));
+            ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
           }
         } catch (Exception e) {
           throw new RuntimeException("Caught exception while merging UltraLogLogs", e);
@@ -287,7 +289,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       forEachNotNull(length, blockValSet, (from, to) -> {
         try {
           for (int i = from; i < to; i++) {
-            UltraLogLog value = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]);
+            UltraLogLog value = ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
             int groupKey = groupKeyArray[i];
             UltraLogLog ull = groupByResultHolder.getResult(groupKey);
             if (ull != null) {
@@ -488,14 +490,14 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       forEachNotNull(length, blockValSet, (from, to) -> {
         try {
           for (int i = from; i < to; i++) {
-            UltraLogLog value = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]);
+            UltraLogLog value = ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
             for (int groupKey : groupKeysArray[i]) {
               UltraLogLog ull = groupByResultHolder.getResult(groupKey);
               if (ull != null) {
                 ull.add(value);
               } else {
                 groupByResultHolder.setValueForKey(groupKey,
-                    ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]));
+                    ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
               }
             }
           }
@@ -741,14 +743,13 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(UltraLogLog ultraLogLog) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.UltraLogLog.getValue(),
-        ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(ultraLogLog));
+  public SerializedResult serializeIntermediateResult(UltraLogLog ultraLogLog) {
+    return new SerializedValue<>(ULTRA_LOG_LOG_TYPE, ultraLogLog, ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE);
   }
 
   @Override
   public UltraLogLog deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(customObject.getBuffer());
+    return ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

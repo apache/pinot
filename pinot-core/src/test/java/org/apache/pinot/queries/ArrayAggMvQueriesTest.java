@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -160,6 +161,24 @@ public class ArrayAggMvQueriesTest extends BaseQueriesTest {
     assertEquals(((float[]) resultTable.getRows().get(0)[2]).length, 2 * NUM_RECORDS);
     assertEquals(((double[]) resultTable.getRows().get(0)[3]).length, 2 * NUM_RECORDS);
     assertEquals(((String[]) resultTable.getRows().get(0)[4]).length, 2 * NUM_RECORDS);
+  }
+
+  /// The data type argument can be omitted for a multi-value column; the optimizer supplies its element type.
+  @Test
+  public void testArrayAggMvWithInferredDataType() {
+    String query = "SELECT ArrayAgg(intMV), ArrayAgg(longMV, true), ArrayAgg(floatMV), ArrayAgg(doubleMV, true), "
+        + "ArrayAgg(stringMV) FROM testTableMv";
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnDataTypes(), new ColumnDataType[]{
+        ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY, ColumnDataType.FLOAT_ARRAY, ColumnDataType.DOUBLE_ARRAY,
+        ColumnDataType.STRING_ARRAY
+    });
+    Object[] row = resultTable.getRows().get(0);
+    assertEquals(((int[]) row[0]).length, 8 * NUM_RECORDS);
+    assertEquals(((long[]) row[1]).length, 2 * NUM_RECORDS);
+    assertEquals(((float[]) row[2]).length, 8 * NUM_RECORDS);
+    assertEquals(((double[]) row[3]).length, 2 * NUM_RECORDS);
+    assertEquals(((String[]) row[4]).length, 8 * NUM_RECORDS);
   }
 
   @AfterClass

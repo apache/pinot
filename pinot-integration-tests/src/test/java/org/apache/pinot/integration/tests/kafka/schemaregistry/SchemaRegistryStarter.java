@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests.kafka.schemaregistry;
 
+import com.github.dockerjava.api.command.InspectContainerResponse;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -26,6 +27,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.DockerImageName;
 
 
@@ -82,7 +84,7 @@ public class SchemaRegistryStarter {
 
       _network = Network.newNetwork();
 
-      _kafkaContainer = new KafkaContainer(KAFKA_DOCKER_IMAGE_NAME)
+      _kafkaContainer = new KafkaContainerWithStartupBarrier()
           .withNetwork(_network).withNetworkAliases("kafka")
           .withCreateContainerCmdModifier(it -> it.withHostName("kafka")).waitingFor(Wait.forListeningPort());
       _kafkaContainer.start();
@@ -145,6 +147,26 @@ public class SchemaRegistryStarter {
       }
       cleanupFailure.addSuppressed(failure);
       return cleanupFailure;
+    }
+  }
+
+  /// Waits for the startup script upload to complete before executing it. Used by a single fixture startup thread.
+  // Keep the existing ZooKeeper-based Confluent fixture while working around Testcontainers' startup race.
+  @SuppressWarnings("deprecation")
+  private static class KafkaContainerWithStartupBarrier extends KafkaContainer {
+    private static final String STARTUP_READY_FILE = "/tmp/pinot_kafka_startup_ready";
+
+    private KafkaContainerWithStartupBarrier() {
+      super(KAFKA_DOCKER_IMAGE_NAME);
+      withCommand("-c", "while [ ! -f " + STARTUP_READY_FILE
+          + " ]; do sleep 0.1; done; exec /tmp/testcontainers_start.sh");
+    }
+
+    @Override
+    protected void containerIsStarting(InspectContainerResponse containerInfo) {
+      // The script becomes visible before Docker closes its write handle. Executing it then can fail with ETXTBSY.
+      super.containerIsStarting(containerInfo);
+      copyFileToContainer(Transferable.of(new byte[0]), STARTUP_READY_FILE);
     }
   }
 }

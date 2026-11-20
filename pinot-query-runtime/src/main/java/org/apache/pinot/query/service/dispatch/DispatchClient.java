@@ -20,24 +20,33 @@ package org.apache.pinot.query.service.dispatch;
 
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
 import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
+import org.apache.pinot.query.grpc.ReceiverIdentity;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.service.dispatch.streaming.StreamingDispatchObserver;
 import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Dispatches a query plan to given a [QueryServerInstance]. Each [DispatchClient] has its own gRPC Channel
@@ -45,13 +54,19 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// TODO: It might be neater to implement pooling at the client level. Two options: (1) Pass a channel provider and
 ///       let that take care of pooling. (2) Create a DispatchClient interface and implement pooled/non-pooled versions.
 class DispatchClient {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DispatchClient.class);
   private static final StreamObserver<Worker.CancelResponse> NO_OP_CANCEL_STREAM_OBSERVER = new CancelObserver();
   /// Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
   /// Using a static allocator allows for better memory pooling across all DispatchClient instances.
   private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
 
+  /// The channel is refreshed at most once in this interval, see [#refreshChannel].
+  private static final long MIN_REFRESH_INTERVAL_NS = TimeUnit.SECONDS.toNanos(1);
+
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
+  /// When the channel was last refreshed, from [System#nanoTime()], see [#refreshChannel].
+  private final AtomicLong _lastRefreshTimeNs = new AtomicLong(System.nanoTime() - MIN_REFRESH_INTERVAL_NS);
 
   public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig) {
     this(host, port, tlsConfig, null, GrpcKeepAliveConfig.DISABLED);
@@ -96,7 +111,52 @@ class DispatchClient {
 
   public void submit(Worker.QueryRequest request, QueryServerInstance virtualServer, Deadline deadline,
       Consumer<AsyncResponse<Worker.QueryResponse>> callback) {
-    _dispatchStub.withDeadline(deadline).submit(request, new LastValueDispatchObserver<>(virtualServer, callback));
+    getStub(virtualServer).withDeadline(deadline)
+        .submit(request, new LastValueDispatchObserver<>(virtualServer, refreshIfMisrouted(virtualServer, callback)));
+  }
+
+  /// Returns a stub whose requests tell the server which instance they are meant for, so that another instance that
+  /// the channel happens to reach rejects them. See [ReceiverIdentity].
+  private PinotQueryWorkerGrpc.PinotQueryWorkerStub getStub(QueryServerInstance virtualServer) {
+    Metadata headers = new Metadata();
+    ReceiverIdentity.addTargetInstanceIdHash(headers, virtualServer.getInstanceIdHash());
+    return _dispatchStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers));
+  }
+
+  private <E> Consumer<AsyncResponse<E>> refreshIfMisrouted(QueryServerInstance virtualServer,
+      Consumer<AsyncResponse<E>> callback) {
+    return response -> {
+      refreshIfMisrouted(virtualServer, response.getThrowable());
+      callback.accept(response);
+    };
+  }
+
+  /// Makes the channel resolve the server's hostname again if `t` says the request reached another instance: the
+  /// channel's connection is stale and leads to whichever server took over the address. Otherwise it would keep
+  /// sending every later request there.
+  private void refreshIfMisrouted(QueryServerInstance virtualServer, @Nullable Throwable t) {
+    String misroutedTo = ReceiverIdentity.getMisroutedTo(t);
+    if (misroutedTo != null) {
+      LOGGER.warn("Request for server: {} reached {}. The connection to {}:{} is stale", virtualServer.getInstanceId(),
+          misroutedTo, virtualServer.getHostname(), virtualServer.getQueryServicePort());
+      BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER, 1L);
+      refreshChannel();
+    }
+  }
+
+  /// Makes the channel resolve the server's hostname again and open a new connection, without reconnect backoff, for
+  /// the next request. Requests in flight finish on the old connection. Does nothing, and returns false, if the
+  /// channel was refreshed less than a second ago: a stale connection usually fails several requests at once, and each
+  /// refresh drops the connection that the previous one opened.
+  public boolean refreshChannel() {
+    long nowNs = System.nanoTime();
+    long lastRefreshTimeNs = _lastRefreshTimeNs.get();
+    if (nowNs - lastRefreshTimeNs < MIN_REFRESH_INTERVAL_NS
+        || !_lastRefreshTimeNs.compareAndSet(lastRefreshTimeNs, nowNs)) {
+      return false;
+    }
+    _channel.enterIdle();
+    return true;
   }
 
   /// Opens a `SubmitWithStream` bidi RPC for one server, sends the initial `submit`, and registers the
@@ -121,9 +181,13 @@ class DispatchClient {
       Deadline deadline, StreamingQuerySession session, int expectedOpChainsForThisServer,
       BiConsumer<Worker.QueryResponse, Throwable> ackCallback) {
     StreamingDispatchObserver observer = new StreamingDispatchObserver(virtualServer, session,
-        expectedOpChainsForThisServer, ackCallback);
+        expectedOpChainsForThisServer, (response, t) -> {
+      refreshIfMisrouted(virtualServer, t);
+      ackCallback.accept(response, t);
+    });
     try {
-      StreamObserver<Worker.BrokerToServer> outbound = _dispatchStub.withDeadline(deadline).submitWithStream(observer);
+      StreamObserver<Worker.BrokerToServer> outbound =
+          getStub(virtualServer).withDeadline(deadline).submitWithStream(observer);
       observer.attachOutboundStream(outbound);
       session.registerStream(observer);
       observer.sendSubmit(request);
@@ -138,20 +202,22 @@ class DispatchClient {
     return observer;
   }
 
-  public void cancelAsync(long requestId) {
+  public void cancelAsync(long requestId, QueryServerInstance virtualServer) {
     Worker.CancelRequest cancelRequest = Worker.CancelRequest.newBuilder().setRequestId(requestId).build();
-    _dispatchStub.cancel(cancelRequest, NO_OP_CANCEL_STREAM_OBSERVER);
+    getStub(virtualServer).cancel(cancelRequest, NO_OP_CANCEL_STREAM_OBSERVER);
   }
 
   public void cancel(long requestId, QueryServerInstance virtualServer, Deadline deadline,
       Consumer<AsyncResponse<Worker.CancelResponse>> callback) {
     Worker.CancelRequest cancelRequest = Worker.CancelRequest.newBuilder().setRequestId(requestId).build();
-    StreamObserver<Worker.CancelResponse> observer = new LastValueDispatchObserver<>(virtualServer, callback);
-    _dispatchStub.withDeadline(deadline).cancel(cancelRequest, observer);
+    StreamObserver<Worker.CancelResponse> observer =
+        new LastValueDispatchObserver<>(virtualServer, refreshIfMisrouted(virtualServer, callback));
+    getStub(virtualServer).withDeadline(deadline).cancel(cancelRequest, observer);
   }
 
   public void explain(Worker.QueryRequest request, QueryServerInstance virtualServer, Deadline deadline,
       Consumer<AsyncResponse<List<Worker.ExplainResponse>>> callback) {
-    _dispatchStub.withDeadline(deadline).explain(request, new AllValuesDispatchObserver<>(virtualServer, callback));
+    getStub(virtualServer).withDeadline(deadline)
+        .explain(request, new AllValuesDispatchObserver<>(virtualServer, refreshIfMisrouted(virtualServer, callback)));
   }
 }

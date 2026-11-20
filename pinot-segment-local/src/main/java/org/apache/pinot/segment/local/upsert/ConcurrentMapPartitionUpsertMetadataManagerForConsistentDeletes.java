@@ -498,6 +498,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   }
 
   @Override
+  public boolean supportsOutOfOrderRecordCheck() {
+    return getClass() == ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes.class;
+  }
+
+  @Override
   public boolean isOutOfOrderRecord(RecordInfo recordInfo) {
     if (!startOperation()) {
       return true;

@@ -64,6 +64,13 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
   private static final String LONG_METRIC = "lm";
   private static final String STRING_METRIC = "sm";
   private static final String BYTES_METRIC = "bm";
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+      .addSingleValueDimension(DIMENSION, DataType.INT)
+      .addSingleValueDimension(INT_METRIC, DataType.INT)
+      .addSingleValueDimension(LONG_METRIC, DataType.LONG)
+      .addSingleValueDimension(STRING_METRIC, DataType.STRING)
+      .addSingleValueDimension(BYTES_METRIC, DataType.BYTES)
+      .build();
 
   private static final Map<String, String> STAR_TREE_ON = Map.of("useStarTree", "true");
   private static final Map<String, String> STAR_TREE_OFF = Map.of("useStarTree", "false");
@@ -95,13 +102,6 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addSingleValueDimension(DIMENSION, DataType.INT)
-        .addSingleValueDimension(INT_METRIC, DataType.INT)
-        .addSingleValueDimension(LONG_METRIC, DataType.LONG)
-        .addSingleValueDimension(STRING_METRIC, DataType.STRING)
-        .addSingleValueDimension(BYTES_METRIC, DataType.BYTES)
-        .build();
     // The LONG metric is raw-encoded: arrayAgg star-tree aggregation supports both dictionary-encoded and raw
     // single-value source columns, so the LONG tests double as raw-metric build/query coverage.
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
@@ -119,7 +119,7 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
       rows.add(row);
     }
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -271,11 +271,33 @@ public class ArrayAggStarTreeQueriesTest extends BaseQueriesTest {
         "Non-distinct arrayAgg must not use the star-tree, so it scans the same docs with the option on or off");
   }
 
+  /// Without the data type argument, distinct arrayAgg is rewritten to the explicit form with each column's type, which
+  /// the star-tree still serves.
+  @Test
+  public void testDistinctArrayAggWithInferredDataTypeUsesStarTree() {
+    String query = String.format(
+        "SELECT %s, arrayAgg(%s, true), arrayAgg(%s, true), arrayAgg(%s, true), arrayAgg(%s, true) FROM %s "
+            + "GROUP BY %s ORDER BY %s", DIMENSION, INT_METRIC, LONG_METRIC, STRING_METRIC, BYTES_METRIC,
+        RAW_TABLE_NAME, DIMENSION, DIMENSION);
+    String explicitQuery = String.format(
+        "SELECT %s, arrayAgg(%s, 'INT', true), arrayAgg(%s, 'LONG', true), arrayAgg(%s, 'STRING', true), "
+            + "arrayAgg(%s, 'BYTES', true) FROM %s GROUP BY %s ORDER BY %s", DIMENSION, INT_METRIC, LONG_METRIC,
+        STRING_METRIC, BYTES_METRIC, RAW_TABLE_NAME, DIMENSION, DIMENSION);
+    BrokerResponseNative starTree = getBrokerResponseForOptimizedQuery("SET useStarTree=true; " + query, SCHEMA);
+    BrokerResponseNative rawScan = getBrokerResponse(explicitQuery, STAR_TREE_OFF);
+    assertTrue(starTree.getNumDocsScanned() < rawScan.getNumDocsScanned(),
+        "Expected the star-tree to serve the distinct arrayAgg query without a data type argument");
+    assertSameDistinctValues(starTree.getResultTable(), rawScan.getResultTable());
+  }
+
   /// Runs the query with the star-tree enabled and disabled and asserts each arrayAgg cell (an unordered MV of
   /// distinct values) is set-equal between the two, per group.
   private void assertStarTreeMatchesRawScan(String query) {
-    ResultTable starTree = getBrokerResponse(query, STAR_TREE_ON).getResultTable();
-    ResultTable rawScan = getBrokerResponse(query, STAR_TREE_OFF).getResultTable();
+    assertSameDistinctValues(getBrokerResponse(query, STAR_TREE_ON).getResultTable(),
+        getBrokerResponse(query, STAR_TREE_OFF).getResultTable());
+  }
+
+  private static void assertSameDistinctValues(ResultTable starTree, ResultTable rawScan) {
     List<Object[]> starTreeRows = starTree.getRows();
     List<Object[]> rawScanRows = rawScan.getRows();
     assertEquals(starTreeRows.size(), rawScanRows.size());

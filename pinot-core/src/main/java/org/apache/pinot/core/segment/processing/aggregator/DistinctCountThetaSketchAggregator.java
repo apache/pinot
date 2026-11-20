@@ -22,7 +22,7 @@ import java.util.Map;
 import org.apache.datasketches.theta.ThetaSetOperationBuilder;
 import org.apache.datasketches.theta.ThetaSketch;
 import org.apache.datasketches.theta.ThetaUnion;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 

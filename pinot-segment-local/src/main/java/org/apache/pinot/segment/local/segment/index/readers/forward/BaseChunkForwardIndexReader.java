@@ -209,19 +209,23 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
       chunkSize = (int) (nextChunkOffset - chunkPosition);
     }
 
-    ByteBuffer decompressedBuffer = context.getChunkBuffer();
-    decompressedBuffer.clear();
+    ByteBuffer chunkBuffer = context.getChunkBuffer();
+    chunkBuffer.clear();
     // Invalidate the cached chunk before decoding. If decompression fails, a subsequent read must
     // retry instead of returning a partially-mutated buffer as a cache hit.
     context.setChunkId(-1);
 
+    ByteBuffer decompressedBuffer;
     try {
       // ChunkReaderContext is sized for a full decoded chunk. Decode every compression type into
       // that owned buffer so the buffer returned on the first read is also the one cached for
       // subsequent reads in the same chunk. The old DELTA/DELTADELTA branch allocated a separate
       // buffer without installing it in the context, causing all same-chunk reads after the first
       // one to observe the untouched context buffer.
-      _chunkDecompressor.decompress(_dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize), decompressedBuffer);
+      decompressedBuffer = _dataBuffer.readWithByteBuffer(chunkPosition, chunkSize, compressedBuffer -> {
+        _chunkDecompressor.decompress(compressedBuffer, chunkBuffer);
+        return chunkBuffer;
+      });
     } catch (IOException e) {
       LOGGER.error("Exception caught while decompressing data chunk", e);
       throw new RuntimeException(e);

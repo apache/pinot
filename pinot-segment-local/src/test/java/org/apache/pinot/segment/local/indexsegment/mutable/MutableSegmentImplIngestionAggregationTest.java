@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -28,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -187,9 +188,36 @@ public class MutableSegmentImplIngestionAggregationTest {
     GenericRow reuse = new GenericRow();
     for (int docId = 0; docId < numDocsIndexed; docId++) {
       GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
-      HyperLogLog actualHLL = CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) row.getValue(m1));
+      HyperLogLog actualHLL = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) row.getValue(m1));
       HyperLogLog expectedHLL = expectedValues.get(buildKey(row));
       assertEquals(actualHLL.cardinality(), expectedHLL.cardinality());
+    }
+
+    mutableSegmentImpl.destroy();
+  }
+
+  @Test
+  public void testDistinctCountHLLPlus()
+      throws Exception {
+    String m1 = "hllPlus1";
+
+    Schema schema = getSchemaBuilder().addMetric(m1, DataType.BYTES).build();
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            List.of(new AggregationConfig(m1, "distinctCountHLLPlus(metric, 12)")));
+
+    Map<String, HyperLogLogPlus> expectedValues = addRowsDistinctCountHLLPlus(998, mutableSegmentImpl);
+
+    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
+    assertTrue(numDocsIndexed < NUM_ROWS);
+    assertEquals(numDocsIndexed, expectedValues.size());
+
+    GenericRow reuse = new GenericRow();
+    for (int docId = 0; docId < numDocsIndexed; docId++) {
+      GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
+      HyperLogLogPlus actualHLLPlus = HyperLogLogPlus.Builder.build((byte[]) row.getValue(m1));
+      HyperLogLogPlus expectedHLLPlus = expectedValues.get(buildKey(row));
+      assertEquals(actualHLLPlus.cardinality(), expectedHLLPlus.cardinality());
     }
 
     mutableSegmentImpl.destroy();
@@ -271,6 +299,25 @@ public class MutableSegmentImplIngestionAggregationTest {
       mutableSegmentImpl.index(row, METADATA);
 
       valueMap.computeIfAbsent(key, k -> new HyperLogLog(12)).offer(metricValue);
+    }
+
+    return valueMap;
+  }
+
+  private Map<String, HyperLogLogPlus> addRowsDistinctCountHLLPlus(long seed, MutableSegmentImpl mutableSegmentImpl)
+      throws Exception {
+    Map<String, HyperLogLogPlus> valueMap = new HashMap<>();
+
+    Random random = new Random(seed);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      GenericRow row = getRow(random, 1);
+      String key = buildKey(row);
+
+      int metricValue = random.nextInt(5000000);
+      row.putValue(METRIC, metricValue);
+      mutableSegmentImpl.index(row, METADATA);
+
+      valueMap.computeIfAbsent(key, k -> new HyperLogLogPlus(12)).offer(metricValue);
     }
 
     return valueMap;

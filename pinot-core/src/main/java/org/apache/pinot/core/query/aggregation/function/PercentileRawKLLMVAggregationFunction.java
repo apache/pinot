@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.lang.foreign.MemorySegment;
+import java.util.Base64;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.datasketches.kll.KllDoublesSketch;
@@ -58,5 +60,17 @@ public class PercentileRawKLLMVAggregationFunction extends PercentileKLLMVAggreg
       return null;
     }
     return new SerializedKLL(sketch, _percentile);
+  }
+
+  /// Merges two final results, which are serialized sketches in string form, into the string form of the merged
+  /// sketch.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    KllDoublesSketch merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedKLL(merged, _percentile).toString();
+  }
+
+  private static KllDoublesSketch deserializeFinalResult(Comparable<?> finalResult) {
+    return KllDoublesSketch.wrap(MemorySegment.ofArray(Base64.getDecoder().decode((String) finalResult)).asReadOnly());
   }
 }

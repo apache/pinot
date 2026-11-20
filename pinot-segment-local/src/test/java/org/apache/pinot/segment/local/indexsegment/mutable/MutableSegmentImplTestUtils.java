@@ -56,6 +56,16 @@ public class MutableSegmentImplTestUtils {
   private static final String STREAM_NAME = "testStream";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MutableSegmentImplTestUtils");
 
+  /// Fails the next physical forward write for the given column, then lets recovery write the default.
+  public static void failNextForwardIndexWrite(MutableSegmentImpl segment, String column) {
+    segment._indexWriteInterceptor = (writingColumn, indexType, value, docId) -> {
+      if (column.equals(writingColumn) && indexType.equals(StandardIndexes.forward())) {
+        segment._indexWriteInterceptor = null;
+        throw new IllegalStateException("Injected forward index failure for column " + column);
+      }
+    };
+  }
+
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema) {
     return createMutableSegmentImpl(schema, Set.of(), Set.of(), Set.of(), false);
   }

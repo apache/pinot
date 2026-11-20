@@ -24,15 +24,17 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
 import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntSet> {
+  private static final int INT_SET_TYPE = 9;
+
   public ArrayAggDistinctIntFunction(ExpressionContext expression, DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
@@ -93,9 +95,8 @@ public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntSet>
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(IntSet intSet) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntSet.getValue(),
-        ObjectSerDeUtils.INT_SET_SER_DE.serialize(intSet));
+  public SerializedResult serializeIntermediateResult(IntSet intSet) {
+    return new SerializedValue<>(INT_SET_TYPE, intSet, ObjectSerDeUtils.INT_SET_SER_DE);
   }
 
   @Override

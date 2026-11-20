@@ -19,9 +19,8 @@
 package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.math.BigDecimal;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Map;
@@ -40,8 +39,10 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.plugin.inputformat.parquet.ParquetTestUtils.int96Bytes;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests [ParquetNativeRecordExtractor] — see its class Javadoc for the Parquet primitive + logical-type
@@ -71,10 +72,50 @@ public class ParquetNativeRecordExtractorTest {
   }
 
   @Test
+  public void testUnsignedInt64PreservesSignedLongBits() {
+    for (String annotation : new String[]{"UINT_64", "INTEGER(64,false)"}) {
+      MessageType schema = MessageTypeParser.parseMessageType(
+          "message R { required int64 col (" + annotation + "); }");
+      for (long value : new long[]{0L, 1L, Long.MAX_VALUE, Long.MIN_VALUE, -1L}) {
+        assertEquals(extract(schema, g -> g.add(0, value)), value, annotation);
+        assertEquals(extract(schema, g -> g.add(0, value), rawConfig()), value, annotation);
+      }
+    }
+    MessageType signed = MessageTypeParser.parseMessageType("message R { required int64 col; }");
+    assertEquals(extract(signed, g -> g.add(0, -1L)), -1L);
+    assertEquals(extract(signed, g -> g.add(0, Long.MIN_VALUE)), Long.MIN_VALUE);
+  }
+
+  @Test
+  public void testNestedUnsignedInt64PreservesSignedLongBits() {
+    MessageType list = MessageTypeParser.parseMessageType("message R { required group col (LIST) {"
+        + " repeated group list { required int64 element (UINT_64); } } }");
+    MessageType struct = MessageTypeParser.parseMessageType(
+        "message R { required group col { required int64 value (UINT_64); } }");
+    MessageType map = MessageTypeParser.parseMessageType("message R { required group col (MAP) {"
+        + " repeated group key_value { required int64 key (UINT_64); optional int64 value (UINT_64); } } }");
+    for (long value : new long[]{Long.MIN_VALUE, -1L}) {
+      assertEquals(extract(list, g -> g.addGroup(0).addGroup(0).add(0, value)), new Object[]{value});
+      assertEquals(extract(struct, g -> g.addGroup(0).add(0, value)), Map.of("value", value));
+      assertEquals(extract(map, g -> {
+        Group entry = g.addGroup(0).addGroup(0);
+        entry.add(0, value);
+        entry.add(1, 0L);
+      }), Map.of(Long.toString(value), 0L));
+      assertEquals(extract(map, g -> {
+        Group entry = g.addGroup(0).addGroup(0);
+        entry.add(0, 0L);
+        entry.add(1, value);
+      }), Map.of("0", value));
+    }
+  }
+
+  @Test
   public void testInt96ExtractedAsTimestamp() {
     long epochMillis = 1_649_924_302_123L;
     MessageType schema = MessageTypeParser.parseMessageType("message R { required int96 col; }");
-    assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(int96Bytes(epochMillis)))),
+    assertEquals(extract(schema,
+        g -> g.add(0, Binary.fromConstantByteArray(int96Bytes(Instant.ofEpochMilli(epochMillis))))),
         new Timestamp(epochMillis));
   }
 
@@ -270,8 +311,33 @@ public class ParquetNativeRecordExtractorTest {
     // nanosecond precision, so nanos is the natural raw unit.
     long epochMillis = 1_649_924_302_123L;
     MessageType schema = MessageTypeParser.parseMessageType("message R { required int96 col; }");
-    assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(int96Bytes(epochMillis))), rawConfig()),
+    assertEquals(extract(schema,
+        g -> g.add(0, Binary.fromConstantByteArray(int96Bytes(Instant.ofEpochMilli(epochMillis)))), rawConfig()),
         epochMillis * 1_000_000L);
+  }
+
+  @Test
+  public void testInt96RangeAndNanosecondBoundaries() {
+    MessageType schema = MessageTypeParser.parseMessageType("message R { required int96 col; }");
+    for (String text : new String[]{"1970-01-01T00:00:00Z", "1969-12-31T23:59:59.999999999Z",
+        "1677-09-21T00:12:43.145224192Z", "2262-04-11T23:47:16.854775807Z",
+        "1677-09-21T00:12:43.145224191Z", "2262-04-11T23:47:16.854775808Z",
+        "1600-01-01T00:00:00.123456789Z", "2300-01-01T00:00:00.123456789Z"}) {
+      Instant instant = Instant.parse(text);
+      byte[] bytes = int96Bytes(instant);
+      assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(bytes))), Timestamp.from(instant), text);
+      BigDecimal nanos = BigDecimal.valueOf(instant.getEpochSecond()).movePointRight(9)
+          .add(BigDecimal.valueOf(instant.getNano()));
+      if (nanos.compareTo(BigDecimal.valueOf(Long.MIN_VALUE)) >= 0
+          && nanos.compareTo(BigDecimal.valueOf(Long.MAX_VALUE)) <= 0) {
+        assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(bytes)), rawConfig()),
+            nanos.longValueExact(), text);
+      } else {
+        IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+            () -> extract(schema, g -> g.add(0, Binary.fromConstantByteArray(bytes)), rawConfig()));
+        assertEquals(exception.getMessage().contains(instant.toString()), true, exception.getMessage());
+      }
+    }
   }
 
   // === LIST — standard 3-level wrapper and legacy forms ===
@@ -448,16 +514,5 @@ public class ParquetNativeRecordExtractorTest {
     ParquetNativeRecordExtractorConfig config = new ParquetNativeRecordExtractorConfig();
     config.setExtractRawTimeValues(true);
     return config;
-  }
-
-  /// Encodes `epochMillis` as an INT96 byte[12]: bytes 0..7 = nanos-within-day (long, little-endian),
-  /// bytes 8..11 = Julian day number (int, little-endian).
-  private static byte[] int96Bytes(long epochMillis) {
-    long millisPerDay = 86_400_000L;
-    long dayNumber = epochMillis / millisPerDay;
-    long nanosWithinDay = (epochMillis - dayNumber * millisPerDay) * 1_000_000L;
-    int julianDay = (int) (dayNumber + ParquetUtils.JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH);
-    return ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
-        .putLong(nanosWithinDay).putInt(julianDay).array();
   }
 }

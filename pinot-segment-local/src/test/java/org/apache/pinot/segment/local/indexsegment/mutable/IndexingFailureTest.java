@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -68,6 +69,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -789,6 +791,11 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(TABLE_NAME + "_REALTIME", 0, upsertContext) {
           @Override
+          public boolean supportsOutOfOrderRecordCheck() {
+            return true;
+          }
+
+          @Override
           public boolean isOutOfOrderRecord(RecordInfo recordInfo) {
             boolean outOfOrder = super.isOutOfOrderRecord(recordInfo);
             // Stands in for the Helix thread taking the key's segment offline right after the peek.
@@ -1022,6 +1029,68 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
   }
 
   @Test
+  public void testRepairedUpsertRowKeepsMetadataAfterSealing()
+      throws Exception {
+    String deleteColumn = "deleted";
+    Schema schema = upsertSchema();
+    schema.addField(new DimensionFieldSpec(deleteColumn, DataType.BOOLEAN, true));
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn(deleteColumn);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL).setUpsertConfig(upsertConfig).setNullHandlingEnabled(true).build();
+    UpsertContext context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setTableDataManager(mock(TableDataManager.class)).setPrimaryKeyColumns(List.of(PK_COL))
+        .setComparisonColumns(List.of(TIME_COL)).setDeleteRecordColumn(deleteColumn).build();
+    String segmentName = "testTable__0__0__155555";
+    File outputDir = new File(FileUtils.getTempDirectory(), "IndexingFailureUpsertSealTest-" + System.nanoTime());
+    PartitionUpsertMetadataManager liveManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(tableConfig.getTableName(), 0, context);
+    PartitionUpsertMetadataManager rebuiltManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(tableConfig.getTableName(), 0, context);
+    MutableSegmentImpl segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(), Set.of(),
+        Set.of(), Map.of(), Map.of(), false, null, true, TIME_COL, liveManager, null, mock(ServerMetrics.class), true);
+    ImmutableSegment sealed = null;
+    try {
+      GenericRow first = upsertRow("A", "original value", 1000L);
+      first.putValue(deleteColumn, 0);
+      segment.index(first, METADATA);
+      MutableSegmentImplTestUtils.failNextForwardIndexWrite(segment, STRING_COL);
+      GenericRow repaired = upsertRow("A", "repaired value", 2000L);
+      repaired.putValue(deleteColumn, 0);
+      segment.index(repaired, METADATA);
+      GenericRow deleted = upsertRow("B", "deleted value", 3000L);
+      deleted.putValue(deleteColumn, 1);
+      segment.index(deleted, METADATA);
+      assertEquals(segment.getValidDocIds().getMutableRoaringBitmap().toArray(), new int[]{1, 2});
+      assertEquals(segment.getQueryableDocIds().getMutableRoaringBitmap().toArray(), new int[]{1});
+
+      SegmentZKPropsConfig zkProps = new SegmentZKPropsConfig();
+      zkProps.setStartOffset("1");
+      zkProps.setEndOffset("4");
+      new RealtimeSegmentConverter(segment, zkProps, outputDir.getAbsolutePath(), schema,
+          tableConfig.getTableName(), tableConfig, segmentName, true).build(SegmentVersion.v3);
+      sealed = ImmutableSegmentLoader.load(new File(outputDir, segmentName), ReadMode.mmap);
+      rebuiltManager.addSegment(sealed);
+      assertEquals(sealed.getValidDocIds().getMutableRoaringBitmap().toArray(), new int[]{1, 2});
+      assertEquals(sealed.getQueryableDocIds().getMutableRoaringBitmap().toArray(), new int[]{1});
+      GenericRow queryable = sealed.getRecord(1, new GenericRow());
+      assertEquals(queryable.getValue(PK_COL), "A");
+      assertEquals(queryable.getValue(TIME_COL), 2000L);
+      assertEquals(queryable.getValue(STRING_COL), schema.getFieldSpecFor(STRING_COL).getDefaultNullValue());
+    } finally {
+      if (sealed != null) {
+        sealed.destroy();
+      }
+      segment.destroy();
+      liveManager.stop();
+      liveManager.close();
+      rebuiltManager.stop();
+      rebuiltManager.close();
+      FileUtils.deleteQuietly(outputDir);
+    }
+  }
+
+  @Test
   public void testLegacyDedupManagerStillDropsDuplicates()
       throws Exception {
     LegacyDedupMetadataManager manager = new LegacyDedupMetadataManager();
@@ -1038,29 +1107,121 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
     }
   }
 
-  @Test
-  public void testDedupClaimFailureAfterPublicationRetainsPublicationStatus()
+  @DataProvider
+  public Object[][] booleanValues() {
+    return new Object[][]{{true}, {false}};
+  }
+
+  @Test(dataProvider = "booleanValues")
+  public void testDedupClaimFailureDoesNotPublishCompletedRow(boolean becameDuplicate)
       throws Exception {
     DedupContext context = mock(DedupContext.class);
     when(context.getPrimaryKeyColumns()).thenReturn(List.of(PK_COL));
     PartitionDedupMetadataManager manager = mock(PartitionDedupMetadataManager.class);
     when(manager.getContext()).thenReturn(context);
     when(manager.supportsRecordPresenceCheck()).thenReturn(true);
-    RuntimeException failure = new RuntimeException("dedup claim failed after physical publication");
-    when(manager.checkRecordPresentOrUpdate(any(), any())).thenThrow(failure);
+    RuntimeException failure = new RuntimeException("dedup claim failed after the physical write");
+    if (becameDuplicate) {
+      when(manager.checkRecordPresentOrUpdate(any(), any())).thenReturn(true);
+    } else {
+      when(manager.checkRecordPresentOrUpdate(any(), any())).thenThrow(failure);
+    }
     MutableSegmentImpl segment =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(upsertSchema(), true, TIME_COL, null, manager);
     try {
       RuntimeException thrown = expectThrows(RuntimeException.class,
-          () -> segment.index(upsertRow("A", "published", 10L), METADATA));
-      assertSame(thrown, failure);
-      assertEquals(segment.getNumDocsIndexed(), 1);
-      assertEquals(segment.getRecord(0, new GenericRow()).getValue(PK_COL), "A");
-      assertTrue(segment.wasLastIndexingOperationPublished());
-      assertFalse(segment.hasUnrecoverableIndexingFailure());
+          () -> segment.index(upsertRow("A", "unpublished", 10L), METADATA));
+      if (becameDuplicate) {
+        assertEquals(thrown.getMessage(), "Dedup key became present during row indexing");
+      } else {
+        assertSame(thrown, failure);
+      }
+      assertEquals(segment.getNumDocsIndexed(), 0);
+      assertFalse(segment.wasLastIndexingOperationPublished());
+      assertTrue(segment.hasUnrecoverableIndexingFailure());
     } finally {
       segment.destroy();
     }
+  }
+
+  @Test
+  public void testUpsertClaimFailureAfterPhysicalWriteIsTerminal()
+      throws Exception {
+    Schema schema = upsertSchema();
+    PartitionUpsertMetadataManager manager = mockUpsertManager(schema, false, null);
+    RuntimeException failure = new RuntimeException("upsert claim failed after the physical write");
+    when(manager.addRecord(any(), any())).thenAnswer(invocation -> {
+      MutableSegmentImpl segment = invocation.getArgument(0);
+      assertEquals(segment.getNumDocsIndexed(), 1, "doc count must precede the bitmap update");
+      throw failure;
+    });
+    MutableSegmentImpl segment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COL, manager, null);
+    try {
+      assertSame(expectThrows(RuntimeException.class, () -> segment.index(upsertRow("A", "a", 10L), METADATA)),
+          failure);
+      assertFalse(segment.wasLastIndexingOperationPublished());
+      assertTrue(segment.hasUnrecoverableIndexingFailure());
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  @Test(dataProvider = "booleanValues")
+  public void testLegacyUpsertManagerStillControlsOutOfOrderDropAndMark(boolean dropOutOfOrder)
+      throws Exception {
+    String outOfOrderColumn = "outOfOrder";
+    Schema schema = upsertSchema();
+    schema.addField(new DimensionFieldSpec(outOfOrderColumn, DataType.BOOLEAN, true));
+    PartitionUpsertMetadataManager manager = mockUpsertManager(schema, dropOutOfOrder, outOfOrderColumn);
+    when(manager.addRecord(any(), any())).thenReturn(true, false, true);
+    MutableSegmentImpl segment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COL, manager, null);
+    try {
+      GenericRow newer = upsertRow("A", "a10", 10L);
+      newer.putDefaultNullValue(outOfOrderColumn, 0);
+      segment.index(newer, METADATA);
+      GenericRow older = upsertRow("A", "a5", 5L);
+      older.putDefaultNullValue(outOfOrderColumn, 0);
+      segment.index(older, METADATA);
+
+      int expectedDocs = dropOutOfOrder ? 1 : 2;
+      assertEquals(segment.getNumDocsIndexed(), expectedDocs);
+      assertEquals(segment.getRecord(0, new GenericRow()).getValue(outOfOrderColumn), 0);
+      if (!dropOutOfOrder) {
+        GenericRow marked = segment.getRecord(1, new GenericRow());
+        assertEquals(marked.getValue(outOfOrderColumn), 1);
+        assertFalse(marked.isNullValue(outOfOrderColumn));
+      }
+
+      // The legacy contract calls addRecord() first. A failure after that call must prevent both publication of
+      // the broken row and subsequent writes to its doc id, even though the plugin cannot roll back its claim.
+      MutableSegmentImplTestUtils.failNextForwardIndexWrite(segment, PK_COL);
+      expectThrows(IllegalStateException.class, () -> segment.index(upsertRow("B", "b20", 20L), METADATA));
+      verify(manager, times(3)).addRecord(any(), any());
+      assertEquals(segment.getNumDocsIndexed(), expectedDocs);
+      assertFalse(segment.wasLastIndexingOperationPublished());
+      assertTrue(segment.hasUnrecoverableIndexingFailure());
+      expectThrows(IllegalStateException.class, () -> segment.index(upsertRow("C", "c30", 30L), METADATA));
+      verify(manager, times(3)).addRecord(any(), any());
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  private static PartitionUpsertMetadataManager mockUpsertManager(Schema schema, boolean dropOutOfOrder,
+      @Nullable String outOfOrderColumn) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL).build();
+    UpsertContext upsertContext = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setTableDataManager(mock(TableDataManager.class)).setPrimaryKeyColumns(List.of(PK_COL))
+        .setComparisonColumns(List.of(TIME_COL)).setDropOutOfOrderRecord(dropOutOfOrder)
+        .setOutOfOrderRecordColumn(outOfOrderColumn).build();
+    PartitionUpsertMetadataManager manager = mock(PartitionUpsertMetadataManager.class);
+    when(manager.getContext()).thenReturn(upsertContext);
+    when(manager.isAcceptingRecords()).thenReturn(true);
+    when(manager.updateRecord(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+    return manager;
   }
 
   @DataProvider
