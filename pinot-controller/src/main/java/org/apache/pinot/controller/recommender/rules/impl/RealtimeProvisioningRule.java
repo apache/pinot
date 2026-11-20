@@ -35,7 +35,6 @@ import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator;
-import org.apache.pinot.controller.recommender.realtime.provisioning.RealtimeProvisioningWarnings;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.io.configs.IndexConfig;
 import org.apache.pinot.controller.recommender.rules.io.params.RealtimeProvisioningRuleParams;
@@ -106,8 +105,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
       memoryEstimator.estimateMemoryUsed(statsFile, numHosts, numHours, totalConsumingPartitions, retentionHours);
 
       // extract recommendations
-      extractResults(memoryEstimator, numHosts, numHours, maxUsableHostMemoryByte,
-          _output.getRealtimeProvisioningRecommendations());
+      extractResults(memoryEstimator, numHosts, numHours, _output.getRealtimeProvisioningRecommendations());
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -144,7 +142,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
   }
 
   private void extractResults(MemoryEstimator memoryEstimator, int[] numHosts, int[] numHours,
-      long maxUsableHostMemoryByte, Map<String, Map<String, String>> rtProvRecommendations) {
+      Map<String, Map<String, String>> rtProvRecommendations) {
     Map<String, String> segmentSizes = makeMatrix(memoryEstimator.getOptimalSegmentSize(), numHosts, numHours);
     Map<String, String> consumingMemory = makeMatrix(memoryEstimator.getConsumingMemoryPerHost(), numHosts, numHours);
     Map<String, String> numSegmentsQueried =
@@ -160,9 +158,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
     rtProvRecommendations.put(CONSUMING_MEMORY_PER_HOST, consumingMemory);
     rtProvRecommendations.put(TOTAL_MEMORY_USED_PER_HOST, totalMemory);
 
-    List<String> warningMessages = RealtimeProvisioningWarnings.generate(memoryEstimator.getOptimalSegmentSize(),
-        memoryEstimator.getActiveMemoryPerHost(), memoryEstimator.getNumSegmentsQueriedPerHost(),
-        maxUsableHostMemoryByte, numHours, numHosts);
+    List<String> warningMessages = memoryEstimator.getWarnings();
     if (!warningMessages.isEmpty()) {
       // Numbered string keys keep the nested Map shape stable for JSON consumers.
       Map<String, String> warnings = new LinkedHashMap<>();

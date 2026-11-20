@@ -19,143 +19,79 @@
 package org.apache.pinot.controller.recommender.realtime.provisioning;
 
 import java.util.List;
+import org.apache.pinot.controller.recommender.realtime.provisioning.RealtimeProvisioningWarnings.Estimate;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/// Unit tests for {@link RealtimeProvisioningWarnings} sanity checks (#8339).
 public class RealtimeProvisioningWarningsTest {
-
-  private static final long MAX_HOST_MEMORY = DataSizeUtils.toBytes("48G");
+  private static final long MIB = 1024 * 1024;
+  private static final long GIB = 1024 * MIB;
+  private static final long MAX_HOST_MEMORY = 48 * GIB;
 
   @Test
-  public void testNoWarningsForModestEstimates() {
-    String[][] segmentSize = {{"100M", "200M"}, {"150M", "250M"}};
-    String[][] activeMemory = {{"10G/12G", "8G/10G"}, {"12G/14G", "9G/11G"}};
-    String[][] numSegments = {{"100", "50"}, {"80", "40"}};
+  public void testNoWarningsAtThresholds() {
+    Estimate[][] estimates = {{new Estimate(500 * MIB, MAX_HOST_MEMORY, 5000)}};
 
-    List<String> warnings =
-        RealtimeProvisioningWarnings.generate(segmentSize, activeMemory, numSegments, MAX_HOST_MEMORY);
+    List<String> warnings = RealtimeProvisioningWarnings.generate(estimates, MAX_HOST_MEMORY, new int[]{2},
+        new int[]{3});
 
-    assertTrue(warnings.isEmpty(), "Expected no warnings, got: " + warnings);
+    assertTrue(warnings.isEmpty(), warnings.toString());
     assertEquals(RealtimeProvisioningWarnings.formatForDisplay(warnings), "");
   }
 
   @Test
-  public void testLargeSegmentSizeWarning() {
-    // 5G segment, the motivating case from #8339
-    String[][] segmentSize = {{"100M", "5G"}, {"200M", "1G"}};
-    String[][] activeMemory = {{"10G/12G", "20G/24G"}, {"12G/14G", "22G/26G"}};
-    String[][] numSegments = {{"100", "20"}, {"80", "15"}};
-    int[] numHours = {2, 4};
-    int[] numHosts = {3, 6};
+  public void testWarningsUseUnroundedBytesAndExactSegmentCount() {
+    long segmentLimit = 500 * MIB;
+    long segmentSize = segmentLimit + 1;
+    long activeMemory = MAX_HOST_MEMORY + 1;
+    assertEquals(DataSizeUtils.fromBytes(segmentSize), DataSizeUtils.fromBytes(segmentLimit));
+    assertEquals(DataSizeUtils.fromBytes(activeMemory), DataSizeUtils.fromBytes(MAX_HOST_MEMORY));
 
-    List<String> warnings =
-        RealtimeProvisioningWarnings.generate(segmentSize, activeMemory, numSegments, MAX_HOST_MEMORY, numHours,
-            numHosts);
+    Estimate[][] estimates = {{new Estimate(segmentSize, activeMemory, 5001)}};
+    List<String> warnings = RealtimeProvisioningWarnings.generate(estimates, MAX_HOST_MEMORY, new int[]{2},
+        new int[]{3});
 
-    assertEquals(warnings.size(), 1);
-    assertTrue(warnings.get(0).contains("segment sizes in the matrix are large"));
-    assertTrue(warnings.get(0).contains("5G"));
-    assertTrue(warnings.get(0).contains("numHours=2,numHosts=6"));
-    assertTrue(warnings.get(0).contains(RealtimeProvisioningWarnings.REALTIME_TUNING_DOCS_URL));
+    assertEquals(warnings.size(), 3);
+    assertTrue(warnings.get(0).contains(segmentSize + " bytes at numHours=2,numHosts=3"), warnings.toString());
+    assertTrue(warnings.get(0).contains("threshold " + segmentLimit + " bytes"), warnings.toString());
+    assertTrue(warnings.get(1).contains(activeMemory + " bytes at numHours=2,numHosts=3"), warnings.toString());
+    assertTrue(warnings.get(1).contains("exceeds max usable host memory (" + MAX_HOST_MEMORY + " bytes)"),
+        warnings.toString());
+    assertTrue(warnings.get(2).contains("5001 at numHours=2,numHosts=3"), warnings.toString());
   }
 
   @Test
-  public void testSegmentSizeAtThresholdDoesNotWarn() {
-    String threshold = DataSizeUtils.fromBytes(RealtimeProvisioningWarnings.LARGE_SEGMENT_SIZE_BYTES);
-    String[][] segmentSize = {{threshold}};
-    String[][] activeMemory = {{"1G/2G"}};
-    String[][] numSegments = {{"10"}};
+  public void testMaximaTieOrderAndInapplicableRows() {
+    Estimate[][] estimates = {
+        {new Estimate(100 * MIB, 50 * GIB, 5010), new Estimate(5 * GIB, 60 * GIB, 100)},
+        {new Estimate(5 * GIB, 40 * GIB, 9000), new Estimate(400 * MIB, 30 * GIB, 7000)},
+        {null, null}
+    };
 
-    List<String> warnings =
-        RealtimeProvisioningWarnings.generate(segmentSize, activeMemory, numSegments, MAX_HOST_MEMORY);
-
-    assertTrue(warnings.isEmpty(), "Size exactly at threshold should not warn, got: " + warnings);
-  }
-
-  @Test
-  public void testMemoryOverHostLimitWarning() {
-    String[][] segmentSize = {{"100M", "200M"}};
-    // 60G active exceeds 48G max
-    String[][] activeMemory = {{"10G/12G", "60G/80G"}};
-    String[][] numSegments = {{"100", "50"}};
-    int[] numHours = {6};
-    int[] numHosts = {2, 4};
-
-    List<String> warnings =
-        RealtimeProvisioningWarnings.generate(segmentSize, activeMemory, numSegments, MAX_HOST_MEMORY, numHours,
-            numHosts);
-
-    assertEquals(warnings.size(), 1);
-    assertTrue(warnings.get(0).contains("exceeds max usable host memory"));
-    assertTrue(warnings.get(0).contains("60G"));
-    assertTrue(warnings.get(0).contains("48G"));
-    assertTrue(warnings.get(0).contains("numHours=6,numHosts=4"));
-  }
-
-  @Test
-  public void testHighSegmentCountWarning() {
-    String[][] segmentSize = {{"50M"}};
-    String[][] activeMemory = {{"5G/6G"}};
-    String[][] numSegments = {{"6000"}};
-
-    List<String> warnings =
-        RealtimeProvisioningWarnings.generate(segmentSize, activeMemory, numSegments, MAX_HOST_MEMORY);
-
-    assertEquals(warnings.size(), 1);
-    assertTrue(warnings.get(0).contains("very high number of segments"));
-    assertTrue(warnings.get(0).contains("6000"));
-  }
-
-  @Test
-  public void testNaCellsExplained() {
-    String[][] segmentSize = {{"100M", MemoryEstimator.NOT_APPLICABLE}};
-    String[][] activeMemory = {{"10G/12G", MemoryEstimator.NOT_APPLICABLE}};
-    String[][] numSegments = {{"100", MemoryEstimator.NOT_APPLICABLE}};
-
-    List<String> warnings =
-        RealtimeProvisioningWarnings.generate(segmentSize, activeMemory, numSegments, MAX_HOST_MEMORY);
-
-    assertEquals(warnings.size(), 1);
-    assertTrue(warnings.get(0).contains("NA"));
-    assertTrue(warnings.get(0).contains("retention hours"));
-  }
-
-  @Test
-  public void testMultipleWarningsAndDisplayFormat() {
-    String[][] segmentSize = {{"5G", MemoryEstimator.NOT_APPLICABLE}};
-    String[][] activeMemory = {{"100G/120G", MemoryEstimator.NOT_APPLICABLE}};
-    String[][] numSegments = {{"9000", MemoryEstimator.NOT_APPLICABLE}};
-
-    List<String> warnings =
-        RealtimeProvisioningWarnings.generate(segmentSize, activeMemory, numSegments, MAX_HOST_MEMORY);
+    List<String> warnings = RealtimeProvisioningWarnings.generate(estimates, MAX_HOST_MEMORY, new int[]{2, 4, 8},
+        new int[]{3, 6});
 
     assertEquals(warnings.size(), 4);
+    assertTrue(warnings.get(0).contains("5G at numHours=2,numHosts=6"), warnings.toString());
+    assertTrue(warnings.get(1).contains("60G at numHours=2,numHosts=6"), warnings.toString());
+    assertTrue(warnings.get(2).contains("9000 at numHours=4,numHosts=3"), warnings.toString());
+    assertTrue(warnings.get(3).contains("NA because numHoursToConsume exceeds the retention hours"),
+        warnings.toString());
 
     String display = RealtimeProvisioningWarnings.formatForDisplay(warnings);
-    assertTrue(display.contains("Warnings"));
-    assertTrue(display.contains("1)"));
-    assertTrue(display.contains("2)"));
-    assertTrue(display.contains("3)"));
-    assertTrue(display.contains("4)"));
-    assertTrue(display.contains(RealtimeProvisioningWarnings.REALTIME_TUNING_DOCS_URL));
-    assertFalse(display.isEmpty());
+    for (int i = 0; i < warnings.size(); i++) {
+      assertTrue(display.contains((i + 1) + ") " + warnings.get(i)), display);
+    }
+    assertTrue(display.contains(RealtimeProvisioningWarnings.REALTIME_TUNING_DOCS_URL), display);
   }
 
   @Test
-  public void testSkipsMalformedCells() {
-    String[][] segmentSize = {{"not-a-size", "300M"}};
-    String[][] activeMemory = {{"bogus", "10G/12G"}};
-    String[][] numSegments = {{"x", "20"}};
-
-    List<String> warnings =
-        RealtimeProvisioningWarnings.generate(segmentSize, activeMemory, numSegments, MAX_HOST_MEMORY);
-
-    assertTrue(warnings.isEmpty(), "Malformed cells should be ignored, got: " + warnings);
+  public void testNoHostsProducesNoWarnings() {
+    Estimate[][] estimates = {{}};
+    assertTrue(RealtimeProvisioningWarnings.generate(estimates, MAX_HOST_MEMORY, new int[]{2}, new int[]{}).isEmpty());
   }
 }

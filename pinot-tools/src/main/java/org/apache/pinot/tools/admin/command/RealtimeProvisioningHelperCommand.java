@@ -299,9 +299,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     LOGGER.info("\nTotal number of segments queried per host (for all partitions)");
     displayResults(memoryEstimator.getNumSegmentsQueriedPerHost(), numHosts, numHours);
 
-    List<String> warnings = RealtimeProvisioningWarnings.generate(memoryEstimator.getOptimalSegmentSize(),
-        memoryEstimator.getActiveMemoryPerHost(), memoryEstimator.getNumSegmentsQueriedPerHost(),
-        maxUsableHostMemBytes, numHours, numHosts);
+    List<String> warnings = memoryEstimator.getWarnings();
     String warningsDisplay = RealtimeProvisioningWarnings.formatForDisplay(warnings);
     if (!warningsDisplay.isEmpty()) {
       System.out.print(warningsDisplay);
