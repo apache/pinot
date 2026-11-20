@@ -696,6 +696,15 @@ public class PinotAggregateExchangeNodeInsertRule {
         functionName = "DISTINCTCOUNT";
         kind = SqlKind.OTHER_FUNCTION;
         functionCategory = SqlFunctionCategory.USER_DEFINED_FUNCTION;
+      } else if (kind == SqlKind.SUM || kind == SqlKind.SUM0) {
+        // SUM(DISTINCT x) arrives here as $SUM0(DISTINCT x) after PinotAggregateReduceFunctionsRule
+        functionName = "DISTINCTSUM";
+        kind = SqlKind.OTHER_FUNCTION;
+        functionCategory = SqlFunctionCategory.USER_DEFINED_FUNCTION;
+      } else if (kind == SqlKind.AVG) {
+        functionName = "DISTINCTAVG";
+        kind = SqlKind.OTHER_FUNCTION;
+        functionCategory = SqlFunctionCategory.USER_DEFINED_FUNCTION;
       } else if (kind == SqlKind.LISTAGG) {
         rexList.add(input.getCluster().getRexBuilder().makeLiteral(true));
       } else if (AggregationFunctionType.getNormalizedAggregationFunctionName(functionName)
