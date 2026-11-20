@@ -980,6 +980,7 @@ public class CalciteSqlCompilerTest {
         "SELECT * FROM foo",
         "sEt \"TiMeOuTmS\" = '120000'; SELECT * FROM foo",
         "SET timeoutMs=120000; SELECT * FROM foo; SET timeoutMs=240000;",
+        "SET a=1;" + "\t".repeat(8) + "SELECT 'x;y' FROM t; SET b=2",
         "SELECT * FROM foo OPTION(timeoutMs=300000, trace=true); -- trailing comment",
         "SELECT * FROM foo\u000BOPTION(timeoutMs=300000)",
         "SET timeoutMs=120000; SELECT * FROM foo OPTION(timeoutMs=300000, trace=true)",
