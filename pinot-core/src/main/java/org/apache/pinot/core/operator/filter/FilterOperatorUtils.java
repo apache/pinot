@@ -81,9 +81,36 @@ public class FilterOperatorUtils {
     return null;
   }
 
+  /// Returns the null rows of the column below `numDocs`, or `null` when there is none, see
+  /// [#getNullBitmap(DataSource)] and [#limitToNumDocs].
+  @Nullable
+  public static ImmutableRoaringBitmap getNullBitmap(DataSource dataSource, int numDocs) {
+    ImmutableRoaringBitmap nullBitmap = getNullBitmap(dataSource);
+    if (nullBitmap == null) {
+      return null;
+    }
+    nullBitmap = limitToNumDocs(nullBitmap, numDocs);
+    return nullBitmap.isEmpty() ? null : nullBitmap;
+  }
+
   /// Returns whether the column holds any null value in this segment, see [#getNullBitmap].
   public static boolean hasNulls(DataSource dataSource) {
     return getNullBitmap(dataSource) != null;
+  }
+
+  /// Returns the given documents limited to `[0, numDocs)`. The given bitmap is never modified, and is returned as is
+  /// when it holds no document at or above `numDocs`.
+  ///
+  /// A consuming segment keeps indexing while a query runs, so a bitmap read from one of its mutable indexes can hold
+  /// documents at or above the `numDocs` read when the query was planned. A filter must leave them out: a flip over
+  /// `[0, numDocs)` keeps them, which turns them into matches, and a count shortcut counts them.
+  public static ImmutableRoaringBitmap limitToNumDocs(ImmutableRoaringBitmap docIds, int numDocs) {
+    if (docIds.isEmpty() || docIds.last() < numDocs) {
+      return docIds;
+    }
+    MutableRoaringBitmap limitedDocIds = docIds.toMutableRoaringBitmap();
+    limitedDocIds.remove(numDocs, 0x100000000L);
+    return limitedDocIds;
   }
 
   public static class DefaultImplementation implements Implementation {
@@ -94,13 +121,15 @@ public class FilterOperatorUtils {
       // under either verdict, so it is selected by neither the predicate nor its negation: the leaf has to carry the
       // null rows for the negation to leave them out, instead of collapsing to a constant that knows nothing of them.
       if (predicateEvaluator.isAlwaysFalse()) {
-        ImmutableRoaringBitmap nullBitmap = queryContext.isNullHandlingEnabled() ? getNullBitmap(dataSource) : null;
+        ImmutableRoaringBitmap nullBitmap =
+            queryContext.isNullHandlingEnabled() ? getNullBitmap(dataSource, numDocs) : null;
         if (nullBitmap != null) {
           return new BitmapBasedFilterOperator(new MutableRoaringBitmap(), false, numDocs, nullBitmap);
         }
         return EmptyFilterOperator.getInstance();
       } else if (predicateEvaluator.isAlwaysTrue()) {
-        ImmutableRoaringBitmap nullBitmap = queryContext.isNullHandlingEnabled() ? getNullBitmap(dataSource) : null;
+        ImmutableRoaringBitmap nullBitmap =
+            queryContext.isNullHandlingEnabled() ? getNullBitmap(dataSource, numDocs) : null;
         if (nullBitmap != null) {
           return new BitmapBasedFilterOperator(nullBitmap, true, numDocs, nullBitmap);
         }
