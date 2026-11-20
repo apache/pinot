@@ -46,6 +46,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Groovy;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,7 +94,8 @@ public final class TableConfigValidationUtils {
             && transformFunction.regionMatches(true, 0, groovyPrefix, 0, groovyPrefix.length())) {
           throw new IllegalStateException(
               "Groovy transform functions are disabled for schema. Found '" + transformFunction + "' for column '"
-                  + fieldSpec.getName() + "'. Set " + ControllerConf.DISABLE_GROOVY + "=false to enable them");
+                  + fieldSpec.getName() + "'. Set " + Groovy.INGESTION_GROOVY_DISABLED
+                  + "=false in cluster config to enable them");
         }
       }
     }

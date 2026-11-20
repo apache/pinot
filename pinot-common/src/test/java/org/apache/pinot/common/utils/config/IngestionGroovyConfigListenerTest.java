@@ -51,7 +51,7 @@ import static org.testng.Assert.expectThrows;
 /// Not thread-safe because the compiler switch is process-wide.
 @Test(singleThreaded = true)
 public class IngestionGroovyConfigListenerTest {
-  private static final String KEY = Groovy.DISABLE_INGESTION_GROOVY;
+  private static final String KEY = Groovy.INGESTION_GROOVY_DISABLED;
   private static final String EXPRESSION = "Groovy({value + 1}, value)";
 
   @AfterMethod(alwaysRun = true)
@@ -67,10 +67,12 @@ public class IngestionGroovyConfigListenerTest {
     assertEquals(GroovyFunctionEvaluator.forQuery(EXPRESSION).evaluate(new Object[]{1}), 2);
 
     ClusterConfig config = new ClusterConfig("test");
+    config.getRecord().setSimpleField(Groovy.DISABLE_INGESTION_GROOVY, "true");
     config.getRecord().setSimpleField(KEY, " false ");
     handler.onClusterConfigChange(config, null);
     assertEquals(new GroovyFunctionEvaluator(EXPRESSION).evaluate(new Object[]{1}), 2);
 
+    config.getRecord().setSimpleField(Groovy.DISABLE_INGESTION_GROOVY, "false");
     config.getRecord().setSimpleField(KEY, "true");
     handler.onClusterConfigChange(config, null);
     expectThrows(IllegalStateException.class, () -> new GroovyFunctionEvaluator(EXPRESSION));
@@ -92,7 +94,7 @@ public class IngestionGroovyConfigListenerTest {
     expectThrows(IllegalStateException.class, () -> new GroovyFunctionEvaluator(EXPRESSION));
 
     IngestionGroovyConfigListener.applyClusterConfig(Map.of(KEY, "false"));
-    IngestionGroovyConfigListener.applyClusterConfig(Map.of(KEY, "invalid"));
+    IngestionGroovyConfigListener.applyClusterConfig(Map.of(KEY, "invalid", Groovy.DISABLE_INGESTION_GROOVY, "false"));
     expectThrows(IllegalStateException.class, () -> new GroovyFunctionEvaluator(EXPRESSION));
   }
 
@@ -194,6 +196,7 @@ public class IngestionGroovyConfigListenerTest {
       assertEquals(new GroovyFunctionEvaluator(EXPRESSION).evaluate(new Object[]{1}), 2);
 
       record.getSimpleFields().remove(KEY);
+      record.setSimpleField(Groovy.DISABLE_INGESTION_GROOVY, "false");
       client.writeData(path, record);
       instance.setProperty(KEY, "false");
       ServiceStartableUtils.applyClusterConfig(instance, zk.getZkUrl(), cluster, ServiceRole.MINION);

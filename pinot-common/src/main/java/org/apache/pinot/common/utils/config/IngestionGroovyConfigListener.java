@@ -40,7 +40,7 @@ public class IngestionGroovyConfigListener implements PinotClusterConfigChangeLi
   /// Applies a raw cluster snapshot before a server or minion starts ingestion or query processing.
   public static void applyClusterConfig(Map<String, String> clusterConfigs) {
     GroovyFunctionEvaluator.setIngestionGroovyDisabled(
-        Groovy.isIngestionGroovyDisabled(clusterConfigs.get(Groovy.DISABLE_INGESTION_GROOVY)));
+        Groovy.isIngestionGroovyDisabled(clusterConfigs.get(Groovy.INGESTION_GROOVY_DISABLED)));
   }
 
   /// Subscribes a runtime role to cluster updates. On failure, disables ingestion compilation, disconnects the

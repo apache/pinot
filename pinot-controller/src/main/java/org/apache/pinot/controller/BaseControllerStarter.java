@@ -249,8 +249,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _config = new ControllerConf(pinotConfiguration.toMap());
     _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
     _clusterConfigChangeHandler.registerClusterConfigChangeListener((changedConfigs, clusterConfigs) -> {
-      boolean disabled =
-          CommonConstants.Groovy.isIngestionGroovyDisabled(clusterConfigs.get(ControllerConf.DISABLE_GROOVY));
+      boolean disabled = CommonConstants.Groovy.isControllerIngestionGroovyDisabled(clusterConfigs);
       TableConfigUtils.setDisableGroovy(disabled);
       _config.setClusterIngestionGroovyDisabled(disabled);
     });

@@ -114,8 +114,7 @@ public class ServiceStartableUtils {
       Map<String, String> clusterConfigs) {
     if (serviceRole == ServiceRole.CONTROLLER) {
       instanceConfig.setProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY,
-          CommonConstants.Groovy.isIngestionGroovyDisabled(
-              clusterConfigs.get(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY)));
+          CommonConstants.Groovy.isControllerIngestionGroovyDisabled(clusterConfigs));
     } else if (serviceRole == ServiceRole.SERVER || serviceRole == ServiceRole.MINION) {
       IngestionGroovyConfigListener.applyClusterConfig(clusterConfigs);
     }
