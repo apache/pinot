@@ -43,9 +43,8 @@ public class SparseKeyDataSourceTest {
       "{\"other\":1}",
   };
 
-  /// One value per document for a key that a sample declared numeric, as later files can hold: only values that fit
-  /// the declared type are present; text, fractions in an integral key, objects and arrays read as absent, never as
-  /// the 0 or 1 a lenient JSON conversion produces.
+  /// Numeric text converts to a number and fractions truncate for integral keys. Nonnumeric text, objects and
+  /// arrays are absent for these single-value numeric keys.
   private static final String[] MIXED = {
       "{\"k\":5}", "{\"k\":\"abc\"}", "{\"k\":1.5}", "{\"k\":2.0}", "{\"k\":\"7\"}", "{\"k\":{\"x\":1}}",
       "{\"k\":true}", "{\"k\":[1,2]}", "{\"k\":9223372036854775807}",
@@ -61,18 +60,26 @@ public class SparseKeyDataSourceTest {
   /// the whole value (its length is part of it), so the document reads as absent.
   @Test
   public void testMultiValueKeyIsAbsentWhenAnyElementIsRejected() {
-    String[] blobs = {"{\"k\":[1,\"2\"]}", "{\"k\":[1,\"abc\"]}", "{\"k\":7}"};
+    String[] blobs = {"{\"k\":[1,\"2\"]}", "{\"k\":[1,2,\"abc\"]}", "{\"k\":7}", "{\"k\":[]}"};
     OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(new FakeStringForwardIndex(blobs),
         FakeStringForwardIndex.nullVector(blobs), blobs.length);
-    SparseKeyDataSource longs = new SparseKeyDataSource(new DimensionFieldSpec("k", DataType.LONG, false), blob, 2);
+    DimensionFieldSpec spec = new DimensionFieldSpec("k", DataType.LONG, false);
+    spec.setDefaultNullValue(-7L);
+    SparseKeyDataSource longs = new SparseKeyDataSource(spec, blob, 2);
     ForwardIndexReader<?> fwd = longs.getForwardIndex();
     assertEquals(fwd.getLongMV(0, null), new long[]{1, 2});
     assertEquals(fwd.getNumValuesMV(1, null), 1);
-    assertEquals(fwd.getLongMV(1, null), new long[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG});
+    long[] buffer = new long[1];
+    assertEquals(fwd.getLongMV(1, buffer, null), 1);
+    assertEquals(buffer[0], -7L);
+    assertEquals(fwd.getLongMV(1, null), new long[]{-7L});
     assertEquals(fwd.getLongMV(2, null), new long[]{7});
     assertFalse(longs.getNullValueVector().isNull(0));
     assertTrue(longs.getNullValueVector().isNull(1));
     assertFalse(longs.getNullValueVector().isNull(2));
+    assertTrue(longs.getNullValueVector().isNull(3));
+    assertEquals(fwd.getNumValuesMV(3, null), 1);
+    assertEquals(fwd.getLongMV(3, null), new long[]{-7L});
   }
 
   private static SparseKeyDataSource multiValue(DataType declaredType, String... blobs) {
@@ -142,14 +149,17 @@ public class SparseKeyDataSourceTest {
   /// BYTES one decodes each base64 element, reading a malformed or non-binary element as the default.
   @Test
   public void testMultiValueStringAndBytesGetters() {
-    String[] stringBlobs = {"{\"k\":[\"a\",{\"x\":1},5,true]}", null, "{\"k\":\"s\"}"};
-    ForwardIndexReader<?> strings = multiValue(DataType.STRING, stringBlobs).getForwardIndex();
+    String[] stringBlobs = {"{\"k\":[\"a\",{\"x\":1},5,true]}", "{\"k\":[]}", "{\"k\":\"s\"}"};
+    SparseKeyDataSource stringSource = multiValue(DataType.STRING, stringBlobs);
+    ForwardIndexReader<?> strings = stringSource.getForwardIndex();
     String[] expected = {"a", "{\"x\":1}", "5", "true"};
     assertEquals(strings.getNumValuesMV(0, null), 4);
     assertEquals(strings.getStringMV(0, null), expected);
     String[] stringBuffer = new String[4];
     assertEquals(strings.getStringMV(0, stringBuffer, null), 4);
     assertEquals(stringBuffer, expected);
+    assertTrue(stringSource.getNullValueVector().isNull(1));
+    assertEquals(strings.getNumValuesMV(1, null), 1);
     assertEquals(strings.getStringMV(1, null), new String[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING});
     assertEquals(strings.getStringMV(2, null), new String[]{"s"});
 
@@ -174,6 +184,30 @@ public class SparseKeyDataSourceTest {
     assertEquals(longs.getForwardIndex().getLongMV(0, null),
         new long[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG});
     assertEquals(longs.getForwardIndex().getLongMV(1, null), new long[]{1, 2});
+
+    String withNull = "{\"k\":[\"aGVsbG8=\",null]}";
+    SparseKeyDataSource strings = multiValue(DataType.STRING, withNull);
+    assertTrue(strings.getNullValueVector().isNull(0));
+    assertEquals(strings.getForwardIndex().getNumValuesMV(0, null), 1);
+    assertEquals(strings.getForwardIndex().getStringMV(0, null),
+        new String[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING});
+    SparseKeyDataSource bytes = multiValue(DataType.BYTES, withNull);
+    assertTrue(bytes.getNullValueVector().isNull(0));
+    assertEquals(bytes.getForwardIndex().getBytesMV(0, null),
+        new byte[][]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES});
+  }
+
+  @Test
+  public void testExponentOutsideDecimalRange() {
+    for (String token : new String[]{"1e-2147483649", "1e2147483649"}) {
+      String blob = "{\"k\":1,\"other\":" + token + "}";
+      assertEquals(of(DataType.LONG, blob).getForwardIndex().getLong(0, null), 1L);
+      assertEquals(of(DataType.BIG_DECIMAL, blob).getForwardIndex().getBigDecimal(0, null), BigDecimal.ONE);
+      SparseKeyDataSource missing = of(DataType.BIG_DECIMAL, "{\"k\":" + token + "}");
+      assertTrue(missing.getNullValueVector().isNull(0));
+      assertEquals(missing.getForwardIndex().getBigDecimal(0, null),
+          FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL);
+    }
   }
 
   @Test

@@ -163,7 +163,7 @@ public class MapFilterOperator extends BaseFilterOperator {
   @Nullable
   private BaseFilterOperator trySparseJsonIndex(OpenStructDataSource osDs, DataSource sparseKeyDs,
       QueryContext queryContext, int numDocs) {
-    JsonIndexReader jsonIndex = osDs.getSparseJsonIndex();
+    JsonIndexReader jsonIndex = osDs.getSparseJsonIndex(_keyName);
     if (jsonIndex == null || !servesKey(jsonIndex)) {
       return null;
     }

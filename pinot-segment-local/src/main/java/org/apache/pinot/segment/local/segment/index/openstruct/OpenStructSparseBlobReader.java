@@ -18,7 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.util.JsonParserDelegate;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.cfg.JsonNodeFeature;
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
@@ -27,6 +33,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -35,6 +42,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 /// stateless and segment-shared; each caller needs its own [ForwardIndexReaderContext].
 /// FastJsonPathExtractor is the planned follow-up for making repeated key reads cheap.
 public class OpenStructSparseBlobReader {
+  private static final ObjectReader NUMERIC_READER =
+      JsonUtils.DEFAULT_READER.without(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES);
+
   private final ForwardIndexReader<ForwardIndexReaderContext> _blobReader;
   @Nullable
   private final NullValueVectorReader _blobNulls;
@@ -59,9 +69,15 @@ public class OpenStructSparseBlobReader {
 
   @Nullable
   public JsonNode getValue(int docId, String key, @Nullable ForwardIndexReaderContext context) {
+    return getValue(docId, key, context, null);
+  }
+
+  @Nullable
+  JsonNode getValue(int docId, String key, @Nullable ForwardIndexReaderContext context,
+      @Nullable PinotDataType converter) {
     // TODO: an N-key projection parses each doc N times. FastJsonPathExtractor fixes this in one pass,
     // but only across a batch of paths — this single-key signature has to change first.
-    JsonNode blob = parseBlob(docId, context);
+    JsonNode blob = parseBlob(docId, context, converter);
     return blob == null ? null : resolve(blob, key);
   }
 
@@ -97,7 +113,8 @@ public class OpenStructSparseBlobReader {
   }
 
   @Nullable
-  private JsonNode parseBlob(int docId, @Nullable ForwardIndexReaderContext context) {
+  private JsonNode parseBlob(int docId, @Nullable ForwardIndexReaderContext context,
+      @Nullable PinotDataType converter) {
     if (_blobNulls != null && _blobNulls.isNull(docId)) {
       return null;
     }
@@ -106,25 +123,54 @@ public class OpenStructSparseBlobReader {
       return null;
     }
     try {
+      if (converter == PinotDataType.INT || converter == PinotDataType.LONG || converter == PinotDataType.FLOAT
+          || converter == PinotDataType.BIG_DECIMAL) {
+        return readNumericBlob(json, converter == PinotDataType.BIG_DECIMAL);
+      }
       return JsonUtils.stringToJsonNode(json);
     } catch (Exception e) {
       throw new IllegalStateException("Failed to parse OPEN_STRUCT sparse blob at doc " + docId, e);
     }
   }
 
+  /// JSON does not distinguish a producer's double from its decimal. Preserve the double conversion when its
+  /// printed value round-trips, including signed zero and overflow saturation. Otherwise let PinotDataType narrow
+  /// the exact decimal to INT, LONG or FLOAT, without first rounding away digits through a double.
+  private static JsonNode readNumericBlob(String json, boolean requireDecimal)
+      throws IOException {
+    try (JsonParser parser = new JsonParserDelegate(JsonUtils.DEFAULT_READER.createParser(json)) {
+      @Override
+      public NumberTypeFP getNumberTypeFP()
+          throws IOException {
+        double value = getDoubleValue();
+        try {
+          BigDecimal exact = getDecimalValue();
+          if (requireDecimal || !Double.isFinite(value) || BigDecimal.valueOf(value).compareTo(exact) != 0) {
+            return NumberTypeFP.BIG_DECIMAL;
+          }
+        } catch (NumberFormatException e) {
+          // A JSON exponent can exceed BigDecimal's scale range. Keep the rest of the document readable.
+        }
+        return NumberTypeFP.DOUBLE64;
+      }
+    }) {
+      return NUMERIC_READER.readTree(parser);
+    }
+  }
+
   /// Full scan for docs where `key` is present (explicit JSON null = absent). Callers memoize.
   public ImmutableRoaringBitmap computePresence(String key) {
-    return computePresence(key, node -> true);
+    return computePresence(key, null, node -> true);
   }
 
   /// Full scan for docs where `key` holds a non-null value that `accept` takes. Callers memoize.
-  ImmutableRoaringBitmap computePresence(String key, Predicate<JsonNode> accept) {
+  ImmutableRoaringBitmap computePresence(String key, @Nullable PinotDataType converter, Predicate<JsonNode> accept) {
     // TODO: the opt-in sparse JSON index already encodes this; deriving presence from it needs a
     // handle on the index, which only ImmutableOpenStructDataSource has.
     MutableRoaringBitmap present = new MutableRoaringBitmap();
     try (ForwardIndexReaderContext context = createBlobContext()) {
       for (int docId = 0; docId < _numDocs; docId++) {
-        JsonNode val = getValue(docId, key, context);
+        JsonNode val = getValue(docId, key, context, converter);
         if (val != null && !val.isNull() && accept.test(val)) {
           present.add(docId);
         }
