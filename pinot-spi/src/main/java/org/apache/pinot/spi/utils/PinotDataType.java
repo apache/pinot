@@ -1659,8 +1659,19 @@ public enum PinotDataType {
       int length = valueArray.length;
       BigDecimal[] bigDecimalArray = new BigDecimal[length];
       PinotDataType singleValueType = getSingleValueType();
+      // Ingestion infers the source type from the first element, even for heterogeneous JSON arrays.
+      boolean inferredNumericType = length > 0 && valueArray[0] instanceof Number
+          && getSingleValueType(valueArray[0]) == singleValueType;
       for (int i = 0; i < length; i++) {
-        bigDecimalArray[i] = singleValueType.toBigDecimal(valueArray[i]);
+        Object element = valueArray[i];
+        if (inferredNumericType && singleValueType == BIG_DECIMAL && element instanceof String) {
+          // JSON decimals used to infer DOUBLE_ARRAY, which parsed numeric strings without trimming.
+          bigDecimalArray[i] = new BigDecimal((String) element);
+        } else {
+          PinotDataType elementType =
+              inferredNumericType && element instanceof Number ? getSingleValueType(element) : singleValueType;
+          bigDecimalArray[i] = (elementType == OBJECT ? singleValueType : elementType).toBigDecimal(element);
+        }
       }
       return bigDecimalArray;
     }

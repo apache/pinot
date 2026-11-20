@@ -26,6 +26,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+
 
 public class MinionConfTest {
 
@@ -71,6 +73,19 @@ public class MinionConfTest {
     subcfg = newConfig.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
     Assert.assertEquals(subcfg.subset("class").getProperty("nooppinotcrypter"),
         "org.apache.pinot.core.crypt.NoOpPinotCrypter");
+  }
+
+  @Test
+  @SuppressWarnings("deprecation") // Tests the legacy un-prefixed key fallback
+  public void testDataDirPrecedence() {
+    MinionConf conf = new MinionConf();
+    assertEquals(conf.getDataDir(), CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR);
+
+    conf.setProperty(CommonConstants.Helix.Instance.DATA_DIR_KEY, "/legacy/data");
+    assertEquals(conf.getDataDir(), "/legacy/data");
+
+    conf.setProperty(CommonConstants.Minion.CONFIG_OF_MINION_DATA_DIR, "/minion/data");
+    assertEquals(conf.getDataDir(), "/minion/data");
   }
 
   @Test

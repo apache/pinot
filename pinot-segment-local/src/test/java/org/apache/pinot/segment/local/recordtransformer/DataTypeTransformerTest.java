@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
@@ -40,6 +41,7 @@ import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertEqualsNoOrder;
 import static org.testng.Assert.assertFalse;
@@ -460,5 +462,29 @@ public class DataTypeTransformerTest {
         PinotDataType.STRING_ARRAY), new String[]{"1.5", "2"});
     assertEquals(DataTypeTransformerUtils.transformValue(COLUMN, new Object[]{2, new BigDecimal("1E+7")},
         PinotDataType.STRING_ARRAY), new String[]{"2", "10000000"});
+  }
+
+  @Test
+  public void testTransformDecodedMixedNumericArrays()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension("decimals", FieldSpec.DataType.BIG_DECIMAL)
+        .addMultiValueDimension("strings", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("flag", FieldSpec.DataType.BOOLEAN).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("test").build();
+    DataTypeTransformer transformer = new DataTypeTransformer(tableConfig, schema);
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(), schema.getPhysicalColumnNames(), "testTopic");
+
+    for (String zero : List.of("0.0", "-0.0", "0E+3")) {
+      String json = "{\"decimals\":[1.50,null,2],\"strings\":[2,1E+7],\"flag\":" + zero + "}";
+      GenericRow row = decoder.decode(json.getBytes(UTF_8), new GenericRow());
+      transformer.transform(row);
+      assertEquals(row.getValue("decimals"), new BigDecimal[]{new BigDecimal("1.50"), BigDecimal.valueOf(2)});
+      assertEquals(row.getValue("strings"), new String[]{"2", "10000000"});
+      assertEquals(row.getValue("flag"), 0);
+    }
+    GenericRow empty = decoder.decode("{\"decimals\":[]}".getBytes(UTF_8), new GenericRow());
+    transformer.transform(empty);
+    assertNull(empty.getValue("decimals"));
   }
 }

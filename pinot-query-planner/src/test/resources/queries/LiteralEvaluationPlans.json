@@ -311,6 +311,98 @@
         ]
       },
       {
+        "description": "INT arithmetic with a result beyond the INT range, which Pinot evaluates as LONG, keeps its value as the argument of BIGINT arithmetic",
+        "sql": "EXPLAIN PLAN FOR SELECT CAST(1 AS BIGINT) + 1000 * 60 * 60 * 100000, 1000 * 60 * 60 * 100000 * 2 FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[360000000001:BIGINT], EXPR$1=[720000000000])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "INT arithmetic with a result beyond the INT range keeps its value in a filter that is evaluated to TRUE",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE 1500000000000 - 1000 * 60 * 60 * 100000 < 1200000000000",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "INT arithmetic with a result beyond the INT range keeps its value as the argument of CAST and ABS, and as an array element with an INT literal",
+        "sql": "EXPLAIN PLAN FOR SELECT CAST(1000 * 60 * 60 * 100000 AS VARCHAR), ABS(-1000 * 60 * 60 * 100000), ARRAY[1000 * 60 * 60 * 100000, 1] FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[_UTF-8'360000000000':VARCHAR CHARACTER SET \"UTF-8\"], EXPR$1=[360000000000], EXPR$2=[ARRAY(360000000000, 1)])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "INT arithmetic at the limits of the INT range",
+        "sql": "EXPLAIN PLAN FOR SELECT 2147483647 + 1 - 1, -2147483648 - 1 + 1, 2147483647 + 0 FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[2147483647], EXPR$1=[-2147483648], EXPR$2=[2147483647])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "an evaluated INT literal with IN on INT literals, which becomes a SEARCH whose Sarg literal has the type INTEGER",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE LENGTH('abc') IN (1, 2, 3)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[SEARCH(3, Sarg[1, 2, 3])])",
+          "\n    PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "array literal with a NULL element",
+        "sql": "EXPLAIN PLAN FOR SELECT ARRAY[1, NULL], ARRAY[CAST(1 AS BIGINT), NULL], ARRAY[1.5, NULL], ARRAY[1000 * 60 * 60 * 100000, CAST(NULL AS INT)] FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[ARRAY(1, null:INTEGER)], EXPR$1=[ARRAY(1:BIGINT, null:BIGINT)], EXPR$2=[ARRAY(1.5:DECIMAL(2, 1), null:DECIMAL(2, 1))], EXPR$3=[ARRAY(360000000000, null:INTEGER)])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "array literal of an evaluated integer and a DECIMAL literal that keeps its exact value, which share a DECIMAL type",
+        "sql": "EXPLAIN PLAN FOR SELECT ARRAY[1 + 1, CAST(5 AS DECIMAL(10, 0))], ARRAY[99999999999999999999, 1 + 1] FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[ARRAY(2, 5:DECIMAL(10, 0))], EXPR$1=[ARRAY(99999999999999999999:DECIMAL(20, 0), 2:BIGINT)])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "CAST between TIMESTAMP and INT or REAL of an evaluated literal",
+        "sql": "EXPLAIN PLAN FOR SELECT CAST(86400 * 1000 AS TIMESTAMP), CAST(CAST(1.5 AS REAL) + 1 AS TIMESTAMP), CAST(fromDateTime('1970-01-02', 'yyyy-MM-dd') AS INT), CAST(fromDateTime('1970-01-02', 'yyyy-MM-dd') AS REAL) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[1970-01-02 00:00:00:TIMESTAMP(3)], EXPR$1=[1970-01-01 00:00:00.002:TIMESTAMP(3)], EXPR$2=[86400000], EXPR$3=[8.64E7:REAL])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "filter that compares a TIMESTAMP column with INT arithmetic, which is evaluated and cast to TIMESTAMP",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE ts_timestamp > 86400 * 1000",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[>($8, 1970-01-02 00:00:00)])",
+          "\n    PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "a DECIMAL literal with a scale is evaluated as a DOUBLE value, as at runtime, so jsonFormat drops the trailing zero",
         "sql": "EXPLAIN PLAN FOR SELECT jsonFormat(1.50) FROM a",
         "output": [

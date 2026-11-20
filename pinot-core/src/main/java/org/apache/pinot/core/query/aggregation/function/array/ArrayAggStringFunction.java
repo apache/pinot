@@ -23,12 +23,14 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 
 
 public class ArrayAggStringFunction extends BaseArrayAggStringFunction<ObjectArrayList<String>> {
+  private static final int STRING_ARRAY_LIST_TYPE = 45;
+
   public ArrayAggStringFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }
@@ -72,14 +74,12 @@ public class ArrayAggStringFunction extends BaseArrayAggStringFunction<ObjectArr
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ObjectArrayList<String> stringArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringArrayList.getValue(),
-        ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.serialize(stringArrayList));
+  public SerializedResult serializeIntermediateResult(ObjectArrayList<String> stringArrayList) {
+    return new SerializedValue<>(STRING_ARRAY_LIST_TYPE, stringArrayList, ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE);
   }
 
   @Override
   public ObjectArrayList<String> deserializeIntermediateResult(CustomObject customObject) {
-    //noinspection unchecked
     return ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
   }
 }

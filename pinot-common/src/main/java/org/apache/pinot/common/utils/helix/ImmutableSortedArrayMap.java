@@ -30,6 +30,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import javax.annotation.Nullable;
@@ -319,6 +320,15 @@ public final class ImmutableSortedArrayMap<V> extends AbstractMap<String, V> imp
       _entrySet = entrySet;
     }
     return entrySet;
+  }
+
+  /// Calls the given action for each entry in key order, without allocating an iterator.
+  @Override
+  public void forEach(BiConsumer<? super String, ? super V> action) {
+    Objects.requireNonNull(action);
+    for (int i = 0; i < _keys.length; i++) {
+      action.accept(_keys[i], valueAt(i));
+    }
   }
 
   @Override

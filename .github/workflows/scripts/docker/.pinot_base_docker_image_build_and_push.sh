@@ -28,15 +28,21 @@ if [ -z "${BASE_IMAGE_TYPE}" ]; then
   exit 1
 fi
 
-cd docker/images/pinot-base/pinot-base-${BASE_IMAGE_TYPE}
+BASE_IMAGE_DIR="docker/images/pinot-base/pinot-base-${BASE_IMAGE_TYPE}"
+JAVA_VERSION="${JDK_VERSION:-25}"
+IMAGE="apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-${ARCH}"
 
 docker build \
+  --pull \
   --no-cache \
   --platform=${BUILD_PLATFORM} \
-  --file ${OPEN_JDK_DIST}.dockerfile \
-  --tag apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-${ARCH} \
-  --build-arg JAVA_VERSION=${JDK_VERSION:-21} \
+  --file "${BASE_IMAGE_DIR}/${OPEN_JDK_DIST}.dockerfile" \
+  --tag "${IMAGE}" \
+  --build-arg JAVA_VERSION="${JAVA_VERSION}" \
   --build-arg ARCH=${ARCH} \
-  .
+  "${BASE_IMAGE_DIR}"
 
-docker push apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-${ARCH}
+docker run --rm -i --platform "${BUILD_PLATFORM}" --entrypoint sh "${IMAGE}" -s \
+  < docker/images/pinot/check-java-version.sh
+
+docker push "${IMAGE}"

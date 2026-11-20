@@ -32,6 +32,7 @@ import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Uncollect;
@@ -55,6 +56,7 @@ import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalMvAggregate;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
@@ -67,6 +69,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -527,6 +530,46 @@ public final class PlanNodeToRelConverter {
         _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownUnnest", Map.of(),
             node.getDataSchema(), inputs));
       }
+      return null;
+    }
+
+    @Override
+    public Void visitMvAggregate(MvAggregateNode node, Void context) {
+      visitChildren(node);
+      // Pop the input so that a failure below cannot pop a node that belongs to the parent or a sibling
+      RelNode input = _builder.build();
+
+      try {
+        // Build a plain aggregate first to resolve the aggregate calls, then carry its fields to the MV aggregate.
+        // Use a separate builder without the simplifications that would return a Project instead of an Aggregate.
+        RelBuilder aggregateBuilder =
+            _builder.transform(config -> config.withDedupAggregateCalls(false).withAggregateUnique(true));
+        aggregateBuilder.push(input);
+        List<RexExpression.FunctionCall> functionCalls = node.getAggCalls();
+        List<Integer> filterArgs = node.getFilterArgs();
+        List<RelBuilder.AggCall> aggCalls = new ArrayList<>(functionCalls.size());
+        for (int i = 0; i < functionCalls.size(); i++) {
+          RelBuilder.AggCall aggCall = RexExpressionUtils.toAggCall(aggregateBuilder, functionCalls.get(i));
+          int filterArg = filterArgs.get(i);
+          if (filterArg >= 0) {
+            aggCall = aggCall.filter(aggregateBuilder.field(filterArg));
+          }
+          aggCalls.add(aggCall);
+        }
+        RelBuilder.GroupKey groupKey =
+            aggregateBuilder.groupKey(node.getGroupKeys().stream().mapToInt(Integer::intValue).toArray());
+        RelNode relNode = aggregateBuilder.aggregate(groupKey, aggCalls).build();
+        Preconditions.checkState(relNode instanceof Aggregate, "Expected an Aggregate, got: %s", relNode);
+        Aggregate aggregate = (Aggregate) relNode;
+        _builder.push(new PinotLogicalMvAggregate(aggregate.getCluster(), aggregate.getTraitSet(), List.of(),
+            aggregate.getInput(), aggregate.getGroupSet(), null, aggregate.getAggCallList(), node.getAggType(),
+            node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(), node.getMvKeyIndexes()));
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert MV aggregate node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownMvAggregate", Map.of(),
+            node.getDataSchema(), List.of(input)));
+      }
+
       return null;
     }
 

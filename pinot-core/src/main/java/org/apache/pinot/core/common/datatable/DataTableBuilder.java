@@ -90,7 +90,7 @@ public interface DataTableBuilder {
   void setColumn(int colId, ByteArray[] values)
       throws IOException;
 
-  void setColumn(int colId, AggregationFunction.SerializedIntermediateResult value)
+  void setColumn(int colId, AggregationFunction.SerializedResult value)
       throws IOException;
 
   /// Writes a `null` for the given column of the current row.

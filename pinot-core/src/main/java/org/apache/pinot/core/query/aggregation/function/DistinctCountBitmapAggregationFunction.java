@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -28,13 +30,13 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.RoaringBitmapUnion;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.memory.PinotOutputStream;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
@@ -44,6 +46,7 @@ import org.roaringbitmap.RoaringBitmap;
 /// multi-value expression using RoaringBitmap. The bitmap stores the actual values for `INT` expression, or hash code
 /// of the values for other data types (values with the same hash code will only be counted once).
 public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggregationFunction<RoaringBitmap, Integer> {
+  private static final int ROARING_BITMAP_TYPE = 14;
 
   public DistinctCountBitmapAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     this(verifySingleArgument(arguments, "DISTINCT_COUNT_BITMAP"), nullHandlingEnabled);
@@ -715,14 +718,13 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(RoaringBitmap roaringBitmap) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.RoaringBitmap.getValue(),
-        ObjectSerDeUtils.ROARING_BITMAP_SER_DE.serialize(roaringBitmap));
+  public SerializedResult serializeIntermediateResult(RoaringBitmap roaringBitmap) {
+    return new SerializedBitmap(roaringBitmap);
   }
 
   @Override
   public RoaringBitmap deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(customObject.getBuffer());
+    return RoaringBitmapUtils.deserialize(customObject.getBuffer());
   }
 
   @Override
@@ -850,6 +852,41 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     private DictIdsWrapper(Dictionary dictionary) {
       _dictionary = dictionary;
       _dictIdBitmap = new RoaringBitmap();
+    }
+  }
+
+  /// The serialized bitmap, written on demand, so the bitmap must not change until written.
+  private static final class SerializedBitmap implements SerializedResult {
+    private final RoaringBitmap _bitmap;
+
+    SerializedBitmap(RoaringBitmap bitmap) {
+      _bitmap = bitmap;
+    }
+
+    @Override
+    public int getType() {
+      return ROARING_BITMAP_TYPE;
+    }
+
+    @Override
+    public int getSize() {
+      return _bitmap.serializedSizeInBytes();
+    }
+
+    @Override
+    public byte[] getBytes() {
+      return RoaringBitmapUtils.serialize(_bitmap);
+    }
+
+    @Override
+    public void writeTo(ByteBuffer buffer) {
+      RoaringBitmapUtils.serialize(_bitmap, buffer);
+    }
+
+    @Override
+    public void writeTo(PinotOutputStream output)
+        throws IOException {
+      output.write(getBytes());
     }
   }
 }

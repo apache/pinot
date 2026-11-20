@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -74,6 +73,7 @@ import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -748,7 +748,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         try {
           String json = JsonUtils.objectToString(sparseEntries);
           jsonPerDoc[docId] = json;
-          maxLen = Math.max(maxLen, Utf8.encodedLength(json));
+          maxLen = Math.max(maxLen, Utf8Utils.encodedLength(json));
         } catch (IOException e) {
           throw new RuntimeException("Failed to serialize sparse entries for docId " + docId, e);
         }

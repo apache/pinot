@@ -19,13 +19,13 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -259,7 +259,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
               if (maxString == null || value.compareTo(maxString) > 0) {
                 maxString = value;
               }
-              int length = Utf8.encodedLength(value);
+              int length = Utf8Utils.encodedLength(value);
               minElementLength = Math.min(minElementLength, length);
               maxElementLength = Math.max(maxElementLength, length);
               if (isAscii) {
@@ -406,7 +406,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
       case BIG_DECIMAL:
         return BigDecimalUtils.byteSize((BigDecimal) value);
       case STRING:
-        return Utf8.encodedLength((String) value);
+        return Utf8Utils.encodedLength((String) value);
       case BYTES:
         return ((ByteArray) value).length();
       default:

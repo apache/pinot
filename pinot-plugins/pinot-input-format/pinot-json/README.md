@@ -114,7 +114,6 @@ All examples use a Kafka real-time table; substitute your stream type (`stream.<
       "streamType": "kafka",
       "stream.kafka.topic.name": "events",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder",
-      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory",
       "stream.kafka.broker.list": "localhost:9092"
     }
   ]
@@ -139,7 +138,6 @@ Full block:
       "stream.kafka.topic.name": "events",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder",
       "stream.kafka.decoder.prop.jsonFormat": "SQLITE_JSONB",
-      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory",
       "stream.kafka.broker.list": "localhost:9092"
     }
   ]

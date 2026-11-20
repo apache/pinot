@@ -204,6 +204,7 @@ public class DedupWithTimestampColumnTest {
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
         this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
       }});
+    when(segmentMetadata.getColumnMetadataFor(DEDUP_TIME_COLUMN_NAME)).thenReturn(columnMetadata);
     doReturn(currentTimeMillis).when(columnMetadata).getMaxValue();
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
 

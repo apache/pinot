@@ -25,6 +25,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -220,6 +221,64 @@ public class QuotaConfigTest {
     }
     assertTrue(foundField && foundValue,
         "Deserialization error chain should mention 'maxQueriesPerSecond' and 'InvalidQpsQuota': " + thrown);
+  }
+
+  @Test
+  public void testEnforcementModeSerDe()
+      throws IOException {
+    // Absent by default, and not serialized when null
+    QuotaConfig quotaConfig = JsonUtils.stringToObject("{\"storage\":\"1G\"}", QuotaConfig.class);
+    assertNull(quotaConfig.getStorageQuotaEnforcementMode());
+    assertNull(quotaConfig.getQueryQuotaEnforcementMode());
+    assertNull(quotaConfig.toJsonNode().get("storageQuotaEnforcementMode"));
+    assertNull(quotaConfig.toJsonNode().get("queryQuotaEnforcementMode"));
+
+    // Deserialize from JSON
+    quotaConfig = JsonUtils.stringToObject(
+        "{\"storage\":\"1G\",\"maxQueriesPerSecond\":\"5\",\"storageQuotaEnforcementMode\":\"SHADOW\","
+            + "\"queryQuotaEnforcementMode\":\"DISABLED\"}", QuotaConfig.class);
+    assertEquals(quotaConfig.getStorageQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
+    assertEquals(quotaConfig.getQueryQuotaEnforcementMode(), QuotaEnforcementMode.DISABLED);
+
+    // Round trip, including equality (equals() is JSON based)
+    QuotaConfig roundTripped = JsonUtils.stringToObject(quotaConfig.toJsonString(), QuotaConfig.class);
+    assertEquals(roundTripped, quotaConfig);
+    assertEquals(roundTripped.getStorageQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
+    assertEquals(roundTripped.getQueryQuotaEnforcementMode(), QuotaEnforcementMode.DISABLED);
+
+    // Modes affect equality
+    assertNotEquals(new QuotaConfig("1G", "5.0"), quotaConfig);
+  }
+
+  @Test
+  public void testSerializedFormWithoutModesIsUnchanged()
+      throws IOException {
+    // Configs that do not set a mode must serialize exactly as before the modes existed, so that rolling out (or back)
+    // does not rewrite them in ZooKeeper and binaries without these fields keep reading them
+    assertEquals(new QuotaConfig("10G", "5").toJsonString(), "{\"storage\":\"10G\",\"maxQueriesPerSecond\":\"5.0\"}");
+
+    // A config written before the modes existed deserializes with no modes and serializes back unchanged
+    String legacyJson = "{\"storage\":\"10G\",\"maxQueriesPerSecond\":\"5.0\"}";
+    QuotaConfig legacy = JsonUtils.stringToObject(legacyJson, QuotaConfig.class);
+    assertNull(legacy.getStorageQuotaEnforcementMode());
+    assertNull(legacy.getQueryQuotaEnforcementMode());
+    assertEquals(legacy.toJsonString(), legacyJson);
+    assertEquals(legacy, new QuotaConfig("10G", "5"));
+
+    // Only the mode that was set is serialized
+    QuotaConfig queryOnly = new QuotaConfig("10G", "5", null, QuotaEnforcementMode.SHADOW);
+    assertEquals(queryOnly.toJsonString(),
+        "{\"storage\":\"10G\",\"maxQueriesPerSecond\":\"5.0\",\"queryQuotaEnforcementMode\":\"SHADOW\"}");
+  }
+
+  @Test
+  public void testInvalidEnforcementMode() {
+    try {
+      JsonUtils.stringToObject("{\"storageQuotaEnforcementMode\":\"SOFT\"}", QuotaConfig.class);
+      fail();
+    } catch (Exception e) {
+      // Expected
+    }
   }
 
   @Test

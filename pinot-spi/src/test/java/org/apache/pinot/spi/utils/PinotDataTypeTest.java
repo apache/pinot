@@ -35,6 +35,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.utils.PinotDataType.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -141,6 +142,31 @@ public class PinotDataTypeTest {
         new String[]{"2", "10000000"});
     assertEquals(STRING_ARRAY.convert(new Object[]{new BigDecimal("1E+7"), new BigDecimal("0.0")},
         BIG_DECIMAL_ARRAY), new String[]{"10000000", "0.0"});
+  }
+
+  @Test
+  public void testToBigDecimalArrayWithMixedNumbers() {
+    BigDecimal decimal = new BigDecimal("1.50");
+    Object[] decimalFirst = {decimal, 2, 9_007_199_254_740_993L};
+    Object[] integerFirst = {2, decimal};
+    BigDecimal[] decimals = {decimal, BigDecimal.ONE};
+
+    assertEquals(BIG_DECIMAL_ARRAY.convert(decimalFirst, BIG_DECIMAL_ARRAY),
+        new BigDecimal[]{decimal, BigDecimal.valueOf(2), new BigDecimal("9007199254740993")});
+    assertEquals(BIG_DECIMAL_ARRAY.convert(integerFirst, INT_ARRAY), new BigDecimal[]{BigDecimal.valueOf(2), decimal});
+    assertSame(BIG_DECIMAL_ARRAY.toBigDecimalArray(decimalFirst)[0], decimal);
+    assertSame(BIG_DECIMAL_ARRAY.convert(decimals, BIG_DECIMAL_ARRAY), decimals);
+  }
+
+  @Test
+  public void testToBigDecimalArrayWithNumericString() {
+    BigDecimal decimal = new BigDecimal("1.50");
+    assertEquals(BIG_DECIMAL_ARRAY.toBigDecimalArray(new Object[]{decimal, "2.75"}),
+        new BigDecimal[]{decimal, new BigDecimal("2.75")});
+    assertThrows(NumberFormatException.class,
+        () -> BIG_DECIMAL_ARRAY.toBigDecimalArray(new Object[]{decimal, "bad"}));
+    assertThrows(NumberFormatException.class,
+        () -> BIG_DECIMAL_ARRAY.toBigDecimalArray(new Object[]{decimal, " 2.75 "}));
   }
 
   @DataProvider

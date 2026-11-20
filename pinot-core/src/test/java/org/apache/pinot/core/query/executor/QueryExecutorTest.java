@@ -35,12 +35,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.TableSegmentsInfo;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -66,6 +71,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
@@ -78,6 +84,8 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
@@ -89,12 +97,19 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -231,6 +246,106 @@ public class QueryExecutorTest {
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0.0);
   }
 
+  /// A server sets up a table when it adds the first segment of it. Until then it has no optional segment of the table
+  /// to query, and a segment it must have is missing along with the table.
+  @Test
+  public void testTableNotOnServer() {
+    String query = "SELECT COUNT(*) FROM otherTable_OFFLINE";
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(List.of());
+    instanceRequest.setOptionalSegments(List.of("newSegment"));
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
+    assertTrue(instanceResponse.getExceptions().isEmpty(), instanceResponse.getExceptions().toString());
+    assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0L);
+    assertEquals(instanceResponse.getResponseMetadata().get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()), "0");
+
+    String error = executeExpectingFailure(query, null);
+    assertTrue(error.contains("Failed to find table: otherTable_OFFLINE"), error);
+  }
+
+  /// A logical table leaves out a physical table the server has not set up when all the segments of that table are
+  /// optional, and fails the query when one of them is a segment the server must have.
+  @Test
+  public void testLogicalTableWithPhysicalTableNotOnServer() {
+    String query = "SELECT COUNT(*) FROM logicalTable_OFFLINE";
+    Object numRows = aggregate("SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME, null);
+    TableSegmentsInfo tableOnServer = newTableSegmentsInfo(OFFLINE_TABLE_NAME, _segmentNames, null);
+    TableSegmentsInfo tableNotOnServer = newTableSegmentsInfo("otherTable_OFFLINE", List.of(), List.of("newSegment"));
+    assertEquals(aggregate(newLogicalTableRequest(query, tableOnServer, tableNotOnServer)), numRows);
+    assertEquals(aggregate(newLogicalTableRequest(query, tableNotOnServer)), 0L);
+
+    tableNotOnServer.setSegments(List.of("segment"));
+    String error = executeExpectingFailure(newLogicalTableRequest(query, tableNotOnServer));
+    assertTrue(error.contains("Failed to find table: otherTable_OFFLINE"), error);
+  }
+
+  private static TableSegmentsInfo newTableSegmentsInfo(String tableNameWithType, List<String> segments,
+      @Nullable List<String> optionalSegments) {
+    TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo();
+    tableSegmentsInfo.setTableName(tableNameWithType);
+    tableSegmentsInfo.setSegments(segments);
+    tableSegmentsInfo.setOptionalSegments(optionalSegments);
+    return tableSegmentsInfo;
+  }
+
+  private static InstanceRequest newLogicalTableRequest(String query, TableSegmentsInfo... tableSegmentsInfos) {
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setTableSegmentsInfoList(List.of(tableSegmentsInfos));
+    return instanceRequest;
+  }
+
+  /// The broker rejects IN_PARTITIONED_SUBQUERY for a principal with row filters. A server behind an older broker,
+  /// which stamps the row filters in the query options but lets the function through, fails the query instead: the
+  /// subquery reaches it as a string literal the filters do not cover, so it would build its ID_SET from every row.
+  @Test
+  public void testInPartitionedSubqueryRejectedUnderRowFilters() {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME + " WHERE IN_PARTITIONED_SUBQUERY(orderItemCount, "
+        + "'SELECT ID_SET(orderItemCount) FROM " + OFFLINE_TABLE_NAME + "') = 1";
+    // Without row filters the function resolves as it always has: every row's value is in the ID_SET
+    long numRows = (Long) aggregate("SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME, null);
+    assertEquals(aggregate(query, null), numRows);
+
+    // With row filters stamped for any table the query fails before the subquery runs
+    for (String table : new String[]{RAW_TABLE_NAME, "otherTable"}) {
+      Map<String, String> queryOptions = Map.of(RlsUtils.buildRlsFilterKey(table), "orderItemCount > 0");
+      String error = executeExpectingFailure(query, queryOptions);
+      assertTrue(error.contains("not allowed when row-level security filters apply"), error);
+    }
+  }
+
+  private Object aggregate(String query, @Nullable Map<String, String> queryOptions) {
+    return aggregate(newInstanceRequest(query, queryOptions));
+  }
+
+  private Object aggregate(InstanceRequest instanceRequest) {
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
+    assertTrue(instanceResponse.getExceptions().isEmpty(), instanceResponse.getExceptions().toString());
+    assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
+    return ((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0);
+  }
+
+  /// Runs the query and returns the text of the exceptions it fails with.
+  private String executeExpectingFailure(String query, @Nullable Map<String, String> queryOptions) {
+    return executeExpectingFailure(newInstanceRequest(query, queryOptions));
+  }
+
+  /// Runs the request and returns the text of the exceptions it fails with.
+  private String executeExpectingFailure(InstanceRequest instanceRequest) {
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
+    assertFalse(instanceResponse.getExceptions().isEmpty(), "Expected the query to fail");
+    return String.join("\n", instanceResponse.getExceptions().values());
+  }
+
+  private InstanceRequest newInstanceRequest(String query, @Nullable Map<String, String> queryOptions) {
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    if (queryOptions != null) {
+      instanceRequest.getQuery().getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
+    }
+    instanceRequest.setSearchSegments(_segmentNames);
+    return instanceRequest;
+  }
+
   @Test
   public void testNoRemoteAccessStatsWithoutRemoteAccesses() {
     String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
@@ -241,6 +356,86 @@ public class QueryExecutorTest {
     assertFalse(responseMetadata.containsKey(MetadataKey.REMOTE_ACCESS_BYTES.getName()));
     assertFalse(responseMetadata.containsKey(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()));
     assertFalse(responseMetadata.containsKey(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()));
+  }
+
+  /// The server parses the expression overrides for the RLS filter once per table config, not once per query. A
+  /// refreshed table config is a new object, so it gets its own overrides.
+  @Test
+  public void testRowFilterExpressionOverrideMapIsCachedPerTableConfig() {
+    TableConfig noOverrides = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    assertNull(ServerQueryExecutorV1Impl.getRowFilterExpressionOverrideMap(noOverrides));
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setQueryConfig(new QueryConfig(null, null, null, Map.of("lower(rawTenant)", "tenantLower"), null, null))
+        .build();
+    Map<Expression, Expression> expressionOverrideMap =
+        ServerQueryExecutorV1Impl.getRowFilterExpressionOverrideMap(tableConfig);
+    assertEquals(expressionOverrideMap, Map.of(CalciteSqlParser.compileToExpression("lower(rawTenant)"),
+        CalciteSqlParser.compileToExpression("tenantLower")));
+    assertSame(ServerQueryExecutorV1Impl.getRowFilterExpressionOverrideMap(tableConfig), expressionOverrideMap);
+    assertThrows(UnsupportedOperationException.class, () -> expressionOverrideMap.clear());
+
+    // The cache compares table configs by identity: an equal but refreshed config gets its own entry
+    TableConfig equalTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setQueryConfig(new QueryConfig(null, null, null, Map.of("lower(rawTenant)", "tenantLower"), null, null))
+        .build();
+    assertEquals(equalTableConfig, tableConfig);
+    Map<Expression, Expression> equalExpressionOverrideMap =
+        ServerQueryExecutorV1Impl.getRowFilterExpressionOverrideMap(equalTableConfig);
+    assertNotSame(equalExpressionOverrideMap, expressionOverrideMap);
+    assertEquals(equalExpressionOverrideMap, expressionOverrideMap);
+
+    TableConfig refreshedTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setQueryConfig(new QueryConfig(null, null, null, Map.of("lower(rawTenant)", "tenantLower2"), null, null))
+        .build();
+    Map<Expression, Expression> refreshedExpressionOverrideMap =
+        ServerQueryExecutorV1Impl.getRowFilterExpressionOverrideMap(refreshedTableConfig);
+    assertNotSame(refreshedExpressionOverrideMap, expressionOverrideMap);
+    assertEquals(refreshedExpressionOverrideMap, Map.of(CalciteSqlParser.compileToExpression("lower(rawTenant)"),
+        CalciteSqlParser.compileToExpression("tenantLower2")));
+  }
+
+  /// Under row-level security, the server leaves out of the response the stats that show the layout of the whole
+  /// table, and keeps them for its own log and metrics. It also records the time spent on the RLS filter.
+  @Test
+  public void testRowLevelSecurityHidesTableLayoutStats() {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME + " WHERE orderAmount > 0";
+    List<String> tableLayoutKeys = List.of(MetadataKey.TOTAL_DOCS.getName(),
+        MetadataKey.NUM_SEGMENTS_QUERIED.getName(), MetadataKey.NUM_SEGMENTS_PROCESSED.getName(),
+        MetadataKey.NUM_SEGMENTS_MATCHED.getName());
+
+    InstanceRequest adminRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    adminRequest.setSearchSegments(_segmentNames);
+    InstanceResponseBlock adminResponse = execute(adminRequest);
+    for (String key : tableLayoutKeys) {
+      assertTrue(adminResponse.getResponseMetadata().containsKey(key), key);
+    }
+
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    brokerRequest.getPinotQuery()
+        .setQueryOptions(new HashMap<>(Map.of(RlsUtils.buildRlsFilterKey(RAW_TABLE_NAME), "orderItemCount > 2")));
+    InstanceRequest userRequest = new InstanceRequest(1L, brokerRequest);
+    userRequest.setSearchSegments(_segmentNames);
+    InstanceResponseBlock userResponse = execute(userRequest);
+
+    assertTrue(userResponse.getExceptions().isEmpty(), userResponse.getExceptions().toString());
+    long userCount = (Long) ((AggregationResultsBlock) userResponse.getResultsBlock()).getResults().get(0);
+    long adminCount = (Long) ((AggregationResultsBlock) adminResponse.getResultsBlock()).getResults().get(0);
+    assertTrue(userCount > 0 && userCount < adminCount, userCount + " vs " + adminCount);
+    for (String key : tableLayoutKeys) {
+      assertFalse(userResponse.getResponseMetadata().containsKey(key), key + " must be hidden");
+      assertEquals(userResponse.getServerMetadata().get(key), adminResponse.getResponseMetadata().get(key), key);
+    }
+    // The stats of the tenant rows stay in the response
+    assertTrue(userResponse.getResponseMetadata().containsKey(MetadataKey.NUM_DOCS_SCANNED.getName()));
+    // The RLS filter scans every document. The server query log and metrics count these entries, the response does not.
+    String entriesKey = MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName();
+    long responseEntries = Long.parseLong(userResponse.getResponseMetadata().get(entriesKey));
+    long serverEntries = Long.parseLong(userResponse.getServerMetadata().get(entriesKey));
+    assertEquals(serverEntries - responseEntries,
+        Long.parseLong(adminResponse.getResponseMetadata().get(MetadataKey.TOTAL_DOCS.getName())));
+    verify(ServerMetrics.get(), atLeastOnce()).addTimedTableValue(eq(OFFLINE_TABLE_NAME),
+        eq(ServerTimer.RLS_FILTER_TIME_MS), anyLong(), eq(TimeUnit.NANOSECONDS));
   }
 
   /// The remote accesses reported while the plan executes, from the query thread and the ones it spawns, are reported

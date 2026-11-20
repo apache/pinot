@@ -31,8 +31,8 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -58,6 +58,7 @@ import org.roaringbitmap.RoaringBitmap;
 /// Example of second argument: 'threshold=10;log2m=8;dictThreshold=100000'
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountSmartSketchAggregationFunction {
+  private static final int HYPER_LOG_LOG_TYPE = 6;
 
   private final int _threshold;
   private final int _log2m;
@@ -376,17 +377,19 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Object o) {
-    if (o instanceof HyperLogLog) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.HyperLogLog.getValue(),
-          ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize((HyperLogLog) o));
+  public SerializedResult serializeIntermediateResult(Object o) {
+    if (o instanceof HyperLogLog hyperLogLog) {
+      return new SerializedValue<>(HYPER_LOG_LOG_TYPE, hyperLogLog, ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE);
     }
     return BaseDistinctAggregateAggregationFunction.serializeSet((Set) o);
   }
 
   @Override
   public Object deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+    if (customObject.getType() == HYPER_LOG_LOG_TYPE) {
+      return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(customObject.getBuffer());
+    }
+    return BaseDistinctAggregateAggregationFunction.deserializeSet(customObject);
   }
 
   @Override

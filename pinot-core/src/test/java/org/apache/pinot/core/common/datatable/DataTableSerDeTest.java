@@ -352,7 +352,7 @@ public class DataTableSerDeTest {
       } else {
         objectValues[rowId] = new byte[large ? 30_000 : 1 + RANDOM.nextInt(500)];
         RANDOM.nextBytes(objectValues[rowId]);
-        dataTableBuilder.setColumn(2, new AggregationFunction.SerializedIntermediateResult(rowId, objectValues[rowId]));
+        dataTableBuilder.setColumn(2, new AggregationFunction.SerializedBytes(rowId, objectValues[rowId]));
       }
       dataTableBuilder.setColumn(3, (long) rowId);
       stringArrayValues[rowId] = new String[large ? 5_000 : RANDOM.nextInt(20)];

@@ -23,9 +23,15 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
+/// FSM for the segments of a pauseless table. The commit start moves the segment to COMMITTING in ZK with its end
+/// offset, creates the next consuming segment and updates the IdealState, all before the committer builds the segment.
+/// From then on no other replica can commit the segment, so the commit deadline of the FSM no longer aborts it. The max
+/// segment completion time bounds the commit instead: after it, the commit end fails and the validation manager repairs
+/// the segment.
 public class PauselessSegmentCompletionFSM extends BlockingSegmentCompletionFSM {
 
   public PauselessSegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
@@ -91,6 +97,74 @@ public class PauselessSegmentCompletionFSM extends BlockingSegmentCompletionFSM 
           return fail(instanceId, offset);
       }
     }
+  }
+
+  /// Reached only in COMMITTER_UPLOADING (see [#extendBuildTime]). Accepts an extension from the committer even after
+  /// the commit deadline or past [SegmentCompletionManager#getMaxCommitTimeForAllSegmentsSeconds()]. Fails an
+  /// extension from any other server or for any other offset, without aborting the FSM.
+  @Override
+  protected SegmentCompletionProtocol.Response committerNotifiedExtendBuildTime(String instanceId,
+      StreamPartitionMsgOffset offset, int extTimeSec, long now) {
+    if (!instanceId.equals(_winner) || offset.compareTo(_winningOffset) != 0) {
+      return fail(instanceId, offset);
+    }
+    logIfPastCommitDeadline(now, instanceId, offset);
+    // After the commit start, the commit deadline only decides which requests are logged as late
+    _maxTimeAllowedToCommitMs = now + extTimeSec * 1000L;
+    return SegmentCompletionProtocol.RESP_PROCESSED;
+  }
+
+  /// After the commit start, the commit deadline does not abort the FSM: an abort cannot hand the commit to another
+  /// replica, it only makes the commit end of the committer fail. Before the commit start, the deadline lets another
+  /// replica take the commit over, as for a blocking table.
+  @Override
+  protected SegmentCompletionProtocol.Response abortIfTooLateAndReturnHold(long now, String instanceId,
+      StreamPartitionMsgOffset offset) {
+    if (_state != BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING
+        && _state != BlockingSegmentCompletionFSMState.COMMITTING) {
+      return super.abortIfTooLateAndReturnHold(now, instanceId, offset);
+    }
+    logIfPastCommitDeadline(now, instanceId, offset);
+    return null;
+  }
+
+  private void logIfPastCommitDeadline(long now, String instanceId, StreamPartitionMsgOffset offset) {
+    if (now > _maxTimeAllowedToCommitMs) {
+      _logger.info("{}:Ignoring commit deadline after commit start (too late) instance={} offset={} now={} start={}",
+          _state, instanceId, offset, now, _startTimeMs);
+    }
+  }
+
+  /// Checks the segment ZK metadata before the commit end moves the uploaded segment file to the deep store path of the
+  /// segment: the segment must still be COMMITTING with the end offset of this commit, within the max segment
+  /// completion time. The ZK metadata update after the move checks the status and the time too, but after the max
+  /// segment completion time the validation manager may already have uploaded another replica's copy to that path,
+  /// and the move would overwrite it.
+  @Override
+  protected SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
+      CommittingSegmentDescriptor committingSegmentDescriptor) {
+    String segmentName = _segmentName.getSegmentName();
+    StreamPartitionMsgOffset offset = _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
+    try {
+      SegmentZKMetadata segmentZKMetadata = _segmentManager.getSegmentZKMetadata(_realtimeTableName, segmentName, null);
+      String endOffset = segmentZKMetadata.getEndOffset();
+      if (segmentZKMetadata.getStatus() != Status.COMMITTING || endOffset == null
+          || _streamPartitionMsgOffsetFactory.create(endOffset).compareTo(offset) != 0) {
+        _logger.warn("Rejecting commit end of segment: {} at offset: {}, segment ZK status: {}, end offset: {}",
+            segmentName, offset, segmentZKMetadata.getStatus(), endOffset);
+        return SegmentCompletionProtocol.RESP_FAILED;
+      }
+      if (_segmentManager.isExceededMaxSegmentCompletionTime(_realtimeTableName, segmentName,
+          _segmentManager.getCurrentTimeMs())) {
+        _logger.warn("Rejecting commit end of segment: {} after the max segment completion time", segmentName);
+        return SegmentCompletionProtocol.RESP_FAILED;
+      }
+    } catch (Exception e) {
+      _logger.error("Caught exception while checking segment ZK metadata before the commit end of segment: {}",
+          segmentName, e);
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+    return super.commitSegment(reqParams, committingSegmentDescriptor);
   }
 
   @Override

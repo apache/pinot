@@ -38,7 +38,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedResult;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -172,7 +172,7 @@ public class IndexedTableTest {
                 Map.of(metricExpression, SyntheticBlockValSets.Double.create(null, values)));
             TDigest digest = function.extractAggregationResult(resultHolder);
             if (serialized) {
-              SerializedIntermediateResult serializedResult = function.serializeIntermediateResult(digest);
+              SerializedResult serializedResult = function.serializeIntermediateResult(digest);
               digest = function.deserializeIntermediateResult(new CustomObject(serializedResult.getType(),
                   ByteBuffer.wrap(serializedResult.getBytes())));
             }

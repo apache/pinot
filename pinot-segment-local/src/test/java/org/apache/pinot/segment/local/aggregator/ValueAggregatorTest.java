@@ -54,6 +54,10 @@ public class ValueAggregatorTest {
         {AggregationFunctionType.DISTINCTCOUNTBITMAP, List.of(), false},
         {AggregationFunctionType.DISTINCTCOUNTHLL, List.of(), true},
         {AggregationFunctionType.DISTINCTCOUNTHLLPLUS, List.of(), true},
+        {AggregationFunctionType.DISTINCTCOUNTHLLPLUS, List.of(
+            ExpressionContext.forLiteral(Literal.intValue(12)),
+            ExpressionContext.forLiteral(Literal.intValue(20))
+        ), false},
         {AggregationFunctionType.DISTINCTCOUNTULL, List.of(), true},
         {AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, List.of(), false},
         {AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH, List.of(), true},
