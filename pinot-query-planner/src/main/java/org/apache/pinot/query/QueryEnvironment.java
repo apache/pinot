@@ -328,10 +328,13 @@ public class QueryEnvironment {
       RelRoot relRoot = compileQuery(queryNode, plannerContext);
       return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
     } catch (QueryException e) {
-      if (plannerContext != null && plannerContext.getValidator().isGroupByNameResolvedToShadowedColumn()) {
-        // Lets callers retry with preferSelectAliasInGroupBy. With the column, the query can fail in the validation
-        // or later, for example when HAVING compares the name with a literal of the type of the alias
-        throw new GroupByAliasShadowedByColumnException(e);
+      if (plannerContext != null) {
+        plannerContext.close();
+        if (plannerContext.getValidator().isGroupByNameResolvedToShadowedColumn()) {
+          // Lets callers retry with preferSelectAliasInGroupBy. With the column, the query can fail in the validation
+          // or later, for example when HAVING compares the name with a literal of the type of the alias
+          throw new GroupByAliasShadowedByColumnException(e);
+        }
       }
       throw e;
     } catch (Throwable t) {

@@ -23,12 +23,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
@@ -90,19 +92,24 @@ public class Validator extends SqlValidatorImpl {
     _meterGroupByAliasShadowedByColumn = meterGroupByAliasShadowedByColumn;
   }
 
-  /// Finds each simple name in the `GROUP BY` list that matches exactly one `SELECT` alias and exactly one column of
-  /// the `FROM` clause, unless the `SELECT` item is the column of the same name. When [#_preferSelectAliasInGroupBy]
-  /// is set, replaces the name with the ordinal of that `SELECT` item.
+  /// Finds each simple name in the `GROUP BY` list that matches exactly one `SELECT` alias and a column, unless the
+  /// `SELECT` item is the column of the same name. When [#_preferSelectAliasInGroupBy] is set, replaces the name with
+  /// the ordinal of that `SELECT` item.
   ///
-  /// Calcite 1.42 (CALCITE-7052) resolves a `GROUP BY` name to a column of the `FROM` clause first, and to a `SELECT`
-  /// alias only when no column (or more than one) has that name. Calcite 1.40 resolved the alias first. Given
+  /// Calcite 1.42 (CALCITE-7052) resolves a `GROUP BY` name to a column first, and to a `SELECT` alias only when no
+  /// column (or more than one) has that name. Calcite 1.40 resolved the alias first. Given
   /// `SELECT CASE WHEN c = 'a' THEN 'x' ELSE c END AS c, COUNT(*) FROM t GROUP BY c`, Calcite 1.40 groups by the
   /// `CASE` expression and Calcite 1.42 groups by the column `c`. An ordinal always refers to the `SELECT` item, so
   /// the rewrite restores the Calcite 1.40 result. It also makes `HAVING` resolve the name to the alias, as before.
   ///
-  /// A name that is not a column, or that is a column of more than one table, is not replaced. Both Calcite versions
-  /// resolve it to the alias. Calcite expands an alias, but not an ordinal, when the `SELECT` item uses another
-  /// `SELECT` alias or a `USING` column, so an ordinal can make such a query fail.
+  /// The column that Calcite 1.42 resolves the name to is one of these:
+  /// - the column of a `USING` or `NATURAL` join
+  /// - the column of exactly one table of the `FROM` clause
+  /// - when no table of the `FROM` clause has the name, the column of exactly one table of an outer query
+  ///
+  /// Any other name is not replaced. Both Calcite versions resolve it to the alias. Calcite expands an alias, but not
+  /// an ordinal, when the `SELECT` item uses another `SELECT` alias or a `USING` column, so an ordinal can make such
+  /// a query fail.
   ///
   /// The rewrite also applies to the names inside `ROLLUP`, `CUBE`, `GROUPING SETS` and their `ROW` operands, because
   /// Calcite 1.40 resolved those names to the alias too, and Calcite 1.42 expands ordinals there as well.
@@ -165,7 +172,8 @@ public class Validator extends SqlValidatorImpl {
       return identifier;
     }
     SelectScope selectScope = getRawSelectScope(select);
-    if (selectScope == null || selectScope.findQualifyingTableNames(name, select, nameMatcher).size() != 1) {
+    if (selectScope == null || (!isCommonJoinColumn(select.getFrom(), name, nameMatcher)
+        && selectScope.findQualifyingTableNames(name, select, nameMatcher).size() != 1)) {
       return identifier;
     }
     if (!_groupByAliasShadowedByColumnFound) {
@@ -180,7 +188,24 @@ public class Validator extends SqlValidatorImpl {
     return SqlLiteral.createExactNumeric(String.valueOf(matchIndex + 1), identifier.getParserPosition());
   }
 
-  /// Runs [#rewriteGroupByAliases] here because it needs the scopes to find the columns of the `FROM` clause.
+  /// Returns whether `name` is a column of a `USING` or `NATURAL` join in `from`. Follows the joins that Calcite
+  /// looks at to expand such a column.
+  private boolean isCommonJoinColumn(@Nullable SqlNode from, String name, SqlNameMatcher nameMatcher) {
+    while (from instanceof SqlJoin) {
+      SqlJoin join = (SqlJoin) from;
+      List<String> commonColumns = usingNames(join);
+      if (commonColumns == null) {
+        return false;
+      }
+      if (nameMatcher.indexOf(commonColumns, name) >= 0) {
+        return true;
+      }
+      from = join.getLeft();
+    }
+    return false;
+  }
+
+  /// Runs [#rewriteGroupByAliases] here because it needs the scopes to find the columns.
   ///
   /// This runs before the validation of the `SELECT` list, so a name that matches an alias and a column is also found
   /// when the query then fails with `Expression '...' is not being grouped`. See
