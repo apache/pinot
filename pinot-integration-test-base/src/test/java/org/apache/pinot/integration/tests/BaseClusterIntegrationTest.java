@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -61,6 +62,7 @@ import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
@@ -71,6 +73,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.ConsumingSegmentInfo;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.PartitionOffsetInfo;
+import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.plugin.stream.kafka40.server.EmbeddedKafkaCluster;
@@ -99,10 +102,12 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -110,6 +115,8 @@ import static org.testng.Assert.assertTrue;
 
 /// Shared implementation details of the cluster integration tests.
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
+  /// Queries [#assertRowsFromEveryReplica] sends at most; the broker alternates replica groups per request.
+  private static final int MAX_QUERIES_TO_REACH_EVERY_REPLICA = 20;
   // Default settings
   protected static final String DEFAULT_TABLE_NAME = "mytable";
   protected static final String DEFAULT_LOGICAL_TABLE_NAME = "mytable_logical";
@@ -1073,17 +1080,23 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /// no result table.
   private List<String> queryRows(@Language("sql") String query)
       throws Exception {
-    JsonNode response = postQuery(query);
+    return toRows(query, postQuery(query));
+  }
+
+  /// Returns the rows of a broker response as JSON arrays; throws with the query and the response on a broker
+  /// exception or when the response has no rows.
+  private static List<String> toRows(String query, JsonNode response) {
     JsonNode exceptions = response.get("exceptions");
     if (exceptions != null && !exceptions.isEmpty()) {
       throw new IllegalStateException("Query: " + query + " failed with: " + exceptions);
     }
     JsonNode resultTable = response.get("resultTable");
-    if (resultTable == null) {
-      throw new IllegalStateException("Query: " + query + " returned no result table: " + response);
+    JsonNode resultRows = resultTable != null ? resultTable.get("rows") : null;
+    if (resultRows == null) {
+      throw new IllegalStateException("Query: " + query + " returned no rows: " + response);
     }
     List<String> rows = new ArrayList<>();
-    for (JsonNode row : resultTable.get("rows")) {
+    for (JsonNode row : resultRows) {
       rows.add(row.toString());
     }
     return rows;
@@ -1098,13 +1111,33 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return rendered;
   }
 
-  /// Asserts the rows 10 times, so that every replica group answers: the broker picks the replica group per request
-  /// in a round-robin fashion.
+  /// Asserts the rows of a query on a REALTIME table until every server the IdealState assigns the table to has
+  /// answered at least once. The broker picks the replica group per request id; the routing table of the request id
+  /// each response reports names the servers that answered it.
   protected void assertRowsFromEveryReplica(@Language("sql") String query, List<List<Object>> expectedRows)
       throws Exception {
-    for (int i = 0; i < 10; i++) {
-      assertRows(query, expectedRows);
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    String realtimeTableName =
+        TableNameBuilder.REALTIME.tableNameWithType(brokerRequest.getQuerySource().getTableName());
+    Set<String> servers = new TreeSet<>();
+    getHelixResourceManager().getTableIdealState(realtimeTableName).getRecord().getMapFields().values()
+        .forEach(instanceStates -> servers.addAll(instanceStates.keySet()));
+    List<String> expected = toJsonRows(expectedRows);
+    Set<String> answered = new TreeSet<>();
+    for (int i = 0; i < MAX_QUERIES_TO_REACH_EVERY_REPLICA && !answered.equals(servers); i++) {
+      JsonNode response = postQuery(query);
+      List<String> actual = toRows(query, response);
+      if (!actual.equals(expected)) {
+        throw new AssertionError(describeRowDiff(query, expected, actual));
+      }
+      RoutingTable routingTable = _brokerStarters.get(0).getRoutingManager()
+          .getRoutingTable(brokerRequest, realtimeTableName, Long.parseLong(response.get("requestId").asText()));
+      if (routingTable != null) {
+        routingTable.getServerInstanceToSegmentsMap().keySet()
+            .forEach(serverInstance -> answered.add(serverInstance.getInstanceId()));
+      }
     }
+    assertEquals(answered, servers, "Not every server of " + realtimeTableName + " answered: " + query);
   }
 
   /// Asserts that the query returns exactly the expected rows, in order. The query should have an `ORDER BY` and a
@@ -1181,20 +1214,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return message.toString();
   }
 
-  /// Returns whether every instance of every segment in the IdealState of the table is in its prescribed state in the
-  /// ExternalView. Queries route by the ExternalView, so until then some segments may not be served where assigned.
+  /// Returns whether the ExternalView of the table has exactly the segments of its IdealState, each instance in its
+  /// prescribed state. Queries route by the ExternalView, so until then some segments may not be served where
+  /// assigned. For a CONSUMING segment this does not mean the consumer caught up; pair it with a row or lag wait.
   protected boolean isExternalViewConverged(String tableNameWithType) {
     IdealState idealState = getHelixResourceManager().getTableIdealState(tableNameWithType);
     ExternalView externalView = getHelixResourceManager().getTableExternalView(tableNameWithType);
     if (idealState == null || externalView == null) {
       return false;
     }
-    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
-      if (!entry.getValue().equals(externalView.getStateMap(entry.getKey()))) {
-        return false;
-      }
-    }
-    return true;
+    return idealState.getRecord().getMapFields().equals(externalView.getRecord().getMapFields());
   }
 
   /// Waits until [#isExternalViewConverged(String)] holds once. [#waitForClusterStateSettled(String, long)] also
@@ -1249,7 +1278,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       return streak.incrementAndGet() >= stableSamples;
     }, 200L, timeoutMs,
         "Cluster state never settled to " + expectedSegments
-            + " segments with no OFFLINE and ExternalView == IdealState for table " + tableNameWithType);
+            + " segments with no OFFLINE and the ExternalView equal to the IdealState for table " + tableNameWithType);
   }
 
   /// Waits until every replica of every stream partition of the table has consumed up to the latest upstream offset,
@@ -1312,7 +1341,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           lastError.set(e);
           return false;
         }
-      }, 100L, timeoutMs, null);
+      }, 1000L, timeoutMs, null);
     } catch (AssertionError e) {
       AssertionError error = new AssertionError("Table " + realtimeTableName + " did not consume every stream "
           + "partition on every replica in " + timeoutMs + "ms; last records lag per consuming segment and server: "

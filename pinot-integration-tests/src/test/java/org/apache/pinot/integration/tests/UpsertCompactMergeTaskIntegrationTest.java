@@ -322,7 +322,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }, TIMEOUT_MS, "Failed to complete task");
   }
 
-  private void verifyInitialSegmentState() {
+  private void verifyInitialSegmentState()
+      throws Exception {
     List<SegmentZKMetadata> segments = _pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME);
     assertFalse(segments.isEmpty(), "Should have segments before compaction");
 
@@ -333,13 +334,9 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
 
     // All 10 fixture rows are ingested, and the table serves the latest row per player
-    try {
-      assertEquals(getCurrentCountStarResultWithoutUpsert(getTableName()), 10,
-          "Should have all fixture rows in segments");
-      assertRows(gameScoresRowsQuery(getTableName()), GAME_SCORES_WINNERS);
-    } catch (Exception e) {
-      fail("Failed to verify initial segment state via queries: " + e.getMessage(), e);
-    }
+    assertEquals(getCurrentCountStarResultWithoutUpsert(getTableName()), 10,
+        "Should have all fixture rows in segments");
+    assertRows(gameScoresRowsQuery(getTableName()), GAME_SCORES_WINNERS);
   }
 
   private void verifySegmentsMerged() {

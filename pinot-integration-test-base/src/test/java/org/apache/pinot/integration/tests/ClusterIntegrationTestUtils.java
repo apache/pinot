@@ -123,8 +123,8 @@ public class ClusterIntegrationTestUtils {
     for (File avroFile : avroFiles) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord record : reader) {
-          Comparable key = (Comparable) toJavaValue(primaryKeyColumn, record.get(primaryKeyColumn));
-          Comparable comparisonValue = (Comparable) toJavaValue(comparisonColumn, record.get(comparisonColumn));
+          Comparable key = toComparable(primaryKeyColumn, record.get(primaryKeyColumn));
+          Comparable comparisonValue = toComparable(comparisonColumn, record.get(comparisonColumn));
           GenericRecord current = winners.get(key);
           if (current != null) {
             int comparison =
@@ -153,6 +153,14 @@ public class ClusterIntegrationTestUtils {
       rows.add(row);
     }
     return rows;
+  }
+
+  @SuppressWarnings("rawtypes")
+  private static Comparable toComparable(String column, @Nullable Object avroValue) {
+    Object value = toJavaValue(column, avroValue);
+    Preconditions.checkState(value instanceof Comparable, "Column %s is not single-value comparable: %s", column,
+        value);
+    return (Comparable) value;
   }
 
   /// Converts an Avro value to the value the broker returns for it. Strings and multi-value columns are converted;

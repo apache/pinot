@@ -424,14 +424,12 @@ public class VectorUpsertTableTest extends CustomDataQueryClusterIntegrationTest
         // Query repeatedly after verifying the table data manager so document counts and segment state must remain
         // stable across broker requests.
         for (int i = 0; i < 10; i++) {
-          ResultSetGroup physicalResult = getPinotConnection().execute(
-              "SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)");
           ResultSetGroup currentResult = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName);
-          if (physicalResult.getResultSet(0).getLong(0) != expectedPhysicalDocs
+          if (getCurrentCountStarResultWithoutUpsert(tableName) != expectedPhysicalDocs
               || currentResult.getResultSet(0).getLong(0) != expectedCurrentDocs) {
             return false;
           }
-          ExecutionStats executionStats = physicalResult.getExecutionStats();
+          ExecutionStats executionStats = currentResult.getExecutionStats();
           if (executionStats.getNumSegmentsQueried() != expectedSegments
               || executionStats.getNumConsumingSegmentsQueried() != expectedConsumingSegments) {
             return false;
