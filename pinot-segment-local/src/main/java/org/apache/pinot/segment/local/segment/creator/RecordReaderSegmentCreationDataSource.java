@@ -70,7 +70,7 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
           }
         } catch (Exception e) {
           if (!continueOnError) {
-            throw new RuntimeException("Caught exception while reading data", e);
+            throw new RecordProcessingException("Caught exception while reading data", e);
           }
           LOGGER.debug("Caught exception while reading data", e);
         }

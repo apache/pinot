@@ -22,7 +22,12 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.restlet.resources.TenantRebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
+import org.apache.pinot.integration.tests.SharedHybridClusterIntegrationTestSuite.HybridScenarioLease;
+import org.apache.pinot.integration.tests.SharedHybridClusterIntegrationTestSuite.SharedHybridSuiteLease;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -30,11 +35,74 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
+/// Verifies tenant rebalance request handling using isolated tables in the shared hybrid cluster.
+/// Scenarios run sequentially; a directly selected class owns a temporary cluster through the same lease.
+public class TenantRebalanceIntegrationTest {
+  private static final String TABLE_NAME = "mytableTenantRebalance";
+  private static final String TOPIC_NAME = "TenantRebalanceIntegrationTest";
+
+  private SharedHybridSuiteLease _suiteLease;
+  private SharedHybridClusterIntegrationTestSuite _owner;
+  private HybridScenarioLease _scenario;
+
+  @BeforeClass(alwaysRun = true)
+  public void setUp()
+      throws Throwable {
+    try {
+      _suiteLease = SharedHybridClusterIntegrationTestSuite.acquireSharedSuite();
+      _owner = _suiteLease.getOwner();
+      // Preserve the original fixture's offline-first teardown to exercise both hybrid table removal orders.
+      _scenario = _owner.newScenario(TABLE_NAME, TOPIC_NAME, TableType.OFFLINE);
+      _owner.setUpStandardScenario(_scenario, null, SharedHybridClusterIntegrationTestSuite.DEFAULT_HYBRID_COUNT);
+    } catch (Throwable t) {
+      try {
+        tearDown();
+      } catch (Throwable cleanupFailure) {
+        t.addSuppressed(cleanupFailure);
+      }
+      throw t;
+    }
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Throwable {
+    Throwable cleanupFailure = null;
+    if (_scenario != null) {
+      try {
+        _owner.closeScenario(_scenario, null);
+      } catch (Throwable t) {
+        cleanupFailure = t;
+      } finally {
+        _scenario = null;
+      }
+    }
+    if (_suiteLease != null) {
+      try {
+        _suiteLease.close(null);
+      } catch (Throwable t) {
+        cleanupFailure = SharedHybridClusterIntegrationTestSuite.appendCleanupFailure(cleanupFailure, t);
+      } finally {
+        _suiteLease = null;
+        _owner = null;
+      }
+    }
+    if (cleanupFailure != null) {
+      throw cleanupFailure;
+    }
+  }
+
+  private String getTableName() {
+    return TABLE_NAME;
+  }
+
+  private String getServerTenant() {
+    return SharedHybridClusterIntegrationTestSuite.TENANT_NAME;
+  }
 
   private TenantRebalanceResult rebalanceTenant(TenantRebalanceConfig config, @Nullable Map<String, String> queryParams)
       throws Exception {
-    return getOrCreateAdminClient().getTenantClient()
+    return _owner.getOrCreateAdminClient().getTenantClient()
         .rebalanceTenantWithConfigObject(config.getTenantName(), JsonUtils.objectToString(config), queryParams);
   }
 

@@ -25,6 +25,7 @@ import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -108,6 +109,37 @@ public class ApproximateAggregateRewriteTest extends QueryEnvironmentTestBase {
         "SELECT col2, PERCENTILE(col3, 90) FROM (SELECT col2, col3 FROM a WHERE col3 > 0) GROUP BY col2");
     assertRewritten(subquery, "percentilesmarttdigest");
     assertTrue(subquery.contains("threshold=23"), subquery);
+  }
+
+  /// The parameters are appended to the project beneath the aggregate, so the literals already in it, here the data
+  /// type argument of FIRST_WITH_TIME, are still inlined when ProjectMerge is skipped.
+  @Test
+  public void testKeepsOtherLiteralsInlinedWithoutProjectMerge() {
+    for (boolean usePhysicalOptimizer : List.of(false, true)) {
+      QueryEnvironment env = newQueryEnvironment(true, "threshold=17", "threshold=23", usePhysicalOptimizer);
+      for (String input : List.of("a", "(SELECT * FROM a UNION ALL SELECT * FROM b UNION ALL SELECT * FROM c)")) {
+        String query = "SET skipPlannerRules='ProjectMerge'; EXPLAIN PLAN FOR SELECT col2, "
+            + "FIRST_WITH_TIME(col3, ts), DISTINCTCOUNT(col1) FROM " + input + " GROUP BY col2";
+        String plan = env.compile(query, CalciteSqlParser.compileToSqlNodeAndOptions(query))
+            .explain(RANDOM_REQUEST_ID_GEN.nextLong(), null).getExplainPlan();
+        String leafAggregate = plan.lines().filter(line -> line.contains("aggType=[LEAF]")).findFirst().orElse("");
+        for (String literal : List.of("_UTF-8'INT'", "_UTF-8'threshold=17'")) {
+          assertTrue(leafAggregate.contains(literal), "Expected " + literal + " in the leaf aggregate of:\n" + plan);
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testApproximateParamsKeepBranchSpecificUnionColumns() {
+    QueryEnvironment env = newQueryEnvironment(true, "threshold=17", "threshold=23");
+    String query = "EXPLAIN PLAN FOR SELECT DISTINCTCOUNT(x), COVARPOP(x, y) FROM "
+        + "(SELECT col3 x, 1.0 y FROM a UNION ALL SELECT col3, CAST(col7 AS DOUBLE) FROM b)";
+    String plan = env.compile(query, CalciteSqlParser.compileToSqlNodeAndOptions(query))
+        .explain(RANDOM_REQUEST_ID_GEN.nextLong(), null).getExplainPlan();
+    String leaf = plan.lines().filter(line -> line.contains("aggType=[LEAF]")).findFirst().orElse("");
+    assertTrue(leaf.contains("_UTF-8'threshold=17'"), plan);
+    assertFalse(leaf.contains("1.0"), plan);
   }
 
   /// `AggregateCaseToFilterRule` turns `COUNT(DISTINCT CASE WHEN c THEN x END)` into `COUNT(DISTINCT x) FILTER (WHERE

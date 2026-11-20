@@ -97,6 +97,7 @@ import org.apache.pinot.query.planner.spi.Phase;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.query.validate.GroupByAliasShadowedByColumnException;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -147,6 +148,8 @@ public class QueryEnvironment {
   private final FrameworkConfig _config;
   private final CalciteCatalogReader _catalogReader;
   private final HepProgram _optProgram;
+  // Same as _optProgram, but rewrites ANY_VALUE(expr) to ANY_VALUE(expr, 'dataType') as well
+  private final HepProgram _inferAnyValueTypeOptProgram;
   private final Config _envConfig;
   private final PinotCatalog _catalog;
   private final Set<String> _defaultDisabledPlannerRules;
@@ -171,7 +174,9 @@ public class QueryEnvironment {
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     _defaultDisabledPlannerRules = _envConfig.defaultDisabledPlannerRules();
     // default optProgram with no skip rule options and no use rule options
-    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules);
+    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, false);
+    _inferAnyValueTypeOptProgram =
+        getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, true);
     _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
@@ -198,7 +203,8 @@ public class QueryEnvironment {
       _catalog.configureVirtualColumnExclusion(true);
     }
 
-    HepProgram optProgram = _optProgram;
+    boolean inferAnyValueType = QueryOptionsUtils.isInferAnyValueType(options);
+    HepProgram optProgram = inferAnyValueType ? _inferAnyValueTypeOptProgram : _optProgram;
     Set<String> useRuleSet = new HashSet<>(QueryOptionsUtils.getUsePlannerRules(options));
     if (Boolean.parseBoolean(options.get(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {
       useRuleSet.add(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE);
@@ -207,7 +213,8 @@ public class QueryEnvironment {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
       if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules);
+        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules,
+            inferAnyValueType);
       }
     }
     int sortExchangeCopyLimit = QueryOptionsUtils.getSortExchangeCopyThreshold(options,
@@ -437,6 +444,19 @@ public class QueryEnvironment {
   /// in case it was legal to apply an automatic cast for these types!).
   private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
     try {
+      return validateAndClassifyErrors(sqlNode, plannerContext);
+    } catch (QueryException e) {
+      if (e.getErrorCode() == QueryErrorCode.QUERY_VALIDATION
+          && plannerContext.getValidator().isGroupByNameResolvedToShadowedColumn()) {
+        // Lets callers retry with preferSelectAliasInGroupBy
+        throw new GroupByAliasShadowedByColumnException(e);
+      }
+      throw e;
+    }
+  }
+
+  private SqlNode validateAndClassifyErrors(SqlNode sqlNode, PlannerContext plannerContext) {
+    try {
       SqlNode validated = plannerContext.getValidator().validate(sqlNode);
       if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
@@ -579,9 +599,10 @@ public class QueryEnvironment {
   /// @param skipRuleSet parsed skipped rule name set from query options
   /// @param useRuleSet parsed use rule set from query options
   /// @param defaultDisabledRuleSet parsed default disabled rule set from broker config
+  /// @param inferAnyValueType whether ANY_VALUE gets the data type argument of its argument's type
   /// @return HepProgram that performs logical transformations
   private static HepProgram getOptProgram(PinotRuleSet ruleSet, Set<String> skipRuleSet, Set<String> useRuleSet,
-      Set<String> defaultDisabledRuleSet) {
+      Set<String> defaultDisabledRuleSet, boolean inferAnyValueType) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -603,10 +624,16 @@ public class QueryEnvironment {
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
     for (RelOptRule relOptRule : basicRules) {
+      // Supplies the data type argument before AggregateCaseToFilter, which rewrites only one-argument calls: its
+      // ARRAY_AGG(expression) FILTER (WHERE condition) form of ARRAY_AGG(CASE WHEN ...) fails at runtime.
+      if (relOptRule.toString().equals(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_CASE_TO_FILTER)) {
+        hepProgramBuilder.addRuleInstance(PinotAggregateTypeArgumentRewriteRule.ARRAY_AGG_ONLY);
+      }
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
-    // Required to plan FIRST_WITH_TIME / LAST_WITH_TIME without a data type, so the rule options do not filter it.
-    hepProgramBuilder.addRuleInstance(PinotAggregateTypeArgumentRewriteRule.INSTANCE);
+    // Required for FIRST_WITH_TIME, LAST_WITH_TIME, ARRAY_AGG and string MODE, so the rule options do not filter it.
+    hepProgramBuilder.addRuleInstance(inferAnyValueType ? PinotAggregateTypeArgumentRewriteRule.INSTANCE
+        : PinotAggregateTypeArgumentRewriteRule.WITHOUT_ANY_VALUE);
 
     // ----
     // Pushdown filters using a single HepInstruction.
@@ -968,6 +995,21 @@ public class QueryEnvironment {
     @Value.Default
     default int defaultSealedInListThreshold() {
       return CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD;
+    }
+
+    /// See [CommonConstants.Broker#CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY]. Can be overridden per query with
+    /// [CommonConstants.Broker.Request.QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY].
+    @Value.Default
+    default boolean defaultPreferSelectAliasInGroupBy() {
+      return CommonConstants.Broker.DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY;
+    }
+
+    /// Whether the validator marks `BrokerMeter.QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN`. Only the broker that
+    /// runs multi-stage queries turns it on. Other users of the validator, like the single-stage paths that compile a
+    /// query only to check it or to get its schema, and the controller, must not change the meter.
+    @Value.Default
+    default boolean meterGroupByAliasShadowedByColumn() {
+      return false;
     }
   }
 

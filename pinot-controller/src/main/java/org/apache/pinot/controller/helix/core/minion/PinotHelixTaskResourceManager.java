@@ -42,6 +42,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.HelixException;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
@@ -90,6 +91,10 @@ public class PinotHelixTaskResourceManager {
 
   private static final EnumSet<TaskState> TERMINAL_STATES =
       EnumSet.of(TaskState.COMPLETED, TaskState.FAILED, TaskState.TIMED_OUT, TaskState.ABORTED);
+
+  @VisibleForTesting
+  static final int DELETE_JOB_MAX_ATTEMPTS = 3;
+  private static final long DELETE_JOB_BACKOFF_MS = 1000L;
 
   private final TaskDriver _taskDriver;
   private final PinotHelixResourceManager _helixResourceManager;
@@ -319,10 +324,16 @@ public class PinotHelixTaskResourceManager {
   /// Delete a single task from the task queue. The task queue should be
   /// stopped before deleting the task, otherwise it fails with exception.
   ///
+  /// A delete that fails with [HelixException] is retried a few times with a growing backoff. The Helix task pipeline
+  /// can still be writing the job context right after the queue is stopped or the task is scheduled. Removing the
+  /// context ZNode then fails with ZooKeeper `NotEmpty`, which Helix reports as a [HelixException] without the cause.
+  /// Each step of a delete skips ZNodes that are already gone, so a retry resumes where the failed attempt stopped.
+  /// Each attempt holds this manager's lock, but the backoff between attempts does not.
+  ///
   /// @param taskName the task to delete from the queue.
   /// @param forceDelete as said in helix comment, if set true, all job's related zk nodes will
   ///                    be clean up from zookeeper even if its workflow information can not be found.
-  public synchronized void deleteTask(String taskName, boolean forceDelete) {
+  public void deleteTask(String taskName, boolean forceDelete) {
     String taskType = getTaskType(taskName);
     String helixJobQueueName = getHelixJobQueueName(taskType);
     if (forceDelete) {
@@ -330,7 +341,28 @@ public class PinotHelixTaskResourceManager {
     } else {
       LOGGER.info("Deleting task: {} from queue: {} of task type: {}", taskName, helixJobQueueName, taskType);
     }
-    _taskDriver.deleteJob(helixJobQueueName, taskName, forceDelete);
+    for (int attempt = 1; ; attempt++) {
+      try {
+        synchronized (this) {
+          _taskDriver.deleteJob(helixJobQueueName, taskName, forceDelete);
+        }
+        return;
+      } catch (HelixException e) {
+        if (attempt >= DELETE_JOB_MAX_ATTEMPTS) {
+          throw e;
+        }
+        long backoffMs = DELETE_JOB_BACKOFF_MS * attempt;
+        LOGGER.warn("Attempt {} to delete task: {} from queue: {} failed, retrying in {}ms", attempt, taskName,
+            helixJobQueueName, backoffMs, e);
+        try {
+          Thread.sleep(backoffMs);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          e.addSuppressed(ie);
+          throw e;
+        }
+      }
+    }
   }
 
   /// Get all task queues.
@@ -510,7 +542,9 @@ public class PinotHelixTaskResourceManager {
   }
 
   /// This method returns a map of table name to count of sub-tasks in various states, given the top-level task name.
-  /// It also collects waiting times for subtasks with null state and running times for subtasks in RUNNING state.
+  /// It also collects waiting times for subtasks with null state and running times for subtasks in RUNNING state, and
+  /// for tables with waiting subtasks, the time since the job last made progress (queue stall): 0 while a subtask is
+  /// running, otherwise the time since a subtask last started or finished.
   ///
   /// @param taskName in the form "Task\_<taskType>\_<uuid>\_<timestamp>"
   /// @return a map of table name to [TaskStatusSummary]
@@ -533,6 +567,7 @@ public class PinotHelixTaskResourceManager {
     }
     long jobStartTime = jobContext.getStartTime();
     long currentTime = System.currentTimeMillis();
+    long lastProgressTime = jobStartTime;
     Map<String, Integer> taskIdPartitionMap = jobContext.getTaskIdPartitionMap();
     for (Map.Entry<String, TaskConfig> entry : taskConfigMap.entrySet()) {
       String taskId = entry.getKey();
@@ -542,6 +577,14 @@ public class PinotHelixTaskResourceManager {
       if (partition != null) {
         state = jobContext.getPartitionState(partition);
         executionStartTime = jobContext.getPartitionStartTime(partition);
+        if (state == TaskPartitionState.RUNNING || state == TaskPartitionState.INIT) {
+          // A subtask in flight is progress: a long one must not read as a stuck queue (MAX_SUBTASK_RUNNING_TIME_MS
+          // catches one that hangs)
+          lastProgressTime = currentTime;
+        } else {
+          lastProgressTime =
+              Math.max(lastProgressTime, Math.max(executionStartTime, jobContext.getPartitionFinishTime(partition)));
+        }
       }
       TaskConfig taskConfig = entry.getValue();
       String tableName = taskConfig.getConfigMap().getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME);
@@ -560,6 +603,16 @@ public class PinotHelixTaskResourceManager {
       if (state == TaskPartitionState.RUNNING && executionStartTime > 0) {
         long runningTimeMillis = (currentTime - executionStartTime);
         taskStatusSummary.getSubtaskRunningTimes().put(taskId, runningTimeMillis);
+      }
+    }
+    // A job whose subtasks keep starting or finishing is draining, however old it is: only the time since the last
+    // such progress tells a stuck queue apart from a long one
+    if (jobStartTime > 0) {
+      long queueStallTimeMillis = currentTime - lastProgressTime;
+      for (TaskStatusSummary taskStatusSummary : taskStatusSummaryMap.values()) {
+        if (!taskStatusSummary.getSubtaskWaitingTimes().isEmpty()) {
+          taskStatusSummary.setQueueStallTimeMs(queueStallTimeMillis);
+        }
       }
     }
     return taskStatusSummaryMap;
@@ -879,7 +932,9 @@ public class PinotHelixTaskResourceManager {
       String worker = entry.getKey();
       String resp = entry.getValue();
       LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
-      minionWorkerIdSubtaskProgressMap.put(minionWorkerUrlToWorkerIdMap.get(worker),
+      // Response keys are "<url>__<count>" when multiRequestPerServer is true
+      minionWorkerIdSubtaskProgressMap.put(
+          minionWorkerUrlToWorkerIdMap.get(StringUtils.substringBeforeLast(worker, "__")),
           JsonUtils.stringToObject(resp, Map.class));
     }
     if (serviceResponse._failedResponseCount > 0) {
@@ -1814,6 +1869,8 @@ public class PinotHelixTaskResourceManager {
     private TaskCount _taskCount = new TaskCount();
     private Map<String, Long> _subtaskWaitingTimes = new HashMap<>(); // subtask ID -> waiting time in milliseconds
     private Map<String, Long> _subtaskRunningTimes = new HashMap<>(); // subtask ID -> running time in milliseconds
+    // Time since the job last made progress (0 while a subtask runs); left at 0 unless the table has a waiting subtask
+    private long _queueStallTimeMs;
 
     public TaskCount getTaskCount() {
       return _taskCount;
@@ -1837,6 +1894,14 @@ public class PinotHelixTaskResourceManager {
 
     public void setSubtaskRunningTimes(Map<String, Long> subtaskRunningTimes) {
       _subtaskRunningTimes = subtaskRunningTimes;
+    }
+
+    public long getQueueStallTimeMs() {
+      return _queueStallTimeMs;
+    }
+
+    public void setQueueStallTimeMs(long queueStallTimeMs) {
+      _queueStallTimeMs = queueStallTimeMs;
     }
   }
 

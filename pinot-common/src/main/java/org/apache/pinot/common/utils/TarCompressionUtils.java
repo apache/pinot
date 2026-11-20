@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -99,14 +100,26 @@ public class TarCompressionUtils {
   /// a supported file extension such as "tar.gz" or "tar.zst"
   public static void createCompressedTarFile(File[] inputFiles, File outputFile)
       throws IOException {
+    createCompressedTarFile(inputFiles, outputFile, file -> true);
+  }
+
+  /// Creates a compressed tar file while excluding files rejected by the predicate. Directory entries are retained
+  /// only when accepted, and their children are filtered recursively.
+  public static void createFilteredCompressedTarFile(File inputFile, File outputFile, Predicate<File> includeFile)
+      throws IOException {
+    createCompressedTarFile(new File[]{inputFile}, outputFile, includeFile);
+  }
+
+  private static void createCompressedTarFile(File[] inputFiles, File outputFile, Predicate<File> includeFile)
+      throws IOException {
     if (outputFile.getName().endsWith(TAR_COMPRESSED_FILE_EXTENSION)) {
-      createCompressedTarFile(inputFiles, outputFile, _defaultCompressorName);
+      createCompressedTarFile(inputFiles, outputFile, _defaultCompressorName, includeFile);
     } else {
       String compressorName = null;
       for (String supportedCompressorExtension : COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
         if (outputFile.getName().endsWith(supportedCompressorExtension)) {
           compressorName = COMPRESSOR_NAME_BY_FILE_EXTENSIONS.get(supportedCompressorExtension);
-          createCompressedTarFile(inputFiles, outputFile, compressorName);
+          createCompressedTarFile(inputFiles, outputFile, compressorName, includeFile);
           return;
         }
       }
@@ -122,6 +135,12 @@ public class TarCompressionUtils {
 
   public static void createCompressedTarFile(File[] inputFiles, File outputFile, String compressorName)
       throws IOException {
+    createCompressedTarFile(inputFiles, outputFile, compressorName, file -> true);
+  }
+
+  private static void createCompressedTarFile(File[] inputFiles, File outputFile, String compressorName,
+      Predicate<File> includeFile)
+      throws IOException {
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
         BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
         OutputStream compressorOut =
@@ -131,7 +150,7 @@ public class TarCompressionUtils {
       tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
 
       for (File inputFile : inputFiles) {
-        addFileToCompressedTar(tarOut, inputFile, "");
+        addFileToCompressedTar(tarOut, inputFile, "", includeFile);
       }
     } catch (CompressorException e) {
       throw new IOException(e);
@@ -140,8 +159,12 @@ public class TarCompressionUtils {
 
   /// Helper method to write a file into the compressed tar file output stream. The base entry name is the relative
   /// path of the file to the root directory.
-  private static void addFileToCompressedTar(ArchiveOutputStream tarOut, File file, String baseEntryName)
+  private static void addFileToCompressedTar(ArchiveOutputStream tarOut, File file, String baseEntryName,
+      Predicate<File> includeFile)
       throws IOException {
+    if (!includeFile.test(file)) {
+      return;
+    }
     String entryName = baseEntryName + file.getName();
     TarArchiveEntry entry = new TarArchiveEntry(file, entryName);
     tarOut.putArchiveEntry(entry);
@@ -157,7 +180,7 @@ public class TarCompressionUtils {
       assert children != null;
       String baseEntryNameForChildren = entryName + ENTRY_NAME_SEPARATOR;
       for (File child : children) {
-        addFileToCompressedTar(tarOut, child, baseEntryNameForChildren);
+        addFileToCompressedTar(tarOut, child, baseEntryNameForChildren, includeFile);
       }
     }
   }

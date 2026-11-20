@@ -32,9 +32,8 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
-/// Avro Record reader for Parquet file. This reader doesn't read parquet file with incompatible Avro schemas,
-/// e.g. INT96, DECIMAL. Please use [org.apache.pinot.plugin.inputformat.parquet.ParquetNativeRecordReader]
-/// instead.
+/// Reads Parquet records through Avro with logical-type conversion, including INT96 timestamps and DECIMAL values.
+/// Parquet schemas that cannot be represented by Avro require [ParquetNativeRecordReader].
 ///
 /// For More info on Avro to Parquet schema conversion:
 /// [https://javadoc.io/doc/org.apache.parquet/parquet-avro/latest/index.html][ref1]
@@ -72,13 +71,16 @@ public class ParquetAvroRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    // Data parsing: extract current record into GenericRow.
-    _recordExtractor.extract(_nextRecord, reuse);
-    // Record fetch: read next Parquet Avro record.
     try {
-      _nextRecord = _parquetReader.read();
-    } catch (IOException e) {
-      throw new RecordFetchException("Failed to read next Parquet Avro record", e);
+      // Data parsing: extract current record into GenericRow.
+      _recordExtractor.extract(_nextRecord, reuse);
+    } finally {
+      // Advance even if extraction fails and the caller skips the rejected record.
+      try {
+        _nextRecord = _parquetReader.read();
+      } catch (IOException e) {
+        throw new RecordFetchException("Failed to read next Parquet Avro record", e);
+      }
     }
     return reuse;
   }

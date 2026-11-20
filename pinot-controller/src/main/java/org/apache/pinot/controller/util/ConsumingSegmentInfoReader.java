@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.util;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -31,6 +32,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
@@ -83,7 +85,7 @@ public class ConsumingSegmentInfoReader {
             partitionOffsetInfo.getAvailabilityLagMs());
         consumingSegmentInfoMap.computeIfAbsent(info.getSegmentName(), k -> new ArrayList<>()).add(
             new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getLastConsumedTimestamp(),
-                partitionOffsetInfo.getCurrentOffsets(), offsetInfo));
+                partitionOffsetInfo.getCurrentOffsets(), offsetInfo, info.getDecoderClassName()));
       }
     }
     // Segments which are in CONSUMING state but found no consumer on the server
@@ -210,18 +212,23 @@ public class ConsumingSegmentInfoReader {
     public Map<String, String> _partitionToOffsetMap;
     @JsonProperty("partitionOffsetInfo")
     public PartitionOffsetInfo _partitionOffsetInfo;
+    @JsonProperty("decoderClassName")
+    @Nullable
+    public String _decoderClassName;
 
-
+    @JsonCreator
     public ConsumingSegmentInfo(@JsonProperty("serverName") String serverName,
         @JsonProperty("consumerState") String consumerState,
         @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
         @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap,
-        @JsonProperty("partitionOffsetInfo") PartitionOffsetInfo partitionOffsetInfo) {
+        @JsonProperty("partitionOffsetInfo") PartitionOffsetInfo partitionOffsetInfo,
+        @JsonProperty("decoderClassName") @Nullable String decoderClassName) {
       _serverName = serverName;
       _consumerState = consumerState;
       _lastConsumedTimestamp = lastConsumedTimestamp;
       _partitionToOffsetMap = partitionToOffsetMap;
       _partitionOffsetInfo = partitionOffsetInfo;
+      _decoderClassName = decoderClassName;
     }
   }
 

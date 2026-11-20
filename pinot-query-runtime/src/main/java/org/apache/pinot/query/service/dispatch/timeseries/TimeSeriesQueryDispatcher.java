@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.service.dispatch.timeseries;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.grpc.Deadline;
 import java.util.HashMap;
@@ -74,7 +75,7 @@ public class TimeSeriesQueryDispatcher {
       Deadline deadline = Deadline.after(deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       Preconditions.checkState(!deadline.isExpired(), "Deadline expired before query could be sent to servers");
       Worker.TimeSeriesQueryRequest request = Worker.TimeSeriesQueryRequest.newBuilder()
-          .addAllDispatchPlan(plan.getSerializedServerFragments())
+          .addAllDispatchPlan(plan.getSerializedServerFragments(serverId))
           .putAllMetadata(initializeTimeSeriesMetadataMap(plan, deadlineMs, requestContext, serverId))
           .putMetadata(MetadataKeys.REQUEST_ID, Long.toString(requestId))
           .build();
@@ -93,7 +94,8 @@ public class TimeSeriesQueryDispatcher {
     }
   }
 
-  private Map<String, String> initializeTimeSeriesMetadataMap(TimeSeriesDispatchablePlan dispatchablePlan,
+  @VisibleForTesting
+  static Map<String, String> initializeTimeSeriesMetadataMap(TimeSeriesDispatchablePlan dispatchablePlan,
       long deadlineMs, RequestContext requestContext, String instanceId) {
     Map<String, String> result = new HashMap<>();
     TimeBuckets timeBuckets = dispatchablePlan.getTimeBuckets();
@@ -104,7 +106,15 @@ public class TimeSeriesQueryDispatcher {
     result.put(MetadataKeys.TimeSeries.DEADLINE_MS, Long.toString(deadlineMs));
     Map<String, List<String>> leafIdToSegments = dispatchablePlan.getLeafIdToSegmentsByInstanceId().get(instanceId);
     for (Map.Entry<String, List<String>> entry : leafIdToSegments.entrySet()) {
-      result.put(MetadataKeys.TimeSeries.encodeSegmentListKey(entry.getKey()), String.join(",", entry.getValue()));
+      if (!entry.getValue().isEmpty()) {
+        result.put(MetadataKeys.TimeSeries.encodeSegmentListKey(entry.getKey()), String.join(",", entry.getValue()));
+      }
+    }
+    Map<String, List<String>> leafIdToOptionalSegments =
+        dispatchablePlan.getLeafIdToOptionalSegmentsByInstanceId().getOrDefault(instanceId, Map.of());
+    for (Map.Entry<String, List<String>> entry : leafIdToOptionalSegments.entrySet()) {
+      result.put(MetadataKeys.TimeSeries.encodeOptionalSegmentListKey(entry.getKey()),
+          String.join(",", entry.getValue()));
     }
     result.put(MetadataKeys.REQUEST_ID, Long.toString(requestContext.getRequestId()));
     result.put(MetadataKeys.BROKER_ID, requestContext.getBrokerId());

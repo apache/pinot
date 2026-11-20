@@ -27,7 +27,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -50,6 +49,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// Sample covariance = covarPop(X, Y) \* besselCorrection
 /// @see <a href="https://en.wikipedia.org/wiki/Bessel%27s_correction">Bessel's correction</a>
 public class CovarianceAggregationFunction extends BaseAggregationFunction<CovarianceTuple, Double> {
+  private static final int COVARIANCE_TUPLE_TYPE = 32;
+
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   protected final ExpressionContext _expression1;
   protected final ExpressionContext _expression2;
@@ -191,14 +192,13 @@ public class CovarianceAggregationFunction extends BaseAggregationFunction<Covar
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(CovarianceTuple covarianceTuple) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.CovarianceTuple.getValue(),
-        ObjectSerDeUtils.COVARIANCE_TUPLE_OBJECT_SER_DE.serialize(covarianceTuple));
+  public SerializedResult serializeIntermediateResult(CovarianceTuple covarianceTuple) {
+    return new SerializedBytes(COVARIANCE_TUPLE_TYPE, covarianceTuple.toBytes());
   }
 
   @Override
   public CovarianceTuple deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.COVARIANCE_TUPLE_OBJECT_SER_DE.deserialize(customObject.getBuffer());
+    return CovarianceTuple.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override

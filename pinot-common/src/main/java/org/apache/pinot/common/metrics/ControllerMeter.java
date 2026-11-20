@@ -37,7 +37,6 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_TABLE_TENANT_CREATE_ERROR("TableTenantCreateError", true),
   CONTROLLER_TABLE_TENANT_DELETE_ERROR("TableTenantDeleteError", true),
   CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR("errors", true),
-  CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_MISMATCH("mismatch", true),
   CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK("leadershipChangeWithoutCallback", true),
   LLC_STATE_MACHINE_ABORTS("aborts", false),
   LLC_ZOOKEEPER_FETCH_FAILURES("failures", false),
@@ -65,6 +64,8 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // are not counted.
   LLC_ERROR_SEGMENT_REPAIR_FAILURES("failures", false),
   DELETED_TMP_SEGMENT_COUNT("DeletedTmpSegmentCount", false),
+  REALTIME_METADATA_TAR_MOVE_FAILURE("RealtimeMetadataTarMoveFailure", false),
+  REALTIME_METADATA_TAR_INVALIDATE_FAILURE("RealtimeMetadataTarInvalidateFailure", false),
   TABLE_REBALANCE_FAILURE_DETECTED("TableRebalanceFailureDetected", false),
   TABLE_REBALANCE_RETRY("TableRebalanceRetry", false),
   TABLE_REBALANCE_RETRY_TOO_MANY_TIMES("TableRebalanceRetryTooManyTimes", false),
@@ -101,7 +102,11 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   QUERY_WORKLOAD_REQUEST_DROPPED("count", true),
   QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED("count", true),
   // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
-  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false);
+  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false),
+  // Storage quota breach detected for a table whose enforcement mode is ENFORCED or SHADOW (not DISABLED)
+  STORAGE_QUOTA_EXCEEDED("StorageQuotaExceeded", false),
+  // Segment uploads rejected for being outside the table retention window.
+  OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED("OutOfRetentionSegmentUploadRejected", true);
 
   private final String _brokerMeterName;
   private final String _unit;

@@ -25,6 +25,7 @@ import io.grpc.Metadata;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.MetadataUtils;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -32,14 +33,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
+import org.apache.pinot.query.grpc.ReceiverIdentity;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
@@ -71,6 +75,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final ChannelManager _channelManager;
   private final String _hostname;
   private final int _port;
+  /// Hash of the instance id of the receiver the plan meant, sent with the stream so that any other instance rejects
+  /// it. 0 if the plan does not say (older broker), in which case any instance accepts the stream.
+  private final long _receiverInstanceIdHash;
+  private final Runnable _onMisrouted;
   private final long _deadlineMs;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
@@ -96,12 +104,30 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private volatile ClientCallStreamObserver<MailboxContent> _contentObserver;
 
+  /// Set when an instance rejected the stream as meant for another instance (see [#onMisrouted]). From then on every
+  /// data send fails with it.
+  @Nullable
+  private volatile String _misroutedError;
+  private final AtomicBoolean _misroutedErrorRerouted = new AtomicBoolean();
+
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize, boolean backpressureEnabled) {
+    this(id, channelManager, hostname, port, 0, deadlineMs, statMap, maxInboundMessageSize, backpressureEnabled,
+        () -> {
+        });
+  }
+
+  /// @param receiverInstanceIdHash hash of the instance id of the receiver the plan meant, or 0 if unknown
+  /// @param onMisrouted called each time an instance rejects a stream of this mailbox as meant for another instance
+  public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port,
+      long receiverInstanceIdHash, long deadlineMs, StatMap<MailboxSendOperator.StatKey> statMap,
+      int maxInboundMessageSize, boolean backpressureEnabled, Runnable onMisrouted) {
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
     _port = port;
+    _receiverInstanceIdHash = receiverInstanceIdHash;
+    _onMisrouted = onMisrouted;
     _deadlineMs = deadlineMs;
     _statMap = statMap;
     _backpressureEnabled = backpressureEnabled;
@@ -125,7 +151,19 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public void send(MseBlock.Data data) {
     QueryThreadContext.checkTerminationAndSampleUsage(SEND_SCOPE);
+    throwIfMisrouted();
     sendInternal(data, List.of());
+    // The rejection can arrive while the block is sent, which then skips it as sent to a terminated stream
+    throwIfMisrouted();
+  }
+
+  /// Fails the stage instead of dropping its data once the stream was rejected as misrouted: the other receivers of
+  /// the stage learn about the error from its EOS.
+  private void throwIfMisrouted() {
+    String misroutedError = _misroutedError;
+    if (misroutedError != null) {
+      throw new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING, misroutedError);
+    }
   }
 
   @Override
@@ -357,9 +395,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
   // Package-private to allow regression tests for the lazy-init race to count how many times a content observer is
   // opened for a single mailbox.
   ClientCallStreamObserver<MailboxContent> getContentObserver() {
-    Metadata metadata = new Metadata();
-    metadata.put(ChannelUtils.MAILBOX_ID_METADATA_KEY, _id);
-
     // We wrap `_statusObserver` in a ClientResponseObserver so we can register the on-ready handler through
     // `beforeStart` — gRPC rejects setOnReadyHandler() if it is called after open() returns. Wrapping (rather than
     // making MailboxStatusObserver itself a ClientResponseObserver) keeps the back-pressure plumbing local to this
@@ -392,7 +427,17 @@ public class GrpcSendingMailbox implements SendingMailbox {
           @Override
           public void onError(Throwable t) {
             try {
+              String misroutedTo = ReceiverIdentity.getMisroutedTo(t);
+              if (misroutedTo != null) {
+                // Before the stream reads as finished, so that a send that finds it finished also finds the error
+                _misroutedError = "Mailbox: " + _id + " was sent to " + _hostname + ":" + _port + " but reached "
+                    + misroutedTo + ", because the connection to that address is stale. The sender reset the "
+                    + "connection. Retry the query.";
+              }
               _statusObserver.onError(t);
+              if (misroutedTo != null) {
+                onMisrouted();
+              }
             } finally {
               wakeWaiters();
             }
@@ -408,11 +453,81 @@ public class GrpcSendingMailbox implements SendingMailbox {
           }
         };
 
+    return openStream(responseObserver);
+  }
+
+  private ClientCallStreamObserver<MailboxContent> openStream(StreamObserver<MailboxStatus> responseObserver) {
+    Metadata metadata = new Metadata();
+    metadata.put(ChannelUtils.MAILBOX_ID_METADATA_KEY, _id);
+    ReceiverIdentity.addTargetInstanceIdHash(metadata, _receiverInstanceIdHash);
     return (ClientCallStreamObserver<MailboxContent>) PinotMailboxGrpc.newStub(
             _channelManager.getChannel(_hostname, _port))
         .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(metadata))
         .withDeadlineAfter(_deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS)
         .open(responseObserver);
+  }
+
+  /// Handles the rejection of the stream by an instance that is not the receiver the plan meant. Runs on a gRPC
+  /// thread, after [#_misroutedError] is set.
+  ///
+  /// The channel to [#_hostname] leads to another instance, typically because that instance took over the IP address
+  /// the hostname used to resolve to and listens on the same port. Whatever this mailbox sent went nowhere. So:
+  ///
+  /// - the channel is refreshed, so that the next stream to this address resolves the hostname again;
+  /// - every later data send fails, which fails this stage and, through its error EOS, the query;
+  /// - the intended receiver is told through a new stream, so that it fails now instead of waiting for data until the
+  ///   query times out. This is best effort, see [#rerouteError].
+  private void onMisrouted() {
+    String misroutedError = _misroutedError;
+    LOGGER.warn(misroutedError);
+    _onMisrouted.run();
+    _channelManager.refreshChannel(_hostname, _port);
+    if (_misroutedErrorRerouted.compareAndSet(false, true)) {
+      rerouteError(misroutedError);
+    }
+  }
+
+  /// Sends an error EOS to the receiver over a new stream, once. This is best effort: the stream reaches the receiver
+  /// only if DNS returns its new address by now, and if the stream starts after the refresh took effect. Otherwise it
+  /// is rejected too, and unless another error reaches the receiver, it waits until the query deadline. A later data
+  /// send of this mailbox still fails the stage, which tells the other receivers at once.
+  private void rerouteError(String errorMessage) {
+    try {
+      DataBlock errorBlock = MseBlockSerializer.toDataBlock(
+          ErrorMseBlock.fromError(QueryErrorCode.SERVER_NOT_RESPONDING, errorMessage), List.of());
+      List<ByteString> byteStrings = toByteStrings(errorBlock, _maxByteStringSize);
+      ClientCallStreamObserver<MailboxContent> observer = openStream(new StreamObserver<>() {
+        @Override
+        public void onNext(MailboxStatus value) {
+        }
+
+        @Override
+        public void onError(Throwable t) {
+          if (ReceiverIdentity.isMisrouted(t)) {
+            LOGGER.warn("Could not tell the receiver of mailbox: {} about the error, the connection to {}:{} still "
+                + "leads to {}", _id, _hostname, _port, ReceiverIdentity.getMisroutedTo(t));
+            _onMisrouted.run();
+            _channelManager.refreshChannel(_hostname, _port);
+          } else {
+            LOGGER.debug("Could not tell the receiver of mailbox: {} about the error", _id, t);
+          }
+        }
+
+        @Override
+        public void onCompleted() {
+        }
+      });
+      for (int i = 0; i < byteStrings.size(); i++) {
+        observer.onNext(MailboxContent.newBuilder()
+            .setMailboxId(_id)
+            .setPayload(byteStrings.get(i))
+            .setWaitForMore(i < byteStrings.size() - 1)
+            .build());
+      }
+      observer.onCompleted();
+    } catch (Exception e) {
+      LOGGER.warn("Could not tell the receiver of mailbox: {} about the error", _id, e);
+    }
   }
 
   protected void sendContent(ByteString byteString, boolean waitForMore) {

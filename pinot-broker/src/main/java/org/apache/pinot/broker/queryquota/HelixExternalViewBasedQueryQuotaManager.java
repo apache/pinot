@@ -46,6 +46,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -235,6 +236,27 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     return tableConfig.getQuotaConfig();
   }
 
+  @Override
+  public QuotaEnforcementMode getQueryQuotaEnforcementMode(String tableName) {
+    List<String> entityNames = TableNameBuilder.getTableTypeFromTableName(tableName) != null ? List.of(tableName)
+        : List.of(tableName, TableNameBuilder.OFFLINE.tableNameWithType(tableName),
+            TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    QuotaEnforcementMode result = null;
+    for (String entityName : entityNames) {
+      // Skip tables without a QPS quota (listed with a null rate limiter): they cannot breach, so their default mode
+      // must not turn a breach of the other side of a hybrid table into a rejection
+      QueryQuotaEntity queryQuotaEntity = _rateLimiterMap.get(entityName);
+      if (queryQuotaEntity == null || queryQuotaEntity.getRateLimiter() == null) {
+        continue;
+      }
+      QuotaEnforcementMode mode = queryQuotaEntity.getEnforcementMode();
+      if (result == null || mode.isStricterThan(result)) {
+        result = mode;
+      }
+    }
+    return result != null ? result : QuotaEnforcementMode.ENFORCED;
+  }
+
   /// Create or update a rate limiter for a table.
   /// @param physicalOrLogicalTableName physical or logical table name.
   /// @param brokerResource broker resource which stores all the broker states of each table.
@@ -305,6 +327,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
               + "per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}",
           physicalOrLogicalTableName, overallRate, previousRate, perBrokerRate, onlineCount, tableStat.getVersion());
     }
+    QuotaEnforcementMode enforcementMode = quotaConfig.getQueryQuotaEnforcementMode();
+    queryQuotaEntity.setEnforcementMode(enforcementMode != null ? enforcementMode : QuotaEnforcementMode.ENFORCED);
     addMaxBurstQPSCallbackTableGaugeIfNeeded(physicalOrLogicalTableName, queryQuotaEntity);
     addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(physicalOrLogicalTableName, queryQuotaEntity);
     if (isQueryRateLimitDisabled()) {
@@ -715,6 +739,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   @VisibleForTesting
   public void cleanUpRateLimiterMap() {
     _rateLimiterMap.clear();
+    _lastKnownBrokerResourceVersion.set(-1);
   }
 
   /// Process query quota change when number of online brokers has changed.

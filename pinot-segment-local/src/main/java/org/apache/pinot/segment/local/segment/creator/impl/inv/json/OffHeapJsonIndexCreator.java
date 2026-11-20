@@ -74,7 +74,18 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
       throws IOException {
     super(indexDir, columnName, tableNameWithType, continueOnError, jsonIndexConfig);
     _postingListFile = new File(_tempDir, POSTING_LIST_FILE_NAME);
-    _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
+    try {
+      _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
+    } catch (Throwable t) {
+      // The base constructor already created the temp dir, but a failure here leaves the caller without an instance to
+      // close, so the temp dir has to be cleaned up here. Call super.close() because close() dereferences the stream.
+      try {
+        super.close();
+      } catch (Throwable cleanupFailure) {
+        t.addSuppressed(cleanupFailure);
+      }
+      throw t;
+    }
   }
 
   @Override
@@ -223,6 +234,18 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
     docIds.serialize(finalPostingListOutputStream);
 
     _numPostingLists++;
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    // NOTE: seal() already closes the stream before reading the posting list file back, but it is not reached when
+    //       add() fails. Closing the stream again here is safe because nothing is written in between.
+    try {
+      _postingListOutputStream.close();
+    } finally {
+      super.close();
+    }
   }
 
   private static class ChunkIterator implements Iterator<PostingListEntry> {

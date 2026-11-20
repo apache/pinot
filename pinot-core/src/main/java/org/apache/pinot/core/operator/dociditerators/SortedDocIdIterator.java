@@ -61,6 +61,29 @@ public final class SortedDocIdIterator implements BlockDocIdIterator {
   }
 
   @Override
+  public int nextBatch(int[] output, int maxDocs) {
+    int size = 0;
+    while (size < maxDocs) {
+      IntPair currentRange = _docIdRanges.get(_currentRangeId);
+      if (_nextDocId > currentRange.getRight()) {
+        if (_currentRangeId == _numRanges - 1) {
+          break;
+        }
+        currentRange = _docIdRanges.get(++_currentRangeId);
+        _nextDocId = currentRange.getLeft();
+      }
+      int nextDocId = _nextDocId;
+      int numDocs = Math.min(maxDocs - size, currentRange.getRight() - nextDocId + 1);
+      for (int i = 0; i < numDocs; i++) {
+        output[size + i] = nextDocId + i;
+      }
+      size += numDocs;
+      _nextDocId += numDocs;
+    }
+    return size;
+  }
+
+  @Override
   public int advance(int targetDocId) {
     IntPair currentRange = _docIdRanges.get(_currentRangeId);
     if (targetDocId <= currentRange.getRight()) {

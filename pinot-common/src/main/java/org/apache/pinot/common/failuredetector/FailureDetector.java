@@ -46,6 +46,16 @@ public interface FailureDetector {
   /// does not know about this server.
   void registerUnhealthyServerRetrier(Function<String, ServerState> unhealthyServerRetrier);
 
+  /// Registers a function that checks a server which left a query unanswered (see [#notifyServerNotResponded]). It is
+  /// called with the instanceId of the server and should return [ServerState#UNHEALTHY] only if the server is not
+  /// answering at all, and [ServerState#HEALTHY] or [ServerState#UNKNOWN] otherwise.
+  ///
+  /// Kept apart from the retriers on purpose. A retrier answers whether an unhealthy server has recovered, and may err
+  /// towards keeping it out -- the multi-stage one reports an idle gRPC channel as unhealthy. A checker decides whether
+  /// a server that is in routing comes out, so it must only report a server that verifiably failed to answer.
+  default void registerServerNotRespondedChecker(Function<String, ServerState> serverNotRespondedChecker) {
+  }
+
   /// Registers a consumer that will be called with the instanceId of a server that is detected as healthy.
   void registerHealthyServerNotifier(Consumer<String> healthyServerNotifier);
 
@@ -72,6 +82,19 @@ public interface FailureDetector {
 
   /// Marks a server as unhealthy.
   void markServerUnhealthy(String instanceId, @Nullable String hostName);
+
+  /// Notifies the detector that a server left a query unanswered until the query deadline, without its connection
+  /// ever breaking.
+  ///
+  /// A server whose node is gone, whose network path is blackholed, or whose JVM is frozen produces no other signal.
+  /// Writing into an open socket succeeds even when the peer is gone, so there is no send exception, the channel is
+  /// never torn down, and connection-failure detection cannot see it. The query simply times out.
+  ///
+  /// A timeout alone cannot tell such a server from one that is merely busy, so implementations must check the server
+  /// with the registered checkers (see [#registerServerNotRespondedChecker]) before acting on it, and do nothing when
+  /// none is registered.
+  default void notifyServerNotResponded(String instanceId, @Nullable String hostName) {
+  }
 
   /// Returns all the unhealthy servers.
   Set<String> getUnhealthyServers();

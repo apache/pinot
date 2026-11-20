@@ -59,17 +59,17 @@ public abstract class AbstractAggregationFunctionBenchmark {
   /// This method will be called in the benchmark method, so it must be fast.
   protected abstract Map<ExpressionContext, BlockValSet> getBlockValSetMap();
 
-  /// Returns the comparable final result extracted from the aggregation result holder.
+  /// Returns the final result extracted from the aggregation result holder.
   ///
   /// This method will be called in the benchmark method, so it must be fast.
-  protected Comparable extractFinalResult(AggregationResultHolder aggregationResultHolder) {
+  protected Object extractFinalResult(AggregationResultHolder aggregationResultHolder) {
     return getAggregationFunction().extractFinalResult(aggregationResultHolder.getResult());
   }
 
   /// Verifies the final result of the aggregation function.
   ///
   /// This method will be called in the benchmark method, so it must be fast.
-  protected void verifyResult(Blackhole bh, Comparable finalResult, Object expectedResult) {
+  protected void verifyResult(Blackhole bh, Object finalResult, Object expectedResult) {
     if (expectedResult == null) {
       Preconditions.checkArgument(finalResult == null, "Expected final result to be null, actual: %s", finalResult);
       return;
@@ -192,7 +192,7 @@ public abstract class AbstractAggregationFunctionBenchmark {
 
     getAggregationFunction().aggregate(DocIdSetPlanNode.MAX_DOC_PER_CALL, resultHolder, blockValSetMap);
 
-    Comparable finalResult = extractFinalResult(resultHolder);
+    Object finalResult = extractFinalResult(resultHolder);
 
     verifyResult(bh, finalResult, getExpectedResult());
   }

@@ -38,6 +38,7 @@ public class RecordingStreamConsumerFactory extends FakeStreamConsumerFactory {
   static final AtomicReference<RetryPolicy> LAST_RETRY_POLICY = new AtomicReference<>();
   static final AtomicBoolean FAIL_CREATE = new AtomicBoolean();
   static final AtomicReference<Runnable> BEFORE_CREATE_WITH_POLICY = new AtomicReference<>();
+  static final AtomicReference<Runnable> AFTER_START = new AtomicReference<>();
   static final AtomicReference<RuntimeException> START_FAILURE = new AtomicReference<>();
   static final AtomicBoolean FAIL_CLOSE = new AtomicBoolean();
   static final AtomicReference<MessageBatch<?>> MESSAGE_BATCH = new AtomicReference<>();
@@ -50,6 +51,7 @@ public class RecordingStreamConsumerFactory extends FakeStreamConsumerFactory {
     LAST_RETRY_POLICY.set(null);
     FAIL_CREATE.set(false);
     BEFORE_CREATE_WITH_POLICY.set(null);
+    AFTER_START.set(null);
     CLOSE_COUNT.set(0);
     FAILED_START_CLOSE_COUNT.set(0);
     START_FAILURE.set(null);
@@ -99,6 +101,10 @@ public class RecordingStreamConsumerFactory extends FakeStreamConsumerFactory {
       if (failure != null) {
         _startFailed = true;
         throw failure;
+      }
+      Runnable afterStart = AFTER_START.get();
+      if (afterStart != null) {
+        afterStart.run();
       }
     }
 

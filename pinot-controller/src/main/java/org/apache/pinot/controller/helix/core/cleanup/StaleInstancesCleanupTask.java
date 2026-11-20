@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -141,9 +142,11 @@ public class StaleInstancesCleanupTask extends BasePeriodicTask {
   private Set<String> getServerInstancesInUse() {
     Set<String> serverInstancesInUse = new HashSet<>();
     _pinotHelixResourceManager.getAllTables().forEach(tableName ->
-        Optional.ofNullable(_pinotHelixResourceManager.getTableIdealState(tableName))
-            .ifPresent(is -> is.getPartitionSet()
-                .forEach(partitionName -> serverInstancesInUse.addAll(is.getInstanceSet(partitionName)))));
+        Optional.ofNullable(_pinotHelixResourceManager.getTableIdealState(tableName)).ifPresent(is -> {
+          is.getPartitionSet().forEach(partitionName -> serverInstancesInUse.addAll(is.getInstanceSet(partitionName)));
+          // The instances of the partition assignment are in use although they might host no segment
+          serverInstancesInUse.addAll(PartitionAssignmentUtils.getAllInstances(is));
+        }));
     return serverInstancesInUse;
   }
 }

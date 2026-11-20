@@ -34,6 +34,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.restlet.resources.RebalancePreCheckerResult;
@@ -41,6 +42,7 @@ import org.apache.pinot.common.restlet.resources.RebalanceResult;
 import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
@@ -69,6 +71,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.testng.Assert.*;
 
@@ -898,6 +901,12 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (Map.Entry<String, Map<String, String>> entry : oldSegmentAssignment.entrySet()) {
       assertEquals(entry.getValue().size(), numReplicas);
     }
+    // With strict replica-group routing, the partition assignment holds every partition on the instances hosting its
+    // segments
+    InstancePartitions consumingInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
+            InstancePartitionsUtils.getInstancePartitionsName(REALTIME_TABLE_NAME, InstancePartitionsType.CONSUMING));
+    verifyPartitionAssignment(numPartitions, consumingInstancePartitions, oldSegmentAssignment);
 
     // Verify that segments are distributed equally across servers
     Map<String, Integer> numSegmentsPerServer = getNumSegmentsPerServer(oldSegmentAssignment);
@@ -954,6 +963,12 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // which partitions are assigned to instances (see InstanceReplicaGroupPartitionSelector)
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getTotalSegmentsToBeMoved(), 130);
 
+    // Drop the partition assignment, as for a table created before it was introduced: the rebalance must populate it
+    HelixHelper.updateIdealState(_helixManager, REALTIME_TABLE_NAME, idealState -> {
+      PartitionAssignmentUtils.setPartitionAssignment(idealState, Map.of());
+      return idealState;
+    });
+
     // Rebalance with reassignInstances and minimizeDataMovement enabled
     rebalanceConfig.setMinimizeDataMovement(Enablement.ENABLE);
     rebalanceConfig.setDryRun(false);
@@ -964,6 +979,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     instancePartitions = instanceAssignment.get(InstancePartitionsType.CONSUMING);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
+    verifyPartitionAssignment(numPartitions, instancePartitions, rebalanceResult.getSegmentAssignment());
 
     // Get number of segments moved
     int numSegmentsMoved = getNumSegmentsMoved(oldSegmentAssignment, rebalanceResult.getSegmentAssignment());
@@ -1003,11 +1019,38 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         }
       }
     }
+    verifyPartitionAssignment(newNumPartitions, instancePartitions, rebalanceResult.getSegmentAssignment());
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 
     for (int i = 0; i < numServers + numServersToAdd; i++) {
       stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
+    }
+  }
+
+  /// Verifies that the partition assignment of the realtime table holds every partition on the first instance of its
+  /// instance partition in each replica-group, and that every segment with ONLINE or CONSUMING replicas is on the
+  /// instances of a partition.
+  private void verifyPartitionAssignment(int numPartitions, InstancePartitions instancePartitions,
+      Map<String, Map<String, String>> segmentAssignment) {
+    Map<Integer, List<String>> partitionAssignment =
+        PartitionAssignmentUtils.getPartitionAssignment(_helixResourceManager.getTableIdealState(REALTIME_TABLE_NAME));
+    assertEquals(partitionAssignment.size(), numPartitions);
+    Set<List<String>> partitionInstances = new HashSet<>();
+    for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
+      List<String> expectedInstances = new ArrayList<>(instancePartitions.getNumReplicaGroups());
+      for (int replicaGroupId = 0; replicaGroupId < instancePartitions.getNumReplicaGroups(); replicaGroupId++) {
+        expectedInstances.add(instancePartitions.getInstances(partitionId, replicaGroupId).get(0));
+      }
+      List<String> instances = partitionAssignment.get(partitionId);
+      assertEquals(instances, PartitionAssignmentUtils.toInstanceList(expectedInstances));
+      partitionInstances.add(instances);
+    }
+    for (Map<String, String> instanceStateMap : segmentAssignment.values()) {
+      if (instanceStateMap.containsValue(ONLINE) || instanceStateMap.containsValue(CONSUMING)) {
+        assertTrue(partitionInstances.contains(PartitionAssignmentUtils.toInstanceList(instanceStateMap.keySet())),
+            "Segment on instances: " + instanceStateMap.keySet() + " is not on the instances of a partition");
+      }
     }
   }
 

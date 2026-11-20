@@ -30,6 +30,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -123,8 +124,8 @@ public class PageCacheWarmupServerQueryExecutorTest {
     String table = "testTable";
 
     // Mock QueryScheduler to return an already‑completed future
-    when(_queryScheduler.submit(any())).thenAnswer(inv ->
-        com.google.common.util.concurrent.Futures.immediateFuture(new byte[0]));
+    when(_queryScheduler.submitResponse(any())).thenAnswer(inv ->
+        com.google.common.util.concurrent.Futures.immediateFuture(PinotByteBuffer.wrap(new byte[0])));
 
     PageCacheWarmupConfig.Spec warmSpec = new PageCacheWarmupConfig.Spec(true, 2, null, null);
 
@@ -157,7 +158,7 @@ public class PageCacheWarmupServerQueryExecutorTest {
     _warmupServerQueryExecutor.warmupTable(table, warmSpec, queries, null, warmupQps);
 
     // Submit should be called once per query
-    verify(_queryScheduler, times(queries.size())).submit(any());
+    verify(_queryScheduler, times(queries.size())).submitResponse(any());
 
     // No error metric should be recorded
     verify(ServerMetrics.get(), never())

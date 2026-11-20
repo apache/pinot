@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.RelTraitSet;
@@ -38,6 +39,8 @@ import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalAsofJoin;
 import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
@@ -83,6 +86,24 @@ public class PinotRuleUtils {
     } else {
       return rel;
     }
+  }
+
+  /// Appends literal arguments to the immediate project, preserving existing column references.
+  public static RelNode appendAggregateLiterals(RelNode input, List<RexNode> literals) {
+    RelNode rel = unboxRel(input);
+    if (rel instanceof Project) {
+      Project project = (Project) rel;
+      List<RexNode> projects = new ArrayList<>(project.getProjects());
+      projects.addAll(literals);
+      return LogicalProject.create(project.getInput(), project.getHints(), projects, (List<String>) null, Set.of());
+    }
+    RexBuilder rexBuilder = input.getCluster().getRexBuilder();
+    List<RexNode> projects = new ArrayList<>(input.getRowType().getFieldCount() + literals.size());
+    for (int i = 0; i < input.getRowType().getFieldCount(); i++) {
+      projects.add(rexBuilder.makeInputRef(input, i));
+    }
+    projects.addAll(literals);
+    return LogicalProject.create(input, List.of(), projects, (List<String>) null, Set.of());
   }
 
   public static boolean isExchange(RelNode rel) {

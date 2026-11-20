@@ -144,8 +144,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
     reducerConfig.put(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerPort);
-    _mailboxService =
-        new MailboxService(_reducerHostname, _reducerPort, InstanceType.BROKER, new PinotConfiguration(reducerConfig));
+    // The broker id of the test planner, so that the reducer checks that every stream it receives is meant for it
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, InstanceType.BROKER,
+        new PinotConfiguration(reducerConfig), null, null, "Broker_localhost");
     _mailboxService.start();
 
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1, getConfiguration());
@@ -576,6 +577,19 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Assert.assertNull(queryResult.getProcessingException(), "Query failed: " + queryResult.getProcessingException());
     // The RLS filter keeps only the two rows with col3 = 42.
     compareRowEquals(queryResult.getResultTable(), List.of(new Object[]{"bar", 1}, new Object[]{"bob", 1}), true);
+  }
+
+  /// The leaf stage applies the RLS filter before the user filter. The user expression is a number on the rows that
+  /// the RLS filter allows (`col3 = 42`: bar and bob) and throws on every other row, so the query fails if the leaf
+  /// evaluates it on a hidden row.
+  @Test
+  public void testUserFilterDoesNotRunOnRowsHiddenByRowLevelSecurity() {
+    String sql = "SELECT col1 FROM b WHERE CAST(REPLACE(REPLACE(col1, 'bar', '1'), 'bob', '2') AS INT) > 0 "
+        + "ORDER BY col1";
+    Map<String, String> rlsFilters = Map.of(RlsUtils.buildRlsFilterKey("b"), "col3 > 1");
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, false, rlsFilters);
+    Assert.assertNull(queryResult.getProcessingException(), "Query failed: " + queryResult.getProcessingException());
+    compareRowEquals(queryResult.getResultTable(), List.of(new Object[]{"bar"}, new Object[]{"bob"}), true);
   }
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")

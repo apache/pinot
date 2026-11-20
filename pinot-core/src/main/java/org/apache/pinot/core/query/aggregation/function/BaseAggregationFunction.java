@@ -35,7 +35,7 @@ import org.roaringbitmap.IntIterator;
 ///
 /// Code that is not an [AggregationFunction] at all, such as the funnel aggregation strategies, calls
 /// [NullSkippingUtils] directly instead.
-public abstract class BaseAggregationFunction<I, F extends Comparable> implements AggregationFunction<I, F> {
+public abstract class BaseAggregationFunction<I, F> implements AggregationFunction<I, F> {
   protected final boolean _nullHandlingEnabled;
 
   public BaseAggregationFunction(boolean nullHandlingEnabled) {

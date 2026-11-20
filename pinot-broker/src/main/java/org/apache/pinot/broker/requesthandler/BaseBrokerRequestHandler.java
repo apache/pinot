@@ -58,6 +58,8 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -73,8 +75,9 @@ import org.slf4j.LoggerFactory;
 
 
 @ThreadSafe
-public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
+public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler, PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
+  private static final String ALL_ROLES_QUERY_FINGERPRINTING = "pinot.all.enable.query.fingerprinting";
   protected final PinotConfiguration _config;
   protected final String _brokerId;
   protected final RoutingManager _routingManager;
@@ -89,6 +92,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final long _brokerTimeoutMs;
   protected final boolean _enableRowColumnLevelAuth;
   protected final QueryLogger _queryLogger;
+  private final boolean _queryFingerprintingBrokerDefault;
+  protected volatile boolean _enableQueryFingerprinting;
   @Nullable
   protected final String _enableNullHandling;
   @Nullable
@@ -106,6 +111,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /// Resolves the approximate-function rewrite defaults, live from the Helix cluster config. Registered as a
   /// listener by the broker starter through [#getApproximateFunctionOverrideProvider()].
   protected final ApproximateFunctionOverrideProvider _approximateFunctionOverrideProvider;
+  /// Resolves the default of the `inferAnyValueType` query option, live from the Helix cluster config. Registered as a
+  /// listener by the broker starter through [#getInferAnyValueTypeProvider()].
+  protected final InferAnyValueTypeProvider _inferAnyValueTypeProvider;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
@@ -121,6 +129,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _threadAccountant = threadAccountant;
     _multiClusterRoutingContext = multiClusterRoutingContext;
     _approximateFunctionOverrideProvider = new ApproximateFunctionOverrideProvider(config);
+    _inferAnyValueTypeProvider = new InferAnyValueTypeProvider(config);
     _brokerMetrics = BrokerMetrics.get();
     _brokerQueryEventListener = BrokerQueryEventListenerFactory.getBrokerQueryEventListener();
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();
@@ -128,6 +137,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _enableRowColumnLevelAuth = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
         Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH);
     _queryLogger = new QueryLogger(config);
+    _queryFingerprintingBrokerDefault = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+        Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
+    updateQueryFingerprinting(_queryFingerprintingBrokerDefault);
     _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
     _regexDictSizeThreshold = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD);
     _enableQueryCancellation = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION,
@@ -147,6 +159,42 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /// with the cluster config change handler so that the defaults reload without a restart.
   public ApproximateFunctionOverrideProvider getApproximateFunctionOverrideProvider() {
     return _approximateFunctionOverrideProvider;
+  }
+
+  /// Returns the provider that resolves the default of the `inferAnyValueType` query option. The broker starter
+  /// registers it with the cluster config change handler so that the default reloads without a restart.
+  public InferAnyValueTypeProvider getInferAnyValueTypeProvider() {
+    return _inferAnyValueTypeProvider;
+  }
+
+  /// Applies the live cluster override. Removing it restores the broker configuration (enabled by default).
+  /// Literal-value SQL redaction always requires fingerprinting, including when the override is `false`.
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING)
+        && !changedConfigs.contains(ALL_ROLES_QUERY_FINGERPRINTING)) {
+      return;
+    }
+    String key = clusterConfigs.containsKey(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING)
+        ? Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING : ALL_ROLES_QUERY_FINGERPRINTING;
+    String enabled = clusterConfigs.get(key);
+    if (enabled != null && !"true".equalsIgnoreCase(enabled.trim()) && !"false".equalsIgnoreCase(enabled.trim())) {
+      LOGGER.warn("Ignoring invalid value '{}' for {}", enabled, key);
+      return;
+    }
+    updateQueryFingerprinting(
+        enabled != null ? Boolean.parseBoolean(enabled.trim()) : _queryFingerprintingBrokerDefault);
+    LOGGER.info("Updated query fingerprinting: enabled: {}", _enableQueryFingerprinting);
+  }
+
+  private void updateQueryFingerprinting(boolean enabled) {
+    boolean redactionNeedsFingerprinting =
+        _queryLogger.getSqlRedactionMode() == QueryLogger.SqlRedactionMode.LITERAL_VALUES;
+    if (redactionNeedsFingerprinting && !enabled) {
+      LOGGER.warn("SQL redaction mode 'literal_values' requires query fingerprinting. "
+          + "Enabling query fingerprinting automatically.");
+    }
+    _enableQueryFingerprinting = enabled || redactionNeedsFingerprinting;
   }
 
   @Override
@@ -214,6 +262,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_enableAutoRewriteAggregationType != null) {
       sqlNodeAndOptions.getOptions()
           .putIfAbsent(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE, _enableAutoRewriteAggregationType);
+    }
+
+    if (_inferAnyValueTypeProvider.isEnabled()) {
+      sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.INFER_ANY_VALUE_TYPE, "true");
     }
 
     if (_regexDictSizeThreshold != null) {
@@ -311,15 +363,41 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return true;
     }
     for (String tableName : tableNames) {
-      if (!_queryQuotaManager.acquire(tableName)) {
+      if (isTableQpsQuotaBreachEnforced(tableName)) {
         LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
         return true;
       }
     }
     return false;
+  }
+
+  ///  Acquires the QPS quota of the given table (name with or without type suffix) and returns true only if the quota
+  ///  is breached and the table's enforcement mode requires rejecting the query.
+  protected boolean isTableQpsQuotaBreachEnforced(String tableName) {
+    return !_queryQuotaManager.acquire(tableName) && shouldEnforceQpsQuotaBreach(tableName);
+  }
+
+  ///  Same as [#isTableQpsQuotaBreachEnforced(String)] for a logical table.
+  protected boolean isLogicalTableQpsQuotaBreachEnforced(String logicalTableName) {
+    return !_queryQuotaManager.acquireLogicalTable(logicalTableName)
+        && shouldEnforceQpsQuotaBreach(logicalTableName);
+  }
+
+  /// Meters a QPS quota breach of the given table and returns whether its enforcement mode requires rejecting the
+  /// query. The mode is only resolved on a breach, so that queries within quota do not pay for it.
+  private boolean shouldEnforceQpsQuotaBreach(String tableName) {
+    QuotaEnforcementMode enforcementMode = _queryQuotaManager.getQueryQuotaEnforcementMode(tableName);
+    if (enforcementMode == QuotaEnforcementMode.DISABLED) {
+      return false;
+    }
+    _brokerMetrics.addMeteredTableValue(TableNameBuilder.extractRawTableName(tableName),
+        BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
+    if (enforcementMode == QuotaEnforcementMode.SHADOW) {
+      LOGGER.warn("Query exceeds quota for table: {}, but enforcement mode is SHADOW, allowing the query", tableName);
+      return false;
+    }
+    return true;
   }
 
   protected void updatePhaseTimingForTables(Set<String> tableNames, BrokerQueryPhase phase, long time) {

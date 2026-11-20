@@ -29,6 +29,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentLoader;
@@ -97,6 +98,9 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
     SegmentDirectory segmentDirectory;
     if (!destDir.exists()) {
       segmentDirectory = new SegmentLocalFSDirectory(destDir);
+    } else if (segmentLoaderContext.isMappedMetadataEnabled()) {
+      segmentDirectory = new SegmentLocalFSDirectory(destDir, SegmentMetadataImpl.loadEagerSnapshot(destDir),
+          segmentLoaderContext.getReadMode(), null);
     } else {
       segmentDirectory = new SegmentLocalFSDirectory(destDir, segmentLoaderContext.getReadMode());
     }

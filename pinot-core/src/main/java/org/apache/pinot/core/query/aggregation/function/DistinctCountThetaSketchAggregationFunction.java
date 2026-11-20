@@ -44,7 +44,6 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -52,6 +51,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -81,6 +81,9 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountThetaSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<List<ThetaSketchAccumulator>, Comparable> {
+  private static final int LIST_TYPE = 21;
+  private static final int THETA_SKETCH_ACCUMULATOR_TYPE = 47;
+
   private static final String SET_UNION = "setunion";
   private static final String SET_INTERSECT = "setintersect";
   private static final String SET_DIFF = "setdiff";
@@ -1318,8 +1321,6 @@ public class DistinctCountThetaSketchAggregationFunction
         mergedAccumulators.add(thetaSketchAccumulator1);
         continue;
       }
-      thetaSketchAccumulator1.setSetOperationBuilder(_setOperationBuilder);
-      thetaSketchAccumulator1.setThreshold(_accumulatorThreshold);
       thetaSketchAccumulator1.merge(thetaSketchAccumulator2);
       mergedAccumulators.add(thetaSketchAccumulator1);
     }
@@ -1332,10 +1333,8 @@ public class DistinctCountThetaSketchAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(
-      List<ThetaSketchAccumulator> thetaSketchAccumulators) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.List.getValue(),
-        serialize(thetaSketchAccumulators));
+  public SerializedResult serializeIntermediateResult(List<ThetaSketchAccumulator> thetaSketchAccumulators) {
+    return new SerializedBytes(LIST_TYPE, serialize(thetaSketchAccumulators));
   }
 
   private static byte[] serialize(List<ThetaSketchAccumulator> thetaSketchAccumulators) {
@@ -1347,19 +1346,18 @@ public class DistinctCountThetaSketchAggregationFunction
     }
 
     // Besides the value bytes, we store: size, value type, length for each value
-    long bufferSize = (2 + (long) size) * Integer.BYTES;
+    int bufferSize = (2 + size) * Integer.BYTES;
     byte[][] valueBytesArray = new byte[size][];
     int index = 0;
     for (ThetaSketchAccumulator value : thetaSketchAccumulators) {
-      byte[] valueBytes = ObjectSerDeUtils.DATA_SKETCH_THETA_ACCUMULATOR_SER_DE.serialize(value);
-      bufferSize += valueBytes.length;
+      byte[] valueBytes = value.getResult().toByteArray();
+      bufferSize = Math.addExact(bufferSize, valueBytes.length);
       valueBytesArray[index++] = valueBytes;
     }
-    Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
-    byte[] bytes = new byte[(int) bufferSize];
+    byte[] bytes = new byte[bufferSize];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     byteBuffer.putInt(size);
-    byteBuffer.putInt(ObjectSerDeUtils.ObjectType.ThetaSketchAccumulator.getValue());
+    byteBuffer.putInt(THETA_SKETCH_ACCUMULATOR_TYPE);
     for (byte[] valueBytes : valueBytesArray) {
       byteBuffer.putInt(valueBytes.length);
       byteBuffer.put(valueBytes);
@@ -1381,7 +1379,8 @@ public class DistinctCountThetaSketchAggregationFunction
       int numBytes = buffer.getInt();
       ByteBuffer slice = buffer.slice();
       slice.limit(numBytes);
-      thetaSketchAccumulators.add(ObjectSerDeUtils.DATA_SKETCH_THETA_ACCUMULATOR_SER_DE.deserialize(slice));
+      thetaSketchAccumulators.add(new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold,
+          ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(slice)));
       buffer.position(buffer.position() + numBytes);
     }
     return thetaSketchAccumulators;
@@ -1402,8 +1401,6 @@ public class DistinctCountThetaSketchAggregationFunction
 
     for (Object accumulatorObject : accumulators) {
       ThetaSketchAccumulator accumulator = convertSketchAccumulator(accumulatorObject);
-      accumulator.setThreshold(_accumulatorThreshold);
-      accumulator.setSetOperationBuilder(_setOperationBuilder);
       mergedSketches.add(accumulator.getResult());
     }
 
@@ -1678,7 +1675,7 @@ public class DistinctCountThetaSketchAggregationFunction
     ThetaSketch[] sketches = new ThetaSketch[length];
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        sketches[i] = ThetaSketch.wrap(MemorySegment.ofArray(serializedSketches[i]).asReadOnly());
+        sketches[i] = ThetaSketch.wrap(MemorySegment.ofArray(serializedSketches[i]));
       }
     });
     return sketches;

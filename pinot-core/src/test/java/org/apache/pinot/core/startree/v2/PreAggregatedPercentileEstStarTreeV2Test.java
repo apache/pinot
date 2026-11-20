@@ -19,7 +19,6 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileEstValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
@@ -48,7 +47,7 @@ public class PreAggregatedPercentileEstStarTreeV2Test extends BaseStarTreeV2Test
     QuantileDigest quantileDigest = new QuantileDigest(MAX_ERROR);
     quantileDigest.add(random.nextInt(MAX_VALUE));
     quantileDigest.add(random.nextInt(MAX_VALUE));
-    return ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest);
+    return quantileDigest.toBytes();
   }
 
   @Override

@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.assignment.segment.OfflineSegmentAssignment;
@@ -62,7 +62,7 @@ public class BalancedNumSegmentAssignmentStrategyTest {
   public void setUp() {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig, null);
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig);
 
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
@@ -80,7 +80,8 @@ public class BalancedNumSegmentAssignmentStrategyTest {
 
   @Test
   public void testAssignSegment() {
-    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    IdealState idealState = new IdealState(RAW_TABLE_NAME);
+    Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
 
     // Segment 0 should be assigned to instance 0, 1, 2
     // Segment 1 should be assigned to instance 3, 4, 5
@@ -91,25 +92,26 @@ public class BalancedNumSegmentAssignmentStrategyTest {
     int expectedAssignedInstanceId = 0;
     for (String segmentName : SEGMENTS) {
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
+          _segmentAssignment.assignSegment(segmentName, idealState, _instancePartitionsMap);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
       for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
         assertEquals(instancesAssigned.get(replicaId), INSTANCES.get(expectedAssignedInstanceId));
         expectedAssignedInstanceId = (expectedAssignedInstanceId + 1) % NUM_INSTANCES;
       }
-      currentAssignment
-          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
   }
 
   @Test
   public void testTableBalanced() {
-    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    IdealState idealState = new IdealState(RAW_TABLE_NAME);
+    Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
     for (String segmentName : SEGMENTS) {
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
-      currentAssignment
-          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+          _segmentAssignment.assignSegment(segmentName, idealState, _instancePartitionsMap);
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // There should be 100 segments assigned
@@ -126,26 +128,26 @@ public class BalancedNumSegmentAssignmentStrategyTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new RebalanceConfig()),
-        currentAssignment);
+    assertEquals(_segmentAssignment.rebalanceTable(idealState, _instancePartitionsMap, null, null,
+        new RebalanceConfig()).getSegmentAssignment(), currentAssignment);
   }
 
   @Test
   public void testBootstrapTable() {
-    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    IdealState idealState = new IdealState(RAW_TABLE_NAME);
+    Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
     for (String segmentName : SEGMENTS) {
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
-      currentAssignment
-          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+          _segmentAssignment.assignSegment(segmentName, idealState, _instancePartitionsMap);
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // Bootstrap table should reassign all segments based on their alphabetical order
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setBootstrap(true);
-    Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, rebalanceConfig);
+    Map<String, Map<String, String>> newAssignment = _segmentAssignment.rebalanceTable(idealState,
+        _instancePartitionsMap, null, null, rebalanceConfig).getSegmentAssignment();
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     List<String> sortedSegments = new ArrayList<>(SEGMENTS);
     sortedSegments.sort(null);
