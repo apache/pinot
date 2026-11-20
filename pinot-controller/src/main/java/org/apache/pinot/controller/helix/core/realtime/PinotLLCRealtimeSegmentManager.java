@@ -174,7 +174,6 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f);
   public static final String COMMITTING_SEGMENTS = "committingSegments";
   private static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
-  private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
   // Not imported: the controller's own Constants class is already imported here.
   private static final String METADATA_TAR_GZ_FILE_EXT =
       org.apache.pinot.spi.ingestion.batch.spec.Constants.METADATA_TAR_GZ_FILE_EXT;
@@ -233,9 +232,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     _clusterName = helixResourceManager.getHelixClusterName();
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
-    _metadataEventNotifierFactory =
-        MetadataEventNotifierFactory.loadFactory(controllerConf.subset(METADATA_EVENT_NOTIFIER_PREFIX),
-            helixResourceManager);
+    _metadataEventNotifierFactory = MetadataEventNotifierFactory.loadFactory(
+        controllerConf.subset(CommonConstants.Minion.METADATA_EVENT_OBSERVER_PREFIX), helixResourceManager);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
 
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
