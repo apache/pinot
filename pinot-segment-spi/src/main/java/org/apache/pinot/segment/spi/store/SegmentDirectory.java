@@ -101,6 +101,13 @@ public abstract class SegmentDirectory implements Closeable {
   public abstract void reloadMetadata()
       throws Exception;
 
+  /// Switches to mapped segment metadata, for a directory that supports it, after preprocessing and before the segment
+  /// is queryable. The serving load calls this only when mapped segment metadata is enabled. The default keeps the
+  /// current metadata.
+  public void loadMappedMetadata()
+      throws IOException {
+  }
+
   /// Get the path/URL for the directory
   public abstract Path getPath();
 
@@ -109,6 +116,14 @@ public abstract class SegmentDirectory implements Closeable {
   /// Get the columns with specific index type, in this local segment directory.
   /// @return a set of columns with such index type.
   public abstract Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type);
+
+  /// Returns whether this segment directory serves buffers through [#prefetch], [#acquire] and [#release]. When it
+  /// returns false, those calls are no-ops, so a fetch planner can skip planning a [FetchContext] for the segment,
+  /// letting query execution skip the fetch lifecycle altogether. Directories that override the fetch calls must
+  /// return true. The value must not change over the lifetime of the directory.
+  public boolean requiresFetch() {
+    return false;
+  }
 
   /// This is a hint to the segment directory, to begin prefetching buffers for given context.
   /// Typically, this should be an async call made before operating on the segment.

@@ -44,6 +44,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -273,8 +274,8 @@ public class PageCacheWarmupServerQueryExecutor {
         _serverMetrics.addMeteredGlobalValue(ServerMeter.PAGE_CACHE_WARMUP_QUERIES, 1L);
 
         // Execute query with timeout
-        ListenableFuture<byte[]> listenableFuture = _queryScheduler.submit(serverQueryRequest);
-        CompletableFuture<byte[]> queryFuture = toCompletableFuture(listenableFuture);
+        ListenableFuture<DataBuffer> listenableFuture = _queryScheduler.submitResponse(serverQueryRequest);
+        CompletableFuture<DataBuffer> queryFuture = toCompletableFuture(listenableFuture);
         CompletableFuture<Void> trackedFuture = queryFuture.orTimeout(remainingWarmupTimeMs, TimeUnit.MILLISECONDS)
             .thenAccept(result -> LOGGER.info("Successfully executed warmup query={}", query))
             .exceptionally(ex -> {

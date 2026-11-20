@@ -39,12 +39,15 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader.AttemptState;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -53,6 +56,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -78,6 +83,8 @@ public class PinotFSSegmentUploaderTest {
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysSucceedPinotFS");
     properties.put("class.record",
         "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$RecordingPinotFS");
+    properties.put("class.timeout",
+        "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysTimeoutPinotFS");
     PinotFSFactory.init(new PinotConfiguration(properties));
     _file = FileUtils.getFile(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
     _file.deleteOnExit();
@@ -125,10 +132,38 @@ public class PinotFSSegmentUploaderTest {
   }
 
   @Test
+  public void testTimeoutBeforeWorkerStartsDeletesLateCopy()
+      throws Exception {
+    CountDownLatch releaseWorker = new CountDownLatch(1);
+    RecordingPinotFS._deleted = new CountDownLatch(1);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    try (ExecutorService worker = Executors.newSingleThreadExecutor()) {
+      try {
+        Future<Boolean> blocker = worker.submit(() -> releaseWorker.await(10, TimeUnit.SECONDS));
+        SegmentUploader uploader = new PinotFSSegmentUploader("record://root", TIMEOUT_IN_MS, metrics, worker);
+        assertNull(uploader.uploadSegment(_file, _llcSegmentName, 0));
+        assertTrue(RecordingPinotFS.COPIED_DEST_URIS.isEmpty());
+        assertTrue(RecordingPinotFS.DELETED_DEST_URIS.isEmpty());
+        releaseWorker.countDown();
+        assertTrue(blocker.get(5, TimeUnit.SECONDS));
+        assertTrue(RecordingPinotFS._deleted.await(5, TimeUnit.SECONDS));
+        assertEquals(RecordingPinotFS.COPIED_DEST_URIS.size(), 1);
+        assertEquals(RecordingPinotFS.DELETED_DEST_URIS, RecordingPinotFS.COPIED_DEST_URIS);
+        assertUuidTempUri(RecordingPinotFS.DELETED_DEST_URIS.getFirst());
+        verify(metrics).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_TIMEOUT), eq(1L));
+        verify(metrics).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_FAILURE), eq(1L));
+      } finally {
+        releaseWorker.countDown();
+      }
+    }
+  }
+
+  @Test
   public void testTimeoutDeletesOnlyTheAbandonedAttempt()
       throws Exception {
     RecordingPinotFS._enteredCopy = new CountDownLatch(1);
-    RecordingPinotFS._releaseCopy = new CountDownLatch(1);
+    CountDownLatch releaseFirstCopy = new CountDownLatch(1);
+    RecordingPinotFS._releaseCopy = releaseFirstCopy;
     RecordingPinotFS._deleted = new CountDownLatch(1);
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("record://root", TIMEOUT_IN_MS, _serverMetrics);
     ExecutorService pool = Executors.newSingleThreadExecutor();
@@ -138,16 +173,17 @@ public class PinotFSSegmentUploaderTest {
       assertNull(first.get(5, TimeUnit.SECONDS));
       assertTrue(RecordingPinotFS.DELETED_DEST_URIS.isEmpty());
       URI abandoned = RecordingPinotFS.COPIED_DEST_URIS.get(0);
-      RecordingPinotFS._releaseCopy.countDown();
-      assertTrue(RecordingPinotFS._deleted.await(5, TimeUnit.SECONDS));
-      assertTrue(RecordingPinotFS.DELETED_DEST_URIS.contains(abandoned));
-
+      // The first worker retained its latch. The retry can finish while the first copy is still blocked.
+      RecordingPinotFS._releaseCopy = null;
       URI retry = segmentUploader.uploadSegment(_file, _llcSegmentName, TIMEOUT_IN_MS);
       assertNotNull(retry);
       assertNotEquals(retry, abandoned);
-      assertFalse(RecordingPinotFS.DELETED_DEST_URIS.contains(retry));
+      assertTrue(RecordingPinotFS.DELETED_DEST_URIS.isEmpty());
+      releaseFirstCopy.countDown();
+      assertTrue(RecordingPinotFS._deleted.await(5, TimeUnit.SECONDS));
+      assertEquals(RecordingPinotFS.DELETED_DEST_URIS, List.of(abandoned));
     } finally {
-      RecordingPinotFS.releaseCopy();
+      releaseFirstCopy.countDown();
       pool.shutdownNow();
     }
   }
@@ -230,6 +266,94 @@ public class PinotFSSegmentUploaderTest {
   }
 
   @Test
+  public void testTimeoutAfterPublicationReturnsUri()
+      throws Exception {
+    CountDownLatch published = new CountDownLatch(1);
+    CountDownLatch finishWorker = new CountDownLatch(1);
+    ServerMetrics metrics = blockTimingAfterPublication(published, finishWorker);
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("record://root", TIMEOUT_IN_MS, metrics);
+    ExecutorService caller = Executors.newSingleThreadExecutor();
+    try {
+      Future<URI> upload = caller.submit(() -> segmentUploader.uploadSegment(_file, _llcSegmentName));
+      assertTrue(published.await(5, TimeUnit.SECONDS));
+      URI result = upload.get(5, TimeUnit.SECONDS);
+      assertNotNull(result);
+      assertUuidTempUri(result);
+      assertEquals(RecordingPinotFS.COPIED_DEST_URIS, List.of(result));
+      assertTrue(RecordingPinotFS.DELETED_DEST_URIS.isEmpty());
+      verify(metrics).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_SUCCESS), eq(1L));
+      verify(metrics, never()).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_TIMEOUT), anyLong());
+      verify(metrics, never()).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_FAILURE), anyLong());
+    } finally {
+      finishWorker.countDown();
+      caller.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testInterruptAfterPublicationDeletesUriAndRestoresFlag()
+      throws Exception {
+    CountDownLatch published = new CountDownLatch(1);
+    CountDownLatch finishWorker = new CountDownLatch(1);
+    RecordingPinotFS._deleted = new CountDownLatch(1);
+    ServerMetrics metrics = blockTimingAfterPublication(published, finishWorker);
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("record://root", 30_000, metrics);
+    AtomicReference<URI> result = new AtomicReference<>(URI.create("record://sentinel"));
+    AtomicBoolean interrupted = new AtomicBoolean();
+    Thread caller = new Thread(() -> {
+      result.set(segmentUploader.uploadSegment(_file, _llcSegmentName));
+      interrupted.set(Thread.currentThread().isInterrupted());
+    });
+    try {
+      caller.start();
+      assertTrue(published.await(5, TimeUnit.SECONDS));
+      caller.interrupt();
+      caller.join(5_000);
+      assertFalse(caller.isAlive());
+      assertTrue(interrupted.get());
+      assertNull(result.get());
+      assertTrue(RecordingPinotFS._deleted.await(5, TimeUnit.SECONDS));
+      assertEquals(RecordingPinotFS.COPIED_DEST_URIS.size(), 1);
+      assertEquals(RecordingPinotFS.DELETED_DEST_URIS, RecordingPinotFS.COPIED_DEST_URIS);
+      assertUuidTempUri(RecordingPinotFS.DELETED_DEST_URIS.getFirst());
+      verify(metrics).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_FAILURE), eq(1L));
+      verify(metrics, never()).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_SUCCESS), anyLong());
+    } finally {
+      finishWorker.countDown();
+      caller.interrupt();
+      caller.join(5_000);
+    }
+  }
+
+  @Test
+  public void testTimingMetricFailureAfterPublicationDeletesUri()
+      throws InterruptedException {
+    RecordingPinotFS._deleted = new CountDownLatch(1);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    doThrow(new IllegalStateException("timing metric failed")).when(metrics)
+        .addTimedTableValue(anyString(), eq(ServerTimer.SEGMENT_UPLOAD_TIME_MS), anyLong(), eq(TimeUnit.MILLISECONDS));
+    SegmentUploader uploader = new PinotFSSegmentUploader("record://root", 30_000, metrics);
+    assertNull(uploader.uploadSegment(_file, _llcSegmentName));
+    assertTrue(RecordingPinotFS._deleted.await(5, TimeUnit.SECONDS));
+    assertEquals(RecordingPinotFS.COPIED_DEST_URIS.size(), 1);
+    assertEquals(RecordingPinotFS.DELETED_DEST_URIS, RecordingPinotFS.COPIED_DEST_URIS);
+    assertUuidTempUri(RecordingPinotFS.DELETED_DEST_URIS.getFirst());
+    verify(metrics).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_FAILURE), eq(1L));
+    verify(metrics, never()).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_SUCCESS), anyLong());
+  }
+
+  private static ServerMetrics blockTimingAfterPublication(CountDownLatch published, CountDownLatch finishWorker) {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    doAnswer(invocation -> {
+      published.countDown();
+      assertTrue(finishWorker.await(15, TimeUnit.SECONDS));
+      return null;
+    }).when(metrics).addTimedTableValue(anyString(), eq(ServerTimer.SEGMENT_UPLOAD_TIME_MS), anyLong(),
+        eq(TimeUnit.MILLISECONDS));
+    return metrics;
+  }
+
+  @Test
   public void testNoSegmentStoreConfigured() {
     SegmentUploader segmentUploader = new PinotFSSegmentUploader("", TIMEOUT_IN_MS, _serverMetrics);
     URI segmentURI = segmentUploader.uploadSegment(_file, _llcSegmentName);
@@ -244,11 +368,97 @@ public class PinotFSSegmentUploaderTest {
     verify(_serverMetrics).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_FAILURE), eq(1L));
   }
 
+  @Test
+  public void testUnregisteredFilesystemFailsBeforeSubmittingCopy() {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    SegmentUploader segmentUploader =
+        new PinotFSSegmentUploader("unregistered-upload-scheme://root", TIMEOUT_IN_MS, metrics);
+    assertNull(segmentUploader.uploadSegment(_file, _llcSegmentName));
+    verify(metrics).addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_UPLOAD_FAILURE), eq(1L));
+    verify(metrics, never()).addTimedTableValue(anyString(), eq(ServerTimer.SEGMENT_UPLOAD_TIME_MS), anyLong(),
+        eq(TimeUnit.MILLISECONDS));
+  }
+
   private void assertUuidTempUri(URI segmentURI) {
     String prefix = StringUtil.join(File.separator, "record://root", _llcSegmentName.getTableName(),
         _llcSegmentName.getSegmentName() + ".tmp.");
     assertTrue(segmentURI.toString().startsWith(prefix), segmentURI.toString());
     UUID.fromString(segmentURI.toString().substring(prefix.length()));
+  }
+
+  @Test
+  public void testMetadataTarUploadSupported() {
+    assertTrue(new PinotFSSegmentUploader("hdfs://root", TIMEOUT_IN_MS, _serverMetrics)
+        .isMetadataTarUploadSupported());
+  }
+
+  @Test
+  public void testMetadataTarUploadUsesTmpName() {
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("record://root", TIMEOUT_IN_MS, _serverMetrics);
+    URI uri = segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS);
+    assertNotNull(uri);
+    String tmpPrefix = StringUtil.join(File.separator, "record://root", _llcSegmentName.getTableName(),
+        _llcSegmentName.getSegmentName() + Constants.METADATA_TAR_GZ_FILE_EXT + ".tmp.");
+    assertTrue(uri.toString().startsWith(tmpPrefix), uri.toString());
+    // The tmp name must be swept by the controller's tmp file cleanup if a commit never completes.
+    assertTrue(SegmentCompletionUtils.isTmpFile(uri.toString()));
+    assertEquals(RecordingPinotFS.COPIED_DEST_URIS, List.of(uri));
+    // The unique tmp name makes a pre-delete unnecessary, and the final object is never touched.
+    assertTrue(RecordingPinotFS.DELETED_DEST_URIS.isEmpty());
+    verify(_serverMetrics).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_SUCCESS, 1);
+  }
+
+  @Test
+  public void testMetadataTarUploadFailureDeletesOnlyTmpObject()
+      throws InterruptedException {
+    RecordingPinotFS._throwOnCopy = true;
+    RecordingPinotFS._deleted = new CountDownLatch(1);
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("record://root", TIMEOUT_IN_MS, _serverMetrics);
+    assertNull(segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS));
+    assertTrue(RecordingPinotFS._deleted.await(5, TimeUnit.SECONDS));
+    assertEquals(RecordingPinotFS.DELETED_DEST_URIS, RecordingPinotFS.COPIED_DEST_URIS);
+    String deleted = RecordingPinotFS.DELETED_DEST_URIS.get(0).toString();
+    assertTrue(SegmentCompletionUtils.isTmpFile(deleted), deleted);
+    assertFalse(deleted.endsWith(Constants.METADATA_TAR_GZ_FILE_EXT), deleted);
+    verify(_serverMetrics).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+  }
+
+  @Test
+  public void testMetadataTarUploadInvalidSegmentStoreUri() {
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("hdfs://ro ot", TIMEOUT_IN_MS, _serverMetrics);
+    assertNull(segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS));
+    verify(_serverMetrics).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+  }
+
+  @Test
+  public void testMetadataTarUploadTimeOut() {
+    // The uploader's own (segment upload) timeout is large, so the timeout passed to uploadMetadataTar must bound the
+    // wait.
+    int segmentUploadTimeoutMs = 60_000;
+    SegmentUploader segmentUploader =
+        new PinotFSSegmentUploader("timeout://root", segmentUploadTimeoutMs, _serverMetrics);
+    long startMs = System.currentTimeMillis();
+    assertNull(segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS));
+    long elapsedMs = System.currentTimeMillis() - startMs;
+    assertTrue(elapsedMs < segmentUploadTimeoutMs / 2, "Waited " + elapsedMs + "ms");
+    verify(_serverMetrics).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_TIMEOUT, 1);
+    verify(_serverMetrics).addMeteredTableValue(
+        TableNameBuilder.extractRawTableName(_llcSegmentName.getTableName()),
+        ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+  }
+
+  @Test
+  public void testMetadataTarUploadNoSegmentStoreConfigured() {
+    SegmentUploader segmentUploader = new PinotFSSegmentUploader("", TIMEOUT_IN_MS, _serverMetrics);
+    assertNull(segmentUploader.uploadMetadataTar(_file, _llcSegmentName, TIMEOUT_IN_MS));
   }
 
   public static class AlwaysSucceedPinotFS extends BasePinotFS {
@@ -384,17 +594,25 @@ public class PinotFSSegmentUploaderTest {
     public void copyFromLocalFile(File srcFile, URI dstUri)
         throws Exception {
       COPIED_DEST_URIS.add(dstUri);
+      CountDownLatch release = _releaseCopy;
       CountDownLatch entered = _enteredCopy;
       if (entered != null) {
         entered.countDown();
       }
-      CountDownLatch release = _releaseCopy;
       if (release != null) {
         release.await();
       }
       if (_throwOnCopy) {
         throw new IOException("stored object then failed");
       }
+    }
+  }
+
+  public static class AlwaysTimeoutPinotFS extends AlwaysSucceedPinotFS {
+    @Override
+    public void copyFromLocalFile(File srcFile, URI dstUri)
+        throws InterruptedException {
+      new CountDownLatch(1).await(20, TimeUnit.SECONDS);
     }
   }
 }

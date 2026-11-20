@@ -22,7 +22,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
@@ -38,16 +37,23 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 /// - timeExpression: expression that contains the column to be used to decide which data is last, can be any
 ///   Numeric column
 public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Float> {
-  private final static ValueLongPair<Float> DEFAULT_VALUE_TIME_PAIR = new FloatLongPair(Float.NaN, Long.MIN_VALUE);
+  private static final int FLOAT_LONG_PAIR_TYPE = 29;
+
+  private static final ValueLongPair<Float> DEFAULT_VALUE_TIME_PAIR = new FloatLongPair(Float.NaN, Long.MIN_VALUE);
 
   public LastFloatValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled) {
-    super(dataCol, timeCol, ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    super(dataCol, timeCol, nullHandlingEnabled);
   }
 
   @Override
   public ValueLongPair<Float> constructValueLongPair(Float value, long time) {
     return new FloatLongPair(value, time);
+  }
+
+  @Override
+  public ValueLongPair<Float> deserializeValueLongPair(byte[] bytes) {
+    return FloatLongPair.fromBytes(bytes);
   }
 
   @Override
@@ -98,14 +104,13 @@ public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggre
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<Float> floatLongPair) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FloatLongPair.getValue(),
-        ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE.serialize((FloatLongPair) floatLongPair));
+  public SerializedResult serializeIntermediateResult(ValueLongPair<Float> floatLongPair) {
+    return new SerializedBytes(FLOAT_LONG_PAIR_TYPE, floatLongPair.toBytes());
   }
 
   @Override
   public ValueLongPair<Float> deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
+    return FloatLongPair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override

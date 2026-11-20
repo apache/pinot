@@ -35,7 +35,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -274,14 +273,12 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   private boolean isMaterializedOpenStructChild(String column) {
-    // Mutable/consuming segments have no column metadata map (never materialize OPEN_STRUCT children
-    // on disk), so getColumnMetadataFor() would NPE on its unconditional map lookup.
-    Map<String, ColumnMetadata> columnMetadataMap = _indexSegment.getSegmentMetadata().getColumnMetadataMap();
-    if (columnMetadataMap == null) {
+    // Mutable/consuming segments never materialize OPEN_STRUCT children on disk and have no column metadata map.
+    if (_indexSegment.getSegmentMetadata().isMutableSegment()) {
       return false;
     }
-    ColumnMetadata columnMetadata = columnMetadataMap.get(column);
-    return columnMetadata instanceof ColumnMetadataImpl && ((ColumnMetadataImpl) columnMetadata).isMaterializedChild();
+    ColumnMetadata columnMetadata = _indexSegment.getSegmentMetadata().getColumnMetadataFor(column);
+    return columnMetadata != null && columnMetadata.isMaterializedChild();
   }
 
   /// Returns the sorted document ids.

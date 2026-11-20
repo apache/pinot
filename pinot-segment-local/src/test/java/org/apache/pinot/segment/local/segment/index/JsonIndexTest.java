@@ -22,8 +22,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.google.common.collect.Lists;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -57,6 +59,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.testng.SkipException;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -1102,6 +1105,100 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     String[] records = {"{\"key1\":\"va\""};
 
     createIndex(true, jsonIndexConfig, records);
+  }
+
+  /// The off-heap creator opens the posting list stream in the constructor, but seal() is never reached when add()
+  /// fails. close() must still release the stream and clean up the temp directory, and must stay idempotent so that
+  /// the normal seal()-then-close() path keeps working.
+  @Test
+  public void testOffHeapCreatorCloseWithoutSeal()
+      throws Exception {
+    String columnName = "offHeapUnsealed";
+    File tempDir = new File(INDEX_DIR, columnName + ".json.idx.tmp");
+
+    OffHeapJsonIndexCreator creator =
+        new OffHeapJsonIndexCreator(INDEX_DIR, columnName, "myTable_OFFLINE", false, getIndexConfig());
+    try {
+      // the braces don't match and cannot be parsed
+      assertThrows(JsonProcessingException.class, () -> creator.add("{\"key1\":\"va\""));
+      // Sanity check that the probe below can observe an open stream, so that the assertion after close() cannot pass
+      // vacuously
+      assertTrue(isPostingListStreamOpen(creator));
+    } finally {
+      creator.close();
+    }
+    assertFalse(isPostingListStreamOpen(creator));
+    assertFalse(tempDir.exists());
+
+    // Closing twice must not fail
+    creator.close();
+
+    // The regular path closes the stream in seal() and again in close()
+    OffHeapJsonIndexCreator sealedCreator =
+        new OffHeapJsonIndexCreator(INDEX_DIR, columnName, "myTable_OFFLINE", false, getIndexConfig());
+    try {
+      sealedCreator.add(TEST_RECORD);
+      sealedCreator.seal();
+    } finally {
+      sealedCreator.close();
+    }
+    assertFalse(isPostingListStreamOpen(sealedCreator));
+    assertTrue(new File(INDEX_DIR, columnName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION).exists());
+  }
+
+  /// The base constructor creates the temp directory before the off-heap creator opens the posting list stream. When
+  /// opening the stream fails, the caller never gets an instance to close, so the constructor has to clean up itself.
+  @Test
+  public void testOffHeapCreatorConstructorFailureCleansUpTempDir()
+      throws Exception {
+    String columnName = "offHeapCtorFailure";
+    File tempDir = new File(INDEX_DIR, columnName + ".json.idx.tmp");
+    assertTrue(tempDir.mkdir());
+    try {
+      // Make the posting list file impossible to create
+      tempDir.setWritable(false, false);
+      if (canCreateFileIn(tempDir)) {
+        throw new SkipException("Running as a user that bypasses file permissions, cannot fail the stream creation");
+      }
+      assertThrows(IOException.class,
+          () -> new OffHeapJsonIndexCreator(INDEX_DIR, columnName, "myTable_OFFLINE", false, getIndexConfig()));
+      assertFalse(tempDir.exists());
+    } finally {
+      tempDir.setWritable(true, false);
+      FileUtils.deleteQuietly(tempDir);
+    }
+  }
+
+  /// Returns whether a file can be created in the given directory, to detect environments (e.g. running as root) where
+  /// making a directory read-only does not actually prevent writes.
+  private static boolean canCreateFileIn(File dir) {
+    File probe = new File(dir, "probe");
+    try {
+      if (!probe.createNewFile()) {
+        return false;
+      }
+    } catch (IOException e) {
+      return false;
+    }
+    FileUtils.deleteQuietly(probe);
+    return true;
+  }
+
+  /// Returns whether the posting list stream of the given creator is still holding its file descriptor, by writing a
+  /// byte and checking whether it reaches the underlying file. The stream is private with no accessor, and the
+  /// buffering layer accepts writes without touching the file descriptor, so this needs both reflection and a flush.
+  private static boolean isPostingListStreamOpen(OffHeapJsonIndexCreator creator)
+      throws Exception {
+    Field field = OffHeapJsonIndexCreator.class.getDeclaredField("_postingListOutputStream");
+    field.setAccessible(true);
+    DataOutputStream postingListOutputStream = (DataOutputStream) field.get(creator);
+    try {
+      postingListOutputStream.writeByte(0);
+      postingListOutputStream.flush();
+      return true;
+    } catch (IOException e) {
+      return false;
+    }
   }
 
   @Test

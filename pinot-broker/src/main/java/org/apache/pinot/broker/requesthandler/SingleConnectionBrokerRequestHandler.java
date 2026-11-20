@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
@@ -113,6 +114,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   protected final BrokerReduceService _brokerReduceService;
   protected final QueryRouter _queryRouter;
   protected final FailureDetector _failureDetector;
+  private final boolean _pingOnTimeout;
+  private final long _pingTimeoutMs;
 
   /// Legacy constructor without an MV handler — see [BaseSingleStageBrokerRequestHandler]'s
   /// legacy ctor for the rationale.  Delegates with `materializedViewHandler = null`.
@@ -137,9 +140,30 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext, materializedViewHandler);
     _brokerReduceService = new BrokerReduceService(_config);
-    _queryRouter = new QueryRouter(_brokerId, nettyConfig, tlsConfig, serverRoutingStatsManager, threadAccountant);
+    _queryRouter = new QueryRouter(_brokerId, nettyConfig, tlsConfig, serverRoutingStatsManager, threadAccountant,
+        _config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD,
+            CommonConstants.Broker.FailureDetector.DEFAULT_UNANSWERED_QUERIES_THRESHOLD),
+        _config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERY_GRACE_MS,
+            CommonConstants.Broker.FailureDetector.DEFAULT_UNANSWERED_QUERY_GRACE_MS));
     _failureDetector = failureDetector;
+    _pingOnTimeout = _config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_ENABLE_PING_ON_TIMEOUT,
+        CommonConstants.Broker.FailureDetector.DEFAULT_ENABLE_PING_ON_TIMEOUT);
+    _pingTimeoutMs = _config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_PING_TIMEOUT_MS,
+        CommonConstants.Broker.FailureDetector.DEFAULT_PING_TIMEOUT_MS);
     _failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
+    if (_pingOnTimeout) {
+      Preconditions.checkArgument(_pingTimeoutMs > 0, "'%s' must be positive, got: %s",
+          CommonConstants.Broker.FailureDetector.CONFIG_OF_PING_TIMEOUT_MS, _pingTimeoutMs);
+      _failureDetector.registerServerNotRespondedChecker(this::checkServerNotResponded);
+    } else if (_config.getProperty(CommonConstants.Broker.FailureDetector.CONFIG_OF_REPORT_UNANSWERED_SERVERS,
+        CommonConstants.Broker.FailureDetector.DEFAULT_REPORT_UNANSWERED_SERVERS)) {
+      // Opted in: without pings nothing else acts on a timeout, so a server that has gone silent on one of its channels
+      // is reported like a server the transport saw go down, and leaves routing until the retry probe re-establishes
+      // the channel. Otherwise, and always with pings (the ping that follows every timeout makes that call), the
+      // silent channel is only replaced.
+      _queryRouter.setUnansweredServerReporter(serverRoutingInstance -> _failureDetector.markServerUnhealthy(
+          serverRoutingInstance.getInstanceId(), serverRoutingInstance.getHostname()));
+    }
   }
 
   @Override
@@ -739,9 +763,32 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
         serversNotResponded.add(entry.getKey());
       }
     }
+    reportServersNotResponded(asyncQueryResponse, finalResponses);
+
     ScatterResultStats stats = new ScatterResultStats(
         dataTableMap.size() + serversNotResponded.size(), dataTableMap.size(), totalResponseSize);
     return new ScatterResult(dataTableMap, serversNotResponded, stats, timedOut, asyncQueryResponse.getException());
+  }
+
+  /// Reports the servers that left a timed-out query unanswered to the failure detector, which, with pings enabled,
+  /// pings each of them and marks the ones that do not answer unhealthy. This is how a server whose node is gone or
+  /// whose JVM is frozen is detected at all -- see [FailureDetector#notifyServerNotResponded].
+  ///
+  /// Nothing is reported unless the query timed out: a `FAILED` response was aborted early by a send failure or a
+  /// channel teardown, both already reported through [AsyncQueryResponse#getFailedServer()], and aborting leaves
+  /// servers that were never given a chance to answer without a response. For the same reason the split
+  /// materialized-view path reports each of its two responses on its own: one can time out while the other aborts.
+  private void reportServersNotResponded(AsyncQueryResponse asyncQueryResponse,
+      Map<ServerRoutingInstance, ServerResponse> finalResponses) {
+    if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
+      for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : finalResponses.entrySet()) {
+        if (entry.getValue().getDataTable() == null) {
+          ServerRoutingInstance serverRoutingInstance = entry.getKey();
+          _failureDetector.notifyServerNotResponded(serverRoutingInstance.getInstanceId(),
+              serverRoutingInstance.getHostname());
+        }
+      }
+    }
   }
 
   /// Executes the reduce step on the scatter result and populates the response with server stats.
@@ -854,6 +901,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
             totalResponseSizeHolder);
     long totalResponseSize = totalResponseSizeHolder[0];
     int numServersResponded = dataTableMap.size();
+
+    reportServersNotResponded(baseAsyncResponse, baseFinalResponses);
+    reportServersNotResponded(materializedViewAsyncResponse, viewFinalResponses);
 
     /// On a SPLIT query, base and MV scatter-gathers cover DISJOINT halves of the timeline
     /// (base covers `ts < boundary`, MV covers `ts >= boundary`).  Partial failure on either
@@ -1004,14 +1054,44 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     }
   }
 
-  /// Check if a server that was previously detected as unhealthy is now healthy.
+  /// Drops the cached Netty channels to a server the routing manager just enabled. Channels opened to a process that
+  /// ran before a restart are half-open if it went away without closing them, and would swallow every query routed to
+  /// the readmitted server until the kernel gives up on them minutes later. A channel that still carries queries is
+  /// retired instead: the next query opens a fresh connection, and the old one is closed once those queries are past
+  /// their deadline, so that toggling a live server lets them finish. A server seen for the first time has no cached
+  /// channel, so this is a no-op for it.
+  @Override
+  public void onServerEnabled(ServerInstance serverInstance) {
+    int numEvicted = _queryRouter.evictChannelsOfEnabledServer(serverInstance);
+    if (numEvicted > 0) {
+      LOGGER.info("Evicted {} live cached channel(s) to enabled server: {}, the next query reconnects", numEvicted,
+          serverInstance.getInstanceId());
+    }
+  }
+
+  /// Drops the cached Netty channels to a server removed from the cluster, or to the previous address of a server
+  /// that moved: nothing routes there any more, and if the server is ever added back under the same id, or moves back
+  /// to that address, it is a new process.
+  @Override
+  public void onServerRemoved(ServerInstance serverInstance) {
+    int numEvicted = _queryRouter.evictChannels(serverInstance);
+    if (numEvicted > 0) {
+      LOGGER.info("Evicted {} live cached channel(s) to server: {} at {}:{}, which left the cluster or that address",
+          numEvicted, serverInstance.getInstanceId(), serverInstance.getHostname(), serverInstance.getPort());
+    }
+  }
+
+  /// Check if a server that was previously detected as unhealthy is now healthy: by pinging it when pings are enabled,
+  /// otherwise by re-establishing every channel it was queried over (see [QueryRouter#connect]).
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Retrying unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
 
+    // Not an enabled server of the routing manager, for example a disabled server or a server of a remote cluster.
+    // Leave it to the other retriers.
     if (serverInstance == null) {
       LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return FailureDetector.ServerState.UNHEALTHY;
+      return FailureDetector.ServerState.UNKNOWN;
     }
 
     // Could occur if the cluster is only serving multi-stage queries
@@ -1019,13 +1099,45 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       return FailureDetector.ServerState.UNKNOWN;
     }
 
+    if (_pingOnTimeout) {
+      // Not a connect: a frozen JVM's kernel still completes the handshake, which would put a server taken out for an
+      // unanswered ping straight back into routing.
+      if (_queryRouter.ping(serverInstance, _pingTimeoutMs)) {
+        LOGGER.info("Server: {} answered a ping, marking it healthy", instanceId);
+        return FailureDetector.ServerState.HEALTHY;
+      } else {
+        LOGGER.warn("Server: {} did not answer a ping within {}ms, retry later", instanceId, _pingTimeoutMs);
+        return FailureDetector.ServerState.UNHEALTHY;
+      }
+    }
+
     if (_queryRouter.connect(serverInstance)) {
-      LOGGER.info("Successfully connect to server: {}, marking it healthy", instanceId);
+      LOGGER.info("Re-established the channel(s) to server: {}, marking it healthy", instanceId);
       return FailureDetector.ServerState.HEALTHY;
     } else {
       LOGGER.warn("Still cannot connect to server: {}, retry later", instanceId);
       return FailureDetector.ServerState.UNHEALTHY;
     }
+  }
+
+  /// Checks a server that left a query unanswered, by pinging it. Registered with the failure detector only when pings
+  /// are enabled, as the only check a timeout runs -- see [FailureDetector#registerServerNotRespondedChecker].
+  private FailureDetector.ServerState checkServerNotResponded(String instanceId) {
+    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+    if (serverInstance == null) {
+      // Not routed by this broker -- a server of another cluster, say, or one Helix has just disabled -- so there is
+      // nothing to take out of routing.
+      return FailureDetector.ServerState.UNKNOWN;
+    }
+    if (!_queryRouter.hasChannel(serverInstance)) {
+      // Nothing to ping over, which says nothing about the server.
+      return FailureDetector.ServerState.UNKNOWN;
+    }
+    if (_queryRouter.ping(serverInstance, _pingTimeoutMs)) {
+      LOGGER.debug("Server: {} left a query unanswered but answered a ping", instanceId);
+      return FailureDetector.ServerState.HEALTHY;
+    }
+    return FailureDetector.ServerState.UNHEALTHY;
   }
 
   /// Counts responses that successfully returned a DataTable. Production callers use this in the

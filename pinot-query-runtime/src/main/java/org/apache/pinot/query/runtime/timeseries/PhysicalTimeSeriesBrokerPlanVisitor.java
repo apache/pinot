@@ -73,7 +73,8 @@ public class PhysicalTimeSeriesBrokerPlanVisitor {
     TimeSeriesExchangeReceivePlanNode exchangeReceivePlanNode = new TimeSeriesExchangeReceivePlanNode(
         exchangeNode.getId(), context.getDeadlineMs(), exchangeNode.getAggInfo(), context.getSeriesBuilderFactory());
     BlockingQueue<Object> receiver = context.getExchangeReceiverByPlanId().get(exchangeNode.getId());
-    exchangeReceivePlanNode.init(Objects.requireNonNull(receiver, "No receiver for node"), numServersQueried);
+    exchangeReceivePlanNode.init(Objects.requireNonNull(receiver, "No receiver for node"), numServersQueried,
+        context.getInitialTimeBuckets());
     return exchangeReceivePlanNode;
   }
 }

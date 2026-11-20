@@ -30,15 +30,24 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.MultiDocValues;
+import org.apache.lucene.index.NumericDocValues;
+import org.apache.lucene.index.StoredFieldVisitor;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexBufferReader;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
@@ -86,6 +95,68 @@ public class TextIndexUtils {
         IndexSearcher.setMaxClauseCount(defaultMaxClauseCount);
         LOGGER.info("Reset Lucene max clause count to default: {} from cluster config", defaultMaxClauseCount);
       }
+    }
+  }
+
+  /// Reads the actual Pinot ids after Lucene merges and sorting, optionally remapping mutable ids during conversion.
+  /// Doc values avoid stored-field decompression. Mutable indexes contain only the stored field; older immutable
+  /// indexes and documents without doc values also use the per-document stored-field fallback.
+  /// Returns whether the final mapping is the identity mapping.
+  public static boolean fillDocIdMapping(IndexReader indexReader, PinotDataBuffer buffer, int numDocs,
+      @Nullable int[] mutableToImmutableDocIdMap)
+      throws IOException {
+    NumericDocValues pinotDocIdValues =
+        MultiDocValues.getNumericValues(indexReader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
+    if (pinotDocIdValues == null) {
+      // A TEXT column named PinotDocID uses the alternate numeric field to avoid a field-schema collision.
+      pinotDocIdValues =
+          MultiDocValues.getNumericValues(indexReader, LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME);
+    }
+    PinotDocIdVisitor visitor = new PinotDocIdVisitor();
+    StoredFields storedFields = null;
+    boolean isIdentityMapping = true;
+    for (int luceneDocId = 0; luceneDocId < numDocs; luceneDocId++) {
+      int pinotDocId;
+      if (pinotDocIdValues != null && pinotDocIdValues.advanceExact(luceneDocId)) {
+        pinotDocId = Math.toIntExact(pinotDocIdValues.longValue());
+      } else {
+        if (storedFields == null) {
+          storedFields = indexReader.storedFields();
+        }
+        visitor._pinotDocId = Integer.MIN_VALUE;
+        storedFields.document(luceneDocId, visitor);
+        pinotDocId = visitor._pinotDocId;
+        if (pinotDocId == Integer.MIN_VALUE) {
+          throw new IOException("Missing Pinot document id for Lucene document: " + luceneDocId);
+        }
+      }
+      if (mutableToImmutableDocIdMap != null) {
+        // Conversion can reorder Pinot rows independently of Lucene's own document order.
+        pinotDocId = mutableToImmutableDocIdMap[pinotDocId];
+      }
+      isIdentityMapping &= luceneDocId == pinotDocId;
+      buffer.putInt((long) luceneDocId * Integer.BYTES, pinotDocId);
+    }
+    return isIdentityMapping;
+  }
+
+  /// Visits only the stored Pinot document id. Each mapping operation owns its visitor.
+  private static class PinotDocIdVisitor extends StoredFieldVisitor {
+    private int _pinotDocId;
+
+    @Override
+    public Status needsField(FieldInfo fieldInfo) {
+      return LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME.equals(fieldInfo.name) ? Status.YES : Status.NO;
+    }
+
+    @Override
+    public void intField(FieldInfo fieldInfo, int value) {
+      _pinotDocId = value;
+    }
+
+    @Override
+    public void stringField(FieldInfo fieldInfo, String value) {
+      _pinotDocId = Integer.parseInt(value);
     }
   }
 
@@ -462,6 +533,9 @@ public class TextIndexUtils {
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES, escapedLuceneAnalyzerClassArgTypes);
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS, config.getLuceneQueryParserClass());
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE, config.getDocIdTranslatorMode());
+    // Persist the build mode so the reader self-describes (a table may hold a mix of dictionary-based and per-row
+    // text segments; reads must not depend on the live table config).
+    properties.setProperty(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, config.isBuildOnDictionary());
 
     File propertiesFile = new File(indexDir, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
     CommonsConfigurationUtils.saveToFile(properties, propertiesFile);
@@ -476,7 +550,7 @@ public class TextIndexUtils {
   /// @return updated TextIndexConfig
   public static TextIndexConfig getUpdatedConfigFromPropertiesFile(File file, TextIndexConfig config)
       throws ConfigurationException {
-    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(file);
+    Configuration properties = readTextIndexProperties(file);
     List<String> luceneAnalyzerClassArgs =
         properties.getList(String.class, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS);
     List<String> luceneAnalyzerClassArgTypes =
@@ -498,6 +572,27 @@ public class TextIndexUtils {
         .withLuceneAnalyzerClassArgTypes(recoveredLuceneAnalyzerClassArgTypes)
         .withLuceneQueryParserClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS))
         .withDocIdTranslatorMode(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE))
+        // The build mode is intrinsic to the segment: default to false when the property is absent (segments written
+        // before this feature are always per-row). Must NOT fall back to the live table config, otherwise a per-row
+        // segment could be misread as dictionary-based after the flag is flipped on.
+        .withBuildOnDictionary(isBuildOnDictionary(properties))
         .build();
+  }
+
+  /// Reads persisted properties from a directory-based text index's properties file.
+  public static Configuration readTextIndexProperties(File propertiesFile)
+      throws ConfigurationException {
+    return CommonsConfigurationUtils.fromFile(propertiesFile);
+  }
+
+  /// Reads persisted properties from a packed text index. The caller retains ownership of the buffer.
+  public static Configuration readTextIndexProperties(PinotDataBuffer buffer, String column)
+      throws IOException {
+    return new MapConfiguration(LuceneTextIndexBufferReader.extractProperties(buffer, column));
+  }
+
+  /// The persisted build mode defaults to per-row for indexes written before the property existed.
+  public static boolean isBuildOnDictionary(Configuration properties) {
+    return properties.getBoolean(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, false);
   }
 }

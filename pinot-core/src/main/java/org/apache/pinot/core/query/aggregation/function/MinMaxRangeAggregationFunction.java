@@ -25,7 +25,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -36,6 +35,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFunction<MinMaxRangePair, Double> {
+  private static final int MIN_MAX_RANGE_PAIR_TYPE = 5;
+
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   public MinMaxRangeAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
@@ -87,7 +88,7 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
     byte[][] bytesValues = blockValSet.getBytesValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
+        MinMaxRangePair minMaxRangePair = MinMaxRangePair.fromBytes(bytesValues[i]);
         minMax.apply(minMaxRangePair);
       }
     });
@@ -145,7 +146,7 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
     byte[][] bytesValues = blockValSet.getBytesValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
+        MinMaxRangePair minMaxRangePair = MinMaxRangePair.fromBytes(bytesValues[i]);
         setGroupByResult(groupKeyArray[i], groupByResultHolder, minMaxRangePair.getMin(), minMaxRangePair.getMax());
       }
     });
@@ -209,7 +210,7 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
+        MinMaxRangePair minMaxRangePair = MinMaxRangePair.fromBytes(bytesValues[i]);
         double min = minMaxRangePair.getMin();
         double max = minMaxRangePair.getMax();
         for (int groupKey : groupKeysArray[i]) {
@@ -280,14 +281,13 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(MinMaxRangePair minMaxRangePair) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.MinMaxRangePair.getValue(),
-        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair));
+  public SerializedResult serializeIntermediateResult(MinMaxRangePair minMaxRangePair) {
+    return new SerializedBytes(MIN_MAX_RANGE_PAIR_TYPE, minMaxRangePair.toBytes());
   }
 
   @Override
   public MinMaxRangePair deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(customObject.getBuffer());
+    return MinMaxRangePair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override

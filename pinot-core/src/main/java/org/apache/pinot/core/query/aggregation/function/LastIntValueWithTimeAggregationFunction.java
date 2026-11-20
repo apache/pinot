@@ -22,7 +22,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.IntLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
@@ -39,20 +38,27 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 /// - timeExpression: expression that contains the column to be used to decide which data is last, can be any
 ///   Numeric column
 public class LastIntValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Integer> {
-  private final static ValueLongPair<Integer> DEFAULT_VALUE_TIME_PAIR =
+  private static final int INT_LONG_PAIR_TYPE = 27;
+
+  private static final ValueLongPair<Integer> DEFAULT_VALUE_TIME_PAIR =
       new IntLongPair(Integer.MIN_VALUE, Long.MIN_VALUE);
 
   private final boolean _isBoolean;
 
   public LastIntValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled, boolean isBoolean) {
-    super(dataCol, timeCol, ObjectSerDeUtils.INT_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    super(dataCol, timeCol, nullHandlingEnabled);
     _isBoolean = isBoolean;
   }
 
   @Override
   public ValueLongPair<Integer> constructValueLongPair(Integer value, long time) {
     return new IntLongPair(value, time);
+  }
+
+  @Override
+  public ValueLongPair<Integer> deserializeValueLongPair(byte[] bytes) {
+    return IntLongPair.fromBytes(bytes);
   }
 
   @Override
@@ -107,14 +113,13 @@ public class LastIntValueWithTimeAggregationFunction extends LastWithTimeAggrega
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<Integer> intLongPair) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntLongPair.getValue(),
-        ObjectSerDeUtils.INT_LONG_PAIR_SER_DE.serialize((IntLongPair) intLongPair));
+  public SerializedResult serializeIntermediateResult(ValueLongPair<Integer> intLongPair) {
+    return new SerializedBytes(INT_LONG_PAIR_TYPE, intLongPair.toBytes());
   }
 
   @Override
   public ValueLongPair<Integer> deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.INT_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
+    return IntLongPair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override

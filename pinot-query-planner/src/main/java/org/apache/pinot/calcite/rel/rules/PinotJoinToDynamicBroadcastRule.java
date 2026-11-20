@@ -107,7 +107,19 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
   @Override
   public boolean matches(RelOptRuleCall call) {
     Join join = call.rel(0);
+    if (!isDynamicBroadcastCandidate(join)) {
+      return false;
+    }
 
+    // Apply this rule if the left side can be pushed as dynamic exchange
+    RelNode left = ((HepRelVertex) join.getLeft()).getCurrentRel();
+    RelNode right = ((HepRelVertex) join.getRight()).getCurrentRel();
+    return left instanceof Exchange && right instanceof Exchange && PinotRuleUtils.canPushDynamicBroadcastToLeaf(
+        left.getInput(0));
+  }
+
+  /// Returns whether `join` becomes a dynamic broadcast join when its left input can run in the leaf stage.
+  static boolean isDynamicBroadcastCandidate(Join join) {
     // Do not apply this rule if join strategy is explicitly set to something other than dynamic broadcast
     String joinStrategy = PinotHintOptions.JoinHintOptions.getJoinStrategyHint(join);
     if (joinStrategy != null && !joinStrategy.equals(
@@ -117,16 +129,8 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
 
     // Do not apply this rule if it is not a SEMI join
     JoinInfo joinInfo = join.analyzeCondition();
-    if (join.getJoinType() != JoinRelType.SEMI || !joinInfo.nonEquiConditions.isEmpty()
-        || joinInfo.leftKeys.size() != 1) {
-      return false;
-    }
-
-    // Apply this rule if the left side can be pushed as dynamic exchange
-    RelNode left = ((HepRelVertex) join.getLeft()).getCurrentRel();
-    RelNode right = ((HepRelVertex) join.getRight()).getCurrentRel();
-    return left instanceof Exchange && right instanceof Exchange && PinotRuleUtils.canPushDynamicBroadcastToLeaf(
-        left.getInput(0));
+    return join.getJoinType() == JoinRelType.SEMI && joinInfo.nonEquiConditions.isEmpty()
+        && joinInfo.leftKeys.size() == 1;
   }
 
   @Override

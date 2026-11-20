@@ -24,7 +24,6 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
@@ -50,7 +49,7 @@ public class IntegerTupleSketchNullHandlingTest {
     for (int i = 0; i < NUM_DOCS; i++) {
       IntegerTupleSketch sketch = new IntegerTupleSketch(4, IntegerSummary.Mode.Sum);
       sketch.update(i, 1);
-      values[i] = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(sketch.compact());
+      values[i] = sketch.compact().toByteArray();
     }
     return values;
   }

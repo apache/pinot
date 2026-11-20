@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -33,6 +35,7 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -43,12 +46,13 @@ import org.slf4j.LoggerFactory;
 /// Each attempt uses `{segment}.tmp.{uuid}`. The object is deleted only when that attempt's URI is not returned.
 /// A timed-out copy that is still in flight is abandoned. The worker deletes it after the copy finishes, including a
 /// late success. A copy that published before the timeout is returned and kept.
+/// The uploader also writes an optional metadata tar to a unique temporary path for the controller to move at commit.
 public class PinotFSSegmentUploader implements SegmentUploader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;
 
   private final String _segmentStoreUriStr;
-  private final ExecutorService _executorService = Executors.newCachedThreadPool();
+  private final ExecutorService _executorService;
   private final int _timeoutInMs;
   private final ServerMetrics _serverMetrics;
 
@@ -62,6 +66,13 @@ public class PinotFSSegmentUploader implements SegmentUploader {
   }
 
   public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis, ServerMetrics serverMetrics) {
+    this(segmentStoreDirUri, timeoutMillis, serverMetrics, Executors.newCachedThreadPool());
+  }
+
+  @VisibleForTesting
+  PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis, ServerMetrics serverMetrics,
+      ExecutorService executorService) {
+    _executorService = executorService;
     _segmentStoreUriStr = segmentStoreDirUri;
     _timeoutInMs = timeoutMillis;
     _serverMetrics = serverMetrics;
@@ -81,17 +92,19 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     }
     final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
     final URI destUri;
+    final PinotFS pinotFS;
     try {
       destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
           SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName())));
-    } catch (URISyntaxException e) {
-      LOGGER.warn("Failed copy segment tar file {} to segment store {}", segmentFile.getName(), _segmentStoreUriStr,
-          e);
+      pinotFS = PinotFSFactory.create(destUri.getScheme());
+    } catch (URISyntaxException | RuntimeException e) {
+      LOGGER.warn("Failed to prepare upload of segment tar file {} to segment store {}", segmentFile.getName(),
+          _segmentStoreUriStr, e);
       _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
       return null;
     }
     AtomicReference<AttemptState> state = new AtomicReference<>(AttemptState.IN_FLIGHT);
-    Future<URI> future = _executorService.submit(() -> copySegment(segmentFile, destUri, rawTableName, state));
+    Future<URI> future = _executorService.submit(() -> copySegment(pinotFS, segmentFile, destUri, rawTableName, state));
     try {
       URI segmentLocation = future.get(timeoutInMillis, TimeUnit.MILLISECONDS);
       if (segmentLocation != null) {
@@ -100,14 +113,12 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         return segmentLocation;
       }
     } catch (InterruptedException e) {
-      LOGGER.info("Interrupted while waiting for segment upload of {} to {}.", segmentName, _segmentStoreUriStr);
-      // future.get already cleared the interrupt flag. Leave it clear until a published object is deleted.
-      // S3 and HDFS abort a delete when the calling thread is interrupted, and the worker will not delete a URI
-      // it already published. Restore the flag after that delete.
-      if (abandonUnlessPublished(state)) {
-        deleteBestEffort(destUri);
+      try {
+        abandonAndDeleteIfPublished(state, pinotFS, destUri);
+        LOGGER.info("Interrupted while waiting for segment upload of {} to {}.", segmentName, _segmentStoreUriStr);
+      } finally {
+        Thread.currentThread().interrupt();
       }
-      Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
       if (abandonUnlessPublished(state)) {
         LOGGER.info("Successfully upload segment {} to {}.", segmentName, destUri);
@@ -117,6 +128,8 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_TIMEOUT, 1);
       LOGGER.warn("Timed out waiting to upload segment: {} for table: {}", segmentName.getSegmentName(), rawTableName);
     } catch (Exception e) {
+      // A timing metric can throw after the worker publishes the object.
+      abandonAndDeleteIfPublished(state, pinotFS, destUri);
       LOGGER.warn("Failed to upload file {} of segment {} for table {}",
           segmentFile.getAbsolutePath(), segmentName, rawTableName, e);
     }
@@ -130,17 +143,20 @@ public class PinotFSSegmentUploader implements SegmentUploader {
   /// success. The caller must not delete in that case: an early delete can race a copy that recreates the object.
   /// Does not cancel the future. An interrupt mid-upload can leave multipart parts this code cannot abort.
   static boolean abandonUnlessPublished(AtomicReference<AttemptState> state) {
-    return !state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.ABANDONED)
-        && state.get() == AttemptState.PUBLISHED;
+    return state.compareAndExchange(AttemptState.IN_FLIGHT, AttemptState.ABANDONED) == AttemptState.PUBLISHED;
   }
 
-  private URI copySegment(File segmentFile, URI destUri, String rawTableName, AtomicReference<AttemptState> state) {
+  private void abandonAndDeleteIfPublished(AtomicReference<AttemptState> state, PinotFS pinotFS, URI destUri) {
+    if (abandonUnlessPublished(state)) {
+      // The caller owns the published URI. Run its cleanup on a worker to keep remote I/O off the caller.
+      _executorService.execute(() -> deleteBestEffort(pinotFS, destUri));
+    }
+  }
+
+  private URI copySegment(PinotFS pinotFS, File segmentFile, URI destUri, String rawTableName,
+      AtomicReference<AttemptState> state) {
     long startTime = System.currentTimeMillis();
     try {
-      PinotFS pinotFS = openSegmentStore(segmentFile, destUri, state);
-      if (pinotFS == null) {
-        return null;
-      }
       try {
         pinotFS.copyFromLocalFile(segmentFile, destUri);
       } catch (Exception e) {
@@ -164,32 +180,89 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     }
   }
 
-  /// Returns null when the filesystem cannot be opened. Nothing was stored, so there is nothing to delete.
-  private PinotFS openSegmentStore(File segmentFile, URI destUri, AtomicReference<AttemptState> state) {
-    try {
-      return PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
-    } catch (Exception e) {
-      state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.FAILED);
-      LOGGER.warn("Failed copy segment tar file {} to segment store {}", segmentFile.getName(), destUri, e);
-      return null;
-    }
-  }
-
-  private void deleteBestEffort(URI destUri) {
-    try {
-      PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
-      deleteBestEffort(pinotFS, destUri);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to delete temporary segment file: {}", destUri, e);
-    }
-  }
-
   private static void deleteBestEffort(PinotFS pinotFS, URI destUri) {
     try {
       // Local and GCS return false for a missing object. ADLS and S3 can throw. Ignore the boolean.
       pinotFS.delete(destUri, true);
     } catch (Exception e) {
       LOGGER.warn("Failed to delete temporary segment file: {}", destUri, e);
+    }
+  }
+
+  @Override
+  public boolean isMetadataTarUploadSupported() {
+    return true;
+  }
+
+  @Override
+  public URI uploadMetadataTar(File metadataTarFile, LLCSegmentName segmentName, int timeoutInMillis) {
+    if (_segmentStoreUriStr == null || _segmentStoreUriStr.isEmpty()) {
+      LOGGER.error("Missing segment store uri. Failed to upload metadata tar {} for {}.", metadataTarFile.getName(),
+          segmentName.getSegmentName());
+      return null;
+    }
+    final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
+    // Like the segment file, upload to a unique tmp name. The controller moves it to <segment>.metadata.tar.gz at
+    // commit end. The final object is never written or deleted here, so a failed or partial upload is never visible
+    // under the final name.
+    final URI destUri;
+    try {
+      destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
+          SegmentCompletionUtils.generateTmpSegmentFileName(
+              segmentName.getSegmentName() + Constants.METADATA_TAR_GZ_FILE_EXT)));
+    } catch (URISyntaxException e) {
+      LOGGER.warn("Invalid segment store uri {} for metadata tar of segment {}", _segmentStoreUriStr, segmentName, e);
+      _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+      return null;
+    }
+    Callable<URI> uploadTask = () -> {
+      long startTime = System.currentTimeMillis();
+      try {
+        PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
+        pinotFS.copyFromLocalFile(metadataTarFile, destUri);
+        return destUri;
+      } catch (Exception e) {
+        LOGGER.warn("Failed copy metadata tar file {} to segment store {}: {}", metadataTarFile.getName(), destUri, e);
+      } finally {
+        long duration = System.currentTimeMillis() - startTime;
+        _serverMetrics.addTimedTableValue(rawTableName, ServerTimer.METADATA_TAR_UPLOAD_TIME_MS, duration,
+            TimeUnit.MILLISECONDS);
+      }
+      return null;
+    };
+    Future<URI> future = _executorService.submit(uploadTask);
+    try {
+      URI metadataTarLocation = future.get(timeoutInMillis, TimeUnit.MILLISECONDS);
+      if (metadataTarLocation != null) {
+        LOGGER.info("Successfully uploaded metadata tar of segment {} to {}.", segmentName, metadataTarLocation);
+        _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_SUCCESS, 1);
+        return metadataTarLocation;
+      }
+    } catch (InterruptedException e) {
+      LOGGER.info("Interrupted while waiting for metadata tar upload of {} to {}.", segmentName, _segmentStoreUriStr);
+      future.cancel(true);
+      Thread.currentThread().interrupt();
+    } catch (TimeoutException e) {
+      future.cancel(true);
+      _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_TIMEOUT, 1);
+      LOGGER.warn("Timed out waiting to upload metadata tar of segment: {} for table: {}",
+          segmentName.getSegmentName(), rawTableName);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to upload metadata tar {} of segment {} for table {}", metadataTarFile.getAbsolutePath(),
+          segmentName, rawTableName, e);
+    }
+    // Fire and forget: the store may be slow or hung (that is why we got here) and the commit must not wait for it.
+    // A copy that outlives the timeout can still leave a tmp object; the controller's tmp file cleanup removes it.
+    _executorService.submit(() -> deleteTmpQuietly(destUri));
+    _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.METADATA_TAR_UPLOAD_FAILURE, 1);
+    return null;
+  }
+
+  private void deleteTmpQuietly(URI tmpUri) {
+    try {
+      PinotFSFactory.create(tmpUri.getScheme()).delete(tmpUri, true);
+    } catch (Exception e) {
+      LOGGER.warn("Could not delete temporary metadata tar {}", tmpUri, e);
     }
   }
 }

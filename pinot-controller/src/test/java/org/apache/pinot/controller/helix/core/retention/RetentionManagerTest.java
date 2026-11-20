@@ -20,6 +20,8 @@ package org.apache.pinot.controller.helix.core.retention;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -32,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -53,6 +56,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -65,15 +69,19 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.helix.core.retention.RetentionManager.DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE;
@@ -513,6 +521,113 @@ public class RetentionManagerTest {
 
     // verify
     verify(mockPinotHelixResourceManager, times(1)).deleteSegments(eq(realtimeTableName), anyList());
+  }
+
+  @Test
+  public void testHybridTableRetentionOverrideTakesPrecedenceOverConfig() {
+    TableConfig realtimeTableConfig = createRealtimeTableConfig1(1);
+    TableConfig offlineTableConfig = createOfflineTableConfig();
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getOfflineTableConfig(TEST_TABLE_NAME)).thenReturn(offlineTableConfig);
+    ControllerConf conf = new ControllerConf();
+    conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, false);
+    RetentionManager retentionManager =
+        createRetentionManagerWithHybridRetentionOverride(realtimeTableConfig, resourceManager, conf);
+
+    retentionManager.processTable(REALTIME_TABLE_NAME);
+
+    verify(retentionManager).shouldEnableHybridTableRetentionStrategy(realtimeTableConfig, offlineTableConfig);
+    verify(retentionManager).manageRetentionForHybridTable(realtimeTableConfig, offlineTableConfig);
+    verify(retentionManager, never()).manageRetentionForRealtimeTable(any(), any(), anyInt(), any());
+  }
+
+  @Test
+  public void testHybridTableRetentionOverrideNotCalledWithoutOfflineTable() {
+    TableConfig realtimeTableConfig = createRealtimeTableConfig1(1);
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getOfflineTableConfig(TEST_TABLE_NAME)).thenReturn(null);
+    RetentionManager retentionManager =
+        createRetentionManagerWithHybridRetentionOverride(realtimeTableConfig, resourceManager, new ControllerConf());
+
+    retentionManager.processTable(REALTIME_TABLE_NAME);
+
+    verify(retentionManager, never()).shouldEnableHybridTableRetentionStrategy(any(), any());
+    verify(retentionManager, never()).manageRetentionForHybridTable(any(), any());
+    verify(retentionManager).manageRetentionForRealtimeTable(
+        argThat(runContext -> REALTIME_TABLE_NAME.equals(runContext.getTableNameWithType())), any(), anyInt(), any());
+  }
+
+  /// Returns a spy of a real retention manager whose `shouldEnableHybridTableRetentionStrategy` always returns `true`,
+  /// simulating a subclass that overrides it. All other methods run their real implementation.
+  private RetentionManager createRetentionManagerWithHybridRetentionOverride(TableConfig realtimeTableConfig,
+      PinotHelixResourceManager resourceManager, ControllerConf conf) {
+    // The realtime retention path reads the ideal state through the Helix admin
+    when(resourceManager.getHelixAdmin()).thenReturn(mock(HelixAdmin.class));
+    stubSizeRetentionResourceManager(realtimeTableConfig, List.of(), resourceManager, conf);
+    RetentionManager retentionManager = spy(new RetentionManager(resourceManager, mock(LeadControllerManager.class),
+        conf, mock(ControllerMetrics.class), mock(BrokerServiceHelper.class)));
+    doReturn(true).when(retentionManager).shouldEnableHybridTableRetentionStrategy(any(), any());
+    return retentionManager;
+  }
+
+  @DataProvider(name = "hybridTableRetentionStrategyOverrides")
+  public Object[][] hybridTableRetentionStrategyOverrides() {
+    // tableLevel (null means omitted; null and DEFAULT fall back to clusterLevel), clusterLevel, hasOfflineTable,
+    // expectHybridPath
+    return new Object[][]{
+        {null, false, true, false},
+        {null, true, true, true},
+        {Enablement.DEFAULT, false, true, false},
+        {Enablement.DEFAULT, true, true, true},
+        {Enablement.ENABLE, false, true, true},
+        {Enablement.ENABLE, true, true, true},
+        {Enablement.DISABLE, false, true, false},
+        {Enablement.DISABLE, true, true, false},
+        // Without an OFFLINE counterpart, realtime retention is used regardless of the table and cluster level configs
+        {null, true, false, false},
+        {Enablement.DEFAULT, true, false, false},
+        {Enablement.ENABLE, false, false, false},
+        {Enablement.ENABLE, true, false, false},
+    };
+  }
+
+  @Test(dataProvider = "hybridTableRetentionStrategyOverrides")
+  public void testTableLevelHybridRetentionStrategyOverridesClusterConfig(@Nullable Enablement tableLevel,
+      boolean clusterLevel, boolean hasOfflineTable, boolean expectHybridPath) {
+    int replicaCount = 1;
+    TableConfig realtimeTableConfig = createRealtimeTableConfig1(replicaCount);
+    if (tableLevel != null) {
+      realtimeTableConfig.getValidationConfig().setHybridTableRetentionStrategy(tableLevel);
+    }
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getHelixAdmin()).thenReturn(mock(HelixAdmin.class));
+    if (hasOfflineTable) {
+      setupSizeRetentionOfflineCounterpart(resourceManager);
+    }
+
+    ControllerConf conf = new ControllerConf();
+    conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, clusterLevel);
+
+    // Spy a plain RetentionManager rather than going through createRetentionManager(...), so the package-private
+    // methods stubbed below stay interceptable when a subclass suite overrides that factory
+    stubSizeRetentionResourceManager(realtimeTableConfig, List.of(), resourceManager, conf);
+    RetentionManager retentionManager = spy(new RetentionManager(resourceManager, mock(LeadControllerManager.class),
+        conf, mock(ControllerMetrics.class), mock(BrokerServiceHelper.class)));
+
+    // Only the retention strategy selection is under test, so stub out both branches
+    doNothing().when(retentionManager).manageRetentionForHybridTable(any(), any());
+    doNothing().when(retentionManager).manageRetentionForRealtimeTable(any(), any(), anyInt(), any());
+
+    retentionManager.processTable(REALTIME_TABLE_NAME);
+
+    if (expectHybridPath) {
+      verify(retentionManager).manageRetentionForHybridTable(any(), any());
+      verify(retentionManager, never()).manageRetentionForRealtimeTable(any(), any(), anyInt(), any());
+    } else {
+      verify(retentionManager, never()).manageRetentionForHybridTable(any(), any());
+      verify(retentionManager).manageRetentionForRealtimeTable(any(), any(), anyInt(), any());
+    }
   }
 
   private TableConfig createOfflineTableConfig() {
@@ -1825,6 +1940,13 @@ public class RetentionManagerTest {
   private RetentionManager createSizeRetentionManager(TableConfig tableConfig, List<SegmentZKMetadata> segments,
       PinotHelixResourceManager resourceManager, ControllerMetrics metrics, ControllerConf conf,
       BrokerServiceHelper brokerServiceHelper) {
+    stubSizeRetentionResourceManager(tableConfig, segments, resourceManager, conf);
+    return createRetentionManager(resourceManager, mock(LeadControllerManager.class), conf,
+        metrics, brokerServiceHelper);
+  }
+
+  private void stubSizeRetentionResourceManager(TableConfig tableConfig, List<SegmentZKMetadata> segments,
+      PinotHelixResourceManager resourceManager, ControllerConf conf) {
     String tableName = tableConfig.getTableName();
     when(resourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
     when(resourceManager.getSegmentsZKMetadata(tableName)).thenReturn(segments);
@@ -1836,8 +1958,6 @@ public class RetentionManagerTest {
     when(resourceManager.getLastLLCCompletedSegments(anyList())).thenCallRealMethod();
     when(resourceManager.getLastLLCCompletedSegments(tableName)).thenCallRealMethod();
     conf.setUntrackedSegmentDeletionEnabled(false);
-    return createRetentionManager(resourceManager, mock(LeadControllerManager.class), conf,
-        metrics, brokerServiceHelper);
   }
 
   private void setupSizeRetentionOfflineCounterpart(PinotHelixResourceManager resourceManager) {
@@ -1857,5 +1977,161 @@ public class RetentionManagerTest {
         new LineageEntry(List.of(source), List.of(destination), state, timestamp));
     when(resourceManager.getPropertyStore().get(anyString(), any(Stat.class), eq(AccessOption.PERSISTENT)))
         .thenReturn(lineage.toZNRecord());
+  }
+
+  /// Per-table work added by a subclass must not add ZK or deep-store reads. The subclass reads through the run
+  /// context before the built-in steps run, and the whole call sees one ZK metadata read and one listing.
+  @Test
+  public void testRunContextSharesReadsWithSubclassPerTableWork() {
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    AtomicInteger listings = new AtomicInteger();
+    AtomicInteger subclassCalls = new AtomicInteger();
+    RetentionManager retentionManager =
+        newRunContextRetentionManager(pinotHelixResourceManager, listings, 0, (context, builtInSteps) -> {
+          subclassCalls.incrementAndGet();
+          context.getSegmentsZKMetadata();
+          context.getDeepStoreFiles();
+          builtInSteps.run();
+        });
+    retentionManager.start();
+    retentionManager.run();
+
+    assertEquals(subclassCalls.get(), 1);
+    assertEquals(listings.get(), 1);
+    verify(pinotHelixResourceManager, times(1)).getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
+  }
+
+  /// A failed listing is not memoized: after the subclass's listing throws, the untracked-segment sweep lists again,
+  /// and time retention still deletes the tracked segment.
+  @Test
+  public void testFailedListingIsRetriedAndTimeRetentionStillRuns() {
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    AtomicInteger listings = new AtomicInteger();
+    RetentionManager retentionManager =
+        newRunContextRetentionManager(pinotHelixResourceManager, listings, 1, (context, builtInSteps) -> {
+          assertThrows(IOException.class, context::getDeepStoreFiles);
+          builtInSteps.run();
+        });
+    retentionManager.start();
+    retentionManager.run();
+
+    assertEquals(listings.get(), 2);
+    // One call that deletes both the tracked segment and the old untracked file, checked by the mock.
+    verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
+  }
+
+  /// Time retention can delete segments, so the context drops its reads after that step: a read after the built-in
+  /// steps sees fresh state, and the memory is not held through the later steps.
+  @Test
+  public void testRunContextIsReleasedAfterTimeRetention() {
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    AtomicInteger listings = new AtomicInteger();
+    RetentionManager retentionManager =
+        newRunContextRetentionManager(pinotHelixResourceManager, listings, 0, (context, builtInSteps) -> {
+          builtInSteps.run();
+          context.getSegmentsZKMetadata();
+          context.getDeepStoreFiles();
+        });
+    retentionManager.start();
+    retentionManager.run();
+
+    // One read each by the built-in steps, and one each after the release.
+    assertEquals(listings.get(), 2);
+    verify(pinotHelixResourceManager, times(2)).getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+  }
+
+  /// Per-table work of a [RetentionManager] subclass in the run context tests. `builtInSteps` runs
+  /// `super.processTable`.
+  @FunctionalInterface
+  private interface PerTableWork {
+    void process(RetentionManager.TableRunContext context, Runnable builtInSteps)
+        throws IOException;
+  }
+
+  /// Retention manager over one APPEND OFFLINE table holding an old tracked segment, an old untracked file and a
+  /// recent untracked file: time retention deletes the segment and the untracked-segment sweep deletes the old file,
+  /// in one `deleteSegments` call. `perTableWork` wraps the built-in steps, and the first `failingListings` listings
+  /// throw.
+  private RetentionManager newRunContextRetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
+      AtomicInteger listings, int failingListings, PerTableWork perTableWork) {
+    final long oldTimeMs = 1343001600000L;
+    SegmentZKMetadata oldSegment = mockSegmentZKMetadata(oldTimeMs, oldTimeMs, TimeUnit.MILLISECONDS);
+    createFileWithContent(new File(_tableDir, oldSegment.getSegmentName()), "tracked");
+    File untrackedOld = new File(_tableDir, "untrackedOld");
+    createFileWithContent(untrackedOld, "untracked old");
+    setFileModificationTime(untrackedOld, oldTimeMs);
+    createFileWithContent(new File(_tableDir, "untrackedRecent"), "untracked recent");
+
+    TableConfig tableConfig = createOfflineTableConfig();
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    setupPinotHelixResourceManager(tableConfig, List.of(oldSegment.getSegmentName(), "untrackedOld"),
+        pinotHelixResourceManager, leadControllerManager);
+    when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
+    when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(List.of(oldSegment));
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
+    // Lets the lineage cleanup step run (no lineage znode) instead of failing on a null lock.
+    when(pinotHelixResourceManager.getLineageUpdaterLock(OFFLINE_TABLE_NAME)).thenReturn(new Object());
+
+    ControllerConf conf = new ControllerConf();
+    conf.setRetentionControllerFrequencyInSeconds(0);
+    conf.setDeletedSegmentsRetentionInDays(0);
+    conf.setUntrackedSegmentDeletionEnabled(true);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mock(PinotHelixResourceManager.class), conf, null, null);
+    return new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+        brokerServiceHelper) {
+      @Override
+      protected void processTable(TableConfig config, TableRunContext context) {
+        try {
+          perTableWork.process(context, () -> super.processTable(config, context));
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }
+
+      @Override
+      protected List<FileMetadata> listDeepStoreTableDir(URI tableDataUri)
+          throws IOException {
+        if (listings.incrementAndGet() <= failingListings) {
+          throw new IOException("Injected listing failure");
+        }
+        return super.listDeepStoreTableDir(tableDataUri);
+      }
+    };
+  }
+
+  @DataProvider
+  public Object[][] tableNamesWithType() {
+    return new Object[][]{{OFFLINE_TABLE_NAME}, {REALTIME_TABLE_NAME}};
+  }
+
+  @Test(dataProvider = "tableNamesWithType")
+  public void testUntrackedScanKeepsSidecarOfTrackedSegment(String tableNameWithType)
+      throws Exception {
+    long thirtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30);
+    for (String fileName : List.of("tracked", "tracked" + Constants.METADATA_TAR_GZ_FILE_EXT,
+        "orphan" + Constants.METADATA_TAR_GZ_FILE_EXT)) {
+      File file = new File(_tableDir, fileName);
+      createFileWithContent(file, fileName);
+      setFileModificationTime(file, thirtyDaysAgo);
+    }
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getDataDir()).thenReturn(_tempDir.toString());
+    RetentionStrategy purgeAll = mock(RetentionStrategy.class);
+    when(purgeAll.isPurgeable(anyString(), anyString(), anyLong())).thenReturn(true);
+    ControllerConf conf = new ControllerConf();
+    RetentionManager retentionManager = createRetentionManager(resourceManager, mock(LeadControllerManager.class),
+        conf, new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
+        new BrokerServiceHelper(resourceManager, conf, null, null));
+
+    List<String> toDelete = retentionManager.findUntrackedSegmentsToDeleteFromDeepstore(
+        retentionManager.new TableRunContext(tableNameWithType), purgeAll, Set.of("tracked"), purgeAll);
+
+    // The aged sidecar of the tracked segment survives; the orphan is still cleaned up (resolved by the deletion path
+    // through its .tar.gz fallback).
+    assertEquals(toDelete, List.of("orphan.metadata"));
   }
 }

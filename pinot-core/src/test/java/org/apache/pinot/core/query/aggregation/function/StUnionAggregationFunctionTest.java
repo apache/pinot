@@ -27,6 +27,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.util.GeometryCombiner;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
@@ -77,6 +78,19 @@ public class StUnionAggregationFunctionTest {
 
     Geometry expected = UnaryUnionOp.union(GeometryCombiner.combine(polygon, line, geometryCollection));
     assertEquals(aggregationResultHolder.getResult(), expected);
+  }
+
+  @Test
+  public void testMergeFinalResults()
+      throws Exception {
+    ExpressionContext expression = ExpressionContext.forIdentifier("geometryColumn");
+    StUnionAggregationFunction aggregationFunction = new StUnionAggregationFunction(List.of(expression), false);
+    Geometry polygon = GeometryUtils.GEOMETRY_WKT_READER.read("POLYGON((0 0, 0 5, 5 5, 5 0, 0 0))");
+    Geometry line = GeometryUtils.GEOMETRY_WKT_READER.read("LINESTRING(20 20, 25 25)");
+
+    ByteArray merged = aggregationFunction.mergeFinalResult(new ByteArray(GeometrySerializer.serialize(polygon)),
+        new ByteArray(GeometrySerializer.serialize(line)));
+    assertEquals(GeometrySerializer.deserialize(merged.getBytes()), aggregationFunction.merge(polygon, line));
   }
 
   private static class BytesBlockValSet extends SyntheticBlockValSets.Base {

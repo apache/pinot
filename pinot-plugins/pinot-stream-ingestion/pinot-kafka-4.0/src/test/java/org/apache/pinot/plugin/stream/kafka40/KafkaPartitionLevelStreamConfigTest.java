@@ -24,8 +24,12 @@ import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class KafkaPartitionLevelStreamConfigTest {
@@ -90,6 +94,35 @@ public class KafkaPartitionLevelStreamConfigTest {
       streamConfigMap.put("stream.kafka.metadata.populate", populateRowMetadata);
     }
     return new StreamConfig(tableNameWithType, streamConfigMap);
+  }
+
+  @DataProvider
+  public Object[][] consumerFactoryNames() {
+    return new Object[][]{
+        {null},
+        {KafkaConsumerFactory.class.getName()},
+        {"org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory"},
+        {"org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory"},
+        {"org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory"},
+        {"org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory"}
+    };
+  }
+
+  @Test(dataProvider = "consumerFactoryNames")
+  public void testDefaultAndLegacyConsumerFactories(String factoryName) {
+    Map<String, String> config = new HashMap<>();
+    config.put("streamType", "kafka");
+    config.put("stream.kafka.topic.name", "topic");
+    config.put("stream.kafka.decoder.class.name", KAFKA_DECODER_CLASS_NAME);
+    config.put("stream.kafka.broker.list", "localhost:9092");
+    if (factoryName != null) {
+      config.put("stream.kafka.consumer.factory.class.name", factoryName);
+    }
+    StreamConfig streamConfig = new StreamConfig("table_REALTIME", config);
+    if (factoryName == null) {
+      assertEquals(streamConfig.getConsumerFactoryClassName(), KafkaConsumerFactory.class.getName());
+    }
+    assertEquals(StreamConsumerFactoryProvider.create(streamConfig).getClass(), KafkaConsumerFactory.class);
   }
 
   @Test

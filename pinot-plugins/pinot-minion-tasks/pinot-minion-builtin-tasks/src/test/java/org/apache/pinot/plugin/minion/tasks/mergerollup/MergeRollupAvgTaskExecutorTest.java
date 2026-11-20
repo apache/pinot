@@ -30,7 +30,6 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.MinionContext;
@@ -240,7 +239,7 @@ public class MergeRollupAvgTaskExecutorTest {
   private static GenericRow makeRow(String dimensionValue, AvgPair avgPair) {
     GenericRow row = new GenericRow();
     row.putValue(DIMENSION_COL, dimensionValue);
-    row.putValue(AVG_COL, ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair));
+    row.putValue(AVG_COL, avgPair.toBytes());
     return row;
   }
 
@@ -290,7 +289,7 @@ public class MergeRollupAvgTaskExecutorTest {
       GenericRow row = reader.next();
       String key = (String) row.getValue(DIMENSION_COL);
       byte[] bytes = (byte[]) row.getValue(AVG_COL);
-      result.put(key, ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytes));
+      result.put(key, AvgPair.fromBytes(bytes));
     }
     reader.close();
     return result;
