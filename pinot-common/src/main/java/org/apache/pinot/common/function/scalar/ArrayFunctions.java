@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Arrays;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
@@ -557,8 +558,9 @@ public class ArrayFunctions {
   }
 
   /// Generates the sequence `start, start + inc, ...`, stopping at the last value that does not pass `end`. Both
-  /// bounds are inclusive when `end` lands on a step (within floating-point rounding error for floating-point inputs),
-  /// and `inc` may be negative to count down.
+  /// bounds are inclusive when `end` is one of the generated values, and `inc` may be negative to count down. A
+  /// decimal step that binary floating point cannot represent exactly, such as `0.1`, still runs all the way to its
+  /// end rather than stopping a step short, and a value that genuinely falls between two steps is never included.
   ///
   /// The main use is building a dense time grid to `UNNEST` and left join a sparse time series onto, which is how gap
   /// filling is expressed in the multi-stage engine:
@@ -642,30 +644,68 @@ public class ArrayFunctions {
     return checkGeneratedArrayLength(span / inc);
   }
 
-  /// Length of the `float` sequence `start, start + inc, ...` bounded by `end`, inclusive. The step count is computed
-  /// in double precision; the rounding tolerance is based on the ULPs of the original float inputs.
+  /// Length of the `float` sequence `start, start + inc, ...` bounded by `end`, inclusive.
   private static int generatedArrayLength(float start, float end, float inc) {
     checkFloatingPointArguments(start, end, inc);
-    // Use double precision for the step count and compare its error with ULPs of the original float inputs.
-    double steps = (end - start) / inc;
-    return generatedFloatingArrayLength(steps, Math.ulp(start), Math.ulp(end), Math.ulp(inc), inc);
+    // Promote an operand so that the subtraction and the division both happen in double precision; assigning the
+    // completed `float` quotient to a `double` would only widen its error.
+    double steps = ((double) end - start) / inc;
+    double nearestSteps = Math.rint(steps);
+    long fullSteps;
+    if (nearestSteps < MAX_GENERATED_ARRAY_LENGTH && start + (float) nearestSteps * inc == end) {
+      // The end is one of the generated elements, so it is part of the range however the quotient rounded.
+      fullSteps = (long) nearestSteps;
+    } else if (Math.abs(steps - nearestSteps) > floatingStepTolerance(steps, Math.ulp(start), Math.ulp(end),
+        Math.ulp(inc), inc)) {
+      // Far enough from a whole step that rounding cannot have crossed one.
+      fullSteps = (long) Math.floor(steps);
+    } else {
+      fullSteps = decimalSteps(Float.toString(start), Float.toString(end), Float.toString(inc));
+    }
+    return checkGeneratedArrayLength(fullSteps);
   }
 
   /// Length of the `double` sequence `start, start + inc, ...` bounded by `end`, inclusive.
   private static int generatedArrayLength(double start, double end, double inc) {
     checkFloatingPointArguments(start, end, inc);
-    return generatedFloatingArrayLength((end - start) / inc, Math.ulp(start), Math.ulp(end), Math.ulp(inc), inc);
+    double steps = (end - start) / inc;
+    double nearestSteps = Math.rint(steps);
+    long fullSteps;
+    if (nearestSteps < MAX_GENERATED_ARRAY_LENGTH && start + nearestSteps * inc == end) {
+      fullSteps = (long) nearestSteps;
+    } else if (Math.abs(steps - nearestSteps) > floatingStepTolerance(steps, Math.ulp(start), Math.ulp(end),
+        Math.ulp(inc), inc)) {
+      fullSteps = (long) Math.floor(steps);
+    } else {
+      fullSteps = decimalSteps(Double.toString(start), Double.toString(end), Double.toString(inc));
+    }
+    return checkGeneratedArrayLength(fullSteps);
   }
 
-  /// Snaps a floating-point step count to an integer only when the distance is within the rounding error of the input
-  /// bounds and increments. Otherwise, truncates toward the last step that does not pass the end.
-  private static int generatedFloatingArrayLength(double steps, double startUlp, double endUlp, double incUlp,
+  /// Distance between a floating-point step count and the exact one, from rounding the three arguments, the
+  /// subtraction that forms the span and the division itself.
+  ///
+  /// A step count within this distance of a whole step is ambiguous: rounding can have moved it across the boundary
+  /// either way, so the quotient cannot say which side the exact count is on. It also bounds how far a decimal step
+  /// such as `0.1` to `0.7` by `0.1` can land from its whole count, which is why it, and not a wider tolerance, is what
+  /// [`decimalSteps`] is consulted for.
+  private static double floatingStepTolerance(double steps, double startUlp, double endUlp, double incUlp,
       double inc) {
-    double nearestSteps = Math.rint(steps);
-    double roundingError = 2 * (startUlp + endUlp + Math.abs(nearestSteps) * incUlp) / Math.abs(inc);
-    double fullSteps = Math.abs(steps - nearestSteps) <= roundingError ? nearestSteps : Math.floor(steps);
-    // A step count too wide for a long saturates at Long.MAX_VALUE, which the length check below rejects.
-    return checkGeneratedArrayLength((long) fullSteps);
+    double argumentError = (startUlp + endUlp + Math.abs(Math.rint(steps)) * incUlp) / Math.abs(inc);
+    // `ulp` is not a usable bound for a zero or infinite step count, so the two operations' share is taken from a unit
+    // magnitude, which bounds both normal and subnormal results.
+    return argumentError + 2 * Math.ulp(Math.abs(steps) < 1 ? 1 : steps);
+  }
+
+  /// Floor of `(end - start) / inc` over the decimal values the three arguments denote.
+  ///
+  /// This is what a step count written in decimal means. It is consulted only where the quotient is ambiguous, because
+  /// here it is the reading that keeps a decimal step such as `0.1` to `0.7` by `0.1` at seven elements, while the
+  /// quotient there cannot be told apart from one whose end genuinely falls between steps.
+  private static long decimalSteps(String start, String end, String inc) {
+    BigDecimal span = new BigDecimal(end).subtract(new BigDecimal(start));
+    // A quotient too wide for a long saturates at Long.MAX_VALUE, which the length check rejects.
+    return span.divide(new BigDecimal(inc), 0, RoundingMode.FLOOR).longValue();
   }
 
   private static void checkFloatingPointArguments(double start, double end, double inc) {
