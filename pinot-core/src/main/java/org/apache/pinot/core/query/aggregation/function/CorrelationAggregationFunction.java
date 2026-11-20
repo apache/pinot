@@ -38,20 +38,16 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 /// Aggregation function which returns the population Pearson correlation coefficient of 2 expressions.
 /// CORR(exp1, exp2) = covarPop(exp1, exp2) / (stdDevPop(exp1) \* stdDevPop(exp2))
-///
-/// Pearson's correlation between two random variables X and Y is defined as
-/// corr(X,Y) = cov(X,Y) / (stdDev(X) \* stdDev(Y)).
-/// Using the raw sums kept in the tuple (count, sum(X), sum(Y), sum(X\*Y), sum(X^2), sum(Y^2)) this becomes
-/// corr(X,Y) = (count \* sum(X\*Y) - sum(X) \* sum(Y))
-///           / sqrt((count \* sum(X^2) - sum(X)^2) \* (count \* sum(Y^2) - sum(Y)^2)).
 /// @see <a href="https://en.wikipedia.org/wiki/Pearson_correlation_coefficient">Pearson correlation coefficient</a>
 ///
-/// The coefficient does not depend on whether the population or sample forms of covariance and standard deviation are
-/// used, because the sample sizes cancel out, so only the population form is computed here. The result is undefined
-/// when fewer than one row contributes or when either column has zero variance (a constant column); in those cases the
-/// function returns NULL when null handling is enabled and a sentinel otherwise.
+/// The intermediate [CorrelationTuple] keeps the means and co-moments of the two columns (Welford's update per row,
+/// Chan's pairwise update on merge), so corr = cXY / sqrt(m2X \* m2Y) stays accurate for values that are large relative
+/// to their spread. The coefficient does not depend on whether the population or sample forms are used, because the
+/// sample sizes cancel out. The result is undefined when fewer than two rows contribute or when either column has zero
+/// variance (a constant column); in those cases the function returns NULL when null handling is enabled and a sentinel
+/// otherwise.
 public class CorrelationAggregationFunction extends BaseAggregationFunction<CorrelationTuple, Double> {
-  private static final int CORRELATION_TUPLE_TYPE = 33;
+  private static final int CORRELATION_TUPLE_TYPE = 58;
 
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   protected final ExpressionContext _expression1;
@@ -97,51 +93,32 @@ public class CorrelationAggregationFunction extends BaseAggregationFunction<Corr
     double[] values1 = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression1);
     double[] values2 = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression2);
 
-    CorrelationTuple tuple = new CorrelationTuple(0.0, 0.0, 0.0, 0.0, 0.0, 0L);
+    CorrelationTuple tuple = new CorrelationTuple();
     forEachNotNull(length, blockValSetMap.get(_expression1), blockValSetMap.get(_expression2), (from, to) -> {
-      double sumX = 0.0;
-      double sumY = 0.0;
-      double sumXY = 0.0;
-      double sumX2 = 0.0;
-      double sumY2 = 0.0;
       for (int i = from; i < to; i++) {
-        double x = values1[i];
-        double y = values2[i];
-        sumX += x;
-        sumY += y;
-        sumXY += x * y;
-        sumX2 += x * x;
-        sumY2 += y * y;
+        tuple.apply(values1[i], values2[i]);
       }
-      tuple.apply(sumX, sumY, sumXY, sumX2, sumY2, to - from);
     });
 
     // Leaving the holder untouched is how "nothing was aggregated" reaches extractFinalResult
     if (_nullHandlingEnabled && tuple.getCount() == 0L) {
       return;
     }
-    setAggregationResult(aggregationResultHolder, tuple.getSumX(), tuple.getSumY(), tuple.getSumXY(), tuple.getSumX2(),
-        tuple.getSumY2(), tuple.getCount());
-  }
-
-  protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, double sumX, double sumY,
-      double sumXY, double sumX2, double sumY2, long count) {
     CorrelationTuple correlationTuple = aggregationResultHolder.getResult();
     if (correlationTuple == null) {
-      aggregationResultHolder.setValue(new CorrelationTuple(sumX, sumY, sumXY, sumX2, sumY2, count));
+      aggregationResultHolder.setValue(tuple);
     } else {
-      correlationTuple.apply(sumX, sumY, sumXY, sumX2, sumY2, count);
+      correlationTuple.apply(tuple);
     }
   }
 
-  protected void setGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, double sumX, double sumY,
-      double sumXY, double sumX2, double sumY2, long count) {
+  private static void setGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, double x, double y) {
     CorrelationTuple correlationTuple = groupByResultHolder.getResult(groupKey);
     if (correlationTuple == null) {
-      groupByResultHolder.setValueForKey(groupKey, new CorrelationTuple(sumX, sumY, sumXY, sumX2, sumY2, count));
-    } else {
-      correlationTuple.apply(sumX, sumY, sumXY, sumX2, sumY2, count);
+      correlationTuple = new CorrelationTuple();
+      groupByResultHolder.setValueForKey(groupKey, correlationTuple);
     }
+    correlationTuple.apply(x, y);
   }
 
   @Override
@@ -151,9 +128,7 @@ public class CorrelationAggregationFunction extends BaseAggregationFunction<Corr
     double[] values2 = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression2);
     forEachNotNull(length, blockValSetMap.get(_expression1), blockValSetMap.get(_expression2), (from, to) -> {
       for (int i = from; i < to; i++) {
-        double x = values1[i];
-        double y = values2[i];
-        setGroupByResult(groupKeyArray[i], groupByResultHolder, x, y, x * y, x * x, y * y, 1L);
+        setGroupByResult(groupKeyArray[i], groupByResultHolder, values1[i], values2[i]);
       }
     });
   }
@@ -168,7 +143,7 @@ public class CorrelationAggregationFunction extends BaseAggregationFunction<Corr
         double x = values1[i];
         double y = values2[i];
         for (int groupKey : groupKeysArray[i]) {
-          setGroupByResult(groupKey, groupByResultHolder, x, y, x * y, x * x, y * y, 1L);
+          setGroupByResult(groupKey, groupByResultHolder, x, y);
         }
       }
     });
@@ -222,23 +197,12 @@ public class CorrelationAggregationFunction extends BaseAggregationFunction<Corr
     if (count == 0L) {
       return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
     }
-    double sumX = correlationTuple.getSumX();
-    double sumY = correlationTuple.getSumY();
-    double sumXY = correlationTuple.getSumXY();
-    double sumX2 = correlationTuple.getSumX2();
-    double sumY2 = correlationTuple.getSumY2();
-    // count * variance of each column, up to the shared 1 / count^2 factor that cancels in the ratio
-    double varX = count * sumX2 - sumX * sumX;
-    double varY = count * sumY2 - sumY * sumY;
-    // Correlation is undefined when either column never varies; floating point can also drive a non-negative variance
-    // slightly below zero, which would turn the square root into NaN, so both are treated as undefined here
-    if (varX <= 0.0 || varY <= 0.0) {
+    double correlation = correlationTuple.getCorrelation();
+    // Undefined for a single row or a constant column
+    if (Double.isNaN(correlation)) {
       return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
     }
-    double cov = count * sumXY - sumX * sumY;
-    double correlation = cov / Math.sqrt(varX * varY);
-    // Clamp rounding error that can push the ratio a hair outside the mathematical [-1, 1] range
-    return Math.max(-1.0, Math.min(1.0, correlation));
+    return correlation;
   }
 
   @Override

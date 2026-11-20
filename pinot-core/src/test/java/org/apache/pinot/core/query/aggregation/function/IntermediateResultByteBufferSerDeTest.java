@@ -91,6 +91,7 @@ import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.BigDecimalLongPair;
 import org.apache.pinot.segment.local.customobject.BytesLongPair;
+import org.apache.pinot.segment.local.customobject.CorrelationTuple;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
@@ -392,6 +393,8 @@ public class IntermediateResultByteBufferSerDeTest {
         {new CovarianceAggregationFunction(List.of(COLUMN, COLUMN_2), false, false),
             new CovarianceTuple(1.0, 2.0, 3.0, 4L), 32},
         {new VarianceAggregationFunction(List.of(COLUMN), false, false, false), new VarianceTuple(4L, 2.0, 1.0), 33},
+        {new CorrelationAggregationFunction(List.of(COLUMN, COLUMN_2), false),
+            new CorrelationTuple(4L, 1.0, 2.0, 3.0, 4.0, 1.5), 58},
         {new FourthMomentAggregationFunction(List.of(COLUMN), FourthMomentAggregationFunction.Type.KURTOSIS, false),
             fourthMoment(), 34},
         {new PercentileEstAggregationFunction(COLUMN, 50, false), quantileDigest(), 7},
