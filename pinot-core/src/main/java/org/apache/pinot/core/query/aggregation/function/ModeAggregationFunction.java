@@ -33,6 +33,7 @@ import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,11 +43,11 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -65,6 +66,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 ///   the result is DOUBLE.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<Map<?, Long>, Comparable<?>> {
+  private static final int INT_2_LONG_MAP_TYPE = 23;
+  private static final int LONG_2_LONG_MAP_TYPE = 24;
+  private static final int FLOAT_2_LONG_MAP_TYPE = 25;
+  private static final int DOUBLE_2_LONG_MAP_TYPE = 26;
+  private static final int STRING_2_LONG_MAP_TYPE = 57;
 
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
@@ -563,32 +569,37 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Map<?, Long> longMap) {
-    if (longMap instanceof Int2LongMap) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Int2LongMap.getValue(),
-          ObjectSerDeUtils.INT_2_LONG_MAP_SER_DE.serialize((Int2LongMap) longMap));
-    } else if (longMap instanceof Long2LongMap) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Long2LongMap.getValue(),
-          ObjectSerDeUtils.LONG_2_LONG_MAP_SER_DE.serialize((Long2LongMap) longMap));
-    } else if (longMap instanceof Float2LongMap) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Float2LongMap.getValue(),
-          ObjectSerDeUtils.FLOAT_2_LONG_MAP_SER_DE.serialize((Float2LongMap) longMap));
-    } else if (longMap instanceof Double2LongMap) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Double2LongMap.getValue(),
-          ObjectSerDeUtils.DOUBLE_2_LONG_MAP_SER_DE.serialize((Double2LongMap) longMap));
-    } else if (longMap instanceof Object2LongMap) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.String2LongMap.getValue(),
-          ObjectSerDeUtils.STRING_2_LONG_MAP_SER_DE.serialize((Object2LongMap<String>) longMap));
-    } else {
-      throw new IllegalStateException(
+  public SerializedResult serializeIntermediateResult(Map<?, Long> longMap) {
+    return switch (longMap) {
+      case Int2LongMap int2LongMap ->
+          new SerializedValue<>(INT_2_LONG_MAP_TYPE, int2LongMap, ObjectSerDeUtils.INT_2_LONG_MAP_SER_DE);
+      case Long2LongMap long2LongMap ->
+          new SerializedValue<>(LONG_2_LONG_MAP_TYPE, long2LongMap, ObjectSerDeUtils.LONG_2_LONG_MAP_SER_DE);
+      case Float2LongMap float2LongMap ->
+          new SerializedValue<>(FLOAT_2_LONG_MAP_TYPE, float2LongMap, ObjectSerDeUtils.FLOAT_2_LONG_MAP_SER_DE);
+      case Double2LongMap double2LongMap ->
+          new SerializedValue<>(DOUBLE_2_LONG_MAP_TYPE, double2LongMap, ObjectSerDeUtils.DOUBLE_2_LONG_MAP_SER_DE);
+      case Object2LongMap object2LongMap ->
+          new SerializedValue<>(STRING_2_LONG_MAP_TYPE, object2LongMap, ObjectSerDeUtils.STRING_2_LONG_MAP_SER_DE);
+      default -> throw new IllegalStateException(
           "Illegal data type for Intermediate Result of MODE aggregation function: " + longMap.getClass()
               .getSimpleName());
-    }
+    };
   }
 
   @Override
   public Map<?, Long> deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+    int type = customObject.getType();
+    ByteBuffer buffer = customObject.getBuffer();
+    return switch (type) {
+      case INT_2_LONG_MAP_TYPE -> ObjectSerDeUtils.INT_2_LONG_MAP_SER_DE.deserialize(buffer);
+      case LONG_2_LONG_MAP_TYPE -> ObjectSerDeUtils.LONG_2_LONG_MAP_SER_DE.deserialize(buffer);
+      case FLOAT_2_LONG_MAP_TYPE -> ObjectSerDeUtils.FLOAT_2_LONG_MAP_SER_DE.deserialize(buffer);
+      case DOUBLE_2_LONG_MAP_TYPE -> ObjectSerDeUtils.DOUBLE_2_LONG_MAP_SER_DE.deserialize(buffer);
+      case STRING_2_LONG_MAP_TYPE -> ObjectSerDeUtils.STRING_2_LONG_MAP_SER_DE.deserialize(buffer);
+      default -> throw new IllegalStateException(
+          "Unexpected intermediate result type: " + type + " for function: " + getType());
+    };
   }
 
   @Override

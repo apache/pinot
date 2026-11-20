@@ -207,7 +207,8 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   }
 
   private SegmentMetadataImpl(SegmentMetadataImpl mapped) {
-    _indexDir = mapped._indexDir;
+    // A subclass may report a different index directory than the one its mapping reads.
+    _indexDir = mapped.getIndexDir();
     _columnMetadataMap = new TreeMap<>();
     _schema = new Schema();
     _segmentName = mapped._segmentName;
@@ -263,7 +264,12 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
     return MappedSegmentMetadataStore.isTempFileName(fileName);
   }
 
-  private SegmentMetadataImpl(File indexDir, ReadMode readMode, @Nullable EagerSnapshot eagerSnapshot)
+  /// Mapped constructor for segment directory implementations that subclass [SegmentMetadataImpl] to carry their own
+  /// metadata, for example one that stages a segment's metadata files locally while its index files live elsewhere.
+  /// It reads `indexDir` exactly as [#loadMapped(File, ReadMode, EagerSnapshot)] does, so the caller owns the mapping
+  /// and must [#close()] it. A subclass may override [#getIndexDir()]; [#detachedCopy()] keeps what it reports, but
+  /// returns a plain [SegmentMetadataImpl].
+  protected SegmentMetadataImpl(File indexDir, ReadMode readMode, @Nullable EagerSnapshot eagerSnapshot)
       throws IOException, ConfigurationException {
     _indexDir = indexDir;
     _columnMetadataMap = null;

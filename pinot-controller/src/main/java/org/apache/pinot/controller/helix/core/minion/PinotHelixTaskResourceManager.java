@@ -542,7 +542,9 @@ public class PinotHelixTaskResourceManager {
   }
 
   /// This method returns a map of table name to count of sub-tasks in various states, given the top-level task name.
-  /// It also collects waiting times for subtasks with null state and running times for subtasks in RUNNING state.
+  /// It also collects waiting times for subtasks with null state and running times for subtasks in RUNNING state, and
+  /// for tables with waiting subtasks, the time since the job last made progress (queue stall): 0 while a subtask is
+  /// running, otherwise the time since a subtask last started or finished.
   ///
   /// @param taskName in the form "Task\_<taskType>\_<uuid>\_<timestamp>"
   /// @return a map of table name to [TaskStatusSummary]
@@ -565,6 +567,7 @@ public class PinotHelixTaskResourceManager {
     }
     long jobStartTime = jobContext.getStartTime();
     long currentTime = System.currentTimeMillis();
+    long lastProgressTime = jobStartTime;
     Map<String, Integer> taskIdPartitionMap = jobContext.getTaskIdPartitionMap();
     for (Map.Entry<String, TaskConfig> entry : taskConfigMap.entrySet()) {
       String taskId = entry.getKey();
@@ -574,6 +577,14 @@ public class PinotHelixTaskResourceManager {
       if (partition != null) {
         state = jobContext.getPartitionState(partition);
         executionStartTime = jobContext.getPartitionStartTime(partition);
+        if (state == TaskPartitionState.RUNNING || state == TaskPartitionState.INIT) {
+          // A subtask in flight is progress: a long one must not read as a stuck queue (MAX_SUBTASK_RUNNING_TIME_MS
+          // catches one that hangs)
+          lastProgressTime = currentTime;
+        } else {
+          lastProgressTime =
+              Math.max(lastProgressTime, Math.max(executionStartTime, jobContext.getPartitionFinishTime(partition)));
+        }
       }
       TaskConfig taskConfig = entry.getValue();
       String tableName = taskConfig.getConfigMap().getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME);
@@ -592,6 +603,16 @@ public class PinotHelixTaskResourceManager {
       if (state == TaskPartitionState.RUNNING && executionStartTime > 0) {
         long runningTimeMillis = (currentTime - executionStartTime);
         taskStatusSummary.getSubtaskRunningTimes().put(taskId, runningTimeMillis);
+      }
+    }
+    // A job whose subtasks keep starting or finishing is draining, however old it is: only the time since the last
+    // such progress tells a stuck queue apart from a long one
+    if (jobStartTime > 0) {
+      long queueStallTimeMillis = currentTime - lastProgressTime;
+      for (TaskStatusSummary taskStatusSummary : taskStatusSummaryMap.values()) {
+        if (!taskStatusSummary.getSubtaskWaitingTimes().isEmpty()) {
+          taskStatusSummary.setQueueStallTimeMs(queueStallTimeMillis);
+        }
       }
     }
     return taskStatusSummaryMap;
@@ -911,7 +932,9 @@ public class PinotHelixTaskResourceManager {
       String worker = entry.getKey();
       String resp = entry.getValue();
       LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
-      minionWorkerIdSubtaskProgressMap.put(minionWorkerUrlToWorkerIdMap.get(worker),
+      // Response keys are "<url>__<count>" when multiRequestPerServer is true
+      minionWorkerIdSubtaskProgressMap.put(
+          minionWorkerUrlToWorkerIdMap.get(StringUtils.substringBeforeLast(worker, "__")),
           JsonUtils.stringToObject(resp, Map.class));
     }
     if (serviceResponse._failedResponseCount > 0) {
@@ -1846,6 +1869,8 @@ public class PinotHelixTaskResourceManager {
     private TaskCount _taskCount = new TaskCount();
     private Map<String, Long> _subtaskWaitingTimes = new HashMap<>(); // subtask ID -> waiting time in milliseconds
     private Map<String, Long> _subtaskRunningTimes = new HashMap<>(); // subtask ID -> running time in milliseconds
+    // Time since the job last made progress (0 while a subtask runs); left at 0 unless the table has a waiting subtask
+    private long _queueStallTimeMs;
 
     public TaskCount getTaskCount() {
       return _taskCount;
@@ -1869,6 +1894,14 @@ public class PinotHelixTaskResourceManager {
 
     public void setSubtaskRunningTimes(Map<String, Long> subtaskRunningTimes) {
       _subtaskRunningTimes = subtaskRunningTimes;
+    }
+
+    public long getQueueStallTimeMs() {
+      return _queueStallTimeMs;
+    }
+
+    public void setQueueStallTimeMs(long queueStallTimeMs) {
+      _queueStallTimeMs = queueStallTimeMs;
     }
   }
 

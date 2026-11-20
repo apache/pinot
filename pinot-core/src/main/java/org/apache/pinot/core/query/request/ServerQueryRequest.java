@@ -75,6 +75,10 @@ public class ServerQueryRequest {
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
 
+  // Upper bound on the execution deadline, which otherwise runs the query timeout from arrival. Set before the request
+  // is handed to the scheduler.
+  private long _maxDeadlineMs = Long.MAX_VALUE;
+
   /// This is called from the Netty server to create a ServerQueryRequest from the InstanceRequest
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
     this(instanceRequest, serverMetrics, queryArrivalTimeMs, false);
@@ -158,6 +162,13 @@ public class ServerQueryRequest {
   /// To be used by Time Series Query Engine.
   public ServerQueryRequest(QueryContext queryContext, List<String> segmentsToQuery, Map<String, String> metadata,
       ServerMetrics serverMetrics) {
+    this(queryContext, segmentsToQuery, null, metadata, serverMetrics);
+  }
+
+  /// To be used by Time Series Query Engine. `optionalSegments` are queried when the server has them and skipped
+  /// otherwise, as in the single-stage engine.
+  public ServerQueryRequest(QueryContext queryContext, List<String> segmentsToQuery,
+      @Nullable List<String> optionalSegments, Map<String, String> metadata, ServerMetrics serverMetrics) {
     long queryArrivalTimeMs = System.currentTimeMillis();
     _queryContext = queryContext;
     _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
@@ -172,7 +183,7 @@ public class ServerQueryRequest {
     _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
 
     _segmentsToQuery = segmentsToQuery;
-    _optionalSegments = null;
+    _optionalSegments = optionalSegments;
 
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
     _tableSegmentsContexts = null;
@@ -261,6 +272,12 @@ public class ServerQueryRequest {
     return _timerContext;
   }
 
+  /// Caps the execution deadline at `maxDeadlineMs`, for a request that arrived late, so that it does not get a full
+  /// timeout measured from its arrival.
+  public void setMaxDeadlineMs(long maxDeadlineMs) {
+    _maxDeadlineMs = maxDeadlineMs;
+  }
+
   public QueryExecutionContext toExecutionContext(String instanceId) {
     Map<String, String> queryOptions = _queryContext.getQueryOptions();
     long startTimeMs = _timerContext.getQueryArrivalTimeMs();
@@ -273,6 +290,7 @@ public class ServerQueryRequest {
       //       timeout for test environment.
       deadlineMs = startTimeMs + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
     }
+    deadlineMs = Math.min(deadlineMs, _maxDeadlineMs);
     // NOTE: Add table type suffix to the cid to make it unique when querying a hybrid table.
     // TODO: Revisit the handling for logical table when multiple tables are queries with the same cid.
     String cid = QueryIdUtils.withTypeSuffix(_cid, _tableType);

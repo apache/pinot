@@ -23,7 +23,9 @@ import java.lang.foreign.MemorySegment;
 import java.math.BigDecimal;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.theta.ThetaSketch;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.datasketches.tuple.TupleSketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -56,7 +58,7 @@ public class SketchFunctionsTest {
   @Test
   public void thetaThetaSketchSummary() {
     for (Object i : _inputs) {
-      ThetaSketch sketch = ThetaSketch.wrap(MemorySegment.ofArray(SketchFunctions.toThetaSketch(i)).asReadOnly());
+      ThetaSketch sketch = ThetaSketch.wrap(MemorySegment.ofArray(SketchFunctions.toThetaSketch(i)));
       Assert.assertEquals(SketchFunctions.thetaSketchToString(sketch), sketch.toString());
     }
     Assert.assertThrows(RuntimeException.class, () -> SketchFunctions.thetaSketchToString(new Object()));
@@ -77,7 +79,7 @@ public class SketchFunctionsTest {
   }
 
   private double intTupleEstimate(byte[] bytes) {
-    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(bytes).getEstimate();
+    return TupleSketch.heapifySketch(MemorySegment.ofArray(bytes), new IntegerSummaryDeserializer()).getEstimate();
   }
 
   @Test
@@ -94,7 +96,7 @@ public class SketchFunctionsTest {
   }
 
   private double cpcEstimate(byte[] bytes) {
-    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes).getEstimate();
+    return CpcSketch.heapify(MemorySegment.ofArray(bytes)).getEstimate();
   }
 
   @Test
@@ -120,7 +122,7 @@ public class SketchFunctionsTest {
 
   private long ullEstimate(byte[] bytes) {
     // round it to a long to make it easier to assert on
-    return Math.round(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytes).getDistinctCountEstimate());
+    return Math.round(ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(bytes).getDistinctCountEstimate());
   }
 
   @Test
@@ -141,7 +143,7 @@ public class SketchFunctionsTest {
       UltraLogLog ull = UltraLogLog.create(12);
       UltraLogLogUtils.hashObject(i).ifPresent(ull::add);
       byte[] loaded = SketchFunctions.fromULL(ull.getState());
-      UltraLogLog deserialized = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(loaded);
+      UltraLogLog deserialized = ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(loaded);
       Assert.assertEquals(deserialized.getState(), ull.getState());
     }
   }

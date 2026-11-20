@@ -220,8 +220,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
     // Initialize data directory
     LOGGER.info("Initializing data directory");
-    File dataDir = new File(_config.getProperty(CommonConstants.Helix.Instance.DATA_DIR_KEY,
-        CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
+    File dataDir = new File(_config.getDataDir());
     if (dataDir.exists()) {
       FileUtils.cleanDirectory(dataDir);
     } else {

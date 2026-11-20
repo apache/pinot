@@ -30,7 +30,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -63,6 +62,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 ///   There is a variation of the function (**FREQUENT_STRINGS_SKETCH**) which accepts STRING type input columns.
 public class FrequentLongsSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<FrequentLongsSketch, Comparable<?>> {
+  private static final int FREQUENT_LONGS_SKETCH_TYPE = 39;
+
   protected static final int DEFAULT_MAX_MAP_SIZE = 256;
 
   protected int _maxMapSize;
@@ -275,14 +276,13 @@ public class FrequentLongsSketchAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(FrequentLongsSketch longsSketch) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FrequentLongsSketch.getValue(),
-        ObjectSerDeUtils.FREQUENT_LONGS_SKETCH_SER_DE.serialize(longsSketch));
+  public SerializedResult serializeIntermediateResult(FrequentLongsSketch longsSketch) {
+    return new SerializedBytes(FREQUENT_LONGS_SKETCH_TYPE, longsSketch.toByteArray());
   }
 
   @Override
   public FrequentLongsSketch deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.FREQUENT_LONGS_SKETCH_SER_DE.deserialize(customObject.getBuffer());
+    return FrequentLongsSketch.getInstance(MemorySegment.ofBuffer(customObject.getBuffer()));
   }
 
   @Override

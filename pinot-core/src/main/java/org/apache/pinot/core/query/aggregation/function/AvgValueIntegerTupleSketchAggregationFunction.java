@@ -57,9 +57,6 @@ public class AvgValueIntegerTupleSketchAggregationFunction
     if (accumulator == null) {
       return null;
     }
-    accumulator.setNominalEntries(_nominalEntries);
-    accumulator.setSetOperations(_setOps);
-    accumulator.setThreshold(_accumulatorThreshold);
     TupleSketch<IntegerSummary> result = accumulator.getResult();
     if (result.isEmpty() || result.getRetainedEntries() == 0) {
       // there is nothing to average, return null

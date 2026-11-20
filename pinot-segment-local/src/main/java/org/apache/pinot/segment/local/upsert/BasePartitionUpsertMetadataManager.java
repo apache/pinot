@@ -383,11 +383,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected boolean skipAddSegmentOutOfTTL(ImmutableSegmentImpl segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
-    MutableRoaringBitmap validDocIdsSnapshot =
-        segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-    if (validDocIdsSnapshot != null) {
-      MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
-      segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
+    MutableRoaringBitmap validDocIdsOnDiskBitmap =
+        segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
+    if (validDocIdsOnDiskBitmap != null) {
+      MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsOnDiskBitmap);
+      segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsOnDiskBitmap),
           queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
     } else {
       _logger.warn("Failed to find validDocIds snapshot to add segment: {} out of TTL, treating all docs as valid",
@@ -397,11 +397,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return true;
   }
 
-  protected boolean skipPreloadSegmentOutOfTTL(ImmutableSegmentImpl segment, MutableRoaringBitmap validDocIdsSnapshot) {
+  protected boolean skipPreloadSegmentOutOfTTL(ImmutableSegmentImpl segment,
+      MutableRoaringBitmap validDocIdsOnDiskBitmap) {
     String segmentName = segment.getSegmentName();
     _logger.info("Skip preloading segment: {} because it's out of TTL", segmentName);
-    MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
-    segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
+    MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsOnDiskBitmap);
+    segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsOnDiskBitmap),
         queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
     // Return true if segment is skipped. This boolean value allows subclass to decide whether to skip.
     return true;
@@ -487,13 +488,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Preloading segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
     long startTimeMs = System.currentTimeMillis();
 
-    MutableRoaringBitmap validDocIds = segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-    Preconditions.checkState(validDocIds != null,
+    MutableRoaringBitmap validDocIdsOnDiskBitmap = segment.loadDocIdsFromSnapshot(
+        V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
+    Preconditions.checkState(validDocIdsOnDiskBitmap != null,
         "Snapshot of validDocIds is required to preload segment: %s, table: %s", segmentName, _tableNameWithType);
     // Cache the maximum even when the snapshot has no valid docs: preloadSegment() still tracks this segment for
     // snapshots, and another thread may destroy it while an updated marker is being read.
     double maxComparisonValue = isTTLEnabled() ? getMaxComparisonValue(segment) : TTL_WATERMARK_NOT_SET;
-    if (validDocIds.isEmpty()) {
+    if (validDocIdsOnDiskBitmap.isEmpty()) {
       _logger.info("Skip preloading segment: {} without valid doc, current primary key count: {}",
           segment.getSegmentName(), getNumPrimaryKeys());
       ThreadSafeMutableRoaringBitmap queryableDocIds =
@@ -503,13 +505,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     // Bump watermark after rows are added; see doAddSegment.
     if (isTTLEnabled() && canSkipSegmentOutOfTTL(maxComparisonValue)
-        && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
+        && skipPreloadSegmentOutOfTTL(segment, validDocIdsOnDiskBitmap)) {
       updateLargestSeenComparisonValue(maxComparisonValue);
       return;
     }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
-      doPreloadSegment(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds));
+      doPreloadSegment(segment, null, null,
+          UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIdsOnDiskBitmap));
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while preloading segment: %s, table: %s", segmentName, _tableNameWithType),
@@ -669,18 +672,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       // the reload flow placed it there (see BaseTableDataManager.reloadSegment); segment commits and uploads always
       // build a fresh segment without one and fall through to the full scan below, unaffected. Rebuilding from just the
       // snapshot's valid docs avoids resurrecting primary keys already expired/deleted by TTL.
-      MutableRoaringBitmap validDocIdsSnapshot = null;
+      MutableRoaringBitmap validDocIdsOnDiskBitmap = null;
       if (isTTLEnabled() && segment instanceof ImmutableSegmentImpl immutableSegment) {
-        validDocIdsSnapshot = immutableSegment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+        validDocIdsOnDiskBitmap = immutableSegment.loadDocIdsFromSnapshot(
+            V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
       }
       Iterator<RecordInfo> recordInfoIterator;
-      if (validDocIdsSnapshot != null) {
+      if (validDocIdsOnDiskBitmap != null) {
         // Rebuild from the snapshot's docIds as-is. On a forceDownload reload with a CRC mismatch the snapshot may have
         // been taken on a different copy of the segment, so its docIds are not guaranteed to map to the same rows here;
         // the operator accepted that risk by requesting forceDownload.
         _logger.info("Replacing segment: {} on reload using validDocIds snapshot with {} valid docs (snapshot docIds "
-            + "are used as-is and assumed to map to this segment)", segmentName, validDocIdsSnapshot.getCardinality());
-        recordInfoIterator = UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIdsSnapshot);
+            + "are used as-is and assumed to map to this segment)", segmentName,
+            validDocIdsOnDiskBitmap.getCardinality());
+        recordInfoIterator = UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIdsOnDiskBitmap);
       } else {
         // No validDocIds snapshot on the incoming segment: rebuild by scanning all docs in the segment.
         _logger.info("Replacing segment: {} using all {} docs (no validDocIds snapshot available)", segmentName,
@@ -1114,19 +1119,21 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
         // NOTE: Segment out of TTL without snapshot might have null validDocIds
         if (validDocIds != null) {
-          ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot = validDocIds.getBytesAndCardinality();
-          segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot,
-              DocIdsSnapshot.metadata(validDocIdsSnapshot, DocIdsType.VALID_DOC_IDS, trigger));
-          numPrimaryKeysInSnapshot += validDocIdsSnapshot.getCardinality();
+          ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsOnDiskBitmap =
+              validDocIds.getBytesAndCardinality();
+          segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, validDocIdsOnDiskBitmap,
+              DocIdsSnapshot.metadata(validDocIdsOnDiskBitmap, DocIdsType.VALID_DOC_IDS, trigger));
+          numPrimaryKeysInSnapshot += validDocIdsOnDiskBitmap.getCardinality();
         }
         if (_deleteRecordColumn != null) {
           ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
           if (queryableDocIds != null) {
-            ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
+            ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsOnDiskBitmap =
                 queryableDocIds.getBytesAndCardinality();
-            segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot,
-                DocIdsSnapshot.metadata(queryableDocIdsSnapshot, DocIdsType.QUERYABLE_DOC_IDS, trigger));
-            numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
+            segment.persistDocIdsSnapshot(
+                V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, queryableDocIdsOnDiskBitmap,
+                DocIdsSnapshot.metadata(queryableDocIdsOnDiskBitmap, DocIdsType.QUERYABLE_DOC_IDS, trigger));
+            numQueryableDocIdsInSnapshot += queryableDocIdsOnDiskBitmap.getCardinality();
           }
         }
         _updatedSegmentsSinceLastSnapshot.remove(segment);
@@ -1165,23 +1172,24 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
           // NOTE: Segment out of TTL without snapshot might have null validDocIds
           if (validDocIds != null) {
-            ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot =
+            ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsOnDiskBitmap =
                 validDocIds.getBytesAndCardinality();
-            segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot,
-                DocIdsSnapshot.metadata(validDocIdsSnapshot, DocIdsType.VALID_DOC_IDS, trigger));
+            segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, validDocIdsOnDiskBitmap,
+                DocIdsSnapshot.metadata(validDocIdsOnDiskBitmap, DocIdsType.VALID_DOC_IDS, trigger));
             // The segment has its validDocIds snapshot file on disk now, so handle it as a segment with snapshot
             // from now on, even if persisting the queryableDocIds snapshot below fails.
             _segmentsWithSnapshot.add(segment);
-            numPrimaryKeysInSnapshot += validDocIdsSnapshot.getCardinality();
+            numPrimaryKeysInSnapshot += validDocIdsOnDiskBitmap.getCardinality();
           }
           if (_deleteRecordColumn != null) {
             ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
             if (queryableDocIds != null) {
-              ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
+              ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsOnDiskBitmap =
                   queryableDocIds.getBytesAndCardinality();
-              segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot,
-                  DocIdsSnapshot.metadata(queryableDocIdsSnapshot, DocIdsType.QUERYABLE_DOC_IDS, trigger));
-              numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
+              segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME,
+                  queryableDocIdsOnDiskBitmap,
+                  DocIdsSnapshot.metadata(queryableDocIdsOnDiskBitmap, DocIdsType.QUERYABLE_DOC_IDS, trigger));
+              numQueryableDocIdsInSnapshot += queryableDocIdsOnDiskBitmap.getCardinality();
             }
           }
           _updatedSegmentsSinceLastSnapshot.remove(segment);
@@ -1284,9 +1292,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void deleteSnapshot(ImmutableSegmentImpl segment) {
-    segment.deleteSnapshotFile(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+    segment.deleteSnapshotFile(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
     if (_deleteRecordColumn != null) {
-      segment.deleteSnapshotFile(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+      segment.deleteSnapshotFile(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
     }
   }
 
@@ -1495,7 +1503,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /// together, so a missing queryableDocIds snapshot file gets recreated the next time the segment's snapshot is
   /// taken.
   protected boolean hasValidDocIdsSnapshotFile(ImmutableSegmentImpl segment) {
-    return segment.hasSnapshotFile(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+    return segment.hasSnapshotFile(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
   }
 
   protected void doClose()

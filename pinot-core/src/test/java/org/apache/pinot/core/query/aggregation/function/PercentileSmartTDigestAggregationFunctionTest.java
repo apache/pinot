@@ -27,13 +27,13 @@ import java.util.Random;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -43,19 +43,20 @@ import static org.testng.Assert.assertTrue;
 
 
 public class PercentileSmartTDigestAggregationFunctionTest {
+  private static final int TDIGEST_TYPE = 10;
+
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
 
   @Test
   public void testAccumulatorIntermediateSerializationIsLegacyCompatibleAtLowCompression() {
     PercentileSmartTDigestAggregationFunction function = newFunction();
     byte[] verbose = PercentileRawTDigestAggregationFunctionTest.createVerboseUnitCentroidDigest(51, 20.0);
-    Object intermediateResult = function.deserializeIntermediateResult(
-        new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(verbose)));
+    Object intermediateResult =
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(verbose)));
     assertTrue(intermediateResult instanceof TDigestAccumulator);
 
-    AggregationFunction.SerializedIntermediateResult serialized =
-        function.serializeIntermediateResult(intermediateResult);
-    assertEquals(serialized.getType(), ObjectSerDeUtils.ObjectType.TDigest.getValue());
+    AggregationFunction.SerializedResult serialized = function.serializeIntermediateResult(intermediateResult);
+    assertEquals(serialized.getType(), TDIGEST_TYPE);
     PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(serialized.getBytes(), 20.0);
 
     Object roundTripped = function.deserializeIntermediateResult(
@@ -76,13 +77,12 @@ public class PercentileSmartTDigestAggregationFunctionTest {
         PercentileRawTDigestAggregationFunctionTest.createSmallUnitCentroidDigest(numCentroids, 20.0, 60, 100);
     PercentileSmartTDigestAggregationFunction function = newFunction();
 
-    Object intermediateResult = function.deserializeIntermediateResult(
-        new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(small)));
+    Object intermediateResult =
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(small)));
     assertTrue(intermediateResult instanceof TDigestAccumulator);
 
-    AggregationFunction.SerializedIntermediateResult serialized =
-        function.serializeIntermediateResult(intermediateResult);
-    assertEquals(serialized.getType(), ObjectSerDeUtils.ObjectType.TDigest.getValue());
+    AggregationFunction.SerializedResult serialized = function.serializeIntermediateResult(intermediateResult);
+    assertEquals(serialized.getType(), TDIGEST_TYPE);
     assertEquals(serialized.getBytes(), small, "Untouched legacy state must retain its original bytes");
     PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(serialized.getBytes(), 20.0);
     TDigest roundTripped = TDigestAccumulator.fromBytes(ByteBuffer.wrap(serialized.getBytes()));
@@ -112,11 +112,9 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     byte[] empty = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(TDigestAccumulator.forLegacyAggregation(20.0));
     PercentileSmartTDigestAggregationFunction function = newFunction();
 
-    Object merged = function.merge(
-        function.deserializeIntermediateResult(
-            new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(small))),
-        function.deserializeIntermediateResult(
-            new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(empty))));
+    Object merged =
+        function.merge(function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(small))),
+            function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(empty))));
     byte[] serialized = function.serializeIntermediateResult(merged).getBytes();
     PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(serialized, 20.0);
     assertEquals(((TDigest) merged).serialize().length, serialized.length);
@@ -135,16 +133,16 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     PercentileSmartTDigestAggregationFunction function = newFunction();
 
     for (boolean accumulatorFirst : new boolean[]{true, false}) {
-      Object accumulator = function.deserializeIntermediateResult(
-          new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(small)));
+      Object accumulator =
+          function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(small)));
       DoubleArrayList valueList = new DoubleArrayList(new double[]{0.0, 25.0, 50.0});
-      Object merged = accumulatorFirst ? function.merge(accumulator, valueList)
-          : function.merge(valueList, accumulator);
+      Object merged =
+          accumulatorFirst ? function.merge(accumulator, valueList) : function.merge(valueList, accumulator);
       assertTrue(merged instanceof TDigestAccumulator);
       assertEquals(((TDigest) merged).size(), numCentroids + 3L);
       assertEquals(((TDigest) merged).quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
-      TDigest roundTripped = TDigestAccumulator.fromBytes(
-          ByteBuffer.wrap(function.serializeIntermediateResult(merged).getBytes()));
+      TDigest roundTripped =
+          TDigestAccumulator.fromBytes(ByteBuffer.wrap(function.serializeIntermediateResult(merged).getBytes()));
       assertEquals(roundTripped.size(), numCentroids + 3L);
     }
   }
@@ -200,8 +198,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
         function.serializeIntermediateResult(intermediateResult).getBytes());
     assertDuplicateInfinityResult(roundTripped, values.length);
 
-    AggregationFunction.SerializedIntermediateResult serialized =
-        function.serializeIntermediateResult(intermediateResult);
+    AggregationFunction.SerializedResult serialized = function.serializeIntermediateResult(intermediateResult);
     Object first = function.deserializeIntermediateResult(
         new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
     Object second = function.deserializeIntermediateResult(
@@ -218,8 +215,7 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     for (int threshold : new int[]{100, 1}) {
       PercentileSmartTDigestAggregationFunction function = new PercentileSmartTDigestAggregationFunction(
           List.of(EXPRESSION, ExpressionContext.forLiteral(Literal.doubleValue(50.0)),
-              ExpressionContext.forLiteral(Literal.stringValue("THRESHOLD=" + threshold + ";COMPRESSION=20"))),
-          true);
+              ExpressionContext.forLiteral(Literal.stringValue("THRESHOLD=" + threshold + ";COMPRESSION=20"))), true);
       AggregationResultHolder holder = function.createAggregationResultHolder();
       function.aggregate(values.length, holder,
           Map.of(EXPRESSION, SyntheticBlockValSets.DoubleMV.create(nulls, values)));
@@ -234,8 +230,8 @@ public class PercentileSmartTDigestAggregationFunctionTest {
       function.aggregate(values.length, holder,
           Map.of(EXPRESSION, SyntheticBlockValSets.DoubleMV.create(nulls, values)));
       result = function.extractAggregationResult(holder);
-      assertEquals(result instanceof TDigest ? ((TDigest) result).getTotalWeight()
-          : ((DoubleArrayList) result).size(), 8.0);
+      assertEquals(result instanceof TDigest ? ((TDigest) result).getTotalWeight() : ((DoubleArrayList) result).size(),
+          8.0);
       assertEquals(function.extractFinalResult(result), 3.0);
     }
   }

@@ -48,11 +48,13 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -150,7 +152,7 @@ public final class TableConfigUtils {
       RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE
   );
 
-  private static boolean _disableGroovy;
+  private static volatile boolean _disableGroovy;
 
   private static boolean _enforcePoolBasedAssignment;
 
@@ -1101,7 +1103,8 @@ public final class TableConfigUtils {
   /// [#validateUpsertAndDedupCommonConfig]), the OFFLINE restrictions (no partial upsert, segment partition config,
   /// comparison or time column), no multi-tier / star-tree, comparison / delete-record / out-of-order columns are
   /// valid, deleted-keys compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and
-  /// delegates to [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
+  /// delegates to [#validateTTLForUpsertConfig], [#validatePartialUpsertStrategies] and
+  /// [#validatePauselessUpsertModes]; rejects MD5 when disabled.
   @VisibleForTesting
   static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
     validateUpsertConfig(tableConfig, schema, null);
@@ -1271,6 +1274,7 @@ public final class TableConfigUtils {
     validateTTLForUpsertConfig(tableConfig, schema);
     validatePartialUpsertStrategies(tableConfig, schema);
     validateConsumptionDuringUpsertRevert(tableConfig);
+    validatePauselessUpsertModes(tableConfig, existingTableConfig);
     Preconditions.checkState(!(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
         "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
   }
@@ -1318,6 +1322,40 @@ public final class TableConfigUtils {
             + "dropOutOfOrderRecord or outOfOrderRecordColumn revert upsert metadata in PROTECTED consistency mode. "
             + "Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS",
         policy != null ? "parallelSegmentConsumptionPolicy " + policy : "allowPartialUpsertConsumptionDuringCommit");
+  }
+
+  /// Rejects partial upsert and out-of-order record handling (`dropOutOfOrderRecord` or `outOfOrderRecordColumn`) on a
+  /// new pauseless table. A pauseless segment is committed before it is built, so a failed build is repaired by
+  /// consuming its offsets again, and for these modes that second pass can produce different rows: a partial upsert
+  /// merge, and whether a record is dropped or marked out of order, depend on the upsert metadata at the time each
+  /// record arrives.
+  ///
+  /// An update is not checked here. One that turns the combination on is a backward compatibility violation (see
+  /// [#validateBackwardCompatibility]), so `force=true` can apply it, and one that keeps it is allowed.
+  @VisibleForTesting
+  static void validatePauselessUpsertModes(TableConfig tableConfig, @Nullable TableConfig existingTableConfig) {
+    if (existingTableConfig != null || !PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      return;
+    }
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    Preconditions.checkState(upsertConfig.getMode() != UpsertConfig.Mode.PARTIAL,
+        "Partial upsert cannot be used with pauseless consumption. If a segment is recovered after a failure, "
+            + "merged values can change. Set upsertConfig.mode to FULL or "
+            + "ingestionConfig.streamIngestionConfig.pauselessConsumptionEnabled to false");
+    Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord() && upsertConfig.getOutOfOrderRecordColumn() == null,
+        "dropOutOfOrderRecord and outOfOrderRecordColumn cannot be used with pauseless consumption. If a segment is "
+            + "recovered after a failure, different records can be dropped or marked out of order. Set "
+            + "upsertConfig.dropOutOfOrderRecord to false or remove upsertConfig.outOfOrderRecordColumn, or set "
+            + "ingestionConfig.streamIngestionConfig.pauselessConsumptionEnabled to false");
+  }
+
+  /// Returns whether the table is pauseless and uses partial upsert, `dropOutOfOrderRecord` or
+  /// `outOfOrderRecordColumn`, see [#validatePauselessUpsertModes].
+  private static boolean hasPauselessUnsafeUpsertMode(TableConfig tableConfig) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    return upsertConfig != null && PauselessConsumptionUtils.isPauselessEnabled(tableConfig) && (
+        upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL || upsertConfig.isDropOutOfOrderRecord()
+            || upsertConfig.getOutOfOrderRecordColumn() != null);
   }
 
   /// Checks if a data type is valid for time-based comparison operations (upsert/dedup).
@@ -1755,7 +1793,9 @@ public final class TableConfigUtils {
 
   /// Validates that critical upsert configuration fields are not changed during table config update.
   /// Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
-  /// deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn.
+  /// deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn, and that the update does not turn on partial
+  /// upsert, dropOutOfOrderRecord or outOfOrderRecordColumn on a pauseless table, by any of those settings or by adding
+  /// the upsert config.
   ///
   /// Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
   /// not validated here — they may be added, removed, or changed on existing tables.
@@ -1765,6 +1805,12 @@ public final class TableConfigUtils {
   /// @param violations list to collect violation messages
   private static void validateUpsertConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
       List<String> violations) {
+    // When one of these upsert settings changes, this adds to that field's violation and says why it is unsafe
+    if (hasPauselessUnsafeUpsertMode(newConfig) && !hasPauselessUnsafeUpsertMode(existingConfig)) {
+      violations.add("pauseless consumption with partial upsert, dropOutOfOrderRecord or outOfOrderRecordColumn "
+          + "(merged values, or which records are dropped or marked out of order, can change when a segment is "
+          + "recovered after a failure)");
+    }
     boolean existingUpsertEnabled = existingConfig.isUpsertEnabled();
     boolean newUpsertEnabled = newConfig.isUpsertEnabled();
 
@@ -2319,6 +2365,18 @@ public final class TableConfigUtils {
           if (!storedTypes.add(storedType)) {
             LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
                 columnPair, storedType);
+          }
+          // Create the value aggregator the same way the star-tree builder does, so that invalid function parameters
+          // fail the config validation instead of the segment creation
+          AggregationFunctionType storedFunctionType = storedType.getFunctionType();
+          Map<String, Object> functionParameters = aggregationConfig.getFunctionParameters();
+          try {
+            ValueAggregatorFactory.getValueAggregator(storedFunctionType,
+                StarTreeBuilderUtils.expressionContextFromFunctionParameters(storedFunctionType,
+                    functionParameters != null ? functionParameters : Map.of()));
+          } catch (Exception e) {
+            throw new IllegalStateException("Invalid function parameters in StarTreeIndex config: " + aggregationConfig,
+                e);
           }
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {

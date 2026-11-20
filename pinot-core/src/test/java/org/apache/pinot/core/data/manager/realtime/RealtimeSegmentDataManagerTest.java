@@ -18,32 +18,51 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.cache.CacheBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.CurrentState;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -58,13 +77,16 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
@@ -72,36 +94,57 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
+import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
+import org.apache.pinot.spi.stream.RetriableDecodeException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamMessage;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import org.testng.asserts.SoftAssert;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 // TODO Re-write this test using the stream abstraction
@@ -117,6 +160,8 @@ public class RealtimeSegmentDataManagerTest {
   private static final String SEGMENT_NAME_STR = SEGMENT_NAME.getSegmentName();
   private static final long START_OFFSET_VALUE = 198L;
   private static final LongMsgOffset START_OFFSET = new LongMsgOffset(START_OFFSET_VALUE);
+  private static final int OFFSET_STREAM_BATCH_SIZE = 10;
+  private static final int OFFSET_STREAM_SEGMENT_ROWS = 20;
 
   private final Map<Integer, ConsumerCoordinator> _partitionGroupIdToConsumerCoordinatorMap =
       new ConcurrentHashMap<>();
@@ -239,6 +284,380 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  /// A stream that reports data loss on every poll must not emit an ERROR line and a segment error entry per poll:
+  /// the first detection is reported right away, later ones only once per interval with a count of the batches in
+  /// between.
+  @Test
+  public void testDataLossReportIsRateLimited()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, timeSupplier, null, null, null)) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      MessageBatch<?> batchWithLoss = mock(MessageBatch.class);
+      when(batchWithLoss.hasDataLoss()).thenReturn(true);
+      when(batchWithLoss.getFirstMessageOffset()).thenReturn(new LongMsgOffset(197));
+      ArgumentCaptor<SegmentErrorInfo> errorCaptor = ArgumentCaptor.forClass(SegmentErrorInfo.class);
+
+      // The first detection is reported immediately
+      segmentDataManager.reportDataLoss(batchWithLoss);
+      verify(tableDataManager, times(1)).addSegmentError(eq(SEGMENT_NAME_STR), errorCaptor.capture());
+      String message = errorCaptor.getValue().getErrorMessage();
+      Assert.assertTrue(message.contains("batchFirstOffset: 197"), message);
+      Assert.assertTrue(message.contains("batches with loss since last report: 1)"), message);
+
+      // Detections within the interval are counted but not reported
+      for (int i = 0; i < 10; i++) {
+        timeSupplier.add(TimeUnit.SECONDS.toMillis(5));
+        segmentDataManager.reportDataLoss(batchWithLoss);
+      }
+      verify(tableDataManager, times(1)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+
+      // Once the interval has elapsed, the next detection is reported along with how many batches it stands for
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(batchWithLoss);
+      verify(tableDataManager, times(2)).addSegmentError(eq(SEGMENT_NAME_STR), errorCaptor.capture());
+      message = errorCaptor.getValue().getErrorMessage();
+      Assert.assertTrue(message.contains("batches with loss since last report: 11)"), message);
+
+      // Batches without loss are never reported
+      MessageBatch<?> batchWithoutLoss = mock(MessageBatch.class);
+      segmentDataManager.reportDataLoss(batchWithoutLoss);
+      verify(tableDataManager, times(2)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+    }
+  }
+
+  /// A second, distinct loss event that falls inside the rate-limit interval after a report and that the stream then
+  /// recovers from must still reach the log and the segment error cache: the first batch processed after the interval
+  /// reports it, even though that batch is healthy.
+  @Test
+  public void testSuppressedDataLossIsReportedAfterRecovery()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, timeSupplier, null, null, null)) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      MessageBatch<?> firstLoss = mock(MessageBatch.class);
+      when(firstLoss.hasDataLoss()).thenReturn(true);
+      when(firstLoss.getFirstMessageOffset()).thenReturn(new LongMsgOffset(197));
+      MessageBatch<?> secondLoss = mock(MessageBatch.class);
+      when(secondLoss.hasDataLoss()).thenReturn(true);
+      when(secondLoss.getFirstMessageOffset()).thenReturn(new LongMsgOffset(481));
+      MessageBatch<?> healthyBatch = mock(MessageBatch.class);
+      ArgumentCaptor<SegmentErrorInfo> errorCaptor = ArgumentCaptor.forClass(SegmentErrorInfo.class);
+
+      segmentDataManager.reportDataLoss(firstLoss);
+      verify(tableDataManager, times(1)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+
+      // A distinct loss within the interval is suppressed, and healthy batches within the interval do not report it
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(5));
+      segmentDataManager.reportDataLoss(secondLoss);
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(healthyBatch);
+      verify(tableDataManager, times(1)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+
+      // The first healthy batch after the interval reports the suppressed loss
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(45));
+      segmentDataManager.reportDataLoss(healthyBatch);
+      verify(tableDataManager, times(2)).addSegmentError(eq(SEGMENT_NAME_STR), errorCaptor.capture());
+      String message = errorCaptor.getValue().getErrorMessage();
+      Assert.assertTrue(message.contains("batchFirstOffset: 481"), message);
+      Assert.assertTrue(message.contains("batches with loss since last report: 1)"), message);
+
+      // The deferred report restarts the interval: a new loss right after it is suppressed, then reported by the first
+      // (healthy) batch after the interval
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(firstLoss);
+      verify(tableDataManager, times(2)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(50));
+      segmentDataManager.reportDataLoss(healthyBatch);
+      verify(tableDataManager, times(3)).addSegmentError(eq(SEGMENT_NAME_STR), errorCaptor.capture());
+      message = errorCaptor.getValue().getErrorMessage();
+      Assert.assertTrue(message.contains("batchFirstOffset: 197"), message);
+
+      // Nothing is left to report afterwards
+      timeSupplier.add(TimeUnit.MINUTES.toMillis(5));
+      segmentDataManager.reportDataLoss(healthyBatch);
+      verify(tableDataManager, times(3)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+    }
+  }
+
+  /// When one report covers several batches with loss, it names where the earliest and the most recent of them were
+  /// detected, since the earliest shows where the loss started. This holds both when the next batch with loss after the
+  /// interval reports them and when a healthy batch after the interval does.
+  @Test
+  public void testDataLossReportNamesEarliestAndLatestLocation()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, timeSupplier, null, null, null)) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      ArgumentCaptor<SegmentErrorInfo> errorCaptor = ArgumentCaptor.forClass(SegmentErrorInfo.class);
+
+      segmentDataManager.reportDataLoss(batchWithLossAt(197));
+      verify(tableDataManager, times(1)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+
+      // Two losses suppressed within the interval, then a third one after it reports all three
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(batchWithLossAt(481));
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(batchWithLossAt(602));
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(40));
+      segmentDataManager.reportDataLoss(batchWithLossAt(733));
+      verify(tableDataManager, times(2)).addSegmentError(eq(SEGMENT_NAME_STR), errorCaptor.capture());
+      String message = errorCaptor.getValue().getErrorMessage();
+      Assert.assertTrue(message.matches(".*earliest startOffset: \\S+ batchFirstOffset: 481, latest startOffset: \\S+ "
+          + "batchFirstOffset: 733 \\(batches with loss since last report: 3\\)"), message);
+
+      // Two losses suppressed within the interval, then reported by a healthy batch after it
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(batchWithLossAt(850));
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(batchWithLossAt(911));
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(40));
+      segmentDataManager.reportDataLoss(mock(MessageBatch.class));
+      verify(tableDataManager, times(3)).addSegmentError(eq(SEGMENT_NAME_STR), errorCaptor.capture());
+      message = errorCaptor.getValue().getErrorMessage();
+      Assert.assertTrue(message.matches(".*earliest startOffset: \\S+ batchFirstOffset: 850, latest startOffset: \\S+ "
+          + "batchFirstOffset: 911 \\(batches with loss since last report: 2\\)"), message);
+    }
+  }
+
+  private static MessageBatch<?> batchWithLossAt(long firstOffset) {
+    MessageBatch<?> batch = mock(MessageBatch.class);
+    when(batch.hasDataLoss()).thenReturn(true);
+    when(batch.getFirstMessageOffset()).thenReturn(new LongMsgOffset(firstOffset));
+    return batch;
+  }
+
+  /// A loss whose report the rate limit suppressed must not be dropped when consumption stops before the interval
+  /// elapses, e.g. because the segment reaches its end criteria and commits: leaving the consume loop reports it.
+  @Test
+  public void testSuppressedDataLossIsReportedWhenConsumptionStops()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), "10m", null)) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      MessageBatch<?> firstLoss = mock(MessageBatch.class);
+      when(firstLoss.hasDataLoss()).thenReturn(true);
+      when(firstLoss.getFirstMessageOffset()).thenReturn(new LongMsgOffset(197));
+      MessageBatch<?> secondLoss = mock(MessageBatch.class);
+      when(secondLoss.hasDataLoss()).thenReturn(true);
+      when(secondLoss.getFirstMessageOffset()).thenReturn(new LongMsgOffset(481));
+      ArgumentCaptor<SegmentErrorInfo> errorCaptor = ArgumentCaptor.forClass(SegmentErrorInfo.class);
+
+      segmentDataManager.reportDataLoss(firstLoss);
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(30));
+      segmentDataManager.reportDataLoss(secondLoss);
+      verify(tableDataManager, times(1)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+
+      // Consume to the end criteria and commit within the interval: the healthy batches do not report the suppressed
+      // loss, leaving the consume loop does
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      LongMsgOffset endOffset =
+          new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      segmentDataManager._consumeOffsets.add(endOffset);
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+              .withStreamPartitionMsgOffset(endOffset.toString())));
+      consumer.run();
+
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      verify(tableDataManager, times(2)).addSegmentError(eq(SEGMENT_NAME_STR), errorCaptor.capture());
+      String message = errorCaptor.getValue().getErrorMessage();
+      Assert.assertTrue(message.contains("batchFirstOffset: 481"), message);
+      Assert.assertTrue(message.contains("batches with loss since last report: 1)"), message);
+
+      // Nothing is left to report afterwards
+      segmentDataManager.flushDataLossReport();
+      verify(tableDataManager, times(2)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+    }
+  }
+
+  /// A batch without messages whose next offset is ahead of the current offset means the stream moved past offsets it
+  /// never delivers (a Kafka consumer skipping a transaction commit marker, for example). That position feeds lag and
+  /// the highest-offset gauge, while the current offset, which every fetch starts from, stays where the last record
+  /// left it. A later batch that reports the requested offset, no offset, or an offset behind does not move the
+  /// position back.
+  @Test
+  public void testEmptyBatchAheadOfCurrentOffsetMovesOnlyTheStreamPosition()
+      throws Exception {
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      // consumeLoop() is called directly, so set the time limit run() would have set
+      segmentDataManager.setConsumeEndTime(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1));
+      ScriptedPartitionGroupConsumer consumer = new ScriptedPartitionGroupConsumer(segmentDataManager,
+          // The stream skipped START_OFFSET_VALUE and START_OFFSET_VALUE + 1 without delivering anything
+          emptyBatch(START_OFFSET_VALUE + 2),
+          // Nothing moved
+          emptyBatch(START_OFFSET_VALUE + 2),
+          // A stream that does not report where the next batch starts
+          emptyBatch(null),
+          // Behind the stream position
+          emptyBatch(START_OFFSET_VALUE + 1));
+      segmentDataManager.setPartitionGroupConsumer(consumer);
+
+      segmentDataManager.consumeLoop();
+
+      assertEquals(consumer._requestedOffsets,
+          List.of(START_OFFSET_VALUE, START_OFFSET_VALUE, START_OFFSET_VALUE, START_OFFSET_VALUE));
+      assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), START_OFFSET_VALUE);
+      assertEquals(((LongMsgOffset) segmentDataManager.getStreamPosition()).getOffset(), START_OFFSET_VALUE + 2);
+      assertEquals(((LongMsgOffset) segmentDataManager.getConsumerPartitionState(null)
+          .get(String.valueOf(PARTITION_GROUP_ID)).getCurrentOffset()).getOffset(), START_OFFSET_VALUE + 2);
+      verify(serverMetrics).setValueOfTableGauge(anyString(), eq(ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED),
+          anyLong());
+      verify(serverMetrics).setValueOfTableGauge(anyString(), eq(ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED),
+          eq(START_OFFSET_VALUE + 2));
+      assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 0);
+    }
+  }
+
+  /// Records still move the current offset after the stream position moved ahead of it, and the stream position
+  /// follows: a single-record transaction after an idle period on a transactional topic, then its commit marker.
+  @Test
+  public void testRecordAfterEmptyBatchMovesTheCurrentOffset()
+      throws Exception {
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      segmentDataManager.setConsumeEndTime(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1));
+      ScriptedPartitionGroupConsumer consumer = new ScriptedPartitionGroupConsumer(segmentDataManager,
+          // Commit marker at START_OFFSET_VALUE
+          emptyBatch(START_OFFSET_VALUE + 1),
+          // The next transaction's record, then its marker at START_OFFSET_VALUE + 2
+          new ScriptedMessageBatch(START_OFFSET_VALUE + 2, START_OFFSET_VALUE + 1),
+          emptyBatch(START_OFFSET_VALUE + 3));
+      segmentDataManager.setPartitionGroupConsumer(consumer);
+
+      segmentDataManager.consumeLoop();
+
+      assertEquals(consumer._requestedOffsets, List.of(START_OFFSET_VALUE, START_OFFSET_VALUE, START_OFFSET_VALUE + 2));
+      assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), START_OFFSET_VALUE + 2);
+      assertEquals(((LongMsgOffset) segmentDataManager.getStreamPosition()).getOffset(), START_OFFSET_VALUE + 3);
+      for (long offset = START_OFFSET_VALUE + 1; offset <= START_OFFSET_VALUE + 3; offset++) {
+        verify(serverMetrics).setValueOfTableGauge(anyString(), eq(ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED),
+            eq(offset));
+      }
+    }
+  }
+
+  /// A replica whose stream position moved past a commit marker still posts, and commits, the offset one past its
+  /// last record: the end offset of a segment never depends on an empty batch.
+  @Test
+  public void testSegmentEndsOnePastLastRecordAfterEmptyBatch()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, timeSupplier, null, null, null)) {
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      segmentDataManager.setConsumeEndTime(timeSupplier.get() + TimeUnit.HOURS.toMillis(1));
+      // A record, then an empty poll that skipped its commit marker, then the time limit
+      ScriptedPartitionGroupConsumer consumer =
+          new ScriptedPartitionGroupConsumer(() -> timeSupplier.add(TimeUnit.HOURS.toMillis(2)),
+              new ScriptedMessageBatch(START_OFFSET_VALUE + 1, START_OFFSET_VALUE),
+              emptyBatch(START_OFFSET_VALUE + 2));
+      segmentDataManager.setPartitionGroupConsumer(consumer);
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params()
+              .withStreamPartitionMsgOffset(Long.toString(START_OFFSET_VALUE + 1))
+              .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)));
+
+      segmentDataManager.createPartitionConsumer().run();
+
+      assertEquals(segmentDataManager._postedOffsets, List.of(START_OFFSET_VALUE + 1));
+      assertTrue(segmentDataManager._commitSegmentCalled);
+      assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.COMMITTED);
+      assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), START_OFFSET_VALUE + 1);
+      assertEquals(((LongMsgOffset) segmentDataManager.getStreamPosition()).getOffset(), START_OFFSET_VALUE + 2);
+    }
+  }
+
+  /// A batch without messages; `nextBatchOffset` is where the stream consumer stands after the poll.
+  private static MessageBatch<byte[]> emptyBatch(@Nullable Long nextBatchOffset) {
+    return new ScriptedMessageBatch(nextBatchOffset);
+  }
+
+  /// A batch of empty messages at the given offsets (each ending at the following offset), reporting the given
+  /// next-batch offset (`null` for a stream that does not report one). A consumed message fails to decode and is
+  /// dropped as an erroneous row, which still moves the current offset past it.
+  private static class ScriptedMessageBatch implements MessageBatch<byte[]> {
+    private final Long _nextBatchOffset;
+    private final long[] _messageOffsets;
+
+    ScriptedMessageBatch(@Nullable Long nextBatchOffset, long... messageOffsets) {
+      _nextBatchOffset = nextBatchOffset;
+      _messageOffsets = messageOffsets;
+    }
+
+    @Override
+    public int getMessageCount() {
+      return _messageOffsets.length;
+    }
+
+    @Override
+    public StreamMessage<byte[]> getStreamMessage(int index) {
+      long offset = _messageOffsets[index];
+      return new BytesStreamMessage(new byte[0], new StreamMessageMetadata.Builder()
+          .setOffset(new LongMsgOffset(offset), new LongMsgOffset(offset + 1)).build());
+    }
+
+    @Override
+    public StreamPartitionMsgOffset getOffsetOfNextBatch() {
+      return _nextBatchOffset != null ? new LongMsgOffset(_nextBatchOffset) : null;
+    }
+
+    @Override
+    public long getSizeInBytes() {
+      return 0;
+    }
+  }
+
+  /// Hands out the given batches in order, recording the offset requested for each, and runs `afterLastBatch` once the
+  /// last one has been handed out (by default it stops the data manager, so consumeLoop() returns).
+  private static class ScriptedPartitionGroupConsumer implements PartitionGroupConsumer {
+    final List<Long> _requestedOffsets = new ArrayList<>();
+    private final Runnable _afterLastBatch;
+    private final LinkedList<MessageBatch<byte[]>> _batches;
+
+    @SafeVarargs
+    ScriptedPartitionGroupConsumer(FakeRealtimeSegmentDataManager segmentDataManager,
+        MessageBatch<byte[]>... batches) {
+      this(segmentDataManager::stop, batches);
+    }
+
+    @SafeVarargs
+    ScriptedPartitionGroupConsumer(Runnable afterLastBatch, MessageBatch<byte[]>... batches) {
+      _afterLastBatch = afterLastBatch;
+      _batches = new LinkedList<>(List.of(batches));
+    }
+
+    @Override
+    public MessageBatch<byte[]> fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
+      _requestedOffsets.add(((LongMsgOffset) startOffset).getOffset());
+      MessageBatch<byte[]> batch = _batches.remove();
+      if (_batches.isEmpty()) {
+        _afterLastBatch.run();
+      }
+      return batch;
+    }
+
+    @Override
+    public void close() {
+    }
+  }
+
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
       throws Exception {
@@ -277,6 +696,15 @@ public class RealtimeSegmentDataManagerTest {
     return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
         new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
         _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, timeSupplier);
+  }
+
+  @Test
+  public void testGetDecoderClassName()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      // Reports the actual instantiated decoder class, not the one configured on the table
+      assertEquals(segmentDataManager.getDecoderClassName(), FakeStreamMessageDecoder.class.getName());
+    }
   }
 
   @BeforeClass
@@ -778,7 +1206,9 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     // Test downloadAndReplace is called after buildAndReplace fails.
-    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+    ServerMetrics buildFailureServerMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, buildFailureServerMetrics)) {
       segmentDataManager._failSegmentBuildAndReplace = true;
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
@@ -786,6 +1216,8 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      verify(buildFailureServerMetrics, never())
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
     }
   }
 
@@ -826,6 +1258,245 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  @Test(timeOut = 20_000)
+  public void testLocalReleaseBetweenReadinessCheckAndWaitStartsSuccessor()
+      throws Exception {
+    assertStartupAfterLocalRelease(true, false);
+  }
+
+  @Test(timeOut = 20_000)
+  public void testLocalReleaseWakesWaitingSuccessor()
+      throws Exception {
+    assertStartupAfterLocalRelease(false, false);
+  }
+
+  @Test(timeOut = 20_000)
+  public void testLocalReleaseDoesNotBypassMissingHistory()
+      throws Exception {
+    assertStartupAfterLocalRelease(false, true);
+  }
+
+  @DataProvider
+  public Object[][] ordinaryRolloverHistory() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "ordinaryRolloverHistory", timeOut = 20_000)
+  public void testOrdinaryRolloverWakesSuccessorBeforeCurrentStatePublication(boolean missingHistory)
+      throws Exception {
+    Map<Integer, ConsumerCoordinator> coordinators = new HashMap<>();
+    TableConfig config = createTableConfigWithStreamIngestion(false, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
+    LLCSegmentName predecessorName =
+        new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, SEQUENCE_ID - 1, SEG_TIME_MS);
+    RolloverReadinessTableDataManager table =
+        new RolloverReadinessTableDataManager(predecessorName, SEGMENT_NAME, missingHistory);
+    ImmutableSegment immutable = mock(ImmutableSegment.class);
+    when(immutable.getSegmentName()).thenReturn(predecessorName.getSegmentName());
+    ImmutableSegmentDataManager replacement = new ImmutableSegmentDataManager(immutable);
+    BooleanSupplier ready = table.createReadyToConsumeDataSupplier(SEGMENT_NAME);
+    AtomicInteger readinessChecks = new AtomicInteger();
+    CountDownLatch checkedReplacement = new CountDownLatch(1);
+    BooleanSupplier observedReady = () -> {
+      boolean result = ready.getAsBoolean();
+      readinessChecks.incrementAndGet();
+      if (replacement.isPartitionMetadataInitialized()) {
+        checkedReplacement.countDown();
+      }
+      return result;
+    };
+    try (FakeRealtimeSegmentDataManager predecessor =
+        createStartupSegmentManager(SEQUENCE_ID - 1, coordinators, () -> true, config);
+        FakeRealtimeSegmentDataManager successor =
+            createStartupSegmentManager(SEQUENCE_ID, coordinators, observedReady, config)) {
+      table.registerSegment(predecessorName.getSegmentName(), predecessor);
+      ConsumerCoordinator coordinator = coordinators.get(PARTITION_GROUP_ID);
+      assertTrue(coordinator.getSemaphore().tryAcquire());
+      predecessor.getConsumerSemaphoreAcquired().set(true);
+      successor._consumeOffsets.add(new LongMsgOffset(START_OFFSET_VALUE + 1));
+      Thread consumerThread = new Thread(successor.createPartitionConsumer(), "ordinary-rollover-readiness");
+      try {
+        consumerThread.start();
+        awaitStartupWait(consumerThread);
+        assertEquals(readinessChecks.get(), 0, "Readiness must not be checked while the predecessor holds the permit");
+
+        // Real Base replacement marks and publishes the immutable manager before real predecessor offload releases
+        // the permit. Helix deliberately continues to report CONSUMING throughout the handoff.
+        table.replacePredecessor(predecessor, replacement);
+        assertTrue(replacement.isPartitionMetadataInitialized());
+        assertFalse(predecessor.hasReleasedConsumerSemaphore(), "Ordinary offload must not use pauseless readiness");
+        assertEquals(table._currentState.getState(predecessorName.getSegmentName()), CONSUMING);
+        if (missingHistory) {
+          assertTrue(checkedReplacement.await(2, TimeUnit.SECONDS), "Offload did not wake the readiness check");
+          awaitStartupWait(consumerThread);
+          assertEquals(successor._consumeLoopStarted.getCount(), 1L,
+              "A ready immutable predecessor must not hide missing older history");
+          assertFalse(successor.getConsumerSemaphoreAcquired().get());
+          assertEquals(coordinator.getSemaphore().availablePermits(), 1);
+        } else {
+          assertTrue(successor._consumeLoopStarted.await(2, TimeUnit.SECONDS),
+              "Ordinary rollover must start before the five-second readiness poll or CurrentState publication");
+          consumerThread.join(2000);
+          assertFalse(consumerThread.isAlive(), "The one-record consumer did not finish");
+          assertFalse(successor._postConsumeStoppedCalled, "Startup must not enter the consumer error path");
+        }
+      } finally {
+        successor.stop();
+        consumerThread.interrupt();
+        consumerThread.join(10_000);
+        assertFalse(consumerThread.isAlive(), "Consumer must terminate before its segment is destroyed");
+      }
+    }
+  }
+
+  private void assertStartupAfterLocalRelease(boolean releaseBeforeWait, boolean missingHistory)
+      throws Exception {
+    Map<Integer, ConsumerCoordinator> coordinators = new HashMap<>();
+    AtomicInteger readinessChecks = new AtomicInteger();
+    CountDownLatch firstCheck = new CountDownLatch(1);
+    CountDownLatch finishFirstCheck = new CountDownLatch(releaseBeforeWait ? 1 : 0);
+    CountDownLatch recheckedAfterRelease = new CountDownLatch(1);
+    try (FakeRealtimeSegmentDataManager predecessor =
+        createStartupSegmentManager(SEQUENCE_ID - 1, coordinators, () -> true)) {
+      ConsumerCoordinator coordinator = coordinators.get(PARTITION_GROUP_ID);
+      if (!releaseBeforeWait) {
+        assertTrue(coordinator.getSemaphore().tryAcquire());
+        predecessor.getConsumerSemaphoreAcquired().set(true);
+      }
+      BooleanSupplier ready = () -> {
+        readinessChecks.incrementAndGet();
+        boolean released = predecessor.hasReleasedConsumerSemaphore();
+        if (released) {
+          recheckedAfterRelease.countDown();
+        }
+        boolean result = released && !missingHistory;
+        firstCheck.countDown();
+        try {
+          assertTrue(finishFirstCheck.await(10, TimeUnit.SECONDS), "First readiness check was not released");
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(e);
+        }
+        return result;
+      };
+      try (FakeRealtimeSegmentDataManager successor = createStartupSegmentManager(SEQUENCE_ID, coordinators, ready)) {
+        successor._consumeOffsets.add(new LongMsgOffset(START_OFFSET_VALUE + 1));
+        Thread consumerThread = new Thread(successor.createPartitionConsumer(), "successor-readiness");
+        try {
+          consumerThread.start();
+          if (releaseBeforeWait) {
+            // The permit is free, so the successor checks readiness. Keep that false result until the predecessor has
+            // taken and released the permit, forcing the check-to-wait race.
+            assertTrue(firstCheck.await(10, TimeUnit.SECONDS), "Successor never checked readiness");
+            assertTrue(coordinator.getSemaphore().tryAcquire());
+            predecessor.getConsumerSemaphoreAcquired().set(true);
+          } else {
+            awaitStartupWait(consumerThread);
+            assertEquals(readinessChecks.get(), 0,
+                "Readiness must not be checked while the predecessor holds the permit");
+          }
+          predecessor.closeStreamConsumerAndReleaseSemaphore();
+          finishFirstCheck.countDown();
+          if (missingHistory) {
+            assertTrue(recheckedAfterRelease.await(2, TimeUnit.SECONDS), "Release did not wake the readiness check");
+            awaitStartupWait(consumerThread);
+            assertEquals(successor._consumeLoopStarted.getCount(), 1L,
+                "A local release must not bypass another missing historical segment");
+            assertFalse(successor.getConsumerSemaphoreAcquired().get());
+            assertEquals(coordinator.getSemaphore().availablePermits(), 1);
+          } else {
+            assertTrue(successor._consumeLoopStarted.await(2, TimeUnit.SECONDS),
+                "Local release must start the successor without waiting for the five-second readiness poll");
+            consumerThread.join(2000);
+            assertFalse(consumerThread.isAlive(), "The one-record consumer did not finish");
+            assertFalse(successor._postConsumeStoppedCalled, "Startup must not enter the consumer error path");
+          }
+        } finally {
+          finishFirstCheck.countDown();
+          successor.stop();
+          consumerThread.interrupt();
+          consumerThread.join(10_000);
+          assertFalse(consumerThread.isAlive(), "Consumer must terminate before its segment is destroyed");
+          if (missingHistory) {
+            assertFalse(successor.getConsumerSemaphoreAcquired().get(), "A stopped waiter must not acquire the permit");
+            assertEquals(coordinator.getSemaphore().availablePermits(), 1);
+          }
+        }
+      }
+    }
+  }
+
+  private static void awaitStartupWait(Thread consumerThread) {
+    TestUtils.waitForCondition(ignored -> consumerThread.getState() == Thread.State.WAITING
+        || consumerThread.getState() == Thread.State.TIMED_WAITING, 10, 2000,
+        "Successor did not enter its startup wait");
+  }
+
+  private FakeRealtimeSegmentDataManager createStartupSegmentManager(int sequence,
+      Map<Integer, ConsumerCoordinator> coordinators, BooleanSupplier ready)
+      throws Exception {
+    return createStartupSegmentManager(sequence, coordinators, ready, createTableConfig());
+  }
+
+  private FakeRealtimeSegmentDataManager createStartupSegmentManager(int sequence,
+      Map<Integer, ConsumerCoordinator> coordinators, BooleanSupplier ready, TableConfig tableConfig)
+      throws Exception {
+    RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
+    coordinators.computeIfAbsent(PARTITION_GROUP_ID, ignored -> new ConsumerCoordinator(false, tableDataManager));
+    LLCSegmentName name = new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, sequence, SEG_TIME_MS);
+    SegmentZKMetadata metadata = new SegmentZKMetadata(name.getSegmentName());
+    metadata.setStartOffset(START_OFFSET.toString());
+    metadata.setCreationTime(System.currentTimeMillis());
+    metadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    return new FakeRealtimeSegmentDataManager(metadata, tableConfig, tableDataManager,
+        new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), Fixtures.createSchema(), name, coordinators,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), new TimeSupplier(), ready);
+  }
+
+  /// Supplies real readiness and replacement lifecycle code with fixed Helix records. Only the segment map changes
+  /// concurrently, through the production registration path; the assignment and CurrentState stay unchanged.
+  private static class RolloverReadinessTableDataManager extends RealtimeTableDataManager {
+    private final CurrentState _currentState = new CurrentState(REALTIME_TABLE_NAME);
+    private final PartitionUpsertMetadataManager _partition = mock(PartitionUpsertMetadataManager.class);
+
+    RolloverReadinessTableDataManager(LLCSegmentName predecessor, LLCSegmentName consumer, boolean missingHistory) {
+      super(null);
+      String instance = "server-1";
+      _tableNameWithType = REALTIME_TABLE_NAME;
+      _logger = LoggerFactory.getLogger(RolloverReadinessTableDataManager.class);
+      _recentlyDeletedSegments = CacheBuilder.newBuilder().build();
+      _tableUpsertMetadataManager = mock(TableUpsertMetadataManager.class);
+      UpsertContext context = mock(UpsertContext.class);
+      when(context.getUpsertMode()).thenReturn(UpsertConfig.Mode.PARTIAL);
+      when(context.isTableTypeInconsistentDuringConsumption()).thenReturn(true);
+      when(context.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.NONE);
+      when(_tableUpsertMetadataManager.getContext()).thenReturn(context);
+      IdealState assignment = new IdealState(REALTIME_TABLE_NAME);
+      assignment.setInstanceStateMap(predecessor.getSegmentName(), Map.of(instance, ONLINE));
+      assignment.setInstanceStateMap(consumer.getSegmentName(), Map.of(instance, CONSUMING));
+      _currentState.setState(predecessor.getSegmentName(), CONSUMING);
+      if (missingHistory) {
+        LLCSegmentName older = new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, SEQUENCE_ID - 2, SEG_TIME_MS);
+        assignment.setInstanceStateMap(older.getSegmentName(), Map.of(instance, ONLINE));
+      }
+      _helixManager = mock(HelixManager.class);
+      HelixDataAccessor accessor = mock(HelixDataAccessor.class);
+      PropertyKey.Builder keys = new PropertyKey.Builder("test-cluster");
+      LiveInstance liveInstance = mock(LiveInstance.class);
+      when(_helixManager.getInstanceName()).thenReturn(instance);
+      when(_helixManager.getHelixDataAccessor()).thenReturn(accessor);
+      when(accessor.keyBuilder()).thenReturn(keys);
+      when(accessor.getProperty(keys.idealStates(REALTIME_TABLE_NAME))).thenReturn(assignment);
+      when(accessor.getProperty(keys.liveInstance(instance))).thenReturn(liveInstance);
+      when(liveInstance.getEphemeralOwner()).thenReturn("test-session");
+      when(accessor.getProperty(keys.currentState(instance, "test-session", REALTIME_TABLE_NAME)))
+          .thenReturn(_currentState);
+    }
+
+    void replacePredecessor(RealtimeSegmentDataManager predecessor, ImmutableSegmentDataManager replacement) {
+      replaceUpsertSegment(predecessor.getSegmentName(), predecessor, replacement, _partition);
+    }
+  }
+
   @Test
   public void testOffloadAfterParallelConsumptionReleaseDoesNotReleaseSemaphoreTwice()
       throws Exception {
@@ -835,9 +1506,12 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(semaphore.tryAcquire());
       segmentDataManager.getConsumerSemaphoreAcquired().set(true);
 
+      assertFalse(segmentDataManager.hasReleasedConsumerSemaphore());
       // With ALLOW_DURING_BUILD_ONLY / ALLOW_ALWAYS, buildSegmentInternal() and downloadSegmentAndReplace() let the
       // next consuming segment start early by closing the consumer and releasing the semaphore together.
       segmentDataManager.closeStreamConsumerAndReleaseSemaphore();
+      assertTrue(segmentDataManager.hasReleasedConsumerSemaphore(),
+          "A stopped predecessor must allow readiness while its segment is still being sealed");
       Assert.assertTrue(segmentDataManager.isStreamConsumerClosed());
       Assert.assertEquals(semaphore.availablePermits(), 1,
           "Consumer semaphore must be released for parallel consumption");
@@ -892,11 +1566,15 @@ public class RealtimeSegmentDataManagerTest {
     long finalOffsetValue = START_OFFSET_VALUE + 600;
 
     // Upsert + committed CRC set + local CRC mismatch -> discard local build, download the committed segment.
-    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+    ServerMetrics crcMismatchServerMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, crcMismatchServerMetrics)) {
       when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(true);
       runGoOnlineForCrcGuard(segmentDataManager, crcMetadata(finalOffsetValue, 12345L), false, finalOffsetValue);
-      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
-      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      assertTrue(segmentDataManager._buildAndReplaceCalled);
+      assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      verify(crcMismatchServerMetrics)
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
     }
 
     // Non-upsert + committed CRC set + local CRC mismatch -> discard local build, download the committed segment.
@@ -908,48 +1586,172 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     // Upsert + committed CRC set + local CRC match -> build locally, no download, swap in committed metadata.
-    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+    ServerMetrics matchingUpsertServerMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, matchingUpsertServerMetrics)) {
       when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(true);
       SegmentZKMetadata committedMetadata = crcMetadata(finalOffsetValue, 12345L);
       runGoOnlineForCrcGuard(segmentDataManager, committedMetadata, true, finalOffsetValue);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+      verify(matchingUpsertServerMetrics, never())
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
       verify(segmentDataManager._tableDataManager)
           .replaceConsumingSegment(eq(SEGMENT_NAME_STR), same(committedMetadata));
     }
 
     // Non-upsert + committed CRC set + local CRC match -> build locally, no download, swap in committed metadata.
-    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+    ServerMetrics matchingNonUpsertServerMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, matchingNonUpsertServerMetrics)) {
       when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(false);
       SegmentZKMetadata committedMetadata = crcMetadata(finalOffsetValue, 12345L);
       runGoOnlineForCrcGuard(segmentDataManager, committedMetadata, true, finalOffsetValue);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+      verify(matchingNonUpsertServerMetrics, never())
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
       verify(segmentDataManager._tableDataManager)
           .replaceConsumingSegment(eq(SEGMENT_NAME_STR), same(committedMetadata));
     }
 
     // Committed CRC unset (-1) -> guard skipped, build locally with construction-time metadata.
-    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+    ServerMetrics unsetCrcServerMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, unsetCrcServerMetrics)) {
       when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(false);
       SegmentZKMetadata committedMetadata = crcMetadata(finalOffsetValue, -1L);
       runGoOnlineForCrcGuard(segmentDataManager, committedMetadata, false, finalOffsetValue);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+      verify(unsetCrcServerMetrics, never())
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
       verify(segmentDataManager._tableDataManager)
           .replaceConsumingSegment(eq(SEGMENT_NAME_STR), argThat(m -> m != committedMetadata));
     }
 
     // Pauseless table -> guard skipped, build locally with construction-time metadata.
+    ServerMetrics pauselessServerMetrics = mock(ServerMetrics.class);
     try (FakeRealtimeSegmentDataManager segmentDataManager =
-        createFakeSegmentManager(false, new TimeSupplier(), null, null, createPauselessTableConfig())) {
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, createPauselessTableConfig(),
+            pauselessServerMetrics)) {
       when(segmentDataManager._tableDataManager.isUpsertEnabled()).thenReturn(false);
       SegmentZKMetadata committedMetadata = crcMetadata(finalOffsetValue, 12345L);
       runGoOnlineForCrcGuard(segmentDataManager, committedMetadata, false, finalOffsetValue);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+      verify(pauselessServerMetrics, never())
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
       verify(segmentDataManager._tableDataManager)
           .replaceConsumingSegment(eq(SEGMENT_NAME_STR), argThat(m -> m != committedMetadata));
+    }
+  }
+
+  @Test
+  public void testCrcBuildMismatchMetricForCatchup()
+      throws Exception {
+    long finalOffsetValue = START_OFFSET_VALUE + 600;
+    LongMsgOffset finalOffset = new LongMsgOffset(finalOffsetValue);
+    SegmentZKMetadata metadata = crcMetadata(finalOffsetValue, 12345L);
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager._useRealBuildAndReplace = true;
+      segmentDataManager._localSegmentCrcMatchesZk = false;
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._consumeOffsets.add(finalOffset);
+
+      segmentDataManager.goOnlineFromConsuming(metadata);
+
+      assertTrue(segmentDataManager._buildAndReplaceCalled);
+      assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      verify(serverMetrics)
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
+    }
+  }
+
+  @Test
+  public void testCrcBuildMismatchMetricNotEmittedForCatchupBuildFailure()
+      throws Exception {
+    long finalOffsetValue = START_OFFSET_VALUE + 600;
+    SegmentZKMetadata metadata = crcMetadata(finalOffsetValue, 12345L);
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager._failSegmentBuildAndReplace = true;
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._consumeOffsets.add(new LongMsgOffset(finalOffsetValue));
+
+      segmentDataManager.goOnlineFromConsuming(metadata);
+
+      assertTrue(segmentDataManager._buildAndReplaceCalled);
+      assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      verify(serverMetrics, never())
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
+    }
+  }
+
+  @Test
+  public void testCrcBuildMismatchMetricNotEmittedForCrcReadError()
+      throws Exception {
+    long finalOffsetValue = START_OFFSET_VALUE + 600;
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager._useRealCrcCheck = true;
+      FileUtils.deleteQuietly(new File(new File(TEMP_DIR, REALTIME_TABLE_NAME), SEGMENT_NAME_STR));
+      runGoOnlineForCrcGuard(segmentDataManager, crcMetadata(finalOffsetValue, 12345L), false, finalOffsetValue);
+
+      assertTrue(segmentDataManager._buildAndReplaceCalled);
+      assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      verify(serverMetrics, never())
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
+    }
+  }
+
+  @Test
+  public void testCrcBuildMismatchMetricEmittedWhenMatchedOffsetDownloadFails()
+      throws Exception {
+    long finalOffsetValue = START_OFFSET_VALUE + 600;
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager._failDownloadAndReplace = true;
+
+      assertThrows(IOException.class, () ->
+          runGoOnlineForCrcGuard(segmentDataManager, crcMetadata(finalOffsetValue, 12345L), false, finalOffsetValue));
+
+      // Confirmed mismatch is counted even when the download fallback fails.
+      verify(serverMetrics)
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
+    }
+  }
+
+  @Test
+  public void testCrcBuildMismatchMetricEmittedWhenCatchupDownloadFails()
+      throws Exception {
+    long finalOffsetValue = START_OFFSET_VALUE + 600;
+    SegmentZKMetadata metadata = crcMetadata(finalOffsetValue, 12345L);
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, null, serverMetrics)) {
+      segmentDataManager._useRealBuildAndReplace = true;
+      segmentDataManager._localSegmentCrcMatchesZk = false;
+      segmentDataManager._failDownloadAndReplace = true;
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._consumeOffsets.add(new LongMsgOffset(finalOffsetValue));
+
+      assertThrows(IOException.class, () -> segmentDataManager.goOnlineFromConsuming(metadata));
+
+      // Confirmed mismatch is counted even when the download fallback fails.
+      verify(serverMetrics)
+          .addMeteredTableValue(anyString(), eq(ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH), eq(1L));
     }
   }
 
@@ -1082,26 +1884,11 @@ public class RealtimeSegmentDataManagerTest {
 
       SegmentZKMetadata matchingMetadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
       matchingMetadata.setCrc(localCrc);
-      Assert.assertTrue(segmentDataManager.isLocalSegmentCrcMatchingZk(matchingMetadata));
+      assertTrue(segmentDataManager.isLocalSegmentCrcMatchingZk(matchingMetadata));
 
       SegmentZKMetadata mismatchingMetadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
       mismatchingMetadata.setCrc(localCrc + 1);
-      Assert.assertFalse(segmentDataManager.isLocalSegmentCrcMatchingZk(mismatchingMetadata));
-    }
-  }
-
-  // When the locally-built segment cannot be read (e.g. missing/corrupt), the CRC check must report a mismatch so the
-  // ONLINE transition downloads the committed segment instead of throwing.
-  @Test
-  public void testIsLocalSegmentCrcMatchingZkTreatsUnreadableSegmentAsMismatch()
-      throws Exception {
-    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
-      segmentDataManager._useRealCrcCheck = true;
-      // No segment was built under the resource dir, so the metadata read fails.
-      FileUtils.deleteQuietly(new File(new File(TEMP_DIR, REALTIME_TABLE_NAME), SEGMENT_NAME_STR));
-      SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
-      metadata.setCrc(12345L);
-      Assert.assertFalse(segmentDataManager.isLocalSegmentCrcMatchingZk(metadata));
+      assertFalse(segmentDataManager.isLocalSegmentCrcMatchingZk(mismatchingMetadata));
     }
   }
 
@@ -1492,6 +2279,578 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  @DataProvider
+  public Object[][] decodeRetryModes() {
+    return new Object[][]{
+        // fetchAfterStartOffset, stopOnDecodeError
+        {false, false}, {false, true}, {true, false}, {true, true}
+    };
+  }
+
+  @Test(dataProvider = "decodeRetryModes")
+  public void testRetriableDecodeErrorFetchesTheMessageAgainInsteadOfDroppingIt(boolean fetchAfterStartOffset,
+      boolean stopOnDecodeError)
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    OffsetPayloadConsumerFactory.FETCH_AFTER_START_OFFSET.set(fetchAfterStartOffset);
+    long firstFailingOffset = START_OFFSET_VALUE + 5;
+    long secondFailingOffset = START_OFFSET_VALUE + 12;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(firstFailingOffset, new AtomicInteger(3));
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(secondFailingOffset, new AtomicInteger(1));
+    // A stream that fetches from after the given offset stands at the previous message
+    long fetchOffsetDelta = fetchAfterStartOffset ? 1 : 0;
+    long firstFetchOffset = firstFailingOffset - fetchOffsetDelta;
+    long secondFetchOffset = secondFailingOffset - fetchOffsetDelta;
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
+        new TimeSupplier(), Map.of(StreamConfigProperties.DECODE_RETRY_MAX_BACKOFF_MILLIS, "250",
+            "stopOnDecodeError", String.valueOf(stopOnDecodeError)))) {
+      List<Long> offsetsWhileFailing = new CopyOnWriteArrayList<>();
+      OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(
+          () -> offsetsWhileFailing.add(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset()));
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+      long retriesBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_DECODE_RETRIES);
+
+      consumeToRowLimitAndCommit(segmentDataManager);
+
+      SoftAssert softAssert = new SoftAssert();
+      softAssert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          0, "rows dropped");
+      softAssert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS,
+          List.of(firstFailingOffset, firstFailingOffset, firstFailingOffset, secondFailingOffset),
+          "offsets of the retriable decode failures");
+      softAssert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_DECODE_RETRIES) - retriesBefore, 4,
+          "decode retries");
+      softAssert.assertEquals(offsetsWhileFailing,
+          List.of(firstFetchOffset, firstFetchOffset, firstFetchOffset, secondFetchOffset),
+          "current offset during the retriable decode failures");
+      softAssert.assertEquals(OffsetPayloadConsumerFactory.FETCH_START_OFFSETS,
+          List.of(START_OFFSET_VALUE, firstFetchOffset, firstFetchOffset, firstFetchOffset, secondFetchOffset),
+          "fetch start offsets");
+      softAssert.assertEquals(OffsetPayloadDecoder.getFirstDecodeAttemptAfterEachRetriableFailure(),
+          OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS, "first decode attempt after each retriable decode failure");
+      // Doubles up to the cap, and starts over for the second failing message
+      softAssert.assertEquals(segmentDataManager._decodeRetrySleeps, List.of(100L, 200L, 250L, 100L),
+          "decode retry backoffs");
+      softAssert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), OFFSET_STREAM_SEGMENT_ROWS,
+          "rows indexed");
+      softAssert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS, "current offset at the end of the segment");
+      softAssert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+          RealtimeSegmentDataManager.State.COMMITTED, "state");
+      softAssert.assertAll();
+      // Both failures belong to one outage, reported once
+      verify(segmentDataManager.getTableDataManager(), times(1)).addSegmentError(eq(SEGMENT_NAME_STR), any());
+    }
+  }
+
+  @Test(timeOut = 30_000)
+  public void testStopWhileRetryingDecodeExitsWithoutMovingPastTheMessage()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(Integer.MAX_VALUE));
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics)) {
+      OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(() -> {
+        if (OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS.size() == 3) {
+          segmentDataManager.stop();
+        }
+      });
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+
+      segmentDataManager.createPartitionConsumer().run();
+
+      Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS,
+          List.of(failingOffset, failingOffset, failingOffset));
+      // No backoff once stopping
+      Assert.assertEquals(segmentDataManager._decodeRetrySleeps, List.of(100L, 200L));
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), failingOffset);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 5);
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          0);
+      // Clean exit: no ERROR state and no stoppedConsuming message
+      Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+          RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+      // The ingestion delay comes from the last consumed message, not the batch end, and is not reset to zero
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      verify(tableDataManager, atLeastOnce()).updateIngestionMetrics(eq(SEGMENT_NAME_STR), anyInt(), anyLong(),
+          anyLong(), argThat(offset -> isLongOffset(offset, failingOffset - 1)));
+      verify(tableDataManager, never()).updateIngestionMetrics(eq(SEGMENT_NAME_STR), anyInt(), anyLong(), anyLong(),
+          argThat(offset -> offset == null || isLongOffset(offset, START_OFFSET_VALUE + OFFSET_STREAM_BATCH_SIZE - 1)));
+    }
+  }
+
+  @Test(timeOut = 30_000)
+  public void testStopInterruptsTheDecodeRetryBackoff()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(Integer.MAX_VALUE));
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()))) {
+      // The backoff sleeps until interrupted
+      segmentDataManager._decodeRetrySleepStarted = new CountDownLatch(1);
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      Thread consumerThread = new Thread(segmentDataManager.createPartitionConsumer());
+      consumerThread.start();
+      Assert.assertTrue(segmentDataManager._decodeRetrySleepStarted.await(10, TimeUnit.SECONDS));
+
+      // The real stop() interrupts the consumer thread and waits for it
+      segmentDataManager.setConsumerThread(consumerThread);
+      segmentDataManager.invokeRealStop();
+
+      Assert.assertFalse(consumerThread.isAlive());
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), failingOffset);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 5);
+      Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+          RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test(timeOut = 30_000)
+  public void testTimeLimitWhileRetryingDecodeEndsTheSegmentAtTheMessage()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(Integer.MAX_VALUE));
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
+        timeSupplier, Map.of())) {
+      OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(() -> {
+        if (OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS.size() == 2) {
+          timeSupplier.set(segmentDataManager.getConsumeEndTime());
+        }
+      });
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      LongMsgOffset failingMsgOffset = new LongMsgOffset(failingOffset);
+      segmentDataManager._consumeOffsets.add(failingMsgOffset);
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+              SegmentCompletionProtocol.ControllerResponseStatus.COMMIT).withStreamPartitionMsgOffset(
+              failingMsgOffset.toString())));
+
+      segmentDataManager.createPartitionConsumer().run();
+
+      Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
+      Assert.assertTrue(segmentDataManager._commitSegmentCalled);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), failingOffset);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 5);
+      Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS, List.of(failingOffset, failingOffset));
+      // No backoff past the consumption deadline
+      Assert.assertEquals(segmentDataManager._decodeRetrySleeps, List.of(100L));
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          0);
+    }
+  }
+
+  @Test(timeOut = 30_000)
+  public void testForceCommitWhileRetryingDecodeEndsTheSegmentAtTheMessage()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(Integer.MAX_VALUE));
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
+        timeSupplier, Map.of())) {
+      OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(() -> {
+        if (OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS.size() == 2) {
+          segmentDataManager.forceCommit();
+        }
+      });
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      LongMsgOffset failingMsgOffset = new LongMsgOffset(failingOffset);
+      segmentDataManager._consumeOffsets.add(failingMsgOffset);
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+              SegmentCompletionProtocol.ControllerResponseStatus.COMMIT).withStreamPartitionMsgOffset(
+              failingMsgOffset.toString())));
+
+      segmentDataManager.createPartitionConsumer().run();
+
+      Assert.assertEquals(segmentDataManager.getStopReason(),
+          SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+      Assert.assertTrue(segmentDataManager._commitSegmentCalled);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), failingOffset);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 5);
+      Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS, List.of(failingOffset, failingOffset));
+      // Only the backoff before the force commit arrived
+      Assert.assertEquals(segmentDataManager._decodeRetrySleeps, List.of(100L));
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          0);
+    }
+  }
+
+  @Test(timeOut = 30_000)
+  public void testForceCommitWakesTheDecodeRetryBackoff()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(Integer.MAX_VALUE));
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
+        new TimeSupplier(), Map.of())) {
+      // The backoff sleeps until woken
+      segmentDataManager._decodeRetrySleepStarted = new CountDownLatch(1);
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      LongMsgOffset failingMsgOffset = new LongMsgOffset(failingOffset);
+      segmentDataManager._consumeOffsets.add(failingMsgOffset);
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+              SegmentCompletionProtocol.ControllerResponseStatus.COMMIT).withStreamPartitionMsgOffset(
+              failingMsgOffset.toString())));
+      Thread consumerThread = new Thread(segmentDataManager.createPartitionConsumer());
+      consumerThread.start();
+      Assert.assertTrue(segmentDataManager._decodeRetrySleepStarted.await(10, TimeUnit.SECONDS));
+
+      segmentDataManager.forceCommit();
+      consumerThread.join(10_000);
+
+      Assert.assertFalse(consumerThread.isAlive());
+      Assert.assertEquals(segmentDataManager.getStopReason(),
+          SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+      Assert.assertTrue(segmentDataManager._commitSegmentCalled);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), failingOffset);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 5);
+    }
+  }
+
+  /// The catch-up deadline caps the backoff; at the deadline, the segment is downloaded instead.
+  @Test(timeOut = 30_000)
+  public void testCatchUpForOnlineTransitionGivesUpAtTheDeadlineWhileRetryingDecode()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(Integer.MAX_VALUE));
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
+        timeSupplier, Map.of())) {
+      // The second backoff starts 50ms before the deadline, and the third failure happens at it
+      OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(() -> {
+        int numFailures = OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS.size();
+        if (numFailures == 2) {
+          timeSupplier.set(segmentDataManager.getConsumeEndTime() - 50);
+        } else if (numFailures == 3) {
+          timeSupplier.set(segmentDataManager.getConsumeEndTime());
+        }
+      });
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
+      SegmentZKMetadata committedSegmentZKMetadata = createZkMetadata();
+      committedSegmentZKMetadata.setEndOffset(new LongMsgOffset(START_OFFSET_VALUE + 10).toString());
+
+      segmentDataManager.goOnlineFromConsuming(committedSegmentZKMetadata);
+
+      Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+          RealtimeSegmentDataManager.State.CONSUMING_TO_ONLINE);
+      Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS,
+          List.of(failingOffset, failingOffset, failingOffset));
+      Assert.assertEquals(segmentDataManager._decodeRetrySleeps, List.of(100L, 50L));
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), failingOffset);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 5);
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          0);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
+    }
+  }
+
+  @Test(timeOut = 30_000)
+  public void testCatchingUpRetriesDecodeWithoutDeadlineUntilStopped()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(Integer.MAX_VALUE));
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), timeSupplier, Map.of())) {
+      OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(
+          () -> timeSupplier.set(segmentDataManager.getConsumeEndTime() + TimeUnit.HOURS.toMillis(1)));
+      // The fifth backoff sleeps until interrupted
+      segmentDataManager._blockOnDecodeRetrySleep = 5;
+      segmentDataManager._decodeRetrySleepStarted = new CountDownLatch(1);
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager.setFinalOffset(START_OFFSET_VALUE + 10);
+      Thread consumerThread = new Thread(segmentDataManager.createPartitionConsumer());
+      consumerThread.start();
+      Assert.assertTrue(segmentDataManager._decodeRetrySleepStarted.await(10, TimeUnit.SECONDS));
+
+      segmentDataManager.setConsumerThread(consumerThread);
+      segmentDataManager.invokeRealStop();
+
+      Assert.assertFalse(consumerThread.isAlive());
+      Assert.assertEquals(segmentDataManager._decodeRetrySleeps, List.of(100L, 200L, 400L, 800L, 1600L));
+      Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS.size(), 5);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), failingOffset);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 5);
+      Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+          RealtimeSegmentDataManager.State.CATCHING_UP);
+      Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
+    }
+  }
+
+  @Test
+  public void testDecodeRetryMaxDurationHandlesTheMessageLikeAnyOtherDecodeError()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(Integer.MAX_VALUE));
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
+        timeSupplier, Map.of(StreamConfigProperties.DECODE_RETRY_MAX_DURATION_MILLIS, "1000"))) {
+      // The second failure comes after the 1s limit
+      OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(() -> timeSupplier.add(1000));
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+      long retriesBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_DECODE_RETRIES);
+
+      consumeToRowLimitAndCommit(segmentDataManager);
+
+      Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS, List.of(failingOffset, failingOffset));
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_DECODE_RETRIES) - retriesBefore, 1);
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          1);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), OFFSET_STREAM_SEGMENT_ROWS);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS + 1);
+    }
+  }
+
+  @Test
+  public void testDecodeRetryMaxDurationBoundsAnOutageOfInterleavedFailures()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    // Failures less than the limit apart, with messages decoding in between, then one after a quiet period
+    List<Long> outageOffsets = List.of(START_OFFSET_VALUE + 5, START_OFFSET_VALUE + 7, START_OFFSET_VALUE + 9);
+    for (long offset : outageOffsets) {
+      OffsetPayloadDecoder.RETRIABLE_FAILURES.put(offset, new AtomicInteger(Integer.MAX_VALUE));
+    }
+    long nextOutageOffset = START_OFFSET_VALUE + 17;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(nextOutageOffset, new AtomicInteger(1));
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
+        timeSupplier, Map.of(StreamConfigProperties.DECODE_RETRY_MAX_DURATION_MILLIS, "1000"))) {
+      // Failures happen 600ms apart, except the last one, 2s after the previous one
+      OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(() -> timeSupplier.add(
+          OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS.get(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS.size() - 1)
+              == nextOutageOffset ? 2000 : 600));
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+      long retriesBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_DECODE_RETRIES);
+
+      consumeToRowLimitAndCommit(segmentDataManager);
+
+      // The first message is retried until the outage has lasted 1s, then dropped; later failures of that outage are
+      // dropped at once. The failure 2s later starts a new outage and is retried.
+      long firstOffset = outageOffsets.get(0);
+      Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS,
+          List.of(firstOffset, firstOffset, firstOffset, outageOffsets.get(1), outageOffsets.get(2), nextOutageOffset));
+      Assert.assertEquals(OffsetPayloadConsumerFactory.FETCH_START_OFFSETS,
+          List.of(START_OFFSET_VALUE, firstOffset, firstOffset, START_OFFSET_VALUE + 15, nextOutageOffset));
+      Assert.assertEquals(segmentDataManager._decodeRetrySleeps, List.of(100L, 200L, 100L));
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          3);
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_DECODE_RETRIES) - retriesBefore, 3);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), OFFSET_STREAM_SEGMENT_ROWS);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS + 3);
+      // One segment error per outage
+      verify(segmentDataManager.getTableDataManager(), times(2)).addSegmentError(eq(SEGMENT_NAME_STR), any());
+    }
+  }
+
+  @Test
+  public void testFailureLongAfterThePreviousOneIsReportedAgainWithNoRetryLimit()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long firstOffset = START_OFFSET_VALUE + 3;
+    long laterOffset = START_OFFSET_VALUE + 10;
+    long soonAfterOffset = START_OFFSET_VALUE + 12;
+    for (long offset : List.of(firstOffset, laterOffset, soonAfterOffset)) {
+      OffsetPayloadDecoder.RETRIABLE_FAILURES.put(offset, new AtomicInteger(1));
+    }
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    TimeSupplier timeSupplier = new TimeSupplier();
+    // No retry limit, so the outage that starts at the first failure never ends
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
+        timeSupplier, Map.of())) {
+      // The second failure comes 5 minutes after the first, and the third 10 seconds after the second
+      OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(() -> {
+        List<Long> failingOffsets = OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS;
+        long failingOffset = failingOffsets.get(failingOffsets.size() - 1);
+        if (failingOffset == laterOffset) {
+          timeSupplier.add(TimeUnit.MINUTES.toMillis(5));
+        } else if (failingOffset == soonAfterOffset) {
+          timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+        }
+      });
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+      long retriesBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_DECODE_RETRIES);
+
+      consumeToRowLimitAndCommit(segmentDataManager);
+
+      Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS,
+          List.of(firstOffset, laterOffset, soonAfterOffset));
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_DECODE_RETRIES) - retriesBefore, 3);
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          0);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), OFFSET_STREAM_SEGMENT_ROWS);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS);
+      // Reported: the first failure and the one 5 minutes later, not the one 10 seconds after that
+      verify(segmentDataManager.getTableDataManager(), times(2)).addSegmentError(eq(SEGMENT_NAME_STR), any());
+    }
+  }
+
+  @Test
+  public void testBatchesFetchedAgainChargeOnlyTheMessagesTheyProcess()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(2));
+    // In the first batch and in the batch fetched again for the failing message
+    OffsetPayloadConsumerFactory.TOMBSTONE_OFFSETS.add(START_OFFSET_VALUE + 8);
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics)) {
+      long fetchedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_ROWS_FETCHED);
+
+      consumeToRowLimitAndCommit(segmentDataManager);
+
+      Assert.assertEquals(OffsetPayloadConsumerFactory.FETCH_START_OFFSETS,
+          List.of(START_OFFSET_VALUE, failingOffset, failingOffset, failingOffset + OFFSET_STREAM_BATCH_SIZE));
+      // Charged: the first batch (9 messages and a tombstone) when fetched, the refetch stopped at the failing message
+      // for that message only, the refetch processed in full like any batch, and the next batch when fetched
+      int recordSizeInBytes = 3 + OffsetPayloadConsumerFactory.RECORD_OVERHEAD_IN_BYTES;
+      Assert.assertEquals(segmentDataManager._throttledMessageCounts, List.of(9, 1, 9, 10));
+      Assert.assertEquals(segmentDataManager._throttledSizesInBytes,
+          List.of(9L * recordSizeInBytes, (long) recordSizeInBytes, 9L * recordSizeInBytes, 10L * recordSizeInBytes));
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_ROWS_FETCHED) - fetchedBefore,
+          10 + 1 + 10 + 10);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), OFFSET_STREAM_SEGMENT_ROWS);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS + 1);
+    }
+  }
+
+  @Test
+  public void testZeroDecodeRetryMaxDurationNeverRetries()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(Integer.MAX_VALUE));
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
+        new TimeSupplier(), Map.of(StreamConfigProperties.DECODE_RETRY_MAX_DURATION_MILLIS, "0"))) {
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+
+      consumeToRowLimitAndCommit(segmentDataManager);
+
+      Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS, List.of(failingOffset));
+      Assert.assertTrue(segmentDataManager._decodeRetrySleeps.isEmpty());
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          1);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS + 1);
+    }
+  }
+
+  private static boolean isLongOffset(@Nullable StreamPartitionMsgOffset offset, long expectedOffset) {
+    return offset instanceof LongMsgOffset && ((LongMsgOffset) offset).getOffset() == expectedOffset;
+  }
+
+  @Test
+  public void testFilteredAndDroppedRowsInOneBatchAreCountedOnTheirOwnMeters()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    // A filtered row before the dropped one in the same batch: a shared meter local would count the drop as filtered
+    OffsetPayloadDecoder.FILTERED_OFFSETS.add(START_OFFSET_VALUE + 1);
+    OffsetPayloadDecoder.DROPPED_OFFSETS.add(START_OFFSET_VALUE + 2);
+    OffsetPayloadDecoder.FILTERED_OFFSETS.add(START_OFFSET_VALUE + 4);
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics)) {
+      // The registry is shared across tests, so compare deltas
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+      long filteredBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_ROWS_FILTERED);
+
+      consumeToRowLimitAndCommit(segmentDataManager);
+
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          1);
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_ROWS_FILTERED) - filteredBefore, 2);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), OFFSET_STREAM_SEGMENT_ROWS);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS + 3);
+    }
+  }
+
+  private FakeRealtimeSegmentDataManager createOffsetPayloadSegmentManager(ServerMetrics serverMetrics)
+      throws Exception {
+    return createOffsetPayloadSegmentManager(serverMetrics, new TimeSupplier(), Map.of());
+  }
+
+  private FakeRealtimeSegmentDataManager createOffsetPayloadSegmentManager(ServerMetrics serverMetrics,
+      TimeSupplier timeSupplier, Map<String, String> streamConfigs)
+      throws Exception {
+    TableConfig tableConfig = Fixtures.createTableConfig(OffsetPayloadConsumerFactory.class.getName(),
+        OffsetPayloadDecoder.class.getName());
+    // getStreamConfigMaps() returns the table's own map, not a copy
+    IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0).putAll(streamConfigs);
+    return createFakeSegmentManager(true, timeSupplier, String.valueOf(OFFSET_STREAM_SEGMENT_ROWS), "10m",
+        tableConfig, serverMetrics);
+  }
+
+  /// Runs the real consume loop until the row limit ends the segment, then commits it.
+  private static void consumeToRowLimitAndCommit(FakeRealtimeSegmentDataManager segmentDataManager)
+      throws Exception {
+    segmentDataManager._stubConsumeLoop = false;
+    segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+    LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS);
+    segmentDataManager._consumeOffsets.add(endOffset);
+    segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+        new SegmentCompletionProtocol.Response.Params().withStatus(
+            SegmentCompletionProtocol.ControllerResponseStatus.COMMIT).withStreamPartitionMsgOffset(
+            endOffset.toString())));
+    segmentDataManager.createPartitionConsumer().run();
+  }
+
+  private static long getMeterCount(ServerMetrics serverMetrics, FakeRealtimeSegmentDataManager segmentDataManager,
+      ServerMeter meter) {
+    return serverMetrics.getMeteredTableValue(segmentDataManager._clientId, meter).count();
+  }
+
   @Test
   public void testCompletionModeDownloadWithUrlValidation()
       throws Exception {
@@ -1663,6 +3022,148 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  /// Endless stream whose message at offset `n` has payload `n`.
+  public static class OffsetPayloadConsumerFactory extends FakeStreamConsumerFactory {
+    static final List<Long> FETCH_START_OFFSETS = new CopyOnWriteArrayList<>();
+    // Like Kinesis, fetch from after the given offset, and give each message its own offset as next offset
+    static final AtomicBoolean FETCH_AFTER_START_OFFSET = new AtomicBoolean();
+    // Like Kafka tombstones, left out of the batch but counted in its unfiltered message count
+    static final Set<Long> TOMBSTONE_OFFSETS = ConcurrentHashMap.newKeySet();
+    // Like Kafka records with a key and headers, a record is larger than its value
+    static final int RECORD_OVERHEAD_IN_BYTES = 7;
+
+    @Override
+    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+      return new PartitionGroupConsumer() {
+        @Override
+        public MessageBatch<byte[]> fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
+          long start = ((LongMsgOffset) startOffset).getOffset();
+          FETCH_START_OFFSETS.add(start);
+          boolean fetchAfterStartOffset = FETCH_AFTER_START_OFFSET.get();
+          long firstOffset = fetchAfterStartOffset ? start + 1 : start;
+          List<BytesStreamMessage> messages = new ArrayList<>(OFFSET_STREAM_BATCH_SIZE);
+          for (long offset = firstOffset; offset < firstOffset + OFFSET_STREAM_BATCH_SIZE; offset++) {
+            if (TOMBSTONE_OFFSETS.contains(offset)) {
+              continue;
+            }
+            long nextOffset = fetchAfterStartOffset ? offset : offset + 1;
+            byte[] value = Long.toString(offset).getBytes(StandardCharsets.UTF_8);
+            messages.add(new BytesStreamMessage(value,
+                new StreamMessageMetadata.Builder().setOffset(new LongMsgOffset(offset), new LongMsgOffset(nextOffset))
+                    .setSerializedValueSize(value.length + RECORD_OVERHEAD_IN_BYTES).build()));
+          }
+          // The offset after the last one of the batch, or that offset for a stream fetching from after it
+          long offsetOfNextBatch = fetchAfterStartOffset ? firstOffset + OFFSET_STREAM_BATCH_SIZE - 1
+              : firstOffset + OFFSET_STREAM_BATCH_SIZE;
+          return new MessageBatch<>() {
+            @Override
+            public int getMessageCount() {
+              return messages.size();
+            }
+
+            @Override
+            public int getUnfilteredMessageCount() {
+              return OFFSET_STREAM_BATCH_SIZE;
+            }
+
+            @Override
+            public BytesStreamMessage getStreamMessage(int index) {
+              return messages.get(index);
+            }
+
+            @Override
+            public StreamPartitionMsgOffset getOffsetOfNextBatch() {
+              return new LongMsgOffset(offsetOfNextBatch);
+            }
+
+            // Like Kafka, the sum of the record sizes
+            @Override
+            public long getSizeInBytes() {
+              return messages.stream().mapToLong(message -> message.getMetadata().getRecordSerializedSize()).sum();
+            }
+          };
+        }
+
+        @Override
+        public void close() {
+        }
+      };
+    }
+  }
+
+  /// Drops [#DROPPED_OFFSETS] (returns `null`) and marks [#FILTERED_OFFSETS] to be filtered out. For
+  /// [#RETRIABLE_FAILURES] it first throws [RetriableDecodeException] the given number of times.
+  public static class OffsetPayloadDecoder implements StreamMessageDecoder<byte[]> {
+    static final Set<Long> DROPPED_OFFSETS = ConcurrentHashMap.newKeySet();
+    static final Set<Long> FILTERED_OFFSETS = ConcurrentHashMap.newKeySet();
+    // Offset -> number of attempts that throw RetriableDecodeException before the message decodes
+    static final Map<Long, AtomicInteger> RETRIABLE_FAILURES = new ConcurrentHashMap<>();
+    static final List<Long> RETRIABLE_FAILURE_OFFSETS = new CopyOnWriteArrayList<>();
+    // Offsets of all decode attempts, and indexes into it of the attempts that threw RetriableDecodeException
+    static final List<Long> DECODE_ATTEMPT_OFFSETS = new CopyOnWriteArrayList<>();
+    static final List<Integer> RETRIABLE_FAILURE_ATTEMPTS = new CopyOnWriteArrayList<>();
+    // Run before each RetriableDecodeException is thrown
+    static final AtomicReference<Runnable> ON_RETRIABLE_FAILURE = new AtomicReference<>();
+
+    static void reset() {
+      DROPPED_OFFSETS.clear();
+      FILTERED_OFFSETS.clear();
+      RETRIABLE_FAILURES.clear();
+      RETRIABLE_FAILURE_OFFSETS.clear();
+      DECODE_ATTEMPT_OFFSETS.clear();
+      RETRIABLE_FAILURE_ATTEMPTS.clear();
+      ON_RETRIABLE_FAILURE.set(() -> {
+      });
+      OffsetPayloadConsumerFactory.FETCH_START_OFFSETS.clear();
+      OffsetPayloadConsumerFactory.FETCH_AFTER_START_OFFSET.set(false);
+      OffsetPayloadConsumerFactory.TOMBSTONE_OFFSETS.clear();
+    }
+
+    static List<Long> getFirstDecodeAttemptAfterEachRetriableFailure() {
+      List<Long> offsets = new ArrayList<>(RETRIABLE_FAILURE_ATTEMPTS.size());
+      for (int attempt : RETRIABLE_FAILURE_ATTEMPTS) {
+        if (attempt + 1 < DECODE_ATTEMPT_OFFSETS.size()) {
+          offsets.add(DECODE_ATTEMPT_OFFSETS.get(attempt + 1));
+        }
+      }
+      return offsets;
+    }
+
+    @Override
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
+    }
+
+    @Nullable
+    @Override
+    public GenericRow decode(byte[] payload, GenericRow destination) {
+      long offset = Long.parseLong(new String(payload, StandardCharsets.UTF_8));
+      DECODE_ATTEMPT_OFFSETS.add(offset);
+      AtomicInteger retriableFailures = RETRIABLE_FAILURES.get(offset);
+      if (retriableFailures != null && retriableFailures.getAndDecrement() > 0) {
+        RETRIABLE_FAILURE_OFFSETS.add(offset);
+        RETRIABLE_FAILURE_ATTEMPTS.add(DECODE_ATTEMPT_OFFSETS.size() - 1);
+        ON_RETRIABLE_FAILURE.get().run();
+        throw new RetriableDecodeException("Schema registry unavailable",
+            new SocketTimeoutException("Read timed out"));
+      }
+      if (DROPPED_OFFSETS.contains(offset)) {
+        return null;
+      }
+      destination.init(Fixtures.createSingleRow(offset));
+      if (FILTERED_OFFSETS.contains(offset)) {
+        destination.putValue(GenericRow.SKIP_RECORD_KEY, true);
+      }
+      return destination;
+    }
+
+    @Nullable
+    @Override
+    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+      return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+    }
+  }
+
   // Implementing Closeable to make it easier to use in try-with-resources
   public static class FakeRealtimeSegmentDataManager extends RealtimeSegmentDataManager implements Closeable {
 
@@ -1671,11 +3172,8 @@ public class RealtimeSegmentDataManagerTest {
     public Field _stopReasonCode;
     public Field _segmentBuildFailedWithDeterministicError;
     public boolean _failSegmentBuildAndReplace = false;
-    // When set, buildSegmentAndReplace runs the real implementation (including the upsert CRC guard) instead of being
-    // short-circuited, and isLocalSegmentCrcMatchingZk returns _localSegmentCrcMatchesZk.
     public boolean _useRealBuildAndReplace = false;
     public boolean _localSegmentCrcMatchesZk = true;
-    // When set, isLocalSegmentCrcMatchingZk runs the real on-disk metadata read + CRC comparison.
     public boolean _useRealCrcCheck = false;
     // When set, buildSegmentInternal releases the consumer semaphore like the real build does when the parallel
     // consumption policy allows consuming during build.
@@ -1685,10 +3183,13 @@ public class RealtimeSegmentDataManagerTest {
     private Field _streamMsgOffsetFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
+    // Offsets posted with segmentConsumed(), which the real postSegmentConsumedMsg() reads from getCurrentOffset()
+    public List<Long> _postedOffsets = new ArrayList<>();
     public boolean _commitSegmentCalled = false;
     public boolean _buildSegmentCalled = false;
     public boolean _failSegmentBuild = false;
     public boolean _buildAndReplaceCalled = false;
+    public boolean _failDownloadAndReplace = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
     private boolean _notifySegmentBuildFailedWithDeterministicErrorCalled = false;
@@ -1699,9 +3200,17 @@ public class RealtimeSegmentDataManagerTest {
         SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED;
     public Map<Integer, ConsumerCoordinator> _consumerCoordinatorMap;
     public boolean _stubConsumeLoop = true;
+    private final CountDownLatch _consumeLoopStarted = new CountDownLatch(1);
     public RealtimeTableDataManager _tableDataManager;
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
+    // Requested decode retry backoffs, not slept. If _decodeRetrySleepStarted is set, backoff number
+    // _blockOnDecodeRetrySleep counts it down and blocks until interrupted or woken.
+    public final List<Long> _decodeRetrySleeps = new CopyOnWriteArrayList<>();
+    public volatile CountDownLatch _decodeRetrySleepStarted;
+    public volatile int _blockOnDecodeRetrySleep = 1;
+    public final List<Integer> _throttledMessageCounts = new CopyOnWriteArrayList<>();
+    public final List<Long> _throttledSizesInBytes = new CopyOnWriteArrayList<>();
 
     private static InstanceDataManagerConfig makeInstanceDataManagerConfig() {
       InstanceDataManagerConfig dataManagerConfig = mock(InstanceDataManagerConfig.class);
@@ -1718,10 +3227,18 @@ public class RealtimeSegmentDataManagerTest {
         LLCSegmentName llcSegmentName, Map<Integer, ConsumerCoordinator> consumerCoordinatorMap,
         ServerMetrics serverMetrics, TimeSupplier timeSupplier)
         throws Exception {
+      this(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir, schema, llcSegmentName,
+          consumerCoordinatorMap, serverMetrics, timeSupplier, () -> true);
+    }
+
+    FakeRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
+        RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
+        LLCSegmentName llcSegmentName, Map<Integer, ConsumerCoordinator> consumerCoordinatorMap,
+        ServerMetrics serverMetrics, TimeSupplier timeSupplier, BooleanSupplier ready)
+        throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null,
-          () -> true);
+          consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null, ready);
       _tableDataManager = realtimeTableDataManager;
       _state = RealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
@@ -1749,6 +3266,14 @@ public class RealtimeSegmentDataManagerTest {
       Field realtimeSegmentField = RealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
       realtimeSegmentField.setAccessible(true);
       realtimeSegmentField.set(this, realtimeSegment);
+    }
+
+    /// Replaces the stream consumer so tests can script the batches consumeLoop() sees.
+    public void setPartitionGroupConsumer(PartitionGroupConsumer partitionGroupConsumer)
+        throws Exception {
+      Field partitionGroupConsumerField = RealtimeSegmentDataManager.class.getDeclaredField("_partitionGroupConsumer");
+      partitionGroupConsumerField.setAccessible(true);
+      partitionGroupConsumerField.set(this, partitionGroupConsumer);
     }
 
     /// Replaces the upsert metadata manager, which the constructor always leaves null.
@@ -1815,6 +3340,7 @@ public class RealtimeSegmentDataManagerTest {
     @Override
     protected boolean consumeLoop()
         throws Exception {
+      _consumeLoopStarted.countDown();
       if (_stubConsumeLoop) {
         if (_throwExceptionFromConsume) {
           throw new PermanentConsumerException(new Throwable("Offset out of range"));
@@ -1828,6 +3354,7 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
+      _postedOffsets.add(((LongMsgOffset) getCurrentOffset()).getOffset());
       return _responses.remove();
     }
 
@@ -1849,6 +3376,32 @@ public class RealtimeSegmentDataManagerTest {
     public void invokeRealStop()
         throws InterruptedException {
       super.stop();
+    }
+
+    /// Sets the thread the real stop() interrupts, normally created by startConsumption().
+    public void setConsumerThread(Thread consumerThread)
+        throws Exception {
+      Field consumerThreadField = RealtimeSegmentDataManager.class.getDeclaredField("_consumerThread");
+      consumerThreadField.setAccessible(true);
+      consumerThreadField.set(this, consumerThread);
+    }
+
+    @Override
+    void throttle(MessageBatch<?> messageBatch) {
+      _throttledMessageCounts.add(messageBatch.getMessageCount());
+      _throttledSizesInBytes.add(messageBatch.getSizeInBytes());
+      super.throttle(messageBatch);
+    }
+
+    @Override
+    void sleepBeforeDecodeRetry(long backoffMs)
+        throws InterruptedException {
+      _decodeRetrySleeps.add(backoffMs);
+      CountDownLatch decodeRetrySleepStarted = _decodeRetrySleepStarted;
+      if (decodeRetrySleepStarted != null && _decodeRetrySleeps.size() >= _blockOnDecodeRetrySleep) {
+        decodeRetrySleepStarted.countDown();
+        super.sleepBeforeDecodeRetry(Long.MAX_VALUE);
+      }
     }
 
     @Override
@@ -1897,7 +3450,8 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean isLocalSegmentCrcMatchingZk(SegmentZKMetadata committedSegmentZKMetadata) {
+    protected boolean isLocalSegmentCrcMatchingZk(SegmentZKMetadata committedSegmentZKMetadata)
+        throws IOException, ConfigurationException {
       if (_useRealCrcCheck) {
         return super.isLocalSegmentCrcMatchingZk(committedSegmentZKMetadata);
       }
@@ -1943,6 +3497,9 @@ public class RealtimeSegmentDataManagerTest {
     protected void downloadSegmentAndReplace(SegmentZKMetadata metadata)
         throws Exception {
       terminateLoopIfNecessary();
+      if (_failDownloadAndReplace) {
+        throw new IOException("download failed");
+      }
       _downloadAndReplaceCalled = true;
       if (_useRealDownloadAndReplace) {
         super.downloadSegmentAndReplace(metadata);

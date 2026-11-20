@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         openJdkDist: ["amazoncorretto", "ms-openjdk"]
-        jdk_version: [21, 25]
+        jdk_version: [25]
         arch: [amd64, arm64]
         type: [build, runtime]
         include:
@@ -39,7 +39,7 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -60,11 +60,11 @@ jobs:
     strategy:
       matrix:
         openJdkDist: ["amazoncorretto", "ms-openjdk"]
-        jdk_version: [21, 25]
+        jdk_version: [25]
         type: [build, runtime]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

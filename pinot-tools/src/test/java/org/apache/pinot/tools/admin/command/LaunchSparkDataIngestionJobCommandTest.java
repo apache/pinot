@@ -19,9 +19,12 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
+import java.util.List;
 import org.apache.pinot.tools.admin.command.LaunchSparkDataIngestionJobCommand.SparkType;
 import org.testng.annotations.Test;
+import picocli.CommandLine;
 
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -45,6 +48,19 @@ public class LaunchSparkDataIngestionJobCommandTest {
           sparkType + " declares plugin name '" + sparkType.getPluginName() + "', which is not a module under "
               + batchIngestion + ". shouldLoadPlugin() matches this against the plugin's directory name, so it must "
               + "be the module name.");
+    }
+  }
+
+  @Test
+  public void testLegacyKafkaPluginSelection() {
+    for (String pluginName : List.of("pinot-kafka-2.0", "pinot-kafka-3.0", "pinot-kafka-4.0")) {
+      LaunchSparkDataIngestionJobCommand command = new LaunchSparkDataIngestionJobCommand();
+      new CommandLine(command).parseArgs("-jobSpecFile", "unused", "-pluginsToExclude", pluginName);
+      assertFalse(command.shouldLoadPlugin("pinot-kafka-4.0"));
+      assertTrue(command.shouldLoadPlugin("pinot-parquet"));
+      new CommandLine(command).parseArgs("-jobSpecFile", "unused", "-pluginsToLoad", pluginName);
+      assertTrue(command.shouldLoadPlugin("pinot-kafka-4.0"));
+      assertFalse(command.shouldLoadPlugin("pinot-parquet"));
     }
   }
 

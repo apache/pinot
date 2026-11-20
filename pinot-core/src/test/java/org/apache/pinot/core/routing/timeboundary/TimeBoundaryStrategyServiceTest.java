@@ -20,6 +20,7 @@ package org.apache.pinot.core.routing.timeboundary;
 
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -33,8 +34,10 @@ public class TimeBoundaryStrategyServiceTest {
 
   @Test
   public void testMinTimeBoundaryStrategy() {
-    TimeBoundaryStrategy timeBoundaryStrategy = TimeBoundaryStrategyService.getInstance()
-        .getTimeBoundaryStrategy("min");
+    TimeBoundaryStrategyService service = TimeBoundaryStrategyService.getInstance();
+    TimeBoundaryStrategy timeBoundaryStrategy = service.getTimeBoundaryStrategy("min");
     assertTrue(timeBoundaryStrategy instanceof MinTimeBoundaryStrategy, "Expected MinTimeBoundaryStrategy instance");
+    assertNotSame(service.getTimeBoundaryStrategy("min"), timeBoundaryStrategy,
+        "Expected a new strategy instance for each lookup");
   }
 }

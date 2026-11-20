@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 
 
@@ -205,6 +206,7 @@ public class CommonConstants {
     public static class Instance {
       @Deprecated
       public static final String INSTANCE_ID_KEY = "instanceId";
+      @Deprecated
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
       public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
@@ -216,6 +218,17 @@ public class CommonConstants {
 
       public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
       public static final String PINOT_VERSION_KEY = "pinotVersion";
+      /// The map field with the features that an instance supports: the key is the capability name and the value is
+      /// its revision, an integer that only grows. Any instance type may write it at startup. Other components read
+      /// it to decide whether they can use a feature that instances of an older version do not support. A missing
+      /// map or key means revision 0: not supported. See `InstanceCapability` in pinot-common.
+      public static final String CAPABILITIES_KEY = "capabilities";
+      /// The reserved entry of the [#CAPABILITIES_KEY] map with the Pinot version that wrote the map. A reader uses the
+      /// capabilities only when this entry is string-equal to the simple field [#PINOT_VERSION_KEY] of the same
+      /// instance config. A version that predates the capabilities rewrites [#PINOT_VERSION_KEY] at startup but keeps
+      /// the map, so after a rollback the two values differ and the stale map is ignored. Capability names are upper
+      /// case, so they never clash with this key.
+      public static final String CAPABILITIES_PINOT_VERSION_KEY = PINOT_VERSION_KEY;
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
@@ -646,6 +659,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD =
         "pinot.broker.mse.streaming.distinct.flush.threshold";
     public static final int DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD = -1;
+
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -838,6 +852,20 @@ public class CommonConstants {
     /// Calcite itself stops treating an IN list as a scalar predicate.
     public static final int DEFAULT_SEALED_IN_LIST_THRESHOLD = 20;
 
+    /// Whether the multi-stage engine resolves a simple name in `GROUP BY` to a `SELECT` alias before a column of the
+    /// same name. Calcite 1.42 (CALCITE-7052) resolves the column first, as MySQL and PostgreSQL do. Before that, Pinot
+    /// resolved the alias first. Enable this to keep the old behavior for queries such as
+    /// `SELECT CASE WHEN c = 'a' THEN 'x' ELSE c END AS c, COUNT(*) FROM t GROUP BY c`.
+    ///
+    /// This value can always be overridden by the [Request.QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY] query
+    /// option. Planning outside the broker's multi-stage request handler does not read this broker config and uses
+    /// the default. The query option works everywhere. The controller `/sql` endpoint compiles a query only to find
+    /// its tables: when a `GROUP BY` name that matches an alias and a column makes that compile fail, it retries with
+    /// the option set and lets the broker decide.
+    public static final String CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY =
+        "pinot.broker.multistage.prefer.select.alias.in.group.by";
+    public static final boolean DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -992,6 +1020,19 @@ public class CommonConstants {
         /// exchange over the distinct columns provides. Do not set it on the gRPC streaming query path, where
         /// there is no such stage and the client would observe duplicate rows across flush windows.
         public static final String STREAMING_DISTINCT_FLUSH_THRESHOLD = "streamingDistinctFlushThreshold";
+
+        /// Selects the streaming k-way-merge selection ORDER BY combine over sorted segments. One of
+        /// [Server.SortedSelectionMergeMode] (case-insensitive); defaults to
+        /// [Server#DEFAULT_SORTED_SELECTION_MERGE_MODE]. [Server.SortedSelectionMergeMode#ON] and
+        /// [Server.SortedSelectionMergeMode#AUTO] are experimental.
+        public static final String SORTED_SELECTION_MERGE_MODE = "sortedSelectionMergeMode";
+        /// Minimum fraction of segments that must be physically sorted on the leading ORDER BY column for
+        /// [Server.SortedSelectionMergeMode#AUTO] to select the streaming merge. Overrides
+        /// [Server#DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO].
+        public static final String SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO =
+            "sortedSelectionMergeAutoMinSortedRatio";
+        /// Output block size (rows) for the streaming selection ORDER BY combine.
+        public static final String SORTED_SELECTION_MERGE_BLOCK_SIZE = "sortedSelectionMergeBlockSize";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
@@ -1236,6 +1277,9 @@ public class CommonConstants {
         /// Option to customize the value of [Broker#CONFIG_OF_SEALED_IN_LIST_THRESHOLD]
         public static final String SEALED_IN_LIST_THRESHOLD = "sealedInListThreshold";
 
+        /// Option to customize the value of [Broker#CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY]
+        public static final String PREFER_SELECT_ALIAS_IN_GROUP_BY = "preferSelectAliasInGroupBy";
+
         // Vector search query options
 
         /// Number of inverted-list probes for IVF-based vector indexes. Higher values improve recall
@@ -1400,6 +1444,33 @@ public class CommonConstants {
       /// stop-the-world GC pause expected on a server, or a pause will briefly take that server out of routing.
       public static final String CONFIG_OF_PING_TIMEOUT_MS = "pinot.broker.failure.detector.ping.timeout.ms";
       public static final long DEFAULT_PING_TIMEOUT_MS = 5_000L;
+
+      /// Single-stage queries a server leaves unanswered are also counted per channel, with or without pings. A query
+      /// counts once its timeout has passed and, a further grace period later, the server has still sent nothing on
+      /// the channel since the query was written to it. The grace lets the server's own late timeout response through,
+      /// so a burst of slow queries or a broker pause does not look like a dead channel; a half-open channel answers
+      /// nothing, ever. At the threshold the channel is marked suspect, so the next query to it (or the failure
+      /// detector's retry) replaces it with a fresh connection. That never takes the server out of routing; see
+      /// [#CONFIG_OF_REPORT_UNANSWERED_SERVERS] for that. Any response from the server, decodable or not, resets the
+      /// count. A non-positive threshold disables the check.
+      public static final String CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD =
+          "pinot.broker.failure.detector.unanswered.queries.threshold";
+      public static final int DEFAULT_UNANSWERED_QUERIES_THRESHOLD = 5;
+      public static final String CONFIG_OF_UNANSWERED_QUERY_GRACE_MS =
+          "pinot.broker.failure.detector.unanswered.query.grace.ms";
+      public static final long DEFAULT_UNANSWERED_QUERY_GRACE_MS = 2_000L;
+
+      /// With pings disabled, whether a server that crosses [#CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD] on a channel is
+      /// also reported to the failure detector, which with the `CONNECTION` detector takes it out of routing until the
+      /// retry probe re-establishes its channels. Off by default: a tenant whose heavy queries routinely overrun their
+      /// timeout, or a long GC pause, can cross the threshold on a healthy server. Without pings the retry probe is a
+      /// TCP connect, which a frozen JVM's kernel still completes, so such a server is readmitted at every retry and
+      /// can leave up to the threshold of queries per channel unanswered again before it is reported once more;
+      /// enabling pings, where every server supports them, is the better way to catch it. With pings enabled this
+      /// setting has no effect: the ping that follows every timeout decides.
+      public static final String CONFIG_OF_REPORT_UNANSWERED_SERVERS =
+          "pinot.broker.failure.detector.report.unanswered.servers";
+      public static final boolean DEFAULT_REPORT_UNANSWERED_SERVERS = false;
     }
 
     // Configs related to AdaptiveServerSelection.
@@ -1546,6 +1617,11 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         FileUtils.getTempDirectoryPath() + File.separator + "PinotServer";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
+    // Require a pre-existing data directory at server startup when enabled.
+    public static final String INSTANCE_DATA_DIR_FAIL_ON_MISSING = "dataDir.failOnMissing";
+    public static final String CONFIG_OF_INSTANCE_DATA_DIR_FAIL_ON_MISSING =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + INSTANCE_DATA_DIR_FAIL_ON_MISSING;
+    public static final boolean DEFAULT_INSTANCE_DATA_DIR_FAIL_ON_MISSING = false;
     public static final String CONSUMER_DIR = "consumerDir";
     public static final String CONFIG_OF_CONSUMER_DIR = INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + CONSUMER_DIR;
     public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
@@ -1717,6 +1793,56 @@ public class CommonConstants {
     // Sequential combine utilizes N + 1 threads, N for processing and 1 for merge. Pair-wise only uses N.
     public static final int DEFAULT_SORT_AGGREGATE_SEQUENTIAL_COMBINE_NUM_SEGMENTS_THRESHOLD =
         Runtime.getRuntime().availableProcessors();
+
+    /// Selects the streaming k-way-merge selection ORDER BY combine
+    /// ([Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_MODE]).
+    ///
+    /// The merge runs single-threaded on the consumer thread, so it trades `maxExecutionThreads` worth of parallel
+    /// segment processing for the ability to emit sorted blocks incrementally. That trade only pays off when the
+    /// segments are physically sorted on the leading ORDER BY column, since an unsorted child must do a full scan
+    /// plus top-K synchronously before the merge can take its first row.
+    public enum SortedSelectionMergeMode {
+      /// Never use the streaming merge. Selection ORDER BY keeps its existing combine operators.
+      OFF,
+      /// Always use the streaming merge, including when the leading ORDER BY expression is not an identifier and no
+      /// segment is sorted. Children then materialize their top-K eagerly and the merge is strictly slower than
+      /// [#OFF]; intended for benchmarking and A/B, not for production traffic.
+      ON,
+      /// Use the streaming merge only when at least
+      /// [Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO] of the queried segments are
+      /// physically sorted on the leading ORDER BY column. Decided from segment metadata alone, without acquiring
+      /// any segment.
+      ///
+      /// Experimental, like [#ON]: the default ratio is not measured yet, and the check ignores segment size and
+      /// overlap, so it does not predict a speedup (#19924).
+      AUTO
+    }
+
+    public static final SortedSelectionMergeMode DEFAULT_SORTED_SELECTION_MERGE_MODE =
+        SortedSelectionMergeMode.OFF;
+
+    /// Default for [Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO].
+    ///
+    /// Consuming segments are never reported as sorted ([org.apache.pinot.segment.spi.datasource.DataSourceMetadata]
+    /// on a mutable segment hardcodes `isSorted()` to false), so a realtime table always has a few unsorted segments
+    /// among many sorted ones. This default is chosen to tolerate that while still rejecting a mostly-unsorted table.
+    /// It is a starting point rather than a measured optimum.
+    public static final double DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO = 0.8;
+    /// Server-wide override of [#DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO], applied to queries that do not
+    /// set the query option.
+    public static final String SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO =
+        "sorted.selection.merge.auto.min.sorted.ratio";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO;
+
+    /// Default output block size (rows) for the streaming selection ORDER BY combine
+    /// ([Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_BLOCK_SIZE]).
+    public static final int DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE = 10_000;
+    /// Server-wide override of [#DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE], applied to queries that do not set the
+    /// query option.
+    public static final String SORTED_SELECTION_MERGE_BLOCK_SIZE = "sorted.selection.merge.block.size";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_SORTED_SELECTION_MERGE_BLOCK_SIZE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + SORTED_SELECTION_MERGE_BLOCK_SIZE;
     public static final String CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE = MSE_CONFIG_PREFIX + ".min.group.trim.size";
     // Match the value of GroupByUtils.DEFAULT_MIN_NUM_GROUPS
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;
@@ -1770,6 +1896,11 @@ public class CommonConstants {
     public static final String DEFAULT_SERVER_QUERY_REGEX_CLASS = "JAVA_UTIL";
     public static final String CONFIG_OF_ENABLE_QUERY_CANCELLATION = "pinot.server.enable.query.cancellation";
     public static final boolean DEFAULT_ENABLE_QUERY_CANCELLATION = true;
+    /// How long after the broker's deadline (`InstanceRequest.deadlineMs`) a request may arrive and still be executed,
+    /// allowing for clock skew between broker and server. A negative value disables the check.
+    public static final String CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS =
+        "pinot.server.request.deadline.clock.skew.ms";
+    public static final long DEFAULT_REQUEST_DEADLINE_CLOCK_SKEW_MS = 10_000L;
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
@@ -2061,6 +2192,7 @@ public class CommonConstants {
   public static class Minion {
     public static final String CONFIG_OF_METRICS_PREFIX = "pinot.minion.";
     public static final String CONFIG_OF_MINION_ID = "pinot.minion.instance.id";
+    public static final String CONFIG_OF_MINION_DATA_DIR = "pinot.minion.instance.dataDir";
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
     // Config keys
@@ -2657,6 +2789,24 @@ public class CommonConstants {
           public static String decodeSegmentListKey(String key) {
             return key.substring(SEGMENT_MAP_ENTRY_PREFIX.length());
           }
+
+          /// Optional segments of a plan: segments the routing manager lets a server skip if it does not have them
+          /// yet, e.g. newly pushed segments not yet ONLINE in the external view. A server that does not know the key
+          /// ignores it and queries only the required segments.
+          public static final String OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX = "$optionalSegmentMapEntry#";
+
+          public static boolean isKeyOptionalSegmentList(String key) {
+            return key.startsWith(OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX);
+          }
+
+          public static String encodeOptionalSegmentListKey(String planId) {
+            return OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX + planId;
+          }
+
+          /// Returns the plan-id corresponding to the encoded optional segment list key.
+          public static String decodeOptionalSegmentListKey(String key) {
+            return key.substring(OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX.length());
+          }
         }
       }
 
@@ -2939,6 +3089,21 @@ public class CommonConstants {
         "pinot.query.runner.mailbox.server.permit.keep.alive.without.calls";
     public static final boolean DEFAULT_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
 
+    /// Whether the mailbox server and the query server of an instance reject a request addressed to another instance.
+    ///
+    /// Senders identify the instance they mean in the request headers. A request reaches the wrong instance when the
+    /// sender's connection is stale: for example after two server pods restart together and take each other's IP
+    /// addresses, while every server listens on the same port. If the wrong instance accepts the request, the intended
+    /// one waits for data until the query times out, and the wrong one runs the stage plan, or keeps the block in a
+    /// mailbox that nothing reads. When the wrong instance rejects the request, the sender resets the connection and
+    /// the query fails with a clear error, in most cases at once rather than at its deadline.
+    ///
+    /// An instance checks requests against its Helix instance id, which is the id that plans address it by. Requests
+    /// without the headers, as sent by older versions, are always accepted. The value is read when the instance starts,
+    /// on brokers and servers.
+    public static final String KEY_OF_REJECT_MISROUTED_REQUESTS = "pinot.query.runner.reject.misrouted.requests";
+    public static final boolean DEFAULT_REJECT_MISROUTED_REQUESTS = true;
+
     /// Configuration for server port used to receive query plans.
     public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";
     public static final int DEFAULT_QUERY_SERVER_PORT = 0;
@@ -3161,13 +3326,21 @@ public class CommonConstants {
     public static final int DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN = 5;
   }
 
-  /// Configuration for setting up groovy static analyzer.
+  /// Configuration for ingestion Groovy and the Groovy static analyzer.
   /// User can config different configuration for query and ingestion (table creation and update) static analyzer.
   /// The all configuration is the default configuration for both query and ingestion static analyzer.
   public static class Groovy {
+    /// Cluster-only switch for ingestion Groovy. Query Groovy remains independently controlled.
+    public static final String DISABLE_INGESTION_GROOVY = "controller.disable.ingestion.groovy";
+    public static final boolean DEFAULT_DISABLE_INGESTION_GROOVY = true;
     public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.groovy.all.static.analyzer";
     public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.groovy.query.static.analyzer";
     public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
+
+    /// Only an explicit false enables ingestion Groovy; absent or malformed values fail closed.
+    public static boolean isIngestionGroovyDisabled(@Nullable String value) {
+      return value == null || !value.trim().equalsIgnoreCase("false");
+    }
   }
 
   /// ZK paths used by Pinot.

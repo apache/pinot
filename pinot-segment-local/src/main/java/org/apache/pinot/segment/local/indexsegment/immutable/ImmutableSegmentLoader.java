@@ -33,7 +33,6 @@ import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConve
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
-import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -213,9 +212,8 @@ public class ImmutableSegmentLoader {
       @Nullable Schema schema)
       throws Exception {
     // Preprocessing uses mutable metadata. Only the final immutable serving path uses the mapped representation.
-    if (indexLoadingConfig.isMappedSegmentMetadataEnabled()
-        && segmentDirectory instanceof SegmentLocalFSDirectory localDirectory) {
-      localDirectory.loadMappedMetadata();
+    if (indexLoadingConfig.isMappedSegmentMetadataEnabled()) {
+      segmentDirectory.loadMappedMetadata();
     }
     SegmentMetadataImpl segmentMetadata = segmentDirectory.getSegmentMetadata();
     if (segmentMetadata.getTotalDocs() == 0) {

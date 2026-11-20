@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.lang.foreign.MemorySegment;
 import java.util.Base64;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.customobject.SerializedKLL;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
@@ -71,6 +71,6 @@ public class PercentileRawKLLMVAggregationFunction extends PercentileKLLMVAggreg
   }
 
   private static KllDoublesSketch deserializeFinalResult(Comparable<?> finalResult) {
-    return ObjectSerDeUtils.KLL_SKETCH_SER_DE.deserialize(Base64.getDecoder().decode((String) finalResult));
+    return KllDoublesSketch.wrap(MemorySegment.ofArray(Base64.getDecoder().decode((String) finalResult)).asReadOnly());
   }
 }

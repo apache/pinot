@@ -22,8 +22,12 @@ FROM --platform=linux/amd64 pinot-build:${PINOT_BUILD_IMAGE_TAG} AS pinot_build_
 FROM apachepinot/pinot-base-runtime:${PINOT_RUNTIME_IMAGE_TAG}
 LABEL MAINTAINER=dev@pinot.apache.org
 
+RUN --mount=type=bind,source=check-java-version.sh,target=/tmp/check-java-version.sh \
+    sh /tmp/check-java-version.sh
+
 ENV PINOT_HOME=/opt/pinot
 ENV JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true"
+ENV JDK_JAVA_OPTIONS="--add-modules=jdk.incubator.vector"
 
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 

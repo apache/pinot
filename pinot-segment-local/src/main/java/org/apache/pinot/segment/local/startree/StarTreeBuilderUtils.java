@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.startree;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -51,6 +50,7 @@ import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -147,7 +147,7 @@ public class StarTreeBuilderUtils {
     for (String dimension : dimensions) {
       headerSizeInBytes += Integer.BYTES; // For dimension index
       headerSizeInBytes += Integer.BYTES; // For length of dimension name
-      headerSizeInBytes += Utf8.encodedLength(dimension); // For dimension name
+      headerSizeInBytes += Utf8Utils.encodedLength(dimension); // For dimension name
     }
 
     headerSizeInBytes += Integer.BYTES; // For number of nodes.

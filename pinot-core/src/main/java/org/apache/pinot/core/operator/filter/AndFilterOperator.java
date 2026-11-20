@@ -99,7 +99,7 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.unscanned();
+    return mayHaveNulls() ? deriveNulls(_queryOptions, _restrictionPushdownEnabled) : EmptyDocIdSet.unscanned();
   }
 
   @Override

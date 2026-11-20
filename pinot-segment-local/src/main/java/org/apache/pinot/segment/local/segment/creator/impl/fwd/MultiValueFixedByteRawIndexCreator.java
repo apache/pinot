@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
+import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
@@ -27,6 +28,7 @@ import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWri
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -34,6 +36,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// Raw (non-dictionary-encoded) forward index creator for multi-value column of fixed length data type (INT, LONG,
 /// FLOAT, DOUBLE).
 public class MultiValueFixedByteRawIndexCreator implements CompressionStatsTrackingForwardIndexCreator {
+  // At this size even DELTA's expansion of 32-bit values to 64-bit differences fits before and after LZ4.
+  private static final int SAFE_LEGACY_CHUNK_SIZE_BYTES = 1_000_000_000;
 
   private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
@@ -48,8 +52,8 @@ public class MultiValueFixedByteRawIndexCreator implements CompressionStatsTrack
   /// @param valueType Type of the values
   /// @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
   /// @param writerVersion writer format version
-  /// @param targetMaxChunkSizeBytes target max chunk size in bytes, applicable only for V4 or when
-  ///                                deriveNumDocsPerChunk is true
+  /// @param targetMaxChunkSizeBytes target max chunk size in bytes, used by V4 and later and for byte-based
+  ///                                sizing of legacy chunks
   public MultiValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk,
       int writerVersion, int targetMaxChunkSizeBytes, int targetDocsPerChunk)
@@ -74,8 +78,14 @@ public class MultiValueFixedByteRawIndexCreator implements CompressionStatsTrack
     if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
       // Store the length followed by the values
       int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
-      int numDocsPerChunk = deriveNumDocsPerChunk ? Math.max(targetMaxChunkSizeBytes / (totalMaxLength
-          + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1) : targetDocsPerChunk;
+      long bytesPerDoc = (long) totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+      int numDocsPerChunk = deriveNumDocsPerChunk
+          ? Math.max((int) (targetMaxChunkSizeBytes / bytesPerDoc), 1)
+          : targetDocsPerChunk;
+      if (!fitsLegacyChunk(bytesPerDoc * numDocsPerChunk, compressionType)) {
+        int fallbackChunkSize = Math.min(targetMaxChunkSizeBytes, SAFE_LEGACY_CHUNK_SIZE_BYTES);
+        numDocsPerChunk = Math.max((int) (fallbackChunkSize / bytesPerDoc), 1);
+      }
       _indexWriter =
           new VarByteChunkForwardIndexWriter(indexFile, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
               writerVersion);
@@ -102,6 +112,21 @@ public class MultiValueFixedByteRawIndexCreator implements CompressionStatsTrack
     }
     _valueType = valueType;
     _chunkCompressionType = compressionType;
+  }
+
+  private static boolean fitsLegacyChunk(long chunkSize, ChunkCompressionType compressionType)
+      throws IOException {
+    if (chunkSize > Integer.MAX_VALUE) {
+      return false;
+    }
+    if (chunkSize <= SAFE_LEGACY_CHUNK_SIZE_BYTES || compressionType == ChunkCompressionType.PASS_THROUGH) {
+      return true;
+    }
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(compressionType)) {
+      return compressor.maxCompressedSize((int) chunkSize) > 0;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   @Override

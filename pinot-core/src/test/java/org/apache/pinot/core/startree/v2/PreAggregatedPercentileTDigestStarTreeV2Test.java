@@ -20,11 +20,11 @@ package org.apache.pinot.core.startree.v2;
 
 import java.util.List;
 import java.util.Random;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;

@@ -25,6 +25,9 @@ ARG PINOT_GIT_REF=master
 ARG JDK_VERSION=25
 ARG CI=true
 
+RUN --mount=type=bind,source=check-java-version.sh,target=/tmp/check-java-version.sh \
+    sh /tmp/check-java-version.sh
+
 RUN echo "Build Pinot based on image: apachepinot/pinot-base-build:${PINOT_BASE_IMAGE_TAG}"
 RUN echo "Current build system CPU arch is [ $(uname -m) ]"
 
@@ -48,8 +51,12 @@ FROM apachepinot/pinot-base-runtime:${PINOT_BASE_IMAGE_TAG}
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
+RUN --mount=type=bind,source=check-java-version.sh,target=/tmp/check-java-version.sh \
+    sh /tmp/check-java-version.sh
+
 ENV PINOT_HOME=/opt/pinot
 ENV JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true"
+ENV JDK_JAVA_OPTIONS="--add-modules=jdk.incubator.vector"
 
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 

@@ -940,6 +940,24 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
+  public void testReplaceSegmentSkippedWhenCrcCheckDisabled()
+      throws Exception {
+    SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);
+    InstanceDataManagerConfig instanceDataManagerConfig = createDefaultInstanceDataManagerConfig();
+    when(instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()).thenReturn(false);
+
+    BaseTableDataManager tableDataManager = createTableManager(instanceDataManagerConfig);
+    File indexDir = createSegment(SegmentVersion.v3, 3);
+    tableDataManager.addNewOnlineSegment(zkMetadata, new IndexLoadingConfig());
+    assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 3);
+
+    ImmutableSegmentDataManager segmentDataManager = createImmutableSegmentDataManager(SEGMENT_NAME, 0);
+    tableDataManager.replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, new IndexLoadingConfig());
+    // CRC check disabled: local copy is kept even though CRCs differ.
+    assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 3);
+  }
+
+  @Test
   public void testReplaceSegmentNewDataWithAsyncSegmentRefresh()
       throws Exception {
     SegmentZKMetadata zkMetadata = createRawSegment(SegmentVersion.v3, 5);

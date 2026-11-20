@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +41,6 @@ import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -90,6 +90,7 @@ import org.apache.pinot.common.utils.config.QueryOptionConfigListener;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
@@ -113,6 +114,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -294,7 +296,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }
 
-  /// Override to customize the [WorkerManager] used for multi-stage query engine worker assignment.
+  /// Override to customize the [WorkerManager] used for multi-stage query engine worker assignment. The worker manager
+  /// must use `brokerId` as its instance id: plans address this broker by that id, and the mailbox server of the broker
+  /// rejects the streams of a plan that addresses another instance.
   protected WorkerManager createWorkerManager(String brokerId, String hostname, int port,
       RoutingManager routingManager) {
     return new WorkerManager(brokerId, hostname, port, routingManager);
@@ -345,6 +349,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         accessControlFactory, queryQuotaManager, tableCache, multiStageQueryThrottler, failureDetector,
         threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
         serverRoutingStatsManager);
+  }
+
+  /// Override to supply a custom [TimeSeriesRequestHandler], e.g. one built with a
+  /// `TimeSeriesRoutingCustomizer` that adjusts how each time-series leaf is routed.
+  /// The default implementation routes every leaf exactly as the routing manager chooses.
+  protected TimeSeriesRequestHandler createTimeSeriesRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, BrokerRoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
+    return new TimeSeriesRequestHandler(config, brokerId, requestIdGenerator, routingManager, accessControlFactory,
+        queryQuotaManager, tableCache, threadAccountant, multiClusterRoutingContext);
   }
 
   private void setupHelixSystemProperties() {
@@ -490,10 +505,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Initialize workload budget manager and thread resource usage accountant. Workload budget manager must be
     // initialized first because it might be used by the accountant.
     PinotConfiguration accountingConfig = ThreadAccountantUtils.extractAccountingConfig(_brokerConf,
-        org.apache.pinot.spi.config.instance.InstanceType.BROKER);
+        InstanceType.BROKER);
     WorkloadBudgetManagerFactory.register(accountingConfig);
     _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId,
-        org.apache.pinot.spi.config.instance.InstanceType.BROKER);
+        InstanceType.BROKER);
     _threadAccountant.startWatcherTask();
     // Get all workload budgets this instance should support
     QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _spectatorHelixManager,
@@ -568,6 +583,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _serverRoutingStatsManager, _failureDetector, _threadAccountant, multiClusterRoutingContext,
               materializedViewHandler);
     }
+    // A server that becomes enabled has most likely been restarted: let the handler drop the connections it cached to
+    // a previous process, so the next query reconnects instead of writing into a half-open socket.
+    _routingManager.addServerEnabledCallback(singleStageBrokerRequestHandler::onServerEnabled);
+    _routingManager.addServerRemovedCallback(singleStageBrokerRequestHandler::onServerRemoved);
 
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
@@ -593,7 +612,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
               _serverRoutingStatsManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
-      _routingManager.setServerEnabledCallback(
+      _routingManager.addServerEnabledCallback(
           serverInstance -> finalHandler.getQueryDispatcher().onServerEnabled(serverInstance));
       // Lets an operator turn the proto segment list encoding on and off through cluster config, without a restart.
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(
@@ -602,7 +621,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
       timeSeriesRequestHandler =
-          new TimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+          createTimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _threadAccountant,
               multiClusterRoutingContext);
     }
@@ -709,7 +728,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Connecting participant Helix manager");
     _participantHelixManager =
-      HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.PARTICIPANT, _zkServers);
+      HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId,
+          org.apache.helix.InstanceType.PARTICIPANT, _zkServers);
     // Register state model factory
     _participantHelixManager.getStateMachineEngine()
         .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
@@ -847,6 +867,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
   }
 
+  /// The capabilities that this broker advertises in its instance config at startup, see [InstanceCapability]. A
+  /// distribution or a plugin built on Pinot overrides it to add its own capabilities to [InstanceCapability#values()].
+  protected Collection<InstanceCapability> getInstanceCapabilities() {
+    return InstanceCapability.values();
+  }
+
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
     boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
@@ -907,7 +933,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       instanceTags = instanceConfig.getTags();
       updated = true;
     }
-    updated |= HelixHelper.updatePinotVersion(instanceConfig);
+    // Also writes the simple field pinotVersion.
+    updated |= HelixHelper.updateCapabilities(instanceConfig, InstanceType.BROKER, getInstanceCapabilities());
     if (updated) {
       HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
     }

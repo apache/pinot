@@ -74,6 +74,7 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -165,11 +166,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
 
-    File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
-    initInstanceDataDir(instanceDataDir);
-
-    File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
-    initInstanceSegmentTarDir(instanceSegmentTarDir);
+    initInstanceDataDir();
+    initInstanceSegmentTarDir();
 
     // Initialize segment build time lease extender executor
     SegmentBuildTimeLeaseExtender.initExecutor();
@@ -204,8 +202,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @VisibleForTesting
-  void initInstanceDataDir(File instanceDataDir) {
+  void initInstanceDataDir() {
+    File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     if (!instanceDataDir.exists()) {
+      Preconditions.checkState(!_instanceDataManagerConfig.shouldFailOnMissingInstanceDataDir(),
+          "Instance data dir does not exist: %s (%s=true)", instanceDataDir,
+          Server.CONFIG_OF_INSTANCE_DATA_DIR_FAIL_ON_MISSING);
       Preconditions.checkState(instanceDataDir.mkdirs(), "Failed to create instance data dir: %s", instanceDataDir);
     } else {
       // Clean up the _tmp (consuming segments) dir and empty table data dir
@@ -232,7 +234,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @VisibleForTesting
-  void initInstanceSegmentTarDir(File instanceSegmentTarDir) {
+  void initInstanceSegmentTarDir() {
+    File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
     if (!instanceSegmentTarDir.exists()) {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance segment tar dir: %s",
           instanceSegmentTarDir);
