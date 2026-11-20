@@ -43,7 +43,7 @@ public final class VectorIndexConfigValidator {
   static final Set<String> HNSW_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Arrays.asList("maxCon", "beamWidth", "maxDimensions", "maxBufferSizeMB",
           "useCompoundFile", "mode", "commit", "commitIntervalMs", "commitDocs",
-          "refreshMinIntervalMs", "refreshWaitTimeoutMs")));
+          "refreshMinIntervalMs", "refreshWaitTimeoutMs", VectorIndexConfig.MMAP_GRAPH_ON_MERGE)));
 
   // IVF_FLAT-specific property keys
   static final Set<String> IVF_FLAT_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
@@ -265,6 +265,13 @@ public final class VectorIndexConfigValidator {
     // created on the server, which would stop ingestion for the partition instead of failing the table config.
     validateLongProperty(properties, "refreshMinIntervalMs", "HNSW refreshMinIntervalMs", 0L);
     validateLongProperty(properties, "refreshWaitTimeoutMs", "HNSW refreshWaitTimeoutMs", 1L);
+    if (properties.containsKey(VectorIndexConfig.MMAP_GRAPH_ON_MERGE)) {
+      String value = properties.get(VectorIndexConfig.MMAP_GRAPH_ON_MERGE);
+      if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
+        throw new IllegalArgumentException(
+            "HNSW " + VectorIndexConfig.MMAP_GRAPH_ON_MERGE + " must be true or false, got: '" + value + "'");
+      }
+    }
   }
 
   /// Absent means "use the default"; anything present must parse and satisfy the bound.

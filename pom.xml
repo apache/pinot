@@ -246,7 +246,7 @@
     <checker-qual.version>4.4.0</checker-qual.version>
     <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
-    <roaring-bitmap.version>1.6.29</roaring-bitmap.version>
+    <roaring-bitmap.version>1.6.30</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.7.0</prometheus.jmx-exporter.version>
     <prometheus.metrics.version>1.10.0</prometheus.metrics.version>
     <fastutil.version>8.5.19</fastutil.version>
@@ -301,7 +301,7 @@
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
     <httpclient5.version>5.6.5</httpclient5.version>
-    <httpcore5.version>5.4.4</httpcore5.version>
+    <httpcore5.version>5.5</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>4.36.2</protobuf.version>
@@ -325,7 +325,7 @@
     <enforcer-api.version>3.7.0</enforcer-api.version>
     <maven.version>3.10.1</maven.version>
     <jdom2.version>2.0.6.1</jdom2.version>
-    <plexus-utils.version>4.1.0</plexus-utils.version>
+    <plexus-utils.version>4.2.0</plexus-utils.version>
     <plexus-xml.version>3.1.1</plexus-xml.version>
 
     <!-- For maven-antrun-plugin -->

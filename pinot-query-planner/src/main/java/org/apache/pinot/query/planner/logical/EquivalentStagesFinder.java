@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -358,6 +359,22 @@ public class EquivalentStagesFinder {
             // Compare the context as a whole so that this stays in step with the fields it holds. Unrolling a subset
             // of them here is how passthroughInputIndexes and prunedPassthrough came to be missed.
             && Objects.equals(node1.getTableFunctionContext(), that.getTableFunctionContext());
+      }
+
+      @Override
+      public Boolean visitMvAggregate(MvAggregateNode node1, PlanNode node2) {
+        if (!(node2 instanceof MvAggregateNode)) {
+          return false;
+        }
+        MvAggregateNode that = (MvAggregateNode) node2;
+        return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getAggCalls(), that.getAggCalls())
+            && Objects.equals(node1.getFilterArgs(), that.getFilterArgs())
+            && Objects.equals(node1.getGroupKeys(), that.getGroupKeys())
+            && node1.getAggType() == that.getAggType()
+            && node1.isLeafReturnFinalResult() == that.isLeafReturnFinalResult()
+            && Objects.equals(node1.getCollations(), that.getCollations())
+            && node1.getLimit() == that.getLimit()
+            && Objects.equals(node1.getMvKeyIndexes(), that.getMvKeyIndexes());
       }
     }
   }

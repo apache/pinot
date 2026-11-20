@@ -65,6 +65,7 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
+import org.apache.pinot.query.grpc.ReceiverIdentity;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -732,7 +733,8 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     return dispatchCallbacks;
   }
 
-  private <E> void processResults(long requestId, int numServers, BiConsumer<E, QueryServerInstance> resultConsumer,
+  @VisibleForTesting
+  <E> void processResults(long requestId, int numServers, BiConsumer<E, QueryServerInstance> resultConsumer,
       Deadline deadline, BlockingQueue<AsyncResponse<E>> dispatchCallbacks)
       throws InterruptedException, TimeoutException {
     int numSuccessCalls = 0;
@@ -742,6 +744,16 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
           dispatchCallbacks.poll(Math.max(1, deadline.timeRemaining(TimeUnit.MILLISECONDS)), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
+          String misroutedTo = ReceiverIdentity.getMisroutedTo(resp.getThrowable());
+          if (misroutedTo != null) {
+            // The server is fine, but the connection of the broker to it leads to another instance. The dispatch
+            // client has already reset the connection, so the next query reaches the server. Do not mark the server
+            // unhealthy.
+            throw new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING, String.format(
+                "Query: %d was sent to server: %s but reached %s, because the connection of the broker to that "
+                    + "server is stale. The broker reset the connection. Retry the query.", requestId,
+                resp.getServerInstance().getInstanceId(), misroutedTo));
+          }
           // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
           // subsequent query failures
           if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)
@@ -904,7 +916,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     }
     for (QueryServerInstance queryServerInstance : servers) {
       try {
-        getOrCreateDispatchClient(queryServerInstance).cancelAsync(requestId);
+        getOrCreateDispatchClient(queryServerInstance).cancelAsync(requestId, queryServerInstance);
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while cancelling query: {} on server: {}", requestId, queryServerInstance, t);
       }
