@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -26,9 +27,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.BuiltInVirtualColumnDefinitions;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -38,11 +42,16 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Schema utils
 public class SchemaUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SchemaUtils.class);
+
   private SchemaUtils() {
   }
 
@@ -58,6 +67,55 @@ public class SchemaUtils {
 
   public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
   public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
+
+  /// Returns a validated realtime segment schema whose invalid time default uses the saved segment creation time.
+  /// Each call prepares its own copy, leaving the cached table schema unchanged.
+  public static Schema prepareRealtimeSegmentSchema(TableConfig tableConfig, Schema schema,
+      SegmentZKMetadata segmentZKMetadata)
+      throws IOException {
+    return prepareRealtimeSegmentSchema(tableConfig, schema, segmentZKMetadata, SchemaUtils::validate);
+  }
+
+  /// Validates the schema copy before adding segment-specific fields and defaults. Live ingestion supplies its
+  /// additional table validation here without coupling this module to the table data manager.
+  public static Schema prepareRealtimeSegmentSchema(TableConfig tableConfig, Schema schema,
+      SegmentZKMetadata segmentZKMetadata, Consumer<Schema> validator)
+      throws IOException {
+    Schema segmentSchema = JsonUtils.jsonNodeToObject(schema.toJsonObject(), Schema.class);
+    validator.accept(segmentSchema);
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(segmentSchema,
+        segmentZKMetadata.getSegmentName());
+    setDefaultTimeValueIfInvalid(tableConfig, segmentSchema, segmentZKMetadata);
+    return segmentSchema;
+  }
+
+  /// Replaces an invalid time default on the supplied segment schema using its original creation time.
+  public static void setDefaultTimeValueIfInvalid(TableConfig tableConfig, Schema schema,
+      SegmentZKMetadata segmentZKMetadata) {
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    if (StringUtils.isEmpty(timeColumnName)) {
+      return;
+    }
+    DateTimeFieldSpec timeColumnSpec = schema.getSpecForTimeColumn(timeColumnName);
+    Preconditions.checkState(timeColumnSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName,
+        schema.getSchemaName());
+    String defaultTimeString = timeColumnSpec.getDefaultNullValueString();
+    DateTimeFormatSpec dateTimeFormatSpec = timeColumnSpec.getFormatSpec();
+    try {
+      long defaultTimeMs = dateTimeFormatSpec.fromFormatToMillis(defaultTimeString);
+      if (TimeUtils.timeValueInValidRange(defaultTimeMs)) {
+        return;
+      }
+    } catch (Exception e) {
+      // An unparsable default is invalid and uses the saved segment creation time below.
+    }
+    String creationTimeString = dateTimeFormatSpec.fromMillisToFormat(segmentZKMetadata.getCreationTime());
+    Object creationTime = timeColumnSpec.getDataType().convert(creationTimeString);
+    timeColumnSpec.setDefaultNullValue(creationTime);
+    LOGGER.info(
+        "Default time: {} does not comply with format: {}, using creation time: {} as the default time for table: {}",
+        defaultTimeString, timeColumnSpec.getFormat(), creationTime, tableConfig.getTableName());
+  }
 
   /// Validates the schema.
   /// First checks that the schema is compatible with any provided table configs associated with it.

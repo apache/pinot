@@ -31,12 +31,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -66,6 +64,7 @@ import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
 import org.apache.pinot.segment.local.realtime.DecodeRetryTracker;
+import org.apache.pinot.segment.local.realtime.RealtimeIngestionRecordProcessor;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -73,17 +72,17 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.IngestionUtils.PartitioningListener;
+import org.apache.pinot.segment.local.utils.IngestionUtils.StreamDecoder;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
-import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -94,7 +93,6 @@ import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPol
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -106,10 +104,8 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamDataDecoder;
-import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.stream.StreamDataDecoderResult;
 import org.apache.pinot.spi.stream.StreamMessage;
-import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -295,11 +291,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // the consumer thread has stopped
   private final DecodeRetryTracker _decodeRetryTracker;
 
-  // Configuration constants
-  private static final String STOP_ON_DECODE_ERROR_CONFIG = "stopOnDecodeError";
-
-  // Cache stopOnDecodeError configuration as class member to avoid repeated lookups
-  private final boolean _stopOnDecodeError;
   private long _startTimeMs = 0;
   private final IdleTimer _idleTimer = new IdleTimer();
   private final String _segmentNameStr;
@@ -337,6 +328,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
   private final TransformPipeline _transformPipeline;
+  private final IngestionRecordListener _ingestionRecordListener = new IngestionRecordListener();
+  private final RealtimeIngestionRecordProcessor _recordProcessor;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
   private StreamMetadataProvider _partitionMetadataProvider = null;
   private final File _resourceTmpDir;
@@ -760,13 +753,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       throttle(messageBatch);
     }
 
-    // One local per meter: addMeteredTableValue() marks the reused meter it is passed, whichever meter is named
-    PinotMeter realtimeBytesIngestedMeter = null;
-    PinotMeter realtimeRowsConsumedMeter = null;
-    PinotMeter realtimeRowsDroppedMeter = null;
-    PinotMeter realtimeRowsFilteredMeter = null;
-    PinotMeter realtimeIncompleteRowsConsumedMeter = null;
-    PinotMeter realtimeRowsSanitizedMeter = null;
+    _ingestionRecordListener.resetMeters();
 
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
@@ -811,7 +798,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       StreamMessageMetadata metadata = streamMessage.getMetadata();
       StreamPartitionMsgOffset offset = metadata.getOffset();
       StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
-      int rowSizeInBytes = metadata.getRecordSerializedSize();
       if (decodedRow.isRetriable() && shouldRetryDecode(offset, decodedRow.getException())) {
         // Stop without moving _currentOffset past the message, so that consumeLoop() backs off and fetches it again
         decodeRetryNeeded = true;
@@ -822,88 +808,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _segmentLogger.info("Resumed decoding at offset: {} after {} retriable decode failures", offset,
             numDecodeRetries);
       }
-      if (decodedRow.getException() != null) {
-        String errorMessage = "Stopping consumption due to decode error at offset: " + offset;
-        if (_stopOnDecodeError) {
-          _segmentLogger.error(errorMessage, decodedRow.getException());
-          _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-                  new SegmentErrorInfo(now(), errorMessage, decodedRow.getException()));
-          throw new RuntimeException(errorMessage, decodedRow.getException());
-        } else {
-          // Log the first decode error, then swallow all subsequent errors
-          if (!_firstDecodeErrorLogged) {
-            _segmentLogger.error("First decode error encountered at offset: {}. "
-                + "Subsequent errors will be silently dropped.", offset, decodedRow.getException());
-            _firstDecodeErrorLogged = true;
-          }
-          // Silently drop the row with error
-          realtimeRowsDroppedMeter =
-              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
-                  realtimeRowsDroppedMeter);
-          _numRowsErrored++;
-          _numBytesDropped += rowSizeInBytes;
-        }
-      } else {
-        TransformPipeline.Result result = null;
-        try {
-          result = _transformPipeline.processRow(decodedRow.getResult());
-        } catch (Exception e) {
-          _numRowsErrored++;
-          _numBytesDropped += rowSizeInBytes;
-          String errorMessage = "Caught exception while transforming the record at offset: " + offset + " , row: "
-              + decodedRow.getResult();
-          _segmentLogger.error(errorMessage, e);
-          _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-        }
-        if (result != null) {
-          if (result.getSkippedRowCount() > 0) {
-            realtimeRowsFilteredMeter =
-                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
-                    result.getSkippedRowCount(), realtimeRowsFilteredMeter);
-            if (_trackFilteredMessageOffsets) {
-              _filteredMessageOffsets.add(offset.toString());
-            }
-          }
-          if (result.getIncompleteRowCount() > 0) {
-            realtimeIncompleteRowsConsumedMeter =
-                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
-                    result.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
-          }
-          if (result.getSanitizedRowCount() > 0) {
-            realtimeRowsSanitizedMeter =
-                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_SANITIZED,
-                    result.getSanitizedRowCount(), realtimeRowsSanitizedMeter);
-          }
-          List<GenericRow> transformedRows = result.getTransformedRows();
-          for (GenericRow transformedRow : transformedRows) {
-            try {
-              canTakeMore = _realtimeSegment.index(transformedRow, metadata);
-              indexedMessageCount++;
-              _lastRowMetadata = metadata;
-              _lastConsumedTimestampMs = System.currentTimeMillis();
-              realtimeRowsConsumedMeter =
-                  _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
-                      realtimeRowsConsumedMeter);
-              _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
-
-              int recordSerializedValueLength = _lastRowMetadata.getRecordSerializedSize();
-              if (recordSerializedValueLength > 0) {
-                realtimeBytesIngestedMeter =
-                    _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_CONSUMED,
-                        recordSerializedValueLength, realtimeBytesIngestedMeter);
-                _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
-              }
-            } catch (Exception e) {
-              _numRowsErrored++;
-              _numBytesDropped += rowSizeInBytes;
-              String errorMessage =
-                  "Caught exception while indexing the record at offset: " + offset + " , row: " + transformedRow;
-              _segmentLogger.error(errorMessage, e);
-              _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-            }
-          }
-        }
-      }
+      canTakeMore = _recordProcessor.process(decodedRow, metadata);
+      indexedMessageCount += _recordProcessor.getNumRowsIndexed();
       _currentOffset = nextOffset;
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
@@ -954,6 +860,106 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       return BatchOutcome.DECODE_RETRY_NEEDED;
     }
     return prematureExit ? BatchOutcome.STOPPED_EARLY : BatchOutcome.PROCESSED;
+  }
+
+  /// Adapts shared record processing to this segment's metrics and errors. Used by the active consumer, or by
+  /// catch-up after that consumer has stopped. Meter references are reused only within a batch, as before.
+  private final class IngestionRecordListener implements RealtimeIngestionRecordProcessor.Listener {
+    private PinotMeter _realtimeBytesIngestedMeter;
+    private PinotMeter _realtimeRowsConsumedMeter;
+    private PinotMeter _realtimeRowsDroppedMeter;
+    private PinotMeter _realtimeRowsFilteredMeter;
+    private PinotMeter _realtimeIncompleteRowsConsumedMeter;
+    private PinotMeter _realtimeRowsSanitizedMeter;
+
+    private void resetMeters() {
+      _realtimeBytesIngestedMeter = null;
+      _realtimeRowsConsumedMeter = null;
+      _realtimeRowsDroppedMeter = null;
+      _realtimeRowsFilteredMeter = null;
+      _realtimeIncompleteRowsConsumedMeter = null;
+      _realtimeRowsSanitizedMeter = null;
+    }
+
+    @Override
+    public void onDecodeError(Exception exception, StreamMessageMetadata metadata, boolean fatal) {
+      if (fatal) {
+        String errorMessage = "Stopping consumption due to decode error at offset: " + metadata.getOffset();
+        _segmentLogger.error(errorMessage, exception);
+        _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+            new SegmentErrorInfo(now(), errorMessage, exception));
+      } else {
+        if (!_firstDecodeErrorLogged) {
+          _segmentLogger.error("First decode error encountered at offset: {}. "
+              + "Subsequent errors will be silently dropped.", metadata.getOffset(), exception);
+          _firstDecodeErrorLogged = true;
+        }
+        _realtimeRowsDroppedMeter =
+            _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                _realtimeRowsDroppedMeter);
+        _numRowsErrored++;
+        _numBytesDropped += metadata.getRecordSerializedSize();
+      }
+    }
+
+    @Override
+    public void onTransformError(GenericRow row, StreamMessageMetadata metadata, Exception exception) {
+      reportRowError("transforming", row, metadata, exception);
+    }
+
+    @Override
+    public void onIndexError(GenericRow row, StreamMessageMetadata metadata, Exception exception) {
+      reportRowError("indexing", row, metadata, exception);
+    }
+
+    private void reportRowError(String operation, GenericRow row, StreamMessageMetadata metadata, Exception exception) {
+      _numRowsErrored++;
+      _numBytesDropped += metadata.getRecordSerializedSize();
+      String errorMessage = "Caught exception while " + operation + " the record at offset: " + metadata.getOffset()
+          + " , row: " + row;
+      _segmentLogger.error(errorMessage, exception);
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, exception));
+    }
+
+    @Override
+    public void onTransformResult(TransformPipeline.Result result, StreamMessageMetadata metadata) {
+      if (result.getSkippedRowCount() > 0) {
+        _realtimeRowsFilteredMeter =
+            _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
+                result.getSkippedRowCount(), _realtimeRowsFilteredMeter);
+        if (_trackFilteredMessageOffsets) {
+          _filteredMessageOffsets.add(metadata.getOffset().toString());
+        }
+      }
+      if (result.getIncompleteRowCount() > 0) {
+        _realtimeIncompleteRowsConsumedMeter =
+            _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
+                result.getIncompleteRowCount(), _realtimeIncompleteRowsConsumedMeter);
+      }
+      if (result.getSanitizedRowCount() > 0) {
+        _realtimeRowsSanitizedMeter =
+            _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_SANITIZED,
+                result.getSanitizedRowCount(), _realtimeRowsSanitizedMeter);
+      }
+    }
+
+    @Override
+    public void onRowIndexed(GenericRow row, StreamMessageMetadata metadata) {
+      _lastRowMetadata = metadata;
+      _lastConsumedTimestampMs = System.currentTimeMillis();
+      _realtimeRowsConsumedMeter =
+          _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
+              _realtimeRowsConsumedMeter);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
+
+      int recordSerializedValueLength = metadata.getRecordSerializedSize();
+      if (recordSerializedValueLength > 0) {
+        _realtimeBytesIngestedMeter =
+            _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_CONSUMED,
+                recordSerializedValueLength, _realtimeBytesIngestedMeter);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
+      }
+    }
   }
 
   @VisibleForTesting
@@ -2268,22 +2274,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _partitionGroupId = llcSegmentName.getPartitionGroupId();
-    List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(_tableConfig);
-    int numStreams = streamConfigMaps.size();
-    if (numStreams == 1) {
-      // Single stream
-      // NOTE: We skip partition id translation logic to handle cases where custom stream might return partition id
-      // larger than 10000.
-      _streamPartitionId = _partitionGroupId;
-      _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(0));
-    } else {
-      // Multiple streams
-      _streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
-      int index = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId);
-      Preconditions.checkState(numStreams > index, "Cannot find stream config of index: %s for table: %s", index,
-          _tableNameWithType);
-      _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(index));
-    }
+    _streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_tableConfig, _partitionGroupId);
+    _streamConfig =
+        new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig, _partitionGroupId));
     _decodeRetryTracker = new DecodeRetryTracker(_streamConfig);
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
@@ -2350,9 +2343,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .setOffHeap(_isOffHeap)
         .setMemoryManager(_memoryManager)
         .setStatsHistory(realtimeTableDataManager.getStatsHistory())
-        .setAggregateMetrics(indexingConfig.isAggregateMetrics())
-        .setIngestionAggregationConfigs(IngestionConfigUtils.getAggregationConfigs(tableConfig))
-        .setDefaultNullHandlingEnabled(_defaultNullHandlingEnabled)
+        .setIngestionSemantics(tableConfig)
         .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
         .setConsumerDir(consumerDir)
@@ -2362,30 +2353,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
 
     // Create message decoder
-    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
-    RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f);
-    AtomicReference<StreamDataDecoder> localStreamDataDecoder = new AtomicReference<>();
-    AtomicReference<String> localDecoderClassName = new AtomicReference<>();
     try {
-      retryPolicy.attempt(() -> {
-        try {
-          StreamMessageDecoder streamMessageDecoder = createMessageDecoder(fieldsToRead);
-          boolean isKeyBytesType = StreamDataDecoderImpl.isKeyBytesType(_schema);
-          localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder, isKeyBytesType));
-          localDecoderClassName.set(streamMessageDecoder.getClass().getName());
-          return true;
-        } catch (Exception e) {
-          _segmentLogger.warn("Failed to initialize the StreamMessageDecoder: ", e);
-          return false;
-        }
-      });
+      StreamDecoder decoder =
+          IngestionUtils.createStreamDecoder(_streamConfig, _tableConfig, _schema, _segmentLogger);
+      _streamDataDecoder = decoder.decoder();
+      _decoderClassName = decoder.decoderClassName();
     } catch (Exception e) {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
           new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
       throw e;
     }
-    _streamDataDecoder = localStreamDataDecoder.get();
-    _decoderClassName = localDecoderClassName.get();
 
     try {
       _transformPipeline = new TransformPipeline(tableConfig, schema);
@@ -2400,12 +2377,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
 
       // Initialize stopOnDecodeError configuration with proper validation
-      _stopOnDecodeError = parseStopOnDecodeErrorConfig(_streamConfig);
+      boolean stopOnDecodeError = parseStopOnDecodeErrorConfig(_streamConfig);
 
       makeStreamConsumer("Starting");
       createPartitionMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
+      _recordProcessor = new RealtimeIngestionRecordProcessor(_transformPipeline, _realtimeSegment, stopOnDecodeError,
+          _ingestionRecordListener);
       _resourceTmpDir = new File(resourceDataDir, RESOURCE_TEMP_DIR_NAME);
       if (!_resourceTmpDir.exists()) {
         _resourceTmpDir.mkdirs();
@@ -2527,53 +2506,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void setPartitionParameters(RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder,
       SegmentPartitionConfig segmentPartitionConfig) {
-    if (segmentPartitionConfig != null) {
-      Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-      if (columnPartitionMap.size() == 1) {
-        Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
-        String partitionColumn = entry.getKey();
-        ColumnPartitionConfig columnPartitionConfig = entry.getValue();
-        String partitionFunctionName = columnPartitionConfig.getFunctionName();
-
-        // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning when they
-        //       don't match, but use the one from the stream. The mismatch could happen when the stream partitions are
-        //       changed, but the table config has not been updated to reflect the change. In such case, picking the
-        //       number of partitions from the stream can keep the segment properly partitioned as long as the
-        //       partition function is not changed.
-        int numPartitions = columnPartitionConfig.getNumPartitions();
-        try {
-          // Use the total stream partition count as the partition function divisor. The upstream producer hashed each
-          // key over the full partition count, so the divisor must match that count for the per-segment partition
-          // metadata (and the partition pruning that relies on it) to be correct. fetchPartitionCount() returns that
-          // full count; computePartitionGroupMetadata().size() does not - when the table consumes only a subset of
-          // stream partitions it returns the subset size, which is wrong here.
-          // TODO: This is correct for Kafka, where partition ids are a stable contiguous range. It does not make
-          //   partitioning work for Kinesis, where shards split/merge and ids are not a contiguous 0..N range -
-          //   fetchPartitionCount() returns the total shard count there. Fix this before opening support for
-          //   partitioning in Kinesis.
-          int numStreamPartitions = _partitionMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/10_000);
-
-          if (numStreamPartitions != numPartitions) {
-            _segmentLogger.warn(
-                "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
-                    + "using number of stream " + "partitions", numStreamPartitions, numPartitions);
-            numPartitions = numStreamPartitions;
+    IngestionUtils.configureRealtimePartitioning(realtimeSegmentConfigBuilder, segmentPartitionConfig,
+        _partitionGroupId, _partitionMetadataProvider, 10_000, _segmentLogger, new PartitioningListener() {
+          @Override
+          public void onPartitionCountMismatch(int configuredCount, int streamCount) {
+            _segmentLogger.warn("Stream partition count {} differs from configured count {}; using stream count",
+                streamCount, configuredCount);
           }
-        } catch (Exception e) {
-          _segmentLogger.error("Failed to get number of stream partitions in 10s, "
-              + "using number of partitions in the partition config: {}", numPartitions, e);
-          createPartitionMetadataProvider("Timeout getting number of stream partitions");
-        }
 
-        realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
-        realtimeSegmentConfigBuilder.setPartitionFunction(
-            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
-                columnPartitionConfig.getFunctionConfig()));
-        realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
-      } else {
-        _segmentLogger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());
-      }
-    }
+          @Override
+          public void onPartitionCountFetchFailure(int configuredCount, Exception exception) {
+            _segmentLogger.error("Failed to get number of stream partitions in 10s; using configured count: {}",
+                configuredCount, exception);
+            createPartitionMetadataProvider("Timeout getting number of stream partitions");
+          }
+        });
   }
 
   /// Creates a new stream consumer
@@ -2674,22 +2621,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /// Creates a [StreamMessageDecoder] using properties in [StreamConfig].
-  ///
-  /// @param fieldsToRead The fields to read from the source stream
-  /// @return The initialized StreamMessageDecoder
-  private StreamMessageDecoder createMessageDecoder(Set<String> fieldsToRead) {
-    String decoderClass = _streamConfig.getDecoderClass();
-    try {
-      StreamMessageDecoder decoder = PluginManager.get().createInstance(decoderClass);
-      decoder.init(fieldsToRead, _streamConfig, _tableConfig, _schema);
-      return decoder;
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while creating StreamMessageDecoder from stream config: " + _streamConfig, e);
-    }
-  }
-
   @Override
   public MutableSegment getSegment() {
     return _realtimeSegment;
@@ -2721,21 +2652,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// @param streamConfig The stream configuration to parse
   /// @return true if stopOnDecodeError is enabled, false otherwise
   private boolean parseStopOnDecodeErrorConfig(StreamConfig streamConfig) {
-    String stopOnDecodeErrorConfig = streamConfig.getStreamConfigsMap().get(STOP_ON_DECODE_ERROR_CONFIG);
-    boolean stopOnDecodeError;
-    if (stopOnDecodeErrorConfig == null) {
-      // Default behavior when config is not provided: do not stop on decode error.
-      stopOnDecodeError = false;
-    } else if ("true".equalsIgnoreCase(stopOnDecodeErrorConfig)) {
-      stopOnDecodeError = true;
-    } else if ("false".equalsIgnoreCase(stopOnDecodeErrorConfig)) {
-      stopOnDecodeError = false;
-    } else {
-      // Invalid value; log and fall back to default to avoid silent misconfiguration.
-      _segmentLogger.warn("Invalid value '{}' for configuration '{}'; "
-          + "expected 'true' or 'false'. Defaulting to 'false'.", stopOnDecodeErrorConfig, STOP_ON_DECODE_ERROR_CONFIG);
-      stopOnDecodeError = false;
-    }
-    return stopOnDecodeError;
+    return RealtimeIngestionRecordProcessor.parseStopOnDecodeErrorConfig(streamConfig, _segmentLogger);
   }
 }
