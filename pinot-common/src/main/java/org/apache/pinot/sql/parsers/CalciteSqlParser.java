@@ -55,6 +55,7 @@ import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
@@ -84,6 +85,7 @@ import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateTable;
 import org.apache.pinot.sql.parsers.parser.SqlPinotShowMaterializedViews;
 import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
+import org.apache.pinot.sql.parsers.parser.Token;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -114,8 +116,9 @@ public class CalciteSqlParser {
   //
   // Multiple OPTIONs is also supported by:
   // `OPTION (<k1> = <v1>, <k2> = <v2>, <k3> = <v3>)`
+  // Start at OPTION itself so the unanchored search does not rescan leading whitespace.
   private static final Pattern OPTIONS_REGEX_PATTEN =
-      Pattern.compile("\\s*option\\s*\\(([^)]+)\\)\\s*;?\\s*\\Z", Pattern.CASE_INSENSITIVE);
+      Pattern.compile("option\\s*+\\(([^)]++)\\)\\s*+;?\\s*+\\Z", Pattern.CASE_INSENSITIVE);
 
   public static SqlNodeAndOptions compileToSqlNodeAndOptions(String sql)
       throws SqlCompilationException {
@@ -139,7 +142,7 @@ public class CalciteSqlParser {
       if (matcher.find()) {
         ignoredOptionsStart = matcher.start(1);
         ignoredOptionsEnd = matcher.end(1);
-        sql = sql.substring(0, matcher.start());
+        sql = stripLegacyOptionSuffix(sql, matcher.start());
       }
     } else {
       options = extractOptionsFromSql(sql);
@@ -200,46 +203,43 @@ public class CalciteSqlParser {
               + "'SET <key> = <value>;' statements instead: " + legacyOptions);
         }
       }
-      sql = sql.substring(0, matcher.start());
+      sql = stripLegacyOptionSuffix(sql, matcher.start());
     }
     try {
       Map<String, String> options = new HashMap<>();
       SqlParserImpl sqlParser = newSqlParser(sql);
-      int firstSeparator = sql.indexOf(';');
-      int lastInternalSeparator = sql.lastIndexOf(';', sql.endsWith(";") ? sql.length() - 2 : sql.length() - 1);
-      boolean hasInternalSeparator = lastInternalSeparator >= 0;
-      int kind = sqlParser.getToken(1).kind;
-      while (kind != SqlParserImplConstants.EOF) {
-        if (kind == SqlParserImplConstants.SET || kind == SqlParserImplConstants.RESET
-            || (kind == SqlParserImplConstants.ALTER
+      SqlParserPos lastSeparator = findLastInternalSeparator(sql);
+      Token token = sqlParser.getToken(1);
+      while (token.kind != SqlParserImplConstants.EOF) {
+        if (token.kind == SqlParserImplConstants.SET || token.kind == SqlParserImplConstants.RESET
+            || (token.kind == SqlParserImplConstants.ALTER
                 && (sqlParser.getToken(2).kind == SqlParserImplConstants.SESSION
                     || sqlParser.getToken(2).kind == SqlParserImplConstants.SYSTEM)
                 && (sqlParser.getToken(3).kind == SqlParserImplConstants.SET
                     || sqlParser.getToken(3).kind == SqlParserImplConstants.RESET))) {
           extractSetOption((SqlSetOption) sqlParser.SqlStmt(), options);
-          kind = sqlParser.getToken(1).kind;
-          if (kind != SqlParserImplConstants.EOF && kind != SqlParserImplConstants.SEMICOLON) {
+          token = sqlParser.getToken(1);
+          if (token.kind != SqlParserImplConstants.EOF && token.kind != SqlParserImplConstants.SEMICOLON) {
             throw new SqlCompilationException("Expected ';' after SET query option");
           }
         } else {
-          // A final semicolon cannot start a later SET statement. Other semicolons may occur in literals or comments,
-          // so use the lexer until consuming a real separator, then skip the remainder if no internal ones are left.
-          if (!hasInternalSeparator) {
+          // Skip the body if no later SET can follow. Otherwise use the lexer to distinguish statement separators
+          // from semicolons in literals and comments.
+          if (token.beginLine > lastSeparator.getLineNum()
+              || (token.beginLine == lastSeparator.getLineNum()
+                  && token.beginColumn > lastSeparator.getColumnNum())) {
             break;
           }
-          while (kind != SqlParserImplConstants.EOF && kind != SqlParserImplConstants.SEMICOLON) {
+          while (token.kind != SqlParserImplConstants.EOF && token.kind != SqlParserImplConstants.SEMICOLON) {
             sqlParser.getNextToken();
-            kind = sqlParser.getToken(1).kind;
+            token = sqlParser.getToken(1);
           }
         }
-        if (kind == SqlParserImplConstants.EOF) {
+        if (token.kind == SqlParserImplConstants.EOF) {
           break;
         }
         sqlParser.getNextToken();
-        if (firstSeparator == lastInternalSeparator) {
-          hasInternalSeparator = false;
-        }
-        kind = sqlParser.getToken(1).kind;
+        token = sqlParser.getToken(1);
       }
       Map<String, String> resolvedOptions = QueryOptionsUtils.resolveCaseInsensitiveOptions(options);
       if (!legacyOptions.isEmpty()) {
@@ -251,6 +251,25 @@ public class CalciteSqlParser {
       throw new SqlCompilationException(
           "Caught exception while extracting query options: " + sql + ": " + e.getMessage(), e);
     }
+  }
+
+  private static SqlParserPos findLastInternalSeparator(String sql) {
+    // A terminal semicolon cannot introduce another statement.
+    int offset = sql.lastIndexOf(';', sql.length() - 2);
+    if (offset < 0) {
+      return SqlParserPos.ZERO;
+    }
+    // Match JavaCC's CR, LF and CRLF line endings. newSqlParser sets the tab size to one.
+    int line = 1;
+    int lineStart = 0;
+    for (int i = 0; i < offset; i++) {
+      char c = sql.charAt(i);
+      if (c == '\n' || (c == '\r' && sql.charAt(i + 1) != '\n')) {
+        line++;
+        lineStart = i + 1;
+      }
+    }
+    return new SqlParserPos(line, offset - lineStart + 1);
   }
 
   private static void extractSetOption(SqlSetOption sqlNode, Map<String, String> options) {
@@ -984,7 +1003,19 @@ public class CalciteSqlParser {
   @Deprecated
   private static String removeOptionsFromSql(String sql) {
     Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
-    return matcher.replaceAll("");
+    return matcher.find() ? stripLegacyOptionSuffix(sql, matcher.start()) : sql;
+  }
+
+  private static String stripLegacyOptionSuffix(String sql, int optionStart) {
+    // Preserve the same ASCII whitespace removal as the old leading \s* in the suffix matcher.
+    while (optionStart > 0) {
+      char c = sql.charAt(optionStart - 1);
+      if (c != ' ' && (c < '\t' || c > '\r')) {
+        break;
+      }
+      optionStart--;
+    }
+    return sql.substring(0, optionStart);
   }
 
   @Deprecated

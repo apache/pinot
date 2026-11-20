@@ -981,6 +981,7 @@ public class CalciteSqlCompilerTest {
         "sEt \"TiMeOuTmS\" = '120000'; SELECT * FROM foo",
         "SET timeoutMs=120000; SELECT * FROM foo; SET timeoutMs=240000;",
         "SELECT * FROM foo OPTION(timeoutMs=300000, trace=true); -- trailing comment",
+        "SELECT * FROM foo\u000BOPTION(timeoutMs=300000)",
         "SET timeoutMs=120000; SELECT * FROM foo OPTION(timeoutMs=300000, trace=true)",
         "SET \"custom:key\"='a:b;''c'; SELECT \"col:;\"\"name\", 'it''s; SET timeoutMs=7;' FROM foo; "
             + "/* SET timeoutMs=8; */ SET /* comment */ timeoutMs=120000; -- SET timeoutMs=9;",
@@ -996,6 +997,9 @@ public class CalciteSqlCompilerTest {
 
     expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToSqlNodeAndOptions(sql));
     assertEquals(CalciteSqlParser.extractQueryOptions(sql), Map.of("timeoutMs", "120000", "trace", "true"));
+
+    String multiSet = "SET timeoutMs=120000;\r\nSET trace=true;\r\tSELECT /* unterminated comment";
+    assertEquals(CalciteSqlParser.extractQueryOptions(multiSet), Map.of("timeoutMs", "120000", "trace", "true"));
   }
 
   @Test

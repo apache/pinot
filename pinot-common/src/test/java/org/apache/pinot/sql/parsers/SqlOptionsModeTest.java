@@ -56,6 +56,7 @@ public class SqlOptionsModeTest {
   public void testIgnoredLegacyOptionSyntaxIsStrippedAndDropped() {
     QueryOptionsUtils.setLegacyOptionSyntaxMode(SqlOptionsMode.IGNORE);
     assertEquals(sqlOptionsOf("select * from vegetables OPTION(timeoutMs=1000)"), Map.of());
+    assertEquals(CalciteSqlParser.extractQueryOptions("select * from vegetables OPTION(timeoutMs=1000)"), Map.of());
     // INSERT is unaffected: its suffix is dropped silently, as always
     assertEquals(sqlOptionsOf("INSERT INTO db.tbl FROM FILE 'file:///tmp/file1' OPTION(taskName=myTask-1)"), Map.of());
     // SET statements are unaffected
@@ -86,6 +87,8 @@ public class SqlOptionsModeTest {
     for (String sql : List.of("select * from vegetables OPTION(timeoutMs=1000)",
         "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1' OPTION(taskName=myTask-1)")) {
       SqlCompilationException e = expectThrows(SqlCompilationException.class, () -> sqlOptionsOf(sql));
+      assertEquals(expectThrows(SqlCompilationException.class,
+          () -> CalciteSqlParser.extractQueryOptions(sql)).getMessage(), e.getMessage());
       assertTrue(e.getMessage().contains("OPTION(...)"), e.getMessage());
       assertTrue(e.getMessage().contains("SET"), e.getMessage());
     }
