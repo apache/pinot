@@ -326,6 +326,8 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
           return false;
         }
       }, 1000L, WAIT_MS, "reload job finished");
+      // Check as soon as the reload finished, and again once the cluster has settled
+      assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
       waitForClusterStateSettled(rtTable, WAIT_MS);
       assertRows(rowsQuery(table), expectedRows(PHASE2_BASE_TS));
     }

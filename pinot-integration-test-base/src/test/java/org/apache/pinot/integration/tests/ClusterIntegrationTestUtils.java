@@ -109,8 +109,9 @@ public class ClusterIntegrationTestUtils {
   /// Values are compared as the Avro values render, so each Avro field type must match the Pinot stored type of the
   /// column (e.g. an Avro float in a DOUBLE column fails with a confusing diff).
   ///
-  /// This is a test oracle and deliberately does not use the upsert code under test. It covers plain full upsert
-  /// only: no delete column, no partial-upsert merge, no null or bytes values. Two records of a key with the same
+  /// This is a test oracle and deliberately does not use the upsert code under test. It covers full upsert, and
+  /// partial upsert when every selected column uses OVERWRITE (out-of-order records are not merged, and the latest
+  /// record per key carries every value): no delete column, no null or bytes values. Two records of a key with the same
   /// largest comparison value fail it, since which one wins depends on the order of stream partitions and uploaded
   /// segments.
   @SuppressWarnings({"rawtypes", "unchecked"})

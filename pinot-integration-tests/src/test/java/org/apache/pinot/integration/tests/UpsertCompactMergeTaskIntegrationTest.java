@@ -381,7 +381,9 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
   /// Verifies that the merge kept exactly the latest row per player, with every column.
   private void verifyDataIntegrityAfterMerge()
       throws Exception {
-    // The merged segments replace the originals, so wait until every server serves the new assignment
+    // Queries see the table while the merged segments replace the originals: check right after the task, and again
+    // once every server serves the new assignment
+    assertRows(gameScoresRowsQuery(SCHEMA_NAME), GAME_SCORES_WINNERS);
     waitForClusterStateSettled(REALTIME_TABLE_NAME, 600_000L);
     assertRows(gameScoresRowsQuery(SCHEMA_NAME), GAME_SCORES_WINNERS);
   }

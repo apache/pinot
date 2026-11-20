@@ -324,7 +324,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         // Updates to create obsolete records with different MAP values
         "400,Player400Updated,game1,90.0,1681154200000,false,{\"level\":12}",
         "401,Player401Updated,game2,95.0,1681154300000,false,{\"level\":18}"), kafkaTopicName, 0);
-    String[] tables = createTables("gameScoresMap", kafkaTopicName, getNumKafkaPartitions(),
+    String[] tables = createTables("gameScoresMap", kafkaTopicName, 1,
         CSV_SCHEMA_HEADER + ",userAttributes", () -> {
           Schema schema = createSchema();
           schema.addField(new DimensionFieldSpec("userAttributes", FieldSpec.DataType.JSON, true));

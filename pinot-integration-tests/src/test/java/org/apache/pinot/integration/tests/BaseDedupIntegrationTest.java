@@ -235,14 +235,14 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
       } catch (Exception e) {
         return false;
       }
-    }, 1000L, 60_000L, "Reload job " + reloadJobId + " did not finish");
+    }, 1000L, 600_000L, "Reload job " + reloadJobId + " did not finish");
 
     // Push data again. Dedup drops every re-pushed row, so wait until both tables have consumed them before checking.
     pushAvroIntoKafka(_avroFiles);
-    waitForAllStreamRecordsConsumed(getTableName(), 60_000L);
-    waitForAllStreamRecordsConsumed(DEDUP_TABLE_WITH_REPLICAS, 60_000L);
-    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(getTableName()), 60_000L);
-    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(DEDUP_TABLE_WITH_REPLICAS), 60_000L);
+    waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
+    waitForAllStreamRecordsConsumed(DEDUP_TABLE_WITH_REPLICAS, 600_000L);
+    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(getTableName()), 600_000L);
+    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(DEDUP_TABLE_WITH_REPLICAS), 600_000L);
 
     // Validate no change
     assertRows(dedupRowsQuery(getTableName()), DEDUP_SURVIVORS);

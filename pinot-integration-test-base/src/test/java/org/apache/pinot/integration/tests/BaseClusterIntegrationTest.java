@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -107,7 +108,6 @@ import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -115,7 +115,7 @@ import static org.testng.Assert.assertTrue;
 
 /// Shared implementation details of the cluster integration tests.
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
-  /// Queries [#assertRowsFromEveryReplica] sends at most; the broker alternates replica groups per request.
+  /// Queries [#assertRowsFromEveryReplica] sends at most; the broker alternates replicas per request.
   private static final int MAX_QUERIES_TO_REACH_EVERY_REPLICA = 20;
   // Default settings
   protected static final String DEFAULT_TABLE_NAME = "mytable";
@@ -1111,20 +1111,30 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return rendered;
   }
 
-  /// Asserts the rows of a query on a REALTIME table until every server the IdealState assigns the table to has
-  /// answered at least once. The broker picks the replica group per request id; the routing table of the request id
-  /// each response reports names the servers that answered it.
+  /// Asserts the rows of a single-stage query on a REALTIME table until every replica of every segment has served
+  /// it: every (segment, instance) pair the IdealState has ONLINE or CONSUMING. The broker picks the replica per
+  /// request id, and the routing table of the request id each response reports names the replicas that served it.
+  /// Needs a broker started by this test, and a deterministic instance selector (no adaptive server selection).
+  /// Settle the cluster first, so the routing does not change between a query and its lookup.
   protected void assertRowsFromEveryReplica(@Language("sql") String query, List<List<Object>> expectedRows)
       throws Exception {
+    Preconditions.checkState(!useMultiStageQueryEngine(), "Replica routing is looked up for single-stage queries");
+    Preconditions.checkState(!_brokerStarters.isEmpty(), "Needs a broker started by this test");
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
     String realtimeTableName =
         TableNameBuilder.REALTIME.tableNameWithType(brokerRequest.getQuerySource().getTableName());
-    Set<String> servers = new TreeSet<>();
-    getHelixResourceManager().getTableIdealState(realtimeTableName).getRecord().getMapFields().values()
-        .forEach(instanceStates -> servers.addAll(instanceStates.keySet()));
+    IdealState idealState = getHelixResourceManager().getTableIdealState(realtimeTableName);
+    Preconditions.checkState(idealState != null, "No REALTIME table %s for query: %s", realtimeTableName, query);
+    Set<String> replicas = new TreeSet<>();
+    idealState.getRecord().getMapFields().forEach((segment, instanceStates) -> instanceStates.forEach(
+        (instance, state) -> {
+          if (SegmentStateModel.ONLINE.equals(state) || SegmentStateModel.CONSUMING.equals(state)) {
+            replicas.add(segment + "@" + instance);
+          }
+        }));
     List<String> expected = toJsonRows(expectedRows);
-    Set<String> answered = new TreeSet<>();
-    for (int i = 0; i < MAX_QUERIES_TO_REACH_EVERY_REPLICA && !answered.equals(servers); i++) {
+    Set<String> served = new TreeSet<>();
+    for (int i = 0; i < MAX_QUERIES_TO_REACH_EVERY_REPLICA && !served.containsAll(replicas); i++) {
       JsonNode response = postQuery(query);
       List<String> actual = toRows(query, response);
       if (!actual.equals(expected)) {
@@ -1133,11 +1143,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       RoutingTable routingTable = _brokerStarters.get(0).getRoutingManager()
           .getRoutingTable(brokerRequest, realtimeTableName, Long.parseLong(response.get("requestId").asText()));
       if (routingTable != null) {
-        routingTable.getServerInstanceToSegmentsMap().keySet()
-            .forEach(serverInstance -> answered.add(serverInstance.getInstanceId()));
+        routingTable.getServerInstanceToSegmentsMap().forEach((serverInstance, segmentsToQuery) -> {
+          segmentsToQuery.getSegments().forEach(segment -> served.add(segment + "@" + serverInstance.getInstanceId()));
+          segmentsToQuery.getOptionalSegments()
+              .forEach(segment -> served.add(segment + "@" + serverInstance.getInstanceId()));
+        });
       }
     }
-    assertEquals(answered, servers, "Not every server of " + realtimeTableName + " answered: " + query);
+    Set<String> missing = new TreeSet<>(replicas);
+    missing.removeAll(served);
+    assertTrue(missing.isEmpty(), "Replicas of " + realtimeTableName + " that never served the query " + query
+        + " in " + MAX_QUERIES_TO_REACH_EVERY_REPLICA + " tries: " + missing);
   }
 
   /// Asserts that the query returns exactly the expected rows, in order. The query should have an `ORDER BY` and a
