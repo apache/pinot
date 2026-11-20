@@ -609,7 +609,7 @@
           "\n  PhysicalSort(sort0=[$1], dir0=[DESC], fetch=[10])",
           "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
           "\n      PhysicalSort(sort0=[$1], dir0=[DESC], fetch=[10])",
-          "\n        PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], leafReturnFinalResult=[true], limit=[10])",
+          "\n        PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], leafReturnFinalResult=[true], collations=[[1 DESC]], limit=[10])",
           "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
           "\n            PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[LEAF], leafReturnFinalResult=[true], collations=[[1 DESC]], limit=[10])",
           "\n              PhysicalFilter(condition=[>=($2, 0)])",
@@ -627,7 +627,7 @@
           "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
           "\n      PhysicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
           "\n        PhysicalProject(cnt=[$1])",
-          "\n          PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], limit=[10])",
+          "\n          PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], collations=[[1 DESC]], limit=[10])",
           "\n            PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
           "\n              PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[LEAF], collations=[[1 DESC]], limit=[10])",
           "\n                PhysicalFilter(condition=[>=($2, 0)])",
@@ -687,6 +687,22 @@
         ]
       },
       {
+        "description": "Distinct with order by and limit keeps the ordering on the final aggregate",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT DISTINCT col3 FROM a ORDER BY col3 DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n      PhysicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
+          "\n        PhysicalAggregate(group=[{0}], aggType=[FINAL], collations=[[0 DESC]], limit=[10])",
+          "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n            PhysicalAggregate(group=[{2}], aggType=[LEAF], collations=[[0 DESC]], limit=[10])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "SQL hint based group by optimization with group trim enabled and offset pushes down offset + fetch",
         "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_enable_group_trim='true') */ COUNT(DISTINCT col2) AS cnt FROM a WHERE a.col3 >= 0 GROUP BY col1 ORDER BY cnt DESC LIMIT 10 OFFSET 5",
         "output": [
@@ -696,7 +712,7 @@
           "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
           "\n      PhysicalSort(sort0=[$0], dir0=[DESC], fetch=[15])",
           "\n        PhysicalProject(cnt=[$1])",
-          "\n          PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], limit=[15])",
+          "\n          PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], collations=[[1 DESC]], limit=[15])",
           "\n            PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
           "\n              PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[LEAF], collations=[[1 DESC]], limit=[15])",
           "\n                PhysicalFilter(condition=[>=($2, 0)])",

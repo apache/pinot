@@ -27,7 +27,6 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
@@ -270,9 +269,10 @@ public class AggregatePushdownRule extends PRelOptRule {
     PhysicalExchange n1 = new PhysicalExchange(o1.getNodeId(), n2,
         o1.getPinotDataDistributionOrThrow().apply(mapFromInputToPartialAgg), newDistKeys, o1.getExchangeStrategy(),
         newCollation, PinotExecStrategyTrait.getDefaultExecStrategy(), o1.getHashFunction());
+    // The collations index the aggregate output, whose group keys and aggregate calls the final aggregate keeps in
+    // the same order. They must not be remapped with the input to partial aggregate mapping.
     return convertAggFromIntermediateInput(aggPRelNode, n1, AggType.FINAL, leafReturnFinalResult,
-        PinotDistMapping.apply(RelCollations.of(o0.getCollations()), mapFromInputToPartialAgg).getFieldCollations(),
-        aggPRelNode.getLimit(), idGenerator);
+        aggPRelNode.getCollations(), aggPRelNode.getLimit(), idGenerator);
   }
 
   // TODO: Currently it only handles one WITHIN GROUP collation across all AggregateCalls.
