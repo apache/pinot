@@ -142,23 +142,6 @@ public class SimpleColumnMetadata implements ColumnMetadata {
     return false;
   }
 
-  @Nullable
-  @Override
-  public String getTransformFunction() {
-    return null;
-  }
-
-  @Override
-  public int getTransformFunctionProvenanceVersion() {
-    return UNAVAILABLE;
-  }
-
-  @Nullable
-  @Override
-  public String getTransformFunctionFingerprint() {
-    return null;
-  }
-
   @Override
   public int getNumIndexes() {
     return 0;

@@ -31,13 +31,25 @@ public interface DefaultColumnHandler {
   void updateDefaultColumns()
       throws Exception;
 
+  /// Runs the invalidation hook before publishing replacements for existing transform-derived columns.
+  default void updateDefaultColumns(BeforePublish beforePublish)
+      throws Exception {
+    beforePublish.invalidate(getColumnsWithPendingTransformValueChanges());
+    updateDefaultColumns();
+  }
+
+  @FunctionalInterface
+  interface BeforePublish {
+    void invalidate(Set<String> changingColumns)
+        throws Exception;
+  }
+
   /// Check if there is a need to add/remove/update the auto-generated default columns
   /// for the segment, according to the current table schema.
   /// @return true if there is a need to update.
   boolean needUpdateDefaultColumns();
 
-  /// Columns whose pending update will regenerate values with a changed transform expression. Indexes built over
-  /// their values must be invalidated before the update runs.
+  /// Existing columns whose pending update will regenerate values from a changed expression or input.
   default Set<String> getColumnsWithPendingTransformValueChanges() {
     return Set.of();
   }

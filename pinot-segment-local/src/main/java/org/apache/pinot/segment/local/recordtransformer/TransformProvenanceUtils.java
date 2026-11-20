@@ -32,6 +32,8 @@ import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.function.FunctionEvaluator;
@@ -40,7 +42,8 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 /// Computes dependency-aware transform provenance for persisted derived columns.
 public final class TransformProvenanceUtils {
-  public static final int CURRENT_VERSION = 2;
+  public static final int CURRENT_VERSION =
+      V1Constants.MetadataKeys.Column.DEPENDENCY_AWARE_TRANSFORM_PROVENANCE_VERSION;
 
   private TransformProvenanceUtils() {
   }
@@ -80,13 +83,28 @@ public final class TransformProvenanceUtils {
     return closure;
   }
 
+  /// Only formats understood by this reader can establish the origin of persisted values.
+  public static boolean hasKnownProvenance(ColumnMetadata columnMetadata) {
+    int version = columnMetadata.getTransformFunctionProvenanceVersion();
+    if (version == V1Constants.MetadataKeys.Column.DIRECT_TRANSFORM_PROVENANCE_VERSION) {
+      return columnMetadata.getTransformFunction() != null
+          && columnMetadata.getTransformFunctionFingerprint() == null;
+    }
+    if (version != CURRENT_VERSION) {
+      return false;
+    }
+    String fingerprint = columnMetadata.getTransformFunctionFingerprint();
+    return columnMetadata.getTransformFunction() == null ? fingerprint == null
+        : ColumnMetadataImpl.isValidTransformFunctionFingerprint(fingerprint);
+  }
+
   /// Returns whether known stored provenance differs from the current expression graph. Version-1 metadata tracked
   /// only the direct expression, so it can safely detect only direct changes. Rebuilding an unchanged version-1 column
   /// merely to upgrade its provenance could overwrite values that depended on an authoritative, unpersisted
   /// intermediate transform output.
   public static boolean hasTransformChanged(ColumnMetadata columnMetadata, @Nullable String currentExpression,
       @Nullable String currentFingerprint) {
-    if (columnMetadata.getTransformFunctionProvenanceVersion() == ColumnMetadata.UNAVAILABLE) {
+    if (!hasKnownProvenance(columnMetadata)) {
       return false;
     }
     if (!Objects.equals(columnMetadata.getTransformFunction(), currentExpression)) {

@@ -168,9 +168,9 @@ public class SegmentPreProcessor implements AutoCloseable {
       DefaultColumnHandler defaultColumnHandler =
           DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, segmentMetadata, _indexLoadingConfig,
               segmentWriter, _segmentDirectory);
-      invalidateIndexesOverChangingColumns(indexDir, segmentMetadata,
-          defaultColumnHandler.getColumnsWithPendingTransformValueChanges());
-      defaultColumnHandler.updateDefaultColumns();
+      SegmentMetadataImpl metadataBeforeColumnUpdate = segmentMetadata;
+      defaultColumnHandler.updateDefaultColumns(
+          columns -> invalidateIndexesOverChangingColumns(indexDir, metadataBeforeColumnUpdate, columns));
       _segmentDirectory.reloadMetadata();
 
       // Resolve per-key index configs for OPEN_STRUCT child columns so index handlers don't strip

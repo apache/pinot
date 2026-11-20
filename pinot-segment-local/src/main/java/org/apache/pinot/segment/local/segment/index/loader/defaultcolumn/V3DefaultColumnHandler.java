@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -64,7 +65,13 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     if (!createColumnV1Indices(column)) {
       return false;
     }
-    // Write index to V3 format
+    publishColumnIndices(column, _indexDir);
+    return true;
+  }
+
+  @Override
+  protected void publishColumnIndices(String column, File columnIndexDir)
+      throws IOException {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     Preconditions.checkNotNull(fieldSpec);
     boolean isSingleValue = fieldSpec.isSingleValueField();
@@ -72,17 +79,19 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     File invertedIndexFile = null;
 
     if (isSingleValue) {
-      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+      forwardIndexFile = new File(columnIndexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       if (!forwardIndexFile.exists()) {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+        forwardIndexFile =
+            new File(columnIndexDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
       if (!forwardIndexFile.exists()) {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+        forwardIndexFile = new File(columnIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
     } else {
-      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+      forwardIndexFile =
+          new File(columnIndexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
       if (!forwardIndexFile.exists()) {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
+        forwardIndexFile = new File(columnIndexDir, column + V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
       }
       if (!forwardIndexFile.exists() && isForwardIndexDisabled(column)) {
         // A forward-index-disabled multi-value DEFAULT column is written as an inverted index instead of a forward
@@ -90,7 +99,7 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
         // forward index -- ForwardIndexHandler drops it in its post-update cleanup once the inverted index has been
         // built from it -- so the on-disk file, not the config, decides which one to transfer here.
         forwardIndexFile = null;
-        invertedIndexFile = new File(_indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+        invertedIndexFile = new File(columnIndexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
       }
     }
 
@@ -101,15 +110,14 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, invertedIndexFile, StandardIndexes.inverted());
     }
 
-    File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
+    File dictionaryFile = new File(columnIndexDir, column + V1Constants.Dict.FILE_EXTENSION);
     if (dictionaryFile.exists()) {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
     }
 
-    File nullValueVectorFile = new File(_indexDir, column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
+    File nullValueVectorFile = new File(columnIndexDir, column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
     if (nullValueVectorFile.exists()) {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, nullValueVectorFile, StandardIndexes.nullValueVector());
     }
-    return true;
   }
 }

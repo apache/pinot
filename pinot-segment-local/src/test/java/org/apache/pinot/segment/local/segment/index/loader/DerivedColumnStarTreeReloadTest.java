@@ -152,6 +152,24 @@ public class DerivedColumnStarTreeReloadTest {
     }
   }
 
+  @Test
+  public void testToleratedBuildFailurePreservesTheExistingStarTree()
+      throws Exception {
+    File indexDir = buildBaseSegment("failureBeforeRewrite");
+    Schema schema = schemaWithDerived();
+    preprocess(indexDir, tableConfig(ORIGINAL_TRANSFORM, true), schema);
+    byte[] originalTree = FileUtils.readFileToByteArray(findStarTreeIndex(indexDir));
+
+    preprocess(indexDir, tableConfig("concat('invalid', src)", false), schema);
+    assertEquals(new SegmentMetadataImpl(indexDir).getColumnMetadataFor(DERIVED).getTransformFunction(),
+        ORIGINAL_TRANSFORM);
+    assertEquals(FileUtils.readFileToByteArray(findStarTreeIndex(indexDir)), originalTree);
+    assertEquals(readStarTreeGrandTotal(indexDir), 63L);
+
+    preprocess(indexDir, tableConfig(UPDATED_TRANSFORM, true), schema);
+    assertEquals(readStarTreeGrandTotal(indexDir), 66L);
+  }
+
   /// A failure between the column rewrite and the star-tree rebuild, like a crash there, must not leave a tree over the
   /// old values: the tree is deleted before the rewrite, so the next load builds it from the new ones.
   @Test
