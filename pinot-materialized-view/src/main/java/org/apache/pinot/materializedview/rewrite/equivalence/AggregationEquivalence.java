@@ -87,6 +87,14 @@ public interface AggregationEquivalence {
   @Nullable
   Expression rewrite(Expression userAggExpression, String materializedViewColumnName);
 
+  /// Returns `true` if the user and MV operands are compatible beyond the function-name match.
+  /// For sketch families this rejects rewrites whose requested precision exceeds the precision
+  /// of the stored sketch, which merging cannot recover. Defaults to `true`.
+  default boolean operandsCompatible(@Nullable List<Expression> userOperands,
+      @Nullable List<Expression> materializedViewOperands) {
+    return true;
+  }
+
   /// Extracts trailing LITERAL operands from the user aggregation expression.
   /// These are configuration parameters (e.g. `log2m` for HLL functions)
   /// that may have been injected by broker overrides such as
