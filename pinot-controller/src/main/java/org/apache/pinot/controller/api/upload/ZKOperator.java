@@ -46,7 +46,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -348,7 +347,7 @@ public class ZKOperator {
             "New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing "
                 + "segment {}", newCrc, existingCrc, segmentName);
         if (finalSegmentLocationURI != null) {
-          invalidateStaleMetadataTar(segmentName, uploadType, sourceDownloadURIStr, finalSegmentLocationURI);
+          invalidateStaleMetadataTar(segmentName, finalSegmentLocationURI);
           copySegmentToDeepStore(tableNameWithType, segmentName, uploadType, segmentFile, sourceDownloadURIStr,
               finalSegmentLocationURI);
         }
@@ -685,18 +684,13 @@ public class ZKOperator {
   }
 
   /// A refresh replaces the full segment, so a sidecar left by the previous build would describe the wrong bytes (a
-  /// metadata push trusts an existing sidecar). The exception is a METADATA push whose own sidecar (next to the source
-  /// tar, describing the bytes about to be copied) is exactly the file we would delete: it is kept. This runs for every
-  /// refresh regardless of the preserve flags because batch jobs write sidecars independent of them. Failing to
-  /// invalidate fails the refresh.
-  private void invalidateStaleMetadataTar(String segmentName, FileUploadType uploadType, String sourceDownloadURIStr,
-      URI finalSegmentLocationURI)
+  /// metadata push trusts an existing sidecar). It is deleted even when the push staged its own sidecar next to the
+  /// source tar: matching paths do not show that the sidecar describes the incoming build, because the request
+  /// metadata may have been extracted from the tar instead. This runs for every refresh regardless of the preserve
+  /// flags because batch jobs write sidecars independent of them. Failing to invalidate fails the refresh.
+  private void invalidateStaleMetadataTar(String segmentName, URI finalSegmentLocationURI)
       throws Exception {
     URI metadataTarURI = URIUtils.getUri(finalSegmentLocationURI + Constants.METADATA_TAR_GZ_FILE_EXT);
-    if (uploadType == FileUploadType.METADATA
-        && SegmentPushUtils.generateSegmentMetadataURI(sourceDownloadURIStr, segmentName).equals(metadataTarURI)) {
-      return;
-    }
     PinotFS pinotFS = PinotFSFactory.create(finalSegmentLocationURI.getScheme());
     if (pinotFS.exists(metadataTarURI)) {
       Preconditions.checkState(pinotFS.delete(metadataTarURI, true), "Failed to delete stale metadata tar: %s",
