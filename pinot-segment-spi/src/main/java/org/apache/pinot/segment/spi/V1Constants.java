@@ -207,6 +207,8 @@ public class V1Constants {
       public static final String TRANSFORM_FUNCTION_PROVENANCE_VERSION = "transformFunctionProvenanceVersion";
       // Optional dependency-aware fingerprint for the transform expression graph.
       public static final String TRANSFORM_FUNCTION_FINGERPRINT = "transformFunctionFingerprint";
+      public static final int DIRECT_TRANSFORM_PROVENANCE_VERSION = 1;
+      public static final int DEPENDENCY_AWARE_TRANSFORM_PROVENANCE_VERSION = 2;
 
       // Optional. The parent column name for columns materialized from an OPEN_STRUCT index.
       // E.g. for column metrics$cpu with parent metrics:

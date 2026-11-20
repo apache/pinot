@@ -756,6 +756,29 @@ public class ColumnMetadataImplTest {
   }
 
   @Test
+  public void malformedTransformProvenanceKeepsColumnReadable() {
+    PropertiesConfiguration config = baseConfig("col");
+    String version = Column.getKeyFor("col", Column.TRANSFORM_FUNCTION_PROVENANCE_VERSION);
+    String expression = Column.getKeyFor("col", Column.TRANSFORM_FUNCTION_BASE64);
+    String fingerprint = Column.getKeyFor("col", Column.TRANSFORM_FUNCTION_FINGERPRINT);
+    config.setProperty(version, 2);
+    config.setProperty(expression, "!!!");
+    assertEquals(ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col")
+        .getTransformFunctionProvenanceVersion(), ColumnMetadata.UNAVAILABLE);
+
+    config.setProperty(expression, Base64.getEncoder().encodeToString(new byte[]{(byte) 0xff}));
+    assertEquals(ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col")
+        .getTransformFunctionProvenanceVersion(), ColumnMetadata.UNAVAILABLE);
+
+    config.setProperty(expression, Base64.getEncoder().encodeToString("plus(x, 1)".getBytes(StandardCharsets.UTF_8)));
+    config.setProperty(fingerprint, "corrupt fingerprint");
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+    assertEquals(metadata.getTransformFunctionProvenanceVersion(), ColumnMetadata.UNAVAILABLE);
+    assertNull(metadata.getTransformFunction());
+    assertEquals(metadata.getCardinality(), 1);
+  }
+
+  @Test
   public void rawTransformFunctionFallbackSupportsIntermediateArtifacts() {
     String transformFunction = "Groovy({x + ',' + y}, x, y)";
     String escapedTransformFunction =
