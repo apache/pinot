@@ -44,6 +44,7 @@ import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
@@ -57,11 +58,14 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
+import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
+import org.apache.pinot.calcite.rex.PinotRexExecutor;
+import org.apache.pinot.calcite.rex.SearchSealer;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
@@ -93,6 +97,7 @@ import org.apache.pinot.query.planner.spi.Phase;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.query.validate.GroupByAliasShadowedByColumnException;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -143,6 +148,8 @@ public class QueryEnvironment {
   private final FrameworkConfig _config;
   private final CalciteCatalogReader _catalogReader;
   private final HepProgram _optProgram;
+  // Same as _optProgram, but rewrites ANY_VALUE(expr) to ANY_VALUE(expr, 'dataType') as well
+  private final HepProgram _inferAnyValueTypeOptProgram;
   private final Config _envConfig;
   private final PinotCatalog _catalog;
   private final Set<String> _defaultDisabledPlannerRules;
@@ -167,7 +174,9 @@ public class QueryEnvironment {
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     _defaultDisabledPlannerRules = _envConfig.defaultDisabledPlannerRules();
     // default optProgram with no skip rule options and no use rule options
-    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules);
+    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, false);
+    _inferAnyValueTypeOptProgram =
+        getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, true);
     _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
@@ -194,7 +203,8 @@ public class QueryEnvironment {
       _catalog.configureVirtualColumnExclusion(true);
     }
 
-    HepProgram optProgram = _optProgram;
+    boolean inferAnyValueType = QueryOptionsUtils.isInferAnyValueType(options);
+    HepProgram optProgram = inferAnyValueType ? _inferAnyValueTypeOptProgram : _optProgram;
     Set<String> useRuleSet = new HashSet<>(QueryOptionsUtils.getUsePlannerRules(options));
     if (Boolean.parseBoolean(options.get(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {
       useRuleSet.add(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE);
@@ -203,7 +213,8 @@ public class QueryEnvironment {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
       if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules);
+        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules,
+            inferAnyValueType);
       }
     }
     int sortExchangeCopyLimit = QueryOptionsUtils.getSortExchangeCopyThreshold(options,
@@ -344,6 +355,20 @@ public class QueryEnvironment {
     }
   }
 
+  /// Validates the query without converting or optimizing it, which costs less than [#compile(String,
+  /// SqlNodeAndOptions)]. The validation changes the parsed query.
+  ///
+  /// @throws QueryException if the query does not validate, e.g. because of an invalid query option
+  public void validate(SqlNodeAndOptions sqlNodeAndOptions) {
+    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
+      validate(sqlNodeAndOptions.getSqlNode(), plannerContext);
+    } catch (QueryException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(e.getMessage(), e);
+    }
+  }
+
   /// Results of planning a query
   public static class QueryPlannerResult {
     private final DispatchableSubPlan _dispatchableSubPlan;
@@ -419,6 +444,19 @@ public class QueryEnvironment {
   /// in case it was legal to apply an automatic cast for these types!).
   private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
     try {
+      return validateAndClassifyErrors(sqlNode, plannerContext);
+    } catch (QueryException e) {
+      if (e.getErrorCode() == QueryErrorCode.QUERY_VALIDATION
+          && plannerContext.getValidator().isGroupByNameResolvedToShadowedColumn()) {
+        // Lets callers retry with preferSelectAliasInGroupBy
+        throw new GroupByAliasShadowedByColumnException(e);
+      }
+      throw e;
+    }
+  }
+
+  private SqlNode validateAndClassifyErrors(SqlNode sqlNode, PlannerContext plannerContext) {
+    try {
       SqlNode validated = plannerContext.getValidator().validate(sqlNode);
       if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
@@ -446,14 +484,23 @@ public class QueryEnvironment {
   ///
   /// It is important to notice that the returned tree is not yet [optimized][#optimize(RelRoot, PlannerContext)].
   private RelRoot toRelation(SqlNode sqlNode, PlannerContext plannerContext) {
+    RelOptPlanner planner = plannerContext.getRelOptPlanner();
+    RexExecutor originalExecutor = planner.getExecutor();
+    if (originalExecutor == null) {
+      // SqlToRelConverter transforms its RelBuilder, discarding executors provided only through the builder context.
+      // Install on the per-query planner so conversion and field trimming can reuse compiled cast templates.
+      planner.setExecutor(PinotRexExecutor.INSTANCE);
+    }
     try {
       RexBuilder rexBuilder = new RexBuilder(_typeFactory);
       RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
+      SearchSealer searchSealer = plannerContext.getSearchSealer();
       SqlToRelConverter converter =
           new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
               PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
       RelRoot relRoot;
-      try {
+      // Large IN lists skip SqlToRelConverter's expansion into OR; PinotConvertletTable builds one SEARCH for each.
+      try (SearchSealer.MarkedInLists ignored = searchSealer.markInLists(sqlNode)) {
         relRoot = converter.convertQuery(sqlNode, false, true);
       } catch (Throwable e) {
         throw new RuntimeException("Failed to convert query to relational expression:\n" + sqlNode, e);
@@ -475,12 +522,17 @@ public class QueryEnvironment {
       } catch (Throwable e) {
         throw new RuntimeException("Failed to trim unused fields from query:\n" + RelOptUtil.toString(rootNode), e);
       }
+      // Hide the large SEARCH calls from the optimizer. SearchSealer#unseal restores them at the end of optimize().
+      rootNode = searchSealer.seal(rootNode);
       return relRoot.withRel(rootNode);
     } catch (QueryException e) {
       throw e;
     } catch (Throwable e) {
       throw QueryErrorCode.QUERY_PLANNING.asException(
           "Error converting query to relational expression: " + e.getMessage(), e);
+    } finally {
+      // Keep the executor policy of the subsequent optimization phase unchanged.
+      planner.setExecutor(originalExecutor);
     }
   }
 
@@ -505,7 +557,8 @@ public class QueryEnvironment {
       listener.populateRuleTimings();
       RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
       traitPlanner.setRoot(optimized);
-      return traitPlanner.findBestExp();
+      // Everything after optimization (EXPLAIN, plan node conversion, physical planning) sees plain SEARCH calls.
+      return plannerContext.getSearchSealer().unseal(traitPlanner.findBestExp());
     } catch (Throwable e) {
       throw QueryErrorCode.QUERY_PLANNING.asException("Error optimizing query: " + e.getMessage(), e);
     }
@@ -546,9 +599,10 @@ public class QueryEnvironment {
   /// @param skipRuleSet parsed skipped rule name set from query options
   /// @param useRuleSet parsed use rule set from query options
   /// @param defaultDisabledRuleSet parsed default disabled rule set from broker config
+  /// @param inferAnyValueType whether ANY_VALUE gets the data type argument of its argument's type
   /// @return HepProgram that performs logical transformations
   private static HepProgram getOptProgram(PinotRuleSet ruleSet, Set<String> skipRuleSet, Set<String> useRuleSet,
-      Set<String> defaultDisabledRuleSet) {
+      Set<String> defaultDisabledRuleSet, boolean inferAnyValueType) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -570,8 +624,16 @@ public class QueryEnvironment {
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
     for (RelOptRule relOptRule : basicRules) {
+      // Supplies the data type argument before AggregateCaseToFilter, which rewrites only one-argument calls: its
+      // ARRAY_AGG(expression) FILTER (WHERE condition) form of ARRAY_AGG(CASE WHEN ...) fails at runtime.
+      if (relOptRule.toString().equals(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_CASE_TO_FILTER)) {
+        hepProgramBuilder.addRuleInstance(PinotAggregateTypeArgumentRewriteRule.ARRAY_AGG_ONLY);
+      }
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
+    // Required for FIRST_WITH_TIME, LAST_WITH_TIME, ARRAY_AGG and string MODE, so the rule options do not filter it.
+    hepProgramBuilder.addRuleInstance(inferAnyValueType ? PinotAggregateTypeArgumentRewriteRule.INSTANCE
+        : PinotAggregateTypeArgumentRewriteRule.WITHOUT_ANY_VALUE);
 
     // ----
     // Pushdown filters using a single HepInstruction.
@@ -793,6 +855,25 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;
     }
 
+    /// Whether to rewrite exact aggregations into their approximate counterparts, already resolved from the query
+    /// option and the defaults. See [CommonConstants.Broker#USE_APPROXIMATE_FUNCTION].
+    @Value.Default
+    default boolean useApproximateFunction() {
+      return CommonConstants.Broker.DEFAULT_USE_APPROXIMATE_FUNCTION;
+    }
+
+    /// Parameters appended to the rewritten calls, empty for the aggregation function defaults.
+    /// See [CommonConstants.Broker#APPROXIMATE_FUNCTION_DISTINCT_COUNT_PARAMS].
+    @Value.Default
+    default String approximateFunctionDistinctCountParams() {
+      return CommonConstants.Broker.DEFAULT_APPROXIMATE_FUNCTION_PARAMS;
+    }
+
+    @Value.Default
+    default String approximateFunctionPercentileParams() {
+      return CommonConstants.Broker.DEFAULT_APPROXIMATE_FUNCTION_PARAMS;
+    }
+
     @Value.Default
     default boolean defaultEnableDynamicFilteringSemiJoin() {
       return CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN;
@@ -908,6 +989,28 @@ public class QueryEnvironment {
     default int defaultSortExchangeCopyLimit() {
       return PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY.config.getFetchLimitThreshold();
     }
+
+    /// See [CommonConstants.Broker#CONFIG_OF_SEALED_IN_LIST_THRESHOLD]. Can be overridden per query with
+    /// [CommonConstants.Broker.Request.QueryOptionKey#SEALED_IN_LIST_THRESHOLD].
+    @Value.Default
+    default int defaultSealedInListThreshold() {
+      return CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD;
+    }
+
+    /// See [CommonConstants.Broker#CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY]. Can be overridden per query with
+    /// [CommonConstants.Broker.Request.QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY].
+    @Value.Default
+    default boolean defaultPreferSelectAliasInGroupBy() {
+      return CommonConstants.Broker.DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY;
+    }
+
+    /// Whether the validator marks `BrokerMeter.QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN`. Only the broker that
+    /// runs multi-stage queries turns it on. Other users of the validator, like the single-stage paths that compile a
+    /// query only to check it or to get its schema, and the controller, must not change the meter.
+    @Value.Default
+    default boolean meterGroupByAliasShadowedByColumn() {
+      return false;
+    }
   }
 
   /// A query that have been parsed, validates, transformed into a [RelNode] and optimized with Calcite.
@@ -955,6 +1058,9 @@ public class QueryEnvironment {
     /// Explain the query plan.
     /// The original query must be an EXPLAIN query and way it will be explained depends on the options of the EXPLAIN
     /// query and the [QueryEnvironment.Config] used to create the [QueryEnvironment] that compiled this query.
+    ///
+    /// Unless the query explicitly asks for a logical plan only (`EXPLAIN PLAN WITHOUT IMPLEMENTATION`), this builds
+    /// the dispatchable subplan and therefore fails wherever [#planQuery] would.
     public QueryEnvironment.QueryPlannerResult explain(long requestId,
         @Nullable AskingServerStageExplainer.OnServerExplainer onServerExplainer) {
       try {
@@ -971,9 +1077,17 @@ public class QueryEnvironment {
           SqlExplainLevel level =
               explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
           Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(_relRoot.rel);
-          if (!explain.withImplementation() || onServerExplainer == null) {
+          if (!explain.withImplementation()) {
+            // The query explicitly asked to skip implementation planning, so render the logical plan as-is.
             return getQueryPlannerResult(_plannerContext, null, PlannerUtils.explainPlan(_relRoot.rel, format, level),
                 tableNames);
+          } else if (onServerExplainer == null) {
+            // Build the dispatchable subplan even though only the logical plan is rendered: some planning errors are
+            // raised while converting the plan or assigning workers (e.g. a `tableOptions` partition hint that
+            // disagrees with the table's actual partitioning), and EXPLAIN must fail wherever execution would.
+            DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext);
+            return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
+                PlannerUtils.explainPlan(_relRoot.rel, format, level), dispatchableSubPlan.getTableNames());
           } else {
             Map<String, String> options = _sqlNodeAndOptions.getOptions();
             boolean explainPlanVerbose = QueryOptionsUtils.isExplainPlanVerbose(options);
@@ -995,6 +1109,8 @@ public class QueryEnvironment {
                 PlannerUtils.explainPlan(explainedNode, format, level), dispatchableSubPlan.getTableNames());
           }
         }
+      } catch (QueryException e) {
+        throw e;
       } catch (Exception e) {
         throw new RuntimeException("Error explain query plan for: " + _textQuery, e);
       }

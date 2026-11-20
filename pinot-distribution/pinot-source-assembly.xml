@@ -40,7 +40,7 @@
         <exclude>.codecov*</exclude>
         <exclude>.gitignore</exclude>
         <exclude>.trivyignore</exclude>
-        <exclude>.mvn/**</exclude>
+        <exclude>.mvn/.develocity/**</exclude>
         <exclude>.java-version</exclude>
         <exclude>.claude/**</exclude>
 

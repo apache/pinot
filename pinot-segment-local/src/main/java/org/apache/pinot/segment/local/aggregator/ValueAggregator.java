@@ -41,6 +41,28 @@ public interface ValueAggregator<R, A> {
   /// specified in the schema.
   A getInitialAggregatedValue(@Nullable R rawValue);
 
+  /// Returns the aggregated value of a group whose input values are all null, or `null` to have the star-tree record
+  /// the group in its null vector instead.
+  ///
+  /// Only consulted by null-aware star-trees, which exclude null input values from the pre-aggregation and can
+  /// therefore produce a group with no values at all.
+  ///
+  /// Returning `null` is safe whenever the aggregation function skips null rows while reading the pre-aggregated
+  /// column, which every aggregation function does apart from `COUNT`. A group recorded in the null vector is never
+  /// read back, so the placeholder left in the forward index is never deserialized.
+  ///
+  /// `COUNT` is the exception and overrides this: it is read back by summing the pre-aggregated column rather than
+  /// through the null vector, so it answers `0` itself. Every other aggregator takes the default, which keeps an
+  /// all-null group down to a placeholder plus one null-vector bit instead of a serialized empty sketch.
+  ///
+  /// An aggregator whose [#getAggregatedValueType] is `BYTES` must also make [#getMaxAggregatedValueByteSize] account
+  /// for the value returned here, because the star-tree sizes the variable-length forward index from that and would
+  /// otherwise under-allocate for a group that has no value of its own.
+  @Nullable
+  default A getAllNullAggregatedValue() {
+    return null;
+  }
+
   /// Applies a raw value to the current aggregated value.
   ///
   /// NOTE: if value is mutable, will directly modify the value.
@@ -59,7 +81,17 @@ public interface ValueAggregator<R, A> {
   boolean isAggregatedValueFixedSize();
 
   /// Returns the maximum size in bytes of the aggregated values seen so far.
+  ///
+  /// When [#isMaxAggregatedValueByteSizeDerivedFromSerialization] is true, the size is complete only once every value
+  /// has been serialized through [#serializeAggregatedValue], so a builder must serialize all values before consuming
+  /// it.
   int getMaxAggregatedValueByteSize();
+
+  /// Returns whether [#getMaxAggregatedValueByteSize] is derived from the values serialized so far rather than
+  /// tracked as values are aggregated.
+  default boolean isMaxAggregatedValueByteSizeDerivedFromSerialization() {
+    return false;
+  }
 
   /// Serializes an aggregated value into a byte array.
   byte[] serializeAggregatedValue(A value);

@@ -20,18 +20,26 @@ package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -74,6 +82,71 @@ public class DataTableSerDeTest {
   private static final ByteArray[][] UUID_ARRAYS = new ByteArray[NUM_ROWS][];
   private static final BigDecimal[][] BIG_DECIMAL_ARRAYS = new BigDecimal[NUM_ROWS][];
   private static final Map<String, Object>[] MAPS = new Map[NUM_ROWS];
+
+  @Test
+  public void testRowBufferReuse()
+      throws IOException {
+    DataSchema schema = new DataSchema(new String[]{"int", "long", "float", "double", "string", "bytes", "array"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
+            ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.INT_ARRAY});
+    DataTableBuilder builder = new DataTableBuilderV4(schema);
+    builder.startRow();
+    builder.setColumn(0, Integer.MIN_VALUE);
+    builder.setColumn(1, Long.MAX_VALUE);
+    builder.setColumn(2, Float.intBitsToFloat(0x7fc00042));
+    builder.setColumn(3, -0.0d);
+    builder.setColumn(4, "first");
+    builder.setColumn(5, new ByteArray(new byte[]{1, 2, 3}));
+    builder.setColumn(6, new int[]{17, -23});
+    builder.finishRow();
+
+    // Populate every column in reverse order, overwriting both fixed values and variable-data offset/length slots.
+    builder.startRow();
+    builder.setColumn(6, new int[0]);
+    builder.setColumn(5, new ByteArray(new byte[0]));
+    builder.setColumn(4, "second");
+    builder.setColumn(3, 0.0d);
+    builder.setColumn(2, 0.0f);
+    builder.setColumn(1, 0L);
+    builder.setColumn(0, 0);
+    builder.finishRow();
+
+    builder.startRow();
+    builder.setNull(0);
+    builder.setColumn(1, -11L);
+    builder.setColumn(2, -0.0f);
+    builder.setColumn(3, Double.longBitsToDouble(0x7ff8000000000042L));
+    builder.setNull(4);
+    builder.setColumn(5, new ByteArray(new byte[]{4}));
+    builder.setColumn(6, new int[]{5});
+    builder.finishRow();
+
+    DataTable result = DataTableFactory.getDataTable(builder.build().toBytes());
+    assertEquals(result.getNumberOfRows(), 3);
+    assertEquals(result.getInt(0, 0), Integer.MIN_VALUE);
+    assertEquals(result.getLong(0, 1), Long.MAX_VALUE);
+    assertEquals(Float.floatToRawIntBits(result.getFloat(0, 2)), 0x7fc00042);
+    assertEquals(Double.doubleToRawLongBits(result.getDouble(0, 3)), Double.doubleToRawLongBits(-0.0d));
+    assertEquals(result.getString(0, 4), "first");
+    assertEquals(result.getBytes(0, 5), new ByteArray(new byte[]{1, 2, 3}));
+    assertEquals(result.getIntArray(0, 6), new int[]{17, -23});
+
+    assertEquals(result.getInt(1, 0), 0);
+    assertEquals(result.getLong(1, 1), 0L);
+    assertEquals(Float.floatToRawIntBits(result.getFloat(1, 2)), 0);
+    assertEquals(Double.doubleToRawLongBits(result.getDouble(1, 3)), 0L);
+    assertEquals(result.getString(1, 4), "second");
+    assertEquals(result.getBytes(1, 5).getBytes(), new byte[0]);
+    assertEquals(result.getIntArray(1, 6), new int[0]);
+
+    assertEquals(result.getNullRowIds(0), RoaringBitmap.bitmapOf(2));
+    assertEquals(result.getLong(2, 1), -11L);
+    assertEquals(Float.floatToRawIntBits(result.getFloat(2, 2)), Float.floatToRawIntBits(-0.0f));
+    assertEquals(Double.doubleToRawLongBits(result.getDouble(2, 3)), 0x7ff8000000000042L);
+    assertEquals(result.getNullRowIds(4), RoaringBitmap.bitmapOf(2));
+    assertEquals(result.getBytes(2, 5), new ByteArray(new byte[]{4}));
+    assertEquals(result.getIntArray(2, 6), new int[]{5});
+  }
 
   @Test(dataProvider = "versionProvider")
   public void testException(int dataTableVersion)
@@ -239,10 +312,114 @@ public class DataTableSerDeTest {
     fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
 
     DataTable dataTable = dataTableBuilder.build();
+    // The built table reads the builder's pages, the deserialized one reads a single array. Both must agree.
+    verifyDataIsSame(dataTable, columnDataTypes, numColumns);
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
     verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+  }
+
+  /// The builder writes the fixed and variable size sections in pages. Values larger than a page, and values that
+  /// straddle a page boundary, must read back the same from the built table and from the deserialized one.
+  @Test
+  public void testValuesSpanningPages()
+      throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"bytes", "ints", "object", "long", "strings", "bigDecimals", "nullableInt"},
+        new ColumnDataType[]{ColumnDataType.BYTES, ColumnDataType.INT_ARRAY, ColumnDataType.OBJECT,
+            ColumnDataType.LONG, ColumnDataType.STRING_ARRAY, ColumnDataType.BIG_DECIMAL_ARRAY, ColumnDataType.INT});
+    // 52 bytes per row, so the fixed size section spans several pages as well.
+    int numRows = 2_000;
+    byte[][] bytesValues = new byte[numRows][];
+    int[][] intArrayValues = new int[numRows][];
+    byte[][] objectValues = new byte[numRows][];
+    String[][] stringArrayValues = new String[numRows][];
+    BigDecimal[][] bigDecimalArrayValues = new BigDecimal[numRows][];
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      // Every 97th row carries values larger than a page.
+      boolean large = rowId % 97 == 0;
+      dataTableBuilder.startRow();
+      bytesValues[rowId] = new byte[large ? 20_000 + RANDOM.nextInt(20_000) : RANDOM.nextInt(300)];
+      RANDOM.nextBytes(bytesValues[rowId]);
+      dataTableBuilder.setColumn(0, new ByteArray(bytesValues[rowId]));
+      intArrayValues[rowId] = RANDOM.ints(large ? 10_000 : RANDOM.nextInt(100)).toArray();
+      dataTableBuilder.setColumn(1, intArrayValues[rowId]);
+      if (rowId % 10 == 1) {
+        dataTableBuilder.setNull(2);
+      } else {
+        objectValues[rowId] = new byte[large ? 30_000 : 1 + RANDOM.nextInt(500)];
+        RANDOM.nextBytes(objectValues[rowId]);
+        dataTableBuilder.setColumn(2, new AggregationFunction.SerializedBytes(rowId, objectValues[rowId]));
+      }
+      dataTableBuilder.setColumn(3, (long) rowId);
+      stringArrayValues[rowId] = new String[large ? 5_000 : RANDOM.nextInt(20)];
+      for (int i = 0; i < stringArrayValues[rowId].length; i++) {
+        stringArrayValues[rowId][i] = "s" + RANDOM.nextInt(1_000);
+      }
+      dataTableBuilder.setColumn(4, stringArrayValues[rowId]);
+      bigDecimalArrayValues[rowId] = new BigDecimal[large ? 2_000 : RANDOM.nextInt(20)];
+      for (int i = 0; i < bigDecimalArrayValues[rowId].length; i++) {
+        bigDecimalArrayValues[rowId][i] = BigDecimal.valueOf(RANDOM.nextLong(), RANDOM.nextInt(10));
+      }
+      dataTableBuilder.setColumn(5, bigDecimalArrayValues[rowId]);
+      // A third of the rows are null, so the null bitmap section is not trivial.
+      if (rowId % 3 == 0) {
+        dataTableBuilder.setNull(6);
+      } else {
+        dataTableBuilder.setColumn(6, rowId);
+      }
+      dataTableBuilder.finishRow();
+    }
+
+    DataTable dataTable = dataTableBuilder.build();
+    DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
+
+    // toDataBuffer() returns the builder's pages without copying them. The first buffer holds the header and the
+    // small sections, and the last one the metadata. Every buffer between them is one page at most.
+    DataBuffer dataBuffer = dataTable.toDataBuffer();
+    List<ByteBuffer> buffers = new ArrayList<>();
+    dataBuffer.appendAsByteBuffers(buffers);
+    assertTrue(buffers.size() > 2, "Expected the sections in pages: " + buffers.size());
+    for (ByteBuffer buffer : buffers.subList(1, buffers.size() - 1)) {
+      assertTrue(buffer.remaining() <= PagedPinotOutputStream.PageAllocator.MIN_RECOMMENDED_PAGE_SIZE,
+          "Buffer of " + buffer.remaining() + " bytes");
+    }
+    byte[] dataBufferBytes = new byte[Math.toIntExact(dataBuffer.size())];
+    dataBuffer.copyTo(0, dataBufferBytes);
+    DataTable dataBufferTable = DataTableFactory.getDataTable(dataBufferBytes);
+
+    for (DataTable table : new DataTable[]{
+        dataTable, dataTable.toDataOnlyDataTable(), newDataTable, dataBufferTable
+    }) {
+      assertEquals(table.getNumberOfRows(), numRows, ERROR_MESSAGE);
+      RoaringBitmap nullRowIds = table.getNullRowIds(6);
+      assertNotNull(nullRowIds, ERROR_MESSAGE);
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        assertEquals(table.getBytes(rowId, 0).getBytes(), bytesValues[rowId], ERROR_MESSAGE);
+        assertEquals(table.getIntArray(rowId, 1), intArrayValues[rowId], ERROR_MESSAGE);
+        CustomObject customObject = table.getCustomObject(rowId, 2);
+        if (objectValues[rowId] == null) {
+          assertNull(customObject, ERROR_MESSAGE);
+        } else {
+          assertNotNull(customObject, ERROR_MESSAGE);
+          assertEquals(customObject.getType(), rowId, ERROR_MESSAGE);
+          ByteBuffer buffer = customObject.getBuffer();
+          byte[] objectBytes = new byte[buffer.remaining()];
+          buffer.get(objectBytes);
+          assertEquals(objectBytes, objectValues[rowId], ERROR_MESSAGE);
+        }
+        assertEquals(table.getLong(rowId, 3), rowId, ERROR_MESSAGE);
+        assertEquals(table.getStringArray(rowId, 4), stringArrayValues[rowId], ERROR_MESSAGE);
+        assertEquals(table.getBigDecimalArray(rowId, 5), bigDecimalArrayValues[rowId], ERROR_MESSAGE);
+        assertEquals(nullRowIds.contains(rowId), rowId % 3 == 0, ERROR_MESSAGE);
+        if (rowId % 3 != 0) {
+          assertEquals(table.getInt(rowId, 6), rowId, ERROR_MESSAGE);
+        }
+      }
+    }
   }
 
   @Test(dataProvider = "versionProvider")

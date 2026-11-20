@@ -49,10 +49,11 @@ import org.slf4j.LoggerFactory;
 /// Therefore the cleanest and safer solution is to not send stats when we know a problematic version is in the cluster.
 ///
 /// We support three modes:
-/// - SAFE: This is the default mode. In this mode, we will send stats unless we detect a problematic version in the
-///  cluster. This doesn't require human intervention and is the recommended mode.
-/// - ALWAYS: In this mode, we will always send stats, regardless of the version of the cluster. This mimics the
-///  behavior in 1.3.0 and lower versions.
+/// - ALWAYS: This is the default mode. In this mode, we will always send stats, regardless of the version of the
+///  cluster.
+/// - SAFE: In this mode, we will send stats unless we detect a problematic version in the cluster, which means any
+///  instance reporting a version other than this one. This doesn't require human intervention, and is the mode to
+///  use for a cluster that may still run versions older than 1.4.
 /// - NEVER: In this mode, we will never send stats, regardless of the version of the cluster. This is useful for
 /// testing purposes or if for whatever reason you want to disable stats.
 public abstract class SendStatsPredicate implements InstanceConfigChangeListener {

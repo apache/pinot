@@ -28,18 +28,19 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 public class InstanceAssignmentConfig extends BaseJsonConfig {
 
-  @JsonPropertyDescription("Configuration for the strategy to assign instances to partitions")
-  private final PartitionSelector _partitionSelector;
   @JsonPropertyDescription("Configuration for the instance tag and pool of the instance assignment (mandatory)")
   private final InstanceTagPoolConfig _tagPoolConfig;
 
-  @JsonPropertyDescription("Configuration for the instance constraints of the instance assignment,"
-      + " which filters out unqualified instances and sorts instances for picking priority")
+  @JsonPropertyDescription("Configuration for the instance constraints of the instance assignment, which filters out "
+      + "unqualified instances and sorts instances for picking priority")
   private final InstanceConstraintConfig _constraintConfig;
 
   @JsonPropertyDescription(
       "Configuration for the instance replica-group and partition of the instance assignment (mandatory)")
   private final InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
+
+  @JsonPropertyDescription("Configuration for the strategy to assign instances to partitions")
+  private final PartitionSelector _partitionSelector;
 
   @JsonPropertyDescription("Configuration to minimize data movement for pool and instance assignment")
   private final boolean _minimizeDataMovement;
@@ -49,23 +50,19 @@ public class InstanceAssignmentConfig extends BaseJsonConfig {
       @JsonProperty(value = "tagPoolConfig", required = true) InstanceTagPoolConfig tagPoolConfig,
       @JsonProperty("constraintConfig") @Nullable InstanceConstraintConfig constraintConfig,
       @JsonProperty(value = "replicaGroupPartitionConfig", required = true)
-          InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
+      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
       @JsonProperty("partitionSelector") @Nullable String partitionSelector,
       @JsonProperty("minimizeDataMovement") boolean minimizeDataMovement) {
     Preconditions.checkArgument(tagPoolConfig != null, "'tagPoolConfig' must be configured");
-    Preconditions
-        .checkArgument(replicaGroupPartitionConfig != null, "'replicaGroupPartitionConfig' must be configured");
+    Preconditions.checkArgument(replicaGroupPartitionConfig != null,
+        "'replicaGroupPartitionConfig' must be configured");
     _tagPoolConfig = tagPoolConfig;
     _constraintConfig = constraintConfig;
     _replicaGroupPartitionConfig = replicaGroupPartitionConfig;
-    _partitionSelector =
-        partitionSelector == null ? PartitionSelector.INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR
-            : PartitionSelector.valueOf(partitionSelector);
+    _partitionSelector = partitionSelector == null
+        ? PartitionSelector.INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR
+        : PartitionSelector.valueOf(partitionSelector);
     _minimizeDataMovement = minimizeDataMovement;
-  }
-
-  public PartitionSelector getPartitionSelector() {
-    return _partitionSelector;
   }
 
   public InstanceTagPoolConfig getTagPoolConfig() {
@@ -81,12 +78,18 @@ public class InstanceAssignmentConfig extends BaseJsonConfig {
     return _replicaGroupPartitionConfig;
   }
 
+  public PartitionSelector getPartitionSelector() {
+    return _partitionSelector;
+  }
+
   public boolean isMinimizeDataMovement() {
     return _minimizeDataMovement;
   }
 
   public enum PartitionSelector {
-    FD_AWARE_INSTANCE_PARTITION_SELECTOR, INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR,
-    MIRROR_SERVER_SET_PARTITION_SELECTOR, IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR;
+    FD_AWARE_INSTANCE_PARTITION_SELECTOR,
+    INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR,
+    MIRROR_SERVER_SET_PARTITION_SELECTOR,
+    IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR;
   }
 }

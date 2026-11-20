@@ -60,6 +60,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalMvAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -75,6 +76,7 @@ import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -141,6 +143,8 @@ public final class RelToPlanNodeConverter {
       result = convertLogicalFilter((LogicalFilter) node);
     } else if (node instanceof PinotLogicalAggregate) {
       result = convertLogicalAggregate((PinotLogicalAggregate) node);
+    } else if (node instanceof PinotLogicalMvAggregate) {
+      result = convertLogicalMvAggregate((PinotLogicalMvAggregate) node);
     } else if (node instanceof LogicalSort) {
       result = convertLogicalSort((LogicalSort) node);
     } else if (node instanceof Exchange) {
@@ -712,6 +716,21 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
         node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(),
         GroupingSetsPlanUtils.computeGroupingSets(node));
+  }
+
+  private MvAggregateNode convertLogicalMvAggregate(PinotLogicalMvAggregate node) {
+    List<AggregateCall> aggregateCalls = node.getAggCallList();
+    int numAggregates = aggregateCalls.size();
+    List<RexExpression.FunctionCall> functionCalls = new ArrayList<>(numAggregates);
+    List<Integer> filterArgs = new ArrayList<>(numAggregates);
+    for (AggregateCall aggregateCall : aggregateCalls) {
+      functionCalls.add(RexExpressionUtils.fromAggregateCall(aggregateCall));
+      filterArgs.add(aggregateCall.filterArg);
+    }
+    return new MvAggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()),
+        NodeHint.fromRelHints(node.getHints()), convertInputs(node.getInputs()), functionCalls, filterArgs,
+        node.getGroupSet().asList(), node.getAggType(), node.isLeafReturnFinalResult(), node.getCollations(),
+        node.getLimit(), node.getMvKeyIndexes());
   }
 
   private ProjectNode convertLogicalProject(LogicalProject node) {

@@ -31,6 +31,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -161,6 +162,26 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
       if (inputRelDistribution != null) {
         return inputRelDistribution;
       }
+    } else if (node instanceof SetOp) {
+      // A set operation sits above the exchanges inserted by PinotSetOpExchangeNodeInsertRule, and an exchange that
+      // genuinely redistributes describes the output: hash on the projected columns leaves the output hash
+      // distributed on them, broadcast leaves every worker holding all rows of every branch. That holds for a
+      // pre-partitioned hash exchange too, because is_colocated_by_set_op_keys asserts that rows equal across all
+      // projected columns already share a worker -- exactly the claimed distribution. We take the hint at its word
+      // here, just as the exchange itself does.
+      // A local (SINGLETON) exchange, which is what UNION ALL gets, is the exception: it redistributes nothing, so
+      // the output keeps whatever placement the inputs happened to have and SINGLETON ("everything on one worker")
+      // is not true of it. Claiming anything there would let a deduplicating consumer above it -- for example the
+      // aggregate UnionToDistinctRule puts over a distinct UNION -- skip a shuffle it needs.
+      // All inputs are checked so a future per-branch decision cannot silently invalidate this.
+      for (RelNode setOpInput : inputs) {
+        RelNode unboxedInput = PinotRuleUtils.unboxRel(setOpInput);
+        if (!(unboxedInput instanceof PinotLogicalExchange)
+            || ((PinotLogicalExchange) unboxedInput).getDistribution().getType() == RelDistribution.Type.SINGLETON) {
+          return RelDistributions.of(RelDistribution.Type.RANDOM_DISTRIBUTED, RelDistributions.EMPTY);
+        }
+      }
+      return ((PinotLogicalExchange) input).getDistribution();
     }
     // TODO: add the rest of the nodes.
     return computeCurrentDistribution(node);

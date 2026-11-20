@@ -199,6 +199,11 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     } else {
       endIndex = _bitmapReader.getNextSetBitOffset(startIndex + 1);
     }
+    // Record the position like getDictIdMV() does. Without it, every call for a sequential scan takes the bitmap
+    // scan from the context position (or the chunk start) instead of the O(1) next-doc path, which makes counting
+    // the values of a whole segment quadratic in the number of docs per chunk.
+    context._docId = docId;
+    context._endOffset = endIndex;
     return endIndex - startIndex;
   }
 

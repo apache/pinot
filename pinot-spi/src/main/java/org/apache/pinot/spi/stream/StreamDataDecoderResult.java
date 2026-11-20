@@ -42,4 +42,9 @@ public final class StreamDataDecoderResult {
   public Exception getException() {
     return _exception;
   }
+
+  /// Whether decoding failed with a [RetriableDecodeException]: decode the message again, don't drop it.
+  public boolean isRetriable() {
+    return _exception instanceof RetriableDecodeException;
+  }
 }

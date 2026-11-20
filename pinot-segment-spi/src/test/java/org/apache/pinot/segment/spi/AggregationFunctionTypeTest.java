@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.segment.spi;
 
+import org.apache.calcite.sql.SqlOperandCountRange;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -37,5 +41,31 @@ public class AggregationFunctionTypeTest {
     assertTrue(AggregationFunctionType.isAggregationFunction("PERCENTILEEST90"));
     assertTrue(AggregationFunctionType.isAggregationFunction("percentileest90"));
     assertFalse(AggregationFunctionType.isAggregationFunction("toEpochSeconds"));
+  }
+
+  @Test
+  public void testTupleSketchOperandTypes() {
+    AggregationFunctionType[] tupleSketchFunctions = {
+        AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
+        AggregationFunctionType.DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
+        AggregationFunctionType.SUMVALUESINTEGERSUMTUPLESKETCH,
+        AggregationFunctionType.AVGVALUEINTEGERSUMTUPLESKETCH
+    };
+
+    for (AggregationFunctionType functionType : tupleSketchFunctions) {
+      SqlOperandTypeChecker operandTypeChecker = functionType.getOperandTypeChecker();
+
+      SqlOperandCountRange countRange = operandTypeChecker.getOperandCountRange();
+      assertEquals(countRange.getMin(), 1, functionType.name());
+      assertEquals(countRange.getMax(), 2, functionType.name());
+      assertFalse(countRange.isValidCount(3), functionType.name());
+
+      String signatures =
+          operandTypeChecker.getAllowedSignatures(SqlStdOperatorTable.COUNT, functionType.name());
+      assertTrue(signatures.contains("BINARY"), functionType.name() + ": " + signatures);
+      assertTrue(signatures.contains("CHARACTER"), functionType.name() + ": " + signatures);
+      assertTrue(signatures.contains("INTEGER"), functionType.name() + ": " + signatures);
+      assertFalse(signatures.contains("ANY"), functionType.name() + ": " + signatures);
+    }
   }
 }

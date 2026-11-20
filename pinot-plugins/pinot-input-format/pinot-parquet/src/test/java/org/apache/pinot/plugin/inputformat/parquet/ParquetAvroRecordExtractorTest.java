@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.plugin.inputformat.parquet;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
@@ -30,7 +29,9 @@ import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.plugin.inputformat.parquet.ParquetTestUtils.int96Bytes;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests [ParquetAvroRecordExtractor]'s INT96 override — see its class Javadoc. All other Avro behavior is
@@ -78,6 +79,18 @@ public class ParquetAvroRecordExtractorTest {
     assertEquals(extract(record, null), new Timestamp(epochMillis));
   }
 
+  @Test
+  public void testInt96BeyondEpochNanosRange() {
+    for (String text : new String[]{"1600-01-01T00:00:00.123456789Z", "2300-01-01T00:00:00.123456789Z"}) {
+      Instant instant = Instant.parse(text);
+      byte[] bytes = int96Bytes(instant);
+      Schema fixed = Schema.createFixed("Int96", "INT96 represented as byte[12]", null, 12);
+      GenericRecord record = singleField(fixed, new GenericData.Fixed(fixed, bytes));
+      assertEquals(extract(record), Timestamp.from(instant), text);
+      expectThrows(IllegalArgumentException.class, () -> extract(record, rawConfig()));
+    }
+  }
+
   // === Helpers ===
 
   private static Object extract(GenericRecord record, AvroRecordExtractorConfig config) {
@@ -112,16 +125,8 @@ public class ParquetAvroRecordExtractorTest {
     return Schema.createUnion(List.of(Schema.create(Schema.Type.NULL), fixedSchema));
   }
 
-  /// Encode `epochMillis` as an INT96 byte[12]: bytes 0..7 = nanos-within-day (long), bytes 8..11 = Julian
-  /// day number (int).
   private static GenericData.Fixed int96Fixed(long epochMillis) {
-    long millisPerDay = 86_400_000L;
-    long dayNumber = epochMillis / millisPerDay;
-    long nanosWithinDay = (epochMillis - dayNumber * millisPerDay) * 1_000_000L;
-    int julianDay = (int) (dayNumber + ParquetUtils.JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH);
-    byte[] int96 = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
-        .putLong(nanosWithinDay).putInt(julianDay).array();
     Schema fixedSchema = Schema.createFixed("Int96", "INT96 represented as byte[12]", null, 12);
-    return new GenericData.Fixed(fixedSchema, int96);
+    return new GenericData.Fixed(fixedSchema, int96Bytes(Instant.ofEpochMilli(epochMillis)));
   }
 }

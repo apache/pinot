@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 name: bench-compare
-description: Run a Pinot JMH benchmark twice — once on a baseline commit, once with the current changes — and report both sets of results side by side. Uses a git worktree so the user's working tree is never disturbed.
+description: Compare baseline and current Pinot JMH benchmark results using an isolated baseline worktree.
 ---
 
 # /bench-compare

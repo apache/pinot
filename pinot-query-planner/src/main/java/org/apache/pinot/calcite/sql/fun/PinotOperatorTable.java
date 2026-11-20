@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlFunction;
@@ -125,6 +126,40 @@ public class PinotOperatorTable implements SqlOperatorTable {
           ReturnTypes.BOOLEAN_NOT_NULL,
           InferTypes.VARCHAR_1024,
           OperandTypes.ANY);
+
+  /// Placeholder for special functions to handle MV.
+  ///
+  /// NOTE: ARRAY_TO_MV is not deterministic.
+  /// We need to explicitly set it as not deterministic in order to do not let Calcite optimize expressions like
+  /// `ARRAY_TO_MV(RandomAirports) = 'MFR' and ARRAY_TO_MV(RandomAirports) = 'GTR'` as `false`.
+  /// If the function were deterministic, its value would never be MFR and GTR at the same time, so Calcite is
+  /// smart enough to know there is no value that satisfies the condition.
+  /// In fact what ARRAY_TO_MV does is just to trick Calcite typesystem, but then what the leaf stage executor
+  /// receives is `RandomAirports = 'MFR' and RandomAirports = 'GTR'`, which in the V1 semantics means:
+  /// true if and only if RandomAirports contains a value equal to 'MFR' and RandomAirports contains a value equal
+  /// to 'GTR'.
+  ///
+  /// [org.apache.pinot.calcite.rel.rules.PinotRuleUtils#isRelocatable] ignores this flag, so ARRAY_TO_MV filters are
+  /// still pushed below joins.
+  public static final PinotSqlFunction ARRAY_TO_MV = new PinotSqlFunction("ARRAY_TO_MV",
+      opBinding -> arrayToMvReturnType(opBinding.getTypeFactory(), opBinding.getOperandType(0)), OperandTypes.ARRAY,
+      false);
+
+  /// The type of [#ARRAY_TO_MV]: the component type of `arrayType`. The type is nullable when the array type or the
+  /// component type is nullable. The MV aggregate gives its MV keys the same type, so that it can replace a plain
+  /// aggregate over `ARRAY_TO_MV(array)` without changing the row type.
+  ///
+  /// A null array goes into the null group at runtime, as in the single-stage engine. The type factory applies the
+  /// nullability of an array to the array only, so a nullable array (for example, from an outer join or a column with
+  /// null handling) usually has a NOT NULL component type. With that type, Calcite removes `COALESCE` and folds
+  /// `IS NULL` on the key, and the null group gives wrong results.
+  public static RelDataType arrayToMvReturnType(RelDataTypeFactory typeFactory, RelDataType arrayType) {
+    RelDataType componentType = arrayType.getComponentType();
+    Preconditions.checkArgument(componentType != null, "ARRAY_TO_MV requires an array, got: %s",
+        arrayType.getFullTypeString());
+    return typeFactory.createTypeWithNullability(componentType,
+        arrayType.isNullable() || componentType.isNullable());
+  }
 
   /// This list includes the supported standard [SqlOperator]s defined in [SqlStdOperatorTable].
   /// NOTE: The operator order follows the same order as defined in [SqlStdOperatorTable] for easier search.
@@ -299,19 +334,13 @@ public class PinotOperatorTable implements SqlOperatorTable {
           OperandTypes.family(
               List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER), i -> i == 2)),
 
-      // Placeholder for special functions to handle MV
-      // NOTE:
-      // ARRAY_TO_MV is not deterministic.
-      // We need to explicitly set it as not deterministic in order to do not let Calcite optimize expressions like
-      // `ARRAY_TO_MV(RandomAirports) = 'MFR' and ARRAY_TO_MV(RandomAirports) = 'GTR'` as `false`.
-      // If the function were deterministic, its value would never be MFR and GTR at the same time, so Calcite is
-      // smart enough to know there is no value that satisfies the condition.
-      // In fact what ARRAY_TO_MV does is just to trick Calcite typesystem, but then what the leaf stage executor
-      // receives is `RandomAirports = 'MFR' and RandomAirports = 'GTR'`, which in the V1 semantics means:
-      // true if and only if RandomAirports contains a value equal to 'MFR' and RandomAirports contains a value equal
-      // to 'GTR'
-      new PinotSqlFunction("ARRAY_TO_MV", opBinding -> opBinding.getOperandType(0).getComponentType(),
-          OperandTypes.ARRAY, false),
+      // IN_SUBQUERY(expr, 'subquery') never runs: the broker runs the subquery first and replaces the call with an
+      // IN_ID_SET on the result. It is registered for the paths that only compile queries, such as the controller
+      // routing a query to a broker. Nullable like IN_ID_SET.
+      new PinotSqlFunction("IN_SUBQUERY", ReturnTypes.BOOLEAN_NULLABLE,
+          OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
+
+      ARRAY_TO_MV,
 
       // SqlStdOperatorTable.COALESCE without rewrite
       new SqlFunction("COALESCE", SqlKind.COALESCE,
@@ -324,7 +353,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
           List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY),
           i -> i > 1)),
 
-      new PinotSqlFunction("NOW", ReturnTypes.TIMESTAMP, OperandTypes.NILADIC)
+      // Deterministic so PinotEvaluateLiteralRule folds it once at plan time, but volatile so it is never
+      // re-evaluated at a different point in the plan. This entry shadows the FunctionRegistry one (see
+      // registerScalarFunctions), so the volatility has to be repeated here.
+      new PinotSqlFunction("NOW", ReturnTypes.TIMESTAMP, OperandTypes.NILADIC, true, true)
   );
 
   private static final List<Pair<SqlOperator, List<String>>> PINOT_OPERATORS_WITH_ALIASES = List.of(

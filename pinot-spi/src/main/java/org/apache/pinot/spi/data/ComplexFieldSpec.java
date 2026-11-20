@@ -91,6 +91,22 @@ public final class ComplexFieldSpec extends FieldSpec {
   }
 
   @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    return _childFieldSpecs.equals(((ComplexFieldSpec) o)._childFieldSpecs);
+  }
+
+  @Override
+  public int hashCode() {
+    return 31 * super.hashCode() + _childFieldSpecs.hashCode();
+  }
+
+  @Override
   public String toString() {
     return "field type: COMPLEX, field name: " + _name + ", root data type: " + _dataType + ", child field specs: "
         + _childFieldSpecs;

@@ -23,15 +23,18 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
 public class ArrayAggBytesFunction extends BaseArrayAggBytesFunction<ObjectArrayList<ByteArray>> {
-  public ArrayAggBytesFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, nullHandlingEnabled);
+  private static final int BYTES_ARRAY_LIST_TYPE = 54;
+
+  public ArrayAggBytesFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
+    super(expression, dataType, nullHandlingEnabled);
   }
 
   @Override
@@ -73,14 +76,13 @@ public class ArrayAggBytesFunction extends BaseArrayAggBytesFunction<ObjectArray
   }
 
   @Override
-  public ObjectArrayList<ByteArray> extractFinalResult(ObjectArrayList<ByteArray> intermediateResult) {
-    return intermediateResult == null ? new ObjectArrayList<>() : intermediateResult;
+  public ByteArray[] extractFinalResult(ObjectArrayList<ByteArray> intermediateResult) {
+    return intermediateResult != null ? intermediateResult.toArray(new ByteArray[0]) : new ByteArray[0];
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ObjectArrayList<ByteArray> list) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BytesArrayList.getValue(),
-        ObjectSerDeUtils.BYTES_ARRAY_LIST_SER_DE.serialize(list));
+  public SerializedResult serializeIntermediateResult(ObjectArrayList<ByteArray> list) {
+    return new SerializedValue<>(BYTES_ARRAY_LIST_TYPE, list, ObjectSerDeUtils.BYTES_ARRAY_LIST_SER_DE);
   }
 
   @Override

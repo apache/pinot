@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -69,12 +70,12 @@ public class MutableOpenStructDataSource extends BaseDataSource implements OpenS
   }
 
   @Override
-  @Nullable
   public DataSource getDataSource(String key) {
-    // Live lookup, outside the memo: a key not yet observed may still be created by the ingestion thread.
+    // Live lookup, outside the memo: a key not yet observed may still be created by the ingestion thread, so an
+    // absent key resolves to a fresh all-null source instead of being memoised
     MutableKeyColumn col = _index.getKeyColumn(key);
     if (col == null) {
-      return null;
+      return new NullDataSource(getValueFieldSpec(key), _numDocs);
     }
     return _perKeyDataSourceCache.computeIfAbsent(key, k -> {
       Map<IndexType, IndexReader> indexes = new HashMap<>(_index.getIndexes(k));
@@ -118,19 +119,14 @@ public class MutableOpenStructDataSource extends BaseDataSource implements OpenS
   public Map<String, DataSource> getDataSources() {
     Map<String, DataSource> result = new HashMap<>();
     for (String key : _index.getKeys()) {
-      DataSource ds = getDataSource(key);
-      if (ds != null) {
-        result.put(key, ds);
-      }
+      result.put(key, getDataSource(key));
     }
     return result;
   }
 
   @Override
-  @Nullable
   public DataSourceMetadata getDataSourceMetadata(String key) {
-    DataSource ds = getDataSource(key);
-    return ds != null ? ds.getDataSourceMetadata() : null;
+    return getDataSource(key).getDataSourceMetadata();
   }
 
   @Override

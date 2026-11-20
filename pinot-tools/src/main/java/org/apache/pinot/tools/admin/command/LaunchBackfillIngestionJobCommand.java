@@ -23,6 +23,9 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.FileSystems;
+import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -41,6 +44,7 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionUtils;
 import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
+import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -247,7 +251,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     return generatedSegments;
   }
 
-  private List<String> collectSegmentNames(SegmentGenerationJobSpec spec) {
+  List<String> collectSegmentNames(SegmentGenerationJobSpec spec) {
     URI outputDirURI;
     try {
       outputDirURI = new URI(spec.getOutputDirURI());
@@ -259,20 +263,27 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     }
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
 
-    // Get list of files to process
-    String[] files;
+    PathMatcher pushFilePathMatcher =
+        spec.getPushJobSpec() != null && spec.getPushJobSpec().getPushFileNamePattern() != null
+            ? FileSystems.getDefault().getPathMatcher(spec.getPushJobSpec().getPushFileNamePattern())
+            : null;
+    List<String> generatedSegments = new ArrayList<>();
     try {
-      files = outputDirFS.listFiles(outputDirURI, true);
+      for (String file : outputDirFS.listFiles(outputDirURI, true)) {
+        if (!Constants.isSegmentTarFile(file)
+            || pushFilePathMatcher != null && !pushFilePathMatcher.matches(Paths.get(file))) {
+          continue;
+        }
+        URI fileURI = PinotFSFactory.LOCAL_PINOT_FS_SCHEME.equals(outputDirURI.getScheme())
+            && !file.startsWith(PinotFSFactory.LOCAL_PINOT_FS_SCHEME + ":")
+            ? new File(file).toURI()
+            : URI.create(file);
+        if (!outputDirFS.isDirectory(fileURI)) {
+          generatedSegments.add(SegmentPushUtils.getSegmentNameFromTarFile(file));
+        }
+      }
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
-    }
-
-    List<String> generatedSegments = new ArrayList<>();
-    for (String file : files) {
-      if (file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        generatedSegments.add(
-            file.substring(file.lastIndexOf(File.separator) + 1, file.indexOf(Constants.TAR_GZ_FILE_EXT)));
-      }
     }
     return generatedSegments;
   }

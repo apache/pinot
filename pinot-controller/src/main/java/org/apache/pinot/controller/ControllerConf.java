@@ -35,6 +35,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -60,6 +61,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_BROKER_PORT_OVERRIDE = "controller.broker.port.override";
   public static final String CONTROLLER_BROKER_TLS_PREFIX = "controller.broker.tls";
   public static final String CONTROLLER_BROKER_AUTH_PREFIX = "controller.broker.auth";
+  /// Namespace for the service credentials used by the controller when invoking Server admin APIs.
+  public static final String CONTROLLER_SERVER_ADMIN_AUTH_PREFIX = "controller.server.admin.auth";
   public static final String CONTROLLER_TLS_PREFIX = "controller.tls";
   public static final String CONTROLLER_HOST = "controller.host";
   public static final String CONTROLLER_PORT = "controller.port";
@@ -351,9 +354,16 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_ENABLE_INSTANCE_CHANGE_PROPAGATION =
       "controller.enable.instance.change.propagation";
   public static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
+  // When enabled, a segment's metadata sidecar (<segment>.metadata.tar.gz) is kept under
+  // Deleted_Segments_Metadata/<table>/ when the segment is deleted with retention > 0; otherwise (or when disabled) it
+  // is deleted with the segment.
+  public static final String DELETED_SEGMENTS_PRESERVE_METADATA = "controller.deleted.segments.preserveMetadata";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   public static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   public static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
+  /// Compatibility-only opt-in for local sources passed to `/ingestFromURI`. Enabling this allows callers with
+  /// access to the endpoint to read files visible to the controller process. Keep disabled unless callers and source
+  /// paths are fully trusted.
   public static final String INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM =
       "controller.ingestFromURI.allowLocalFileSystem";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
@@ -364,6 +374,17 @@ public class ControllerConf extends PinotConfiguration {
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   public static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
+  /// If true, the controller may reject single-segment uploads with HTTP 403 when segment data end is past the table
+  /// data retention window (see {@link org.apache.pinot.controller.api.upload.SegmentValidationUtils}).
+  ///
+  /// This also applies to minion task uploads that push through `POST /segments`: always for Purge, UpsertCompaction
+  /// and RefreshSegment, and for RealtimeToOffline, MergeRollup and UpsertCompactMerge unless `batchSegmentUpload` is
+  /// on.
+  /// A rejected RealtimeToOffline upload does not advance its watermark, so the task retries the same window until the
+  /// source segments age out (indefinitely with the hybrid retention strategy, since the time boundary cannot advance).
+  /// Review task schedules and buffer periods against table retention before enabling.
+  public static final String SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION =
+      "controller.segment.upload.reject.out.of.retention";
   public static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
       "controller.realtime.segment.metadata.commit.numLocks";
   public static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
@@ -401,6 +422,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   public static final int DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   public static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
+  public static final boolean DEFAULT_DELETED_SEGMENTS_PRESERVE_METADATA = false;
   public static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   public static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   public static final boolean DEFAULT_INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM = false;
@@ -413,6 +435,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DEFAULT_REBALANCE_PRE_CHECKER =
       "org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker";
   public static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
+  /// Default for {@link #SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION}: disabled until explicitly enabled.
+  public static final boolean DEFAULT_SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION = false;
   public static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
   public static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   public static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
@@ -438,8 +462,8 @@ public class ControllerConf extends PinotConfiguration {
 
   public static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
-  public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
-  public static final boolean DEFAULT_DISABLE_GROOVY = true;
+  public static final String DISABLE_GROOVY = CommonConstants.Groovy.DISABLE_INGESTION_GROOVY;
+  public static final boolean DEFAULT_DISABLE_GROOVY = CommonConstants.Groovy.DEFAULT_DISABLE_INGESTION_GROOVY;
 
   public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
   public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
@@ -448,13 +472,31 @@ public class ControllerConf extends PinotConfiguration {
   public static final boolean DEFAULT_EXIT_ON_TABLE_CONFIG_CHECK_FAILURE = true;
   public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
   public static final boolean DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE = true;
+  public static final String DEFAULT_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR = "/home/pinot/data/pageCacheWarmupQueries";
+  public static final String CONFIG_OF_PAGE_CACHE_WARMUP_DURATION_MS = "controller.page.cache.warmup.duration.ms";
+  public static final long DEFAULT_PAGE_CACHE_WARMUP_DURATION_MS = 180_000L;
 
   public static final String CONFIG_OF_MAX_TABLE_REBALANCE_JOBS_IN_ZK = "controller.table.rebalance.maxJobsInZK";
   public static final String CONFIG_OF_MAX_TENANT_REBALANCE_JOBS_IN_ZK = "controller.tenant.rebalance.maxJobsInZK";
   public static final String CONFIG_OF_MAX_RELOAD_SEGMENT_JOBS_IN_ZK = "controller.reload.segment.maxJobsInZK";
   public static final String CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK = "controller.force.commit.maxJobsInZK";
+  public static final String CONFIG_OF_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR =
+      "controller.page.cache.warmup.queries.dataDir";
+
+  // Knobs governing how long endReplaceSegments blocks while waiting for the new segments to become
+  // ONLINE in the ExternalView (IdealState -> ExternalView convergence). The per-attempt wait is
+  // retried up to the configured number of attempts, so the worst-case block is
+  // maxWaitMs * maxRetryAttempts. Defaults preserve the historical hard-coded values.
+  public static final String CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_MAX_WAIT_MS =
+      "controller.segment.replace.externalViewMaxWaitMs";
+  public static final String CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_CHECK_INTERVAL_MS =
+      "controller.segment.replace.externalViewCheckIntervalMs";
+  public static final String CONFIG_OF_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS =
+      "controller.segment.replace.maxRetryAttempts";
+  public static final int DEFAULT_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS = 5;
 
   private final Map<String, String> _invalidConfigs = new ConcurrentHashMap<>();
+  private volatile Boolean _clusterIngestionGroovyDisabled;
 
   public ControllerConf() {
     super(new HashMap<>());
@@ -586,7 +628,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public List<String> getControllerAccessProtocols() {
-    return getProperty(CONTROLLER_ACCESS_PROTOCOLS, getControllerPort() == null ? List.of("http") : List.of());
+    return getCommaSeparatedList(CONTROLLER_ACCESS_PROTOCOLS,
+        getControllerPort() == null ? List.of("http") : List.of());
   }
 
   public String getControllerAccessProtocolProperty(String protocol, String property) {
@@ -1096,6 +1139,10 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(DELETED_SEGMENTS_RETENTION_IN_DAYS, retentionInDays);
   }
 
+  public boolean isDeletedSegmentsPreserveMetadata() {
+    return getProperty(DELETED_SEGMENTS_PRESERVE_METADATA, DEFAULT_DELETED_SEGMENTS_PRESERVE_METADATA);
+  }
+
   public boolean isSkipLateCronSchedule() {
     return getProperty(ControllerPeriodicTasksConf.TASK_MANAGER_SKIP_LATE_CRON_SCHEDULE, false);
   }
@@ -1228,6 +1275,16 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setSegmentUploadTimeoutInMillis(long segmentUploadTimeoutInMillis) {
     setProperty(SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS, segmentUploadTimeoutInMillis);
+  }
+
+  /// @return whether out-of-retention single-segment upload rejection is enabled
+  public boolean isSegmentUploadRejectOutOfRetention() {
+    return getProperty(SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION, DEFAULT_SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION);
+  }
+
+  /// @param rejectOutOfRetention value for {@link #SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION}
+  public void setSegmentUploadRejectOutOfRetention(boolean rejectOutOfRetention) {
+    setProperty(SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION, rejectOutOfRetention);
   }
 
   public int getRealtimeSegmentMetadataCommitNumLocks() {
@@ -1520,9 +1577,15 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONTROLLER_RESOURCE_PACKAGES, DEFAULT_CONTROLLER_RESOURCE_PACKAGES);
   }
 
-  /// @return true if Groovy functions are disabled in controller config, otherwise returns false.
+  /// Updates the live cluster policy without mutating the instance configuration shared by request threads.
+  public void setClusterIngestionGroovyDisabled(boolean disabled) {
+    _clusterIngestionGroovyDisabled = disabled;
+  }
+
+  /// @return true if ingestion Groovy functions are disabled by the cluster policy or controller config.
   public boolean isDisableIngestionGroovy() {
-    return getProperty(DISABLE_GROOVY, DEFAULT_DISABLE_GROOVY);
+    Boolean clusterDisabled = _clusterIngestionGroovyDisabled;
+    return clusterDisabled != null ? clusterDisabled : getProperty(DISABLE_GROOVY, DEFAULT_DISABLE_GROOVY);
   }
 
   private long convertPeriodToUnit(String period, TimeUnit timeUnitToConvertTo) {
@@ -1595,6 +1658,20 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK, ControllerJob.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
   }
 
+  public long getSegmentReplaceExternalViewMaxWaitMs() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_MAX_WAIT_MS,
+        PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS);
+  }
+
+  public long getSegmentReplaceExternalViewCheckIntervalMs() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_EXTERNAL_VIEW_CHECK_INTERVAL_MS,
+        PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+  }
+
+  public int getSegmentReplaceMaxRetryAttempts() {
+    return getProperty(CONFIG_OF_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS, DEFAULT_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS);
+  }
+
   /// Get the configured timeseries languages from controller configuration.
   /// @return List of enabled timeseries languages
   public List<String> getTimeseriesLanguages() {
@@ -1610,5 +1687,13 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean getSegmentCompletionGroupCommitEnabled() {
     return getProperty(CONTROLLER_SEGMENT_COMPLETION_GROUP_COMMIT_ENABLED, true);
+  }
+
+  public String getPageCacheWarmupQueriesDataDir() {
+    return getProperty(CONFIG_OF_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR, DEFAULT_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR);
+  }
+
+  public long getPageCacheWarmupDurationMs() {
+    return getProperty(CONFIG_OF_PAGE_CACHE_WARMUP_DURATION_MS, DEFAULT_PAGE_CACHE_WARMUP_DURATION_MS);
   }
 }

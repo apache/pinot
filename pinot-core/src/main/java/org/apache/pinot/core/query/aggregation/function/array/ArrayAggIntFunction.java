@@ -23,14 +23,16 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
-  public ArrayAggIntFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
+  private static final int INT_ARRAY_LIST_TYPE = 42;
+
+  public ArrayAggIntFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
   }
 
@@ -72,9 +74,8 @@ public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(IntArrayList intArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntArrayList.getValue(),
-        ObjectSerDeUtils.INT_ARRAY_LIST_SER_DE.serialize(intArrayList));
+  public SerializedResult serializeIntermediateResult(IntArrayList intArrayList) {
+    return new SerializedValue<>(INT_ARRAY_LIST_TYPE, intArrayList, ObjectSerDeUtils.INT_ARRAY_LIST_SER_DE);
   }
 
   @Override

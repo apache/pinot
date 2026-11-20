@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
+import org.apache.pinot.spi.utils.StoredValueComparator;
 
 
 public class SortUtils {
@@ -72,8 +73,7 @@ public class SortUtils {
         if (v2 == null) {
           return -_nullsMultipliers[i];
         }
-        //noinspection rawtypes,unchecked
-        int result = ((Comparable) v1).compareTo(v2);
+        int result = StoredValueComparator.INSTANCE.compare(v1, v2);
         if (result != 0) {
           return result * _multipliers[i];
         }

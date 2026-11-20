@@ -108,6 +108,20 @@ public class LoggerUtils {
     return context.getLoggers().stream().map(AbstractLogger::getName).collect(Collectors.toList());
   }
 
+  /// Escapes backslashes, CR and LF as `\\`, `\r` and `\n`, so that a value the caller of a request controls (a SQL
+  /// statement, a string literal or a quoted identifier of a predicate, a request option, a proxy header) occupies a
+  /// single log line: it cannot split a log record or append a line that looks like a log record, so it cannot forge
+  /// one. A line ending can terminate a `--` or `//` SQL comment, so it is escaped rather than replaced with a space,
+  /// and escaping the existing backslashes keeps literal escape sequences apart from encoded line endings: the three
+  /// escape sequences decode in a single pass. Returns null for null.
+  @Nullable
+  public static String toSingleLine(@Nullable String text) {
+    if (text == null || (text.indexOf('\\') < 0 && text.indexOf('\n') < 0 && text.indexOf('\r') < 0)) {
+      return text;
+    }
+    return text.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
+  }
+
   private static LoggerConfig getLoggerConfig(Configuration config, String loggerName) {
     return loggerName.equalsIgnoreCase(ROOT) ? config.getRootLogger() : config.getLoggerConfig(loggerName);
   }

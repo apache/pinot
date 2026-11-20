@@ -22,8 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.LiteralContext;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -32,6 +35,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class ArrayLiteralTransformFunctionTest {
@@ -65,6 +69,34 @@ public class ArrayLiteralTransformFunctionTest {
     Assert.assertEquals(intArray.getIntArrayLiteral(), new int[]{
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9
     });
+  }
+
+  @Test
+  public void testBooleanArrayLiteralTransformFunction() {
+    List<ExpressionContext> arrayExpressions = List.of(
+        ExpressionContext.forLiteral(DataType.BOOLEAN, true),
+        ExpressionContext.forLiteral(DataType.BOOLEAN, false));
+
+    ArrayLiteralTransformFunction booleanArray = new ArrayLiteralTransformFunction(arrayExpressions);
+    assertEquals(booleanArray.getResultMetadata().getDataType(), DataType.BOOLEAN);
+    assertEquals(booleanArray.getIntArrayLiteral(), new int[]{1, 0});
+    int[][] ints = booleanArray.transformToIntValuesMV(_projectionBlock);
+    long[][] longs = booleanArray.transformToLongValuesMV(_projectionBlock);
+    float[][] floats = booleanArray.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubles = booleanArray.transformToDoubleValuesMV(_projectionBlock);
+    String[][] strings = booleanArray.transformToStringValuesMV(_projectionBlock);
+    assertEquals(ints.length, NUM_DOCS);
+    assertEquals(longs.length, NUM_DOCS);
+    assertEquals(floats.length, NUM_DOCS);
+    assertEquals(doubles.length, NUM_DOCS);
+    assertEquals(strings.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(ints[i], new int[]{1, 0});
+      assertEquals(longs[i], new long[]{1, 0});
+      assertEquals(floats[i], new float[]{1, 0});
+      assertEquals(doubles[i], new double[]{1, 0});
+      assertEquals(strings[i], new String[]{"true", "false"});
+    }
   }
 
   @Test
@@ -121,6 +153,28 @@ public class ArrayLiteralTransformFunctionTest {
     Assert.assertEquals(stringArray.getStringArrayLiteral(), new String[]{
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
     });
+  }
+
+  @Test
+  public void testBytesArrayLiteralTransformFunction() {
+    byte[][] expected = {BytesUtils.toBytes("00"), BytesUtils.toBytes("deadbeef")};
+    List<ExpressionContext> arrayExpressions = List.of(
+        ExpressionContext.forLiteral(DataType.BYTES, expected[0]),
+        ExpressionContext.forLiteral(DataType.BYTES, expected[1]));
+
+    List<ArrayLiteralTransformFunction> bytesArrays = List.of(new ArrayLiteralTransformFunction(arrayExpressions),
+        new ArrayLiteralTransformFunction(new LiteralContext(RequestUtils.getLiteral(expected))));
+    for (ArrayLiteralTransformFunction bytesArray : bytesArrays) {
+      Assert.assertEquals(bytesArray.getResultMetadata().getDataType(), DataType.BYTES);
+      Assert.assertFalse(bytesArray.getResultMetadata().isSingleValue());
+      Assert.assertEquals(bytesArray.getBytesArrayLiteral(), expected);
+
+      byte[][][] values = bytesArray.transformToBytesValuesMV(_projectionBlock);
+      Assert.assertEquals(values.length, NUM_DOCS);
+      for (byte[][] value : values) {
+        Assert.assertEquals(value, expected);
+      }
+    }
   }
 
   @Test

@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.testng.annotations.Test;
 
@@ -102,6 +103,33 @@ public class PinotDispatchPlannerTest extends QueryEnvironmentTestBase {
     PinotDispatchPlanner.rewriteReduceStageForEmptyLeaves(fragmentMap);
     PlanNode root = fragmentMap.get(0).getPlanFragment().getFragmentRoot();
     assertAllStageIdsAreZero(root);
+  }
+
+  /// `WorkerManager` walks the plan twice (leaves first, then intermediate stages), and with a spool the same
+  /// `PlanFragment` is a child of every receiver that reads it. Sharing one visited set across both passes would leave
+  /// a spooled intermediate fragment with no workers: the leaf pass visits it and skips it as a non-leaf, then the
+  /// intermediate pass skips it as visited.
+  @Test
+  public void testSpooledIntermediateStageGetsWorkers() {
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery("SET useSpools=true; "
+        + "WITH mySpool AS (SELECT col1, SUM(col3) AS s FROM a GROUP BY col1) "
+        + "SELECT 1 FROM mySpool AS a1 JOIN b ON a1.col1 = b.col1 JOIN mySpool AS a2 ON a2.col1 = b.col1");
+
+    // The spool is only useful if some fragment really is read by more than one receiver.
+    assertTrue(hasMultiReceiverSend(subPlan), "Query did not produce a spool: " + subPlan.getQueryStageMap().keySet());
+    for (Map.Entry<Integer, DispatchablePlanFragment> entry : subPlan.getQueryStageMap().entrySet()) {
+      assertFalse(entry.getValue().getWorkerMetadataList().isEmpty(), "No worker for stage: " + entry.getKey());
+    }
+  }
+
+  private static boolean hasMultiReceiverSend(DispatchableSubPlan subPlan) {
+    for (DispatchablePlanFragment fragment : subPlan.getQueryStageMap().values()) {
+      PlanNode root = fragment.getPlanFragment().getFragmentRoot();
+      if (root instanceof MailboxSendNode && ((MailboxSendNode) root).isMultiSend()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static void assertAllStageIdsAreZero(PlanNode node) {

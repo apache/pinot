@@ -30,6 +30,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -50,6 +51,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -78,6 +80,7 @@ import org.apache.helix.api.listeners.PreFetch;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
@@ -89,9 +92,13 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.helix.zookeeper.zkclient.exception.ZkException;
+import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -148,7 +155,7 @@ import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
 import org.apache.pinot.controller.api.resources.StateType;
-import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
+import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
@@ -160,6 +167,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
+import org.apache.pinot.controller.util.PageCacheWarmupControllerExecutor;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
@@ -171,6 +179,7 @@ import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMeta
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
@@ -206,6 +215,8 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.Op;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -216,6 +227,7 @@ public class PinotHelixResourceManager {
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final int DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY = 5;
+  private static final int MAX_SEGMENT_ZK_METADATA_REMOVAL_ATTEMPTS = 5;
   public static final String APPEND = "APPEND";
   private static final int DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE = 500;
   private static final String API_REQUEST_ID_PREFIX = "api-";
@@ -224,7 +236,9 @@ public class PinotHelixResourceManager {
     START, END, REVERT
   }
 
-  // TODO: make this configurable
+  // Default values for the endReplaceSegments IdealState -> ExternalView convergence wait,
+  // overridable via controller config (see ControllerConf#getSegmentReplaceExternalView*). The
+  // resolved values live in the _segmentReplace* / _endReplaceSegmentsRetryPolicy fields.
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
   public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
@@ -244,6 +258,12 @@ public class PinotHelixResourceManager {
   private final boolean _enableTieredSegmentAssignment;
   @Nullable
   private final ControllerConf _controllerConf;
+  private final AuthProvider _serverAdminAuthProvider;
+  // endReplaceSegments IdealState -> ExternalView convergence knobs, resolved once from controller
+  // config (or the static defaults when no config is supplied).
+  private final long _segmentReplaceExternalViewMaxWaitMs;
+  private final long _segmentReplaceExternalViewCheckIntervalMs;
+  private final RetryPolicy _endReplaceSegmentsRetryPolicy;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -256,6 +276,7 @@ public class PinotHelixResourceManager {
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
   private QueryWorkloadManager _queryWorkloadManager;
+  private final PageCacheWarmupControllerExecutor _pageCacheWarmupControllerExecutor;
   // Dedicated ZkClient for transactional multi-path writes (atomic ZK multi()). Lazily built on
   // first multiWriteZK call. A dedicated session is used because Helix 1.3.2 does not expose
   // multi() on BaseDataAccessor, and the underlying ZkClient inside ZKHelixManager is not publicly
@@ -274,21 +295,34 @@ public class PinotHelixResourceManager {
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     _enableTieredSegmentAssignment = enableTieredSegmentAssignment;
     _controllerConf = controllerConf;
-    _instanceAdminEndpointCache =
-        CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
-            .build(new CacheLoader<>() {
-              @Override
-              public String load(String instanceId) {
-                InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
-                Preconditions.checkNotNull(instanceConfig, "Failed to find instance config for: %s", instanceId);
-                return InstanceUtils.getServerAdminEndpoint(instanceConfig);
-              }
-            });
+    _serverAdminAuthProvider =
+        AuthProviderUtils.extractAuthProvider(controllerConf, ControllerConf.CONTROLLER_SERVER_ADMIN_AUTH_PREFIX);
+    if (controllerConf != null) {
+      _segmentReplaceExternalViewMaxWaitMs = controllerConf.getSegmentReplaceExternalViewMaxWaitMs();
+      _segmentReplaceExternalViewCheckIntervalMs = controllerConf.getSegmentReplaceExternalViewCheckIntervalMs();
+      _endReplaceSegmentsRetryPolicy =
+          RetryPolicies.exponentialBackoffRetryPolicy(controllerConf.getSegmentReplaceMaxRetryAttempts(), 1000L, 2.0f);
+    } else {
+      _segmentReplaceExternalViewMaxWaitMs = EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+      _segmentReplaceExternalViewCheckIntervalMs = EXTERNAL_VIEW_CHECK_INTERVAL_MS;
+      _endReplaceSegmentsRetryPolicy = DEFAULT_RETRY_POLICY;
+    }
+    _instanceAdminEndpointCache = CacheBuilder.newBuilder()
+        .expireAfterWrite(Duration.ofHours(CACHE_ENTRY_EXPIRE_TIME_HOURS))
+        .build(new CacheLoader<>() {
+          @Override
+          public String load(String instanceId) {
+            InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
+            Preconditions.checkNotNull(instanceConfig, "Failed to find instance config for: %s", instanceId);
+            return InstanceUtils.getServerAdminEndpoint(instanceConfig);
+          }
+        });
     _lineageUpdaterLocks = new Object[DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE];
     for (int i = 0; i < _lineageUpdaterLocks.length; i++) {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
+    _pageCacheWarmupControllerExecutor = new PageCacheWarmupControllerExecutor(this, controllerConf);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -341,7 +375,7 @@ public class PinotHelixResourceManager {
     }
     // Initialize TableCache
     HelixConfigScope helixConfigScope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
+        new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
     Map<String, String> configs =
         _helixAdmin.getConfig(helixConfigScope, Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY));
     boolean caseInsensitive = Boolean.parseBoolean(configs.getOrDefault(Helix.ENABLE_CASE_INSENSITIVE_KEY,
@@ -352,6 +386,7 @@ public class PinotHelixResourceManager {
   /// Stop the Pinot controller instance.
   public synchronized void stop() {
     _segmentDeletionManager.stop();
+    _pageCacheWarmupControllerExecutor.shutdown();
     ZkClient zkClient = _zkClient;
     if (zkClient != null) {
       _zkClient = null;
@@ -391,7 +426,7 @@ public class PinotHelixResourceManager {
   protected SegmentDeletionManager createSegmentDeletionManager(String dataDir, HelixAdmin helixAdmin,
       String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
     return new SegmentDeletionManager(dataDir, helixAdmin, helixClusterName, propertyStore,
-        deletedSegmentsRetentionInDays);
+        deletedSegmentsRetentionInDays, _controllerConf != null && _controllerConf.isDeletedSegmentsPreserveMetadata());
   }
 
   /// Get the Helix manager.
@@ -429,7 +464,7 @@ public class PinotHelixResourceManager {
     return _lineageManager;
   }
 
-/// Instance related APIs
+  /// Instance related APIs
 
   /// Get all instance Ids.
   ///
@@ -506,27 +541,37 @@ public class PinotHelixResourceManager {
   }
 
   public List<String> getAllBrokerInstances() {
-    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream().filter(InstanceTypeUtils::isBroker)
+    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName)
+        .stream()
+        .filter(InstanceTypeUtils::isBroker)
         .collect(Collectors.toList());
   }
 
   public List<InstanceConfig> getAllBrokerInstanceConfigs() {
-    return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
-        .filter(instance -> InstanceTypeUtils.isBroker(instance.getId())).collect(Collectors.toList());
+    return HelixHelper.getInstanceConfigs(_helixZkManager)
+        .stream()
+        .filter(instance -> InstanceTypeUtils.isBroker(instance.getId()))
+        .collect(Collectors.toList());
   }
 
   public List<InstanceConfig> getAllControllerInstanceConfigs() {
-    return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
-        .filter(instance -> InstanceTypeUtils.isController(instance.getId())).collect(Collectors.toList());
+    return HelixHelper.getInstanceConfigs(_helixZkManager)
+        .stream()
+        .filter(instance -> InstanceTypeUtils.isController(instance.getId()))
+        .collect(Collectors.toList());
   }
 
   public List<InstanceConfig> getAllMinionInstanceConfigs() {
-    return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
-        .filter(instance -> InstanceTypeUtils.isMinion(instance.getId())).collect(Collectors.toList());
+    return HelixHelper.getInstanceConfigs(_helixZkManager)
+        .stream()
+        .filter(instance -> InstanceTypeUtils.isMinion(instance.getId()))
+        .collect(Collectors.toList());
   }
 
   public List<String> getAllServerInstances() {
-    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream().filter(InstanceTypeUtils::isServer)
+    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName)
+        .stream()
+        .filter(InstanceTypeUtils::isServer)
         .collect(Collectors.toList());
   }
 
@@ -569,8 +614,8 @@ public class PinotHelixResourceManager {
           _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}", instanceId,
           newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
-      return PinotResourceManagerResponse.success("Added instance: " + instanceId + ", and updated broker resource - "
-          + "tables added: " + tablesAdded);
+      return PinotResourceManagerResponse.success(
+          "Added instance: " + instanceId + ", and updated broker resource - " + "tables added: " + tablesAdded);
     } else {
       return PinotResourceManagerResponse.success("Added instance: " + instanceId);
     }
@@ -586,29 +631,34 @@ public class PinotHelixResourceManager {
 
     InstanceConfigValidatorRegistry.validate(newInstance);
 
-    // Asymmetric preservation of the operational `queriesDisabled` flag managed by
-    // PUT /instances/{name}/state?state=QUERIES_DISABLE|QUERIES_ENABLE (see #setQueriesDisabled):
-    //   - body=true  -> set true (legacy path; explicit operator intent in this request).
-    //   - body=false -> if live==true, preserve true (the clobber case: a generic update to
-    //                   host/tags/ports must NOT silently re-route queries to a server an
-    //                   operator has explicitly removed from routing).
-    //   - body=false + live!=true -> leave as is (no-op / cleared).
-    boolean liveQueriesDisabled = Boolean.parseBoolean(
-        instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
-
     List<String> newTags = newInstance.getTags();
     List<String> oldTags = instanceConfig.getTags();
-    InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
-    // If the live record had queriesDisabled=true but the request body defaulted it to false,
-    // restore the operational flag so it survives a request-body-driven update.
-    if (liveQueriesDisabled && !newInstance.isQueriesDisabled()) {
-      instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
-      LOGGER.warn("Ignoring request body's queriesDisabled=false for instance: {} because the live config has "
-          + "queriesDisabled=true; use PUT /instances/{}/state?state=QUERIES_ENABLE to clear the flag.", instanceId,
-          instanceId);
+    // Apply request-owned fields to the latest Helix record. A participant can update its
+    // own fields (for example pinotVersion and capabilities) after the read above but before
+    // this write. A full-record setProperty would overwrite those newer values; updateProperty
+    // runs this updater against the current record and preserves fields not changed here.
+    AtomicBoolean preservedQueriesDisabled = new AtomicBoolean();
+    boolean updated = _helixDataAccessor.updateProperty(_keyBuilder.instanceConfig(instanceId), record -> {
+      InstanceConfig currentConfig = new InstanceConfig(record);
+      boolean liveQueriesDisabled =
+          Boolean.parseBoolean(record.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
+      InstanceUtils.updateHelixInstanceConfig(currentConfig, newInstance);
+      // Preserve the operator-controlled flag when the request body supplies its default false.
+      // An explicit true in the request remains supported for the legacy update path.
+      boolean shouldPreserveQueriesDisabled = liveQueriesDisabled && !newInstance.isQueriesDisabled();
+      if (shouldPreserveQueriesDisabled) {
+        currentConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+      }
+      preservedQueriesDisabled.set(shouldPreserveQueriesDisabled);
+      return currentConfig.getRecord();
+    }, instanceConfig);
+    if (!updated) {
+      throw new RuntimeException("Failed to update instance config for instance: " + instanceId);
     }
-    if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
-      throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
+    if (preservedQueriesDisabled.get()) {
+      LOGGER.warn("Ignoring request body's queriesDisabled=false for instance: {} because the live config has "
+              + "queriesDisabled=true; use PUT /instances/{}/state?state=QUERIES_ENABLE to clear the flag.", instanceId,
+          instanceId);
     }
 
     // Update broker resource if necessary
@@ -630,8 +680,9 @@ public class PinotHelixResourceManager {
           _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
-      return PinotResourceManagerResponse.success("Updated instance: " + instanceId + ", and updated broker resource - "
-          + "tables added: " + tablesAdded + ", tables removed: " + tablesRemoved);
+      return PinotResourceManagerResponse.success(
+          "Updated instance: " + instanceId + ", and updated broker resource - " + "tables added: " + tablesAdded
+              + ", tables removed: " + tablesRemoved);
     } else {
       return PinotResourceManagerResponse.success("Updated instance: " + instanceId);
     }
@@ -649,11 +700,10 @@ public class PinotHelixResourceManager {
   public synchronized void setQueriesDisabled(String serverInstanceName, boolean disabled) {
     Preconditions.checkArgument(InstanceTypeUtils.isServer(serverInstanceName),
         "setQueriesDisabled only applies to server instances, got: %s", serverInstanceName);
-    Map<String, String> propToUpdate =
-        Map.of(CommonConstants.Helix.QUERIES_DISABLED, Boolean.toString(disabled));
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, _helixClusterName)
-            .forParticipant(serverInstanceName).build();
+    Map<String, String> propToUpdate = Map.of(CommonConstants.Helix.QUERIES_DISABLED, Boolean.toString(disabled));
+    HelixConfigScope scope = new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName)
+        .forParticipant(serverInstanceName)
+        .build();
     LOGGER.info("Setting queriesDisabled={} for server instance: {}", disabled, serverInstanceName);
     _helixAdmin.setConfig(scope, propToUpdate);
   }
@@ -695,8 +745,9 @@ public class PinotHelixResourceManager {
           _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
-      return PinotResourceManagerResponse.success("Updated tags: " + newTags + " for instance: " + instanceId
-          + ", and updated broker resource - tables added: " + tablesAdded + ", tables removed: " + tablesRemoved);
+      return PinotResourceManagerResponse.success(
+          "Updated tags: " + newTags + " for instance: " + instanceId + ", and updated broker resource - tables added: "
+              + tablesAdded + ", tables removed: " + tablesRemoved);
     } else {
       return PinotResourceManagerResponse.success("Updated tags: " + newTags + " for instance: " + instanceId);
     }
@@ -722,8 +773,9 @@ public class PinotHelixResourceManager {
         _queryWorkloadManager);
     LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
         instanceId, brokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
-    return PinotResourceManagerResponse.success("Updated broker resource for broker: " + instanceId
-        + " - tables added: " + tablesAdded + ", tables removed: " + tablesRemoved);
+    return PinotResourceManagerResponse.success(
+        "Updated broker resource for broker: " + instanceId + " - tables added: " + tablesAdded + ", tables removed: "
+            + tablesRemoved);
   }
 
   /// Validates whether an instance is offline for certain amount of time.
@@ -787,9 +839,10 @@ public class PinotHelixResourceManager {
   /// @param databaseName database name
   /// @return List of table names in provided database name
   public List<String> getAllTables(@Nullable String databaseName) {
-    return getAllResources().stream().filter(
-        resourceName -> TableNameBuilder.isTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(resourceName,
-            databaseName)).collect(Collectors.toList());
+    return getAllResources().stream()
+        .filter(resourceName -> TableNameBuilder.isTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(
+            resourceName, databaseName))
+        .collect(Collectors.toList());
   }
 
   /// Get all offline table names from all databases.
@@ -804,9 +857,10 @@ public class PinotHelixResourceManager {
   /// @param databaseName database name
   /// @return List of offline table names in provided database name
   public List<String> getAllOfflineTables(@Nullable String databaseName) {
-    return getAllResources().stream().filter(
-        resourceName -> TableNameBuilder.isOfflineTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(
-            resourceName, databaseName)).collect(Collectors.toList());
+    return getAllResources().stream()
+        .filter(resourceName -> TableNameBuilder.isOfflineTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(
+            resourceName, databaseName))
+        .collect(Collectors.toList());
   }
 
   /// Get all dimension table names from all databases.
@@ -821,8 +875,10 @@ public class PinotHelixResourceManager {
   /// @param databaseName database name
   /// @return List of dimension table names in provided database name
   public List<String> getAllDimensionTables(@Nullable String databaseName) {
-    return _tableCache.getAllDimensionTables().stream()
-        .filter(table -> DatabaseUtils.isPartOfDatabase(table, databaseName)).collect(Collectors.toList());
+    return _tableCache.getAllDimensionTables()
+        .stream()
+        .filter(table -> DatabaseUtils.isPartOfDatabase(table, databaseName))
+        .collect(Collectors.toList());
   }
 
   /// Get all realtime table names from all databases.
@@ -837,17 +893,22 @@ public class PinotHelixResourceManager {
   /// @param databaseName database name
   /// @return List of realtime table names in provided database name
   public List<String> getAllRealtimeTables(@Nullable String databaseName) {
-    return getAllResources().stream().filter(
-        resourceName -> TableNameBuilder.isRealtimeTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(
-            resourceName, databaseName)).collect(Collectors.toList());
+    return getAllResources().stream()
+        .filter(
+            resourceName -> TableNameBuilder.isRealtimeTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(
+                resourceName, databaseName))
+        .collect(Collectors.toList());
   }
 
   /// Get all raw table names in all databases.
   ///
   /// @return List of raw table names
   public List<String> getAllRawTables() {
-    return getAllResources().stream().filter(TableNameBuilder::isTableResource)
-        .map(TableNameBuilder::extractRawTableName).distinct().collect(Collectors.toList());
+    return getAllResources().stream()
+        .filter(TableNameBuilder::isTableResource)
+        .map(TableNameBuilder::extractRawTableName)
+        .distinct()
+        .collect(Collectors.toList());
   }
 
   /// Get all raw table names from provided database name.
@@ -855,9 +916,12 @@ public class PinotHelixResourceManager {
   /// @param databaseName database name
   /// @return List of raw table names in provided database name
   public List<String> getAllRawTables(@Nullable String databaseName) {
-    return getAllResources().stream().filter(
-        resourceName -> TableNameBuilder.isTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(resourceName,
-            databaseName)).map(TableNameBuilder::extractRawTableName).distinct().collect(Collectors.toList());
+    return getAllResources().stream()
+        .filter(resourceName -> TableNameBuilder.isTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(
+            resourceName, databaseName))
+        .map(TableNameBuilder::extractRawTableName)
+        .distinct()
+        .collect(Collectors.toList());
   }
 
   /// Get all raw materialized view names from provided database name. Backs
@@ -902,8 +966,7 @@ public class PinotHelixResourceManager {
       TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       return tableConfig != null && tableConfig.isMaterializedView();
     } catch (Exception e) {
-      LOGGER.warn("Failed to read TableConfig for {} while filtering MVs; treating as non-MV",
-          tableNameWithType, e);
+      LOGGER.warn("Failed to read TableConfig for {} while filtering MVs; treating as non-MV", tableNameWithType, e);
       return false;
     }
   }
@@ -1049,6 +1112,15 @@ public class PinotHelixResourceManager {
 
   public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType) {
     return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType);
+  }
+
+  /// Reads the ZK metadata of the named segments in a single batched request, index-aligned with `segmentNames` and
+  /// holding `null` for segments whose znode could not be read. See
+  /// [ZKMetadataProvider#getSegmentsZKMetadata(ZkHelixPropertyStore, String, List, List)] for the full contract,
+  /// including the `stats` out-parameter that carries the znodes' modification times.
+  public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType, List<String> segmentNames,
+      @Nullable List<Stat> stats) {
+    return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType, segmentNames, stats);
   }
 
   public Collection<String> getLastLLCCompletedSegments(String tableNameWithType) {
@@ -1461,6 +1533,10 @@ public class PinotHelixResourceManager {
           }
         }
       }
+      // The instances of the partition assignment are in use although they might host no segment
+      if (CollectionUtils.containsAny(taggedInstances, PartitionAssignmentUtils.getAllInstances(tableIdealState))) {
+        return false;
+      }
     }
     return true;
   }
@@ -1501,8 +1577,9 @@ public class PinotHelixResourceManager {
     int numOfflineInstances = serverTenant.getOfflineInstances();
     int numRealtimeInstances = serverTenant.getRealtimeInstances();
     if (numInstances < numOfflineInstances || numInstances < numRealtimeInstances) {
-      throw new BadRequestException("Cannot request more offline instances: " + numOfflineInstances
-          + " or realtime instances: " + numRealtimeInstances + " than total instances: " + numInstances);
+      throw new BadRequestException(
+          "Cannot request more offline instances: " + numOfflineInstances + " or realtime instances: "
+              + numRealtimeInstances + " than total instances: " + numInstances);
     }
     // TODO: Consider throwing BadRequestException
     List<String> untaggedInstances = getOnlineUnTaggedServerInstanceList();
@@ -1643,6 +1720,7 @@ public class PinotHelixResourceManager {
       // Update existing schema
       if (override) {
         updateSchema(schema, oldSchema, force);
+        refreshTablesUsingSchema(schemaName);
       } else {
         throw new SchemaAlreadyExistsException("Schema: " + schemaName + " already exists");
       }
@@ -1675,30 +1753,43 @@ public class PinotHelixResourceManager {
     }
 
     updateSchema(schema, oldSchema, forceTableSchemaUpdate);
+    if (reload) {
+      reloadTablesUsingSchema(schemaName);
+    } else {
+      refreshTablesUsingSchema(schemaName);
+    }
+  }
+
+  /// Reloads all segments of the tables using the given schema. Logical table schemas are skipped because no
+  /// segments are backed by them.
+  private void reloadTablesUsingSchema(String schemaName)
+      throws TableNotFoundException {
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, schemaName)) {
-      // For logical table schemas, we do not need to reload segments or send schema refresh messages
-      LOGGER.info("Logical table schema: {} updated, no need to reload segments or send schema refresh messages",
-          schemaName);
+      LOGGER.info("Logical table schema: {} updated, no need to reload segments", schemaName);
       return;
     }
+    LOGGER.info("Reloading tables with name: {}", schemaName);
+    for (String tableNameWithType : getExistingTableNamesWithType(schemaName, null)) {
+      reloadAllSegments(tableNameWithType, false, null);
+    }
+  }
+
+  /// Sends the table config and schema refresh message to the servers hosting the tables using the given schema.
+  /// Servers reuse their cached schema for ordinary segment loads and only refresh it on this message, an explicit
+  /// reload or a table config update, so every schema update has to send it or newly loaded segments keep being
+  /// processed against the previous schema. Logical table schemas are skipped because no segments are backed by them.
+  private void refreshTablesUsingSchema(String schemaName) {
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, schemaName)) {
+      LOGGER.info("Logical table schema: {} updated, no need to send schema refresh messages", schemaName);
+      return;
+    }
+    LOGGER.info("Refreshing schema for tables with name: {}", schemaName);
     try {
-      List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
-      if (reload) {
-        LOGGER.info("Reloading tables with name: {}", schemaName);
-        for (String tableNameWithType : tableNamesWithType) {
-          reloadAllSegments(tableNameWithType, false, null);
-        }
-      } else {
-        LOGGER.info("Refreshing schema for tables with name: {}", schemaName);
-        for (String tableNameWithType : tableNamesWithType) {
-          sendTableConfigSchemaRefreshMessage(tableNameWithType);
-        }
+      for (String tableNameWithType : getExistingTableNamesWithType(schemaName, null)) {
+        sendTableConfigSchemaRefreshMessage(tableNameWithType);
       }
     } catch (TableNotFoundException e) {
-      if (reload) {
-        throw e;
-      }
-      // We don't throw exception if no tables found for schema when reload is false. Since this could be valid case
+      // A schema can exist before any table uses it
       LOGGER.warn("No tables found for schema (refresh only): {}", schemaName, e);
     }
   }
@@ -1721,7 +1812,8 @@ public class PinotHelixResourceManager {
       } else {
         // Build detailed error message with incompatibility reasons
         StringBuilder errorMsg = new StringBuilder();
-        errorMsg.append("New schema: ").append(schemaName)
+        errorMsg.append("New schema: ")
+            .append(schemaName)
             .append(" is not backward-compatible with the existing schema.");
         errorMsg.append("\n\nIncompatibility Details:");
 
@@ -1731,8 +1823,11 @@ public class PinotHelixResourceManager {
         List<String> newPrimaryKeys = schema.getPrimaryKeyColumns();
         if (CollectionUtils.isNotEmpty(oldPrimaryKeys)) {
           if (!Objects.equals(oldPrimaryKeys, newPrimaryKeys)) {
-            errorMsg.append("\n- Primary key columns changed (").append(oldPrimaryKeys).append(" -> ")
-                .append(newPrimaryKeys).append(")");
+            errorMsg.append("\n- Primary key columns changed (")
+                .append(oldPrimaryKeys)
+                .append(" -> ")
+                .append(newPrimaryKeys)
+                .append(")");
           }
         }
 
@@ -1757,12 +1852,9 @@ public class PinotHelixResourceManager {
             FieldSpec oldFieldSpec = entry.getValue();
             FieldSpec newFieldSpec = schema.getFieldSpecFor(columnName);
             if (!newFieldSpec.isBackwardCompatibleWith(oldFieldSpec)) {
-              incompatibleFields.add(String.format("%s (old: %s %s, new: %s %s)",
-                  columnName,
-                  oldFieldSpec.getFieldType(),
-                  oldFieldSpec.getDataType(),
-                  newFieldSpec.getFieldType(),
-                  newFieldSpec.getDataType()));
+              incompatibleFields.add(
+                  String.format("%s (old: %s %s, new: %s %s)", columnName, oldFieldSpec.getFieldType(),
+                      oldFieldSpec.getDataType(), newFieldSpec.getFieldType(), newFieldSpec.getDataType()));
             }
           }
         }
@@ -1814,8 +1906,7 @@ public class PinotHelixResourceManager {
   /// @return List of schema names
   public List<String> getAllSchemaNames() {
     return _propertyStore.getChildNames(
-        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT
-    );
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
   }
 
   /// Get all schema names in the cluster for default database.
@@ -1831,7 +1922,8 @@ public class PinotHelixResourceManager {
     List<String> schemas = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
     if (schemas != null) {
-      return schemas.stream().filter(schemaName -> DatabaseUtils.isPartOfDatabase(schemaName, databaseName))
+      return schemas.stream()
+          .filter(schemaName -> DatabaseUtils.isPartOfDatabase(schemaName, databaseName))
           .collect(Collectors.toList());
     }
     return List.of();
@@ -1842,14 +1934,13 @@ public class PinotHelixResourceManager {
     if (CollectionUtils.isEmpty(ZKMetadataProvider.getAllUserName(_propertyStore))) {
       String initUsername = controllerConf.getInitAccessControlUsername();
       String initPassword = controllerConf.getInitAccessControlPassword();
-      addUser(new UserConfig(initUsername, initPassword, ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(),
-          null, null, null));
       addUser(
-          new UserConfig(initUsername, initPassword, ComponentType.BROKER.name(), RoleType.ADMIN.name(),
-              null, null, null));
-      addUser(
-          new UserConfig(initUsername, initPassword, ComponentType.SERVER.name(), RoleType.ADMIN.name(),
-              null, null, null));
+          new UserConfig(initUsername, initPassword, ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), null, null,
+              null));
+      addUser(new UserConfig(initUsername, initPassword, ComponentType.BROKER.name(), RoleType.ADMIN.name(), null, null,
+          null));
+      addUser(new UserConfig(initUsername, initPassword, ComponentType.SERVER.name(), RoleType.ADMIN.name(), null, null,
+          null));
     }
   }
 
@@ -1932,8 +2023,8 @@ public class PinotHelixResourceManager {
 
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, rawTableName)) {
-      throw new TableAlreadyExistsException("Logical table '" + rawTableName
-          + "' already exists. Please use a different name for the physical table.");
+      throw new TableAlreadyExistsException(
+          "Logical table '" + rawTableName + "' already exists. Please use a different name for the physical table.");
     }
     if (_helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType) != null) {
       throw new TableAlreadyExistsException("External view for " + tableNameWithType
@@ -2097,8 +2188,9 @@ public class PinotHelixResourceManager {
     if (CollectionUtils.isNotEmpty(tierConfigList)) {
       for (TierConfig tierConfig : tierConfigList) {
         if (getInstancesWithTag(tierConfig.getServerTag()).isEmpty()) {
-          throw new InvalidTableConfigException("Failed to find instances with tag: " + tierConfig.getServerTag()
-              + " as used by tier: " + tierConfig.getName() + " for table: " + tableNameWithType);
+          throw new InvalidTableConfigException(
+              "Failed to find instances with tag: " + tierConfig.getServerTag() + " as used by tier: "
+                  + tierConfig.getName() + " for table: " + tableNameWithType);
         }
       }
     }
@@ -2113,7 +2205,8 @@ public class PinotHelixResourceManager {
     List<InstanceConfig> allMinionWorkerInstanceConfigs = getAllMinionInstanceConfigs();
 
     //extract all minionInstanceTags from allMinionWorkerInstanceConfigs
-    Set<String> minionInstanceTagSet = allMinionWorkerInstanceConfigs.stream().map(InstanceConfig::getTags)
+    Set<String> minionInstanceTagSet = allMinionWorkerInstanceConfigs.stream()
+        .map(InstanceConfig::getTags)
         .collect(HashSet::new, Set::addAll, Set::addAll);
 
     if (tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig().getTaskTypeConfigsMap() != null) {
@@ -2123,9 +2216,10 @@ public class PinotHelixResourceManager {
           String taskInstanceTag = taskTypeConfig.getOrDefault(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG,
               CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
           if (!minionInstanceTagSet.contains(taskInstanceTag)) {
-            throw new InvalidTableConfigException("Failed to find minion instances with tag: " + taskInstanceTag
-                + " for table: " + tableConfig.getTableName()
-                + ". If the task is not required to run, remove the schedule parameter from the task config");
+            throw new InvalidTableConfigException(
+                "Failed to find minion instances with tag: " + taskInstanceTag + " for table: "
+                    + tableConfig.getTableName()
+                    + ". If the task is not required to run, remove the schedule parameter from the task config");
           }
         }
         // Skip the validation if the task is not scheduled to run, because it's possible that the task is not required
@@ -2174,18 +2268,17 @@ public class PinotHelixResourceManager {
         Preconditions.checkState(_helixZkManager != null,
             "multiWriteZK unavailable: PinotHelixResourceManager has not been started");
         String zkAddress = _helixZkManager.getMetadataStoreConnectionString();
-        int sessionTimeoutMs = _controllerConf != null
-            ? _controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
-                CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS)
+        int sessionTimeoutMs = _controllerConf != null ? _controllerConf.getProperty(
+            CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
+            CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS)
             : CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS;
-        int connectTimeoutMs = _controllerConf != null
-            ? _controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG,
-                CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS)
+        int connectTimeoutMs = _controllerConf != null ? _controllerConf.getProperty(
+            CommonConstants.Helix.ZkClient.ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG,
+            CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS)
             : CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS;
-        LOGGER.info("Building dedicated multiWriteZK ZkClient at {} (session={}ms, connect={}ms)",
-            zkAddress, sessionTimeoutMs, connectTimeoutMs);
-        ZkClient built = new ZkClient.Builder()
-            .setZkServer(zkAddress)
+        LOGGER.info("Building dedicated multiWriteZK ZkClient at {} (session={}ms, connect={}ms)", zkAddress,
+            sessionTimeoutMs, connectTimeoutMs);
+        ZkClient built = new ZkClient.Builder().setZkServer(zkAddress)
             .setSessionTimeout(sessionTimeoutMs)
             .setConnectionTimeout(connectTimeoutMs)
             .setZkSerializer(new ZNRecordSerializer())
@@ -2193,12 +2286,95 @@ public class PinotHelixResourceManager {
         if (!built.waitUntilConnected(connectTimeoutMs, TimeUnit.MILLISECONDS)) {
           ZkStarter.closeAsync(built);
           throw new RuntimeException(
-              "Timed out connecting to ZK at " + zkAddress + " after " + connectTimeoutMs
-                  + "ms for multiWriteZK");
+              "Timed out connecting to ZK at " + zkAddress + " after " + connectTimeoutMs + "ms for multiWriteZK");
         }
         _zkClient = built;
       }
       return _zkClient;
+    }
+  }
+
+  /// Removes the ZK metadata of the given segments that are IN_PROGRESS and not in the IdealState of the table, i.e.
+  /// new consuming segments that were not added to the IdealState, and returns the segments whose ZK metadata was
+  /// removed.
+  ///
+  /// The removal is submitted in one ZK `multi()` transaction with version-checked deletes of the segment ZK metadata
+  /// read here, and a version-checked write of the unchanged IdealState:
+  /// - An IdealState update that read the IdealState before the transaction fails its version check. An updater that
+  ///   reads the segment ZK metadata again when it retries, like the one of RealtimeSegmentValidationManager, then no
+  ///   longer finds the removed segments.
+  /// - If the IdealState, or the ZK metadata of one of the segments, is updated after it was read here, the transaction
+  ///   fails and is retried.
+  ///
+  /// The data versions cannot tell a segment ZK metadata deleted and recreated with the same name since it was read,
+  /// e.g. by an upload under the same name, from the one that was read. As the IdealState is outside the property
+  /// store, the transaction uses the multi-write ZkClient directly instead of [ZkMultiWriteBuilder].
+  public Set<String> removeInProgressSegmentsZKMetadataNotInIdealState(String tableNameWithType,
+      Collection<String> segmentNames) {
+    return removeInProgressSegmentsZKMetadataNotInIdealState(tableNameWithType, segmentNames, () -> {
+    });
+  }
+
+  /// @param afterRead Runs after reading the IdealState and the segment ZK metadata, before removing it
+  @VisibleForTesting
+  Set<String> removeInProgressSegmentsZKMetadataNotInIdealState(String tableNameWithType,
+      Collection<String> segmentNames, Runnable afterRead) {
+    ZkClient zkClient = getOrBuildMultiWriteZkClient();
+    String idealStatePath = PropertyPathBuilder.idealState(_helixClusterName, tableNameWithType);
+    String propertyStoreRoot = PropertyPathBuilder.propertyStore(_helixClusterName);
+    for (int attempt = 1; ; attempt++) {
+      Stat idealStateStat = new Stat();
+      ZNRecord idealState;
+      try {
+        idealState = zkClient.readData(idealStatePath, idealStateStat);
+      } catch (ZkNoNodeException e) {
+        idealState = null;
+      }
+      if (idealState == null) {
+        // The table was deleted
+        return Set.of();
+      }
+      List<Op> segmentDeletes = new ArrayList<>();
+      Set<String> segmentsToRemove = new HashSet<>();
+      for (String segmentName : segmentNames) {
+        if (idealState.getMapFields().containsKey(segmentName)) {
+          continue;
+        }
+        String segmentPath =
+            propertyStoreRoot + ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
+        Stat segmentStat = new Stat();
+        ZNRecord segmentRecord;
+        try {
+          segmentRecord = zkClient.readData(segmentPath, segmentStat);
+        } catch (ZkNoNodeException e) {
+          continue;
+        }
+        if (new SegmentZKMetadata(segmentRecord).getStatus() == CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+          segmentDeletes.add(Op.delete(segmentPath, segmentStat.getVersion()));
+          segmentsToRemove.add(segmentName);
+        }
+      }
+      if (segmentsToRemove.isEmpty()) {
+        return segmentsToRemove;
+      }
+      afterRead.run();
+      List<Op> ops = new ArrayList<>(segmentDeletes.size() + 1);
+      ops.add(Op.setData(idealStatePath, zkClient.serialize(idealState, idealStatePath), idealStateStat.getVersion()));
+      ops.addAll(segmentDeletes);
+      try {
+        zkClient.multi(ops);
+        return segmentsToRemove;
+      } catch (ZkException e) {
+        // As in ZkMultiWriteBuilder#execute(), the ZkClient wraps the KeeperException of an atomic rollback. A version
+        // mismatch or a missing node means that the IdealState or a segment ZK metadata changed concurrently.
+        boolean concurrentChange = e.getCause() instanceof KeeperException.BadVersionException
+            || e.getCause() instanceof KeeperException.NoNodeException;
+        if (!concurrentChange || attempt == MAX_SEGMENT_ZK_METADATA_REMOVAL_ATTEMPTS) {
+          throw e;
+        }
+        LOGGER.info("Retrying to remove segment ZK metadata for segments: {} of table: {} after a concurrent change",
+            segmentsToRemove, tableNameWithType);
+      }
     }
   }
 
@@ -2263,36 +2439,14 @@ public class PinotHelixResourceManager {
       }
     }
 
-    InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
     List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
     if (!instancePartitionsTypesToAssign.isEmpty()) {
       LOGGER.info("Assigning {} instances to table: {}", instancePartitionsTypesToAssign, tableNameWithType);
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypesToAssign) {
-        boolean hasPreConfiguredInstancePartitions =
-            InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
-        boolean isPreConfigurationBasedAssignment =
-            InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
-        InstancePartitions instancePartitions;
-        if (!hasPreConfiguredInstancePartitions) {
-          instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null);
-          LOGGER.info("Persisting instance partitions: {}", instancePartitions);
-        } else {
-          String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
-          if (isPreConfigurationBasedAssignment) {
-            InstancePartitions preConfiguredInstancePartitions =
-                InstancePartitionsUtils.fetchInstancePartitionsWithRename(_propertyStore,
-                    referenceInstancePartitionsName, instancePartitionsType.getInstancePartitionsName(rawTableName));
-            instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null,
-                preConfiguredInstancePartitions);
-            LOGGER.info("Persisting instance partitions: {} (based on {})", instancePartitions,
-                preConfiguredInstancePartitions);
-          } else {
-            instancePartitions = InstancePartitionsUtils.fetchInstancePartitionsWithRename(_propertyStore,
-                referenceInstancePartitionsName, instancePartitionsType.getInstancePartitionsName(rawTableName));
-            LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
-                referenceInstancePartitionsName);
-          }
-        }
+        InstancePartitions instancePartitions =
+            InstanceAssignmentUtils.computeInstancePartitions(tableConfig, instancePartitionsType, _propertyStore,
+                instanceConfigs, null);
+        LOGGER.info("Persisting instance partitions: {}", instancePartitions);
         InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions, _queryWorkloadManager);
       }
     }
@@ -2308,7 +2462,7 @@ public class PinotHelixResourceManager {
             LOGGER.info("Calculating instance partitions for tier: {}, table : {}", tierConfig.getName(),
                 tableNameWithType);
             InstancePartitions instancePartitions =
-                instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
+                InstanceAssignmentUtils.assignInstances(tableConfig, tierConfig.getName(), instanceConfigs, null,
                     tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()));
             LOGGER.info("Persisting instance partitions: {}", instancePartitions);
             InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions,
@@ -2402,8 +2556,8 @@ public class PinotHelixResourceManager {
   }
 
   private void updateBrokerResourceForLogicalTable(LogicalTableConfig logicalTableConfig, String tableName) {
-    List<String> brokers = HelixHelper.getInstancesWithTag(
-        _helixZkManager, TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()));
+    List<String> brokers = HelixHelper.getInstancesWithTag(_helixZkManager,
+        TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()));
     HelixHelper.updateBrokerResource(_helixZkManager, tableName,
         SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE), _queryWorkloadManager);
   }
@@ -2436,8 +2590,8 @@ public class PinotHelixResourceManager {
     // Validate schema with same name as logical table exists
     if (!ZKMetadataProvider.isSchemaExists(_propertyStore, logicalTableConfig.getTableName())) {
       throw new IllegalArgumentException(
-          "Invalid logical table. Reason: Schema with same name as logical table '"
-              + logicalTableConfig.getTableName() + "' does not exist");
+          "Invalid logical table. Reason: Schema with same name as logical table '" + logicalTableConfig.getTableName()
+              + "' does not exist");
     }
   }
 
@@ -2547,8 +2701,8 @@ public class PinotHelixResourceManager {
       if (!dependentMVs.isEmpty()) {
         throw new IllegalStateException(String.format(
             "Cannot delete table '%s': %d materialized view(s) depend on it: %s. "
-                + "Drop the dependent materialized views first.",
-            tableNameWithType, dependentMVs.size(), dependentMVs));
+                + "Drop the dependent materialized views first.", tableNameWithType, dependentMVs.size(),
+            dependentMVs));
       }
     }
 
@@ -2566,8 +2720,7 @@ public class PinotHelixResourceManager {
     // Remove all stored segments for the table
     Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
     _segmentDeletionManager.removeSegmentsFromStoreInBatch(tableNameWithType,
-        getSegmentsFromPropertyStore(tableNameWithType),
-        retentionPeriodMs);
+        getSegmentsFromPropertyStore(tableNameWithType), retentionPeriodMs);
     LOGGER.info("Deleting table {}: Removed stored segments", tableNameWithType);
 
     // Remove segment metadata
@@ -2613,15 +2766,13 @@ public class PinotHelixResourceManager {
       MaterializedViewDefinitionMetadataUtils.delete(_propertyStore, tableNameWithType);
       LOGGER.info("Deleting table {}: Removed MV definition metadata", tableNameWithType);
     } catch (Exception e) {
-      LOGGER.debug("Deleting table {}: No MV definition metadata to remove or removal failed",
-          tableNameWithType, e);
+      LOGGER.debug("Deleting table {}: No MV definition metadata to remove or removal failed", tableNameWithType, e);
     }
     try {
       MaterializedViewRuntimeMetadataUtils.delete(_propertyStore, tableNameWithType);
       LOGGER.info("Deleting table {}: Removed MV runtime metadata", tableNameWithType);
     } catch (Exception e) {
-      LOGGER.debug("Deleting table {}: No MV runtime metadata to remove or removal failed",
-          tableNameWithType, e);
+      LOGGER.debug("Deleting table {}: No MV runtime metadata to remove or removal failed", tableNameWithType, e);
     }
 
     // Remove table config
@@ -2638,8 +2789,8 @@ public class PinotHelixResourceManager {
   public boolean deleteLogicalTableConfig(String tableName) {
     LOGGER.info("Deleting logical table {}: Start", tableName);
     if (!ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
-      throw new ControllerApplicationException(LOGGER,
-          "Logical table: " + tableName + " does not exists.", Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, "Logical table: " + tableName + " does not exists.",
+          Response.Status.NOT_FOUND);
     }
 
     LOGGER.info("Deleting logical table {}: Removing BrokerResource for logical table", tableName);
@@ -2898,8 +3049,7 @@ public class PinotHelixResourceManager {
         instancePartitionsMap = fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
       }
 
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
         Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
@@ -2908,7 +3058,7 @@ public class PinotHelixResourceManager {
               tableNameWithType);
         } else {
           List<String> assignedInstances =
-              segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+              segmentAssignment.assignSegment(segmentName, idealState, instancePartitionsMap);
           LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
               tableNameWithType);
           currentAssignment.put(segmentName,
@@ -2968,8 +3118,7 @@ public class PinotHelixResourceManager {
         tierToInstancePartitionsMap = null;
       }
 
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       long segmentAssignmentStartMs = System.currentTimeMillis();
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
@@ -2988,7 +3137,7 @@ public class PinotHelixResourceManager {
               instancePartitionsMap = tierToInstancePartitionsMap.get(segmentZKMetadata.getTier());
             }
             List<String> assignedInstances =
-                segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+                segmentAssignment.assignSegment(segmentName, idealState, instancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 tableNameWithType);
             currentAssignment.put(segmentName,
@@ -3062,8 +3211,7 @@ public class PinotHelixResourceManager {
   /// @param segmentZKMetadata
   /// @return
   public boolean createSegmentZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
-    boolean created =
-        ZKMetadataProvider.createSegmentZkMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+    boolean created = ZKMetadataProvider.createSegmentZkMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
     if (created) {
       // Notify the MV consistency manager so any partition of a dependent MV that overlaps the
       // new segment's time range is marked STALE.  This hook covers the OFFLINE segment-upload
@@ -3082,8 +3230,8 @@ public class PinotHelixResourceManager {
   }
 
   public boolean updateZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
-    boolean updated = ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata,
-        expectedVersion);
+    boolean updated =
+        ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata, expectedVersion);
     if (updated) {
       // Segment metadata updates (e.g. refresh, CRC change) may shift the segment's time range
       // or replace its content.  Notify so MV partitions that overlap pick up STALE.
@@ -3147,15 +3295,22 @@ public class PinotHelixResourceManager {
 
   public Map<String, Integer> reloadSegments(String tableNameWithType, boolean forceDownload,
       Map<String, List<String>> instanceToSegmentsMap, String reloadJobId) {
-    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and instanceToSegmentsMap: {}",
-        tableNameWithType, forceDownload, instanceToSegmentsMap);
+    return reloadSegments(tableNameWithType, forceDownload, false, instanceToSegmentsMap, reloadJobId);
+  }
+
+  /// Sends reload messages for the given segments to their target instances. When `onlyIfNeeded` is true, servers
+  /// reload only the segments whose loaded copy is out of date and skip the rest.
+  public Map<String, Integer> reloadSegments(String tableNameWithType, boolean forceDownload, boolean onlyIfNeeded,
+      Map<String, List<String>> instanceToSegmentsMap, String reloadJobId) {
+    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, onlyIfNeeded: {}, and "
+        + "instanceToSegmentsMap: {}", tableNameWithType, forceDownload, onlyIfNeeded, instanceToSegmentsMap);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     Map<String, Integer> instanceMsgInfoMap = new HashMap<>();
     for (Map.Entry<String, List<String>> entry : instanceToSegmentsMap.entrySet()) {
       String targetInstance = entry.getKey();
       SegmentReloadMessage message =
-          new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload, reloadJobId);
+          new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload, onlyIfNeeded, reloadJobId);
       int numMessagesSent =
           MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
       if (numMessagesSent > 0) {
@@ -3171,11 +3326,19 @@ public class PinotHelixResourceManager {
 
   public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
       @Nullable String targetInstance) {
-    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, and target: {}", tableNameWithType,
-        forceDownload, targetInstance == null ? "every instance" : targetInstance);
+    return reloadAllSegments(tableNameWithType, forceDownload, false, targetInstance);
+  }
+
+  /// Sends a reload message for all segments of the table. When `onlyIfNeeded` is true, servers reload only the
+  /// segments whose loaded copy is out of date and skip the rest.
+  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
+      boolean onlyIfNeeded, @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, onlyIfNeeded: {}, and target: {}",
+        tableNameWithType, forceDownload, onlyIfNeeded, targetInstance == null ? "every instance" : targetInstance);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, forceDownload);
+    SegmentReloadMessage message =
+        new SegmentReloadMessage(tableNameWithType, null, forceDownload, onlyIfNeeded, null);
     int numMessagesSent =
         MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
     if (numMessagesSent > 0) {
@@ -3189,11 +3352,20 @@ public class PinotHelixResourceManager {
 
   public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
       @Nullable String targetInstance) {
-    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, and target: {}",
-        segmentName, tableNameWithType, forceDownload, targetInstance == null ? "every instance" : targetInstance);
+    return reloadSegment(tableNameWithType, segmentName, forceDownload, false, targetInstance);
+  }
+
+  /// Sends a reload message for a single segment. When `onlyIfNeeded` is true, servers skip the reload if the loaded
+  /// copy is already up to date.
+  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
+      boolean onlyIfNeeded, @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, onlyIfNeeded: {}, and "
+            + "target: {}", segmentName, tableNameWithType, forceDownload, onlyIfNeeded,
+        targetInstance == null ? "every instance" : targetInstance);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, List.of(segmentName), forceDownload);
+    SegmentReloadMessage message =
+        new SegmentReloadMessage(tableNameWithType, List.of(segmentName), forceDownload, onlyIfNeeded, null);
     int numMessagesSent =
         MessagingServiceUtils.send(messagingService, message, tableNameWithType, segmentName, targetInstance);
     if (numMessagesSent > 0) {
@@ -3283,6 +3455,55 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /// Resets the replicas of the given segments that are in ERROR state, leaving the other replicas untouched. The ideal
+  /// state and external view are read once, when the resets are sent, to find the ERROR replicas; a replica on an
+  /// instance the ideal state no longer assigns the segment to is skipped. The resets are sent in one batch per
+  /// instance, only for the segments still in ERROR in the instance's current state, and the instance discards a reset
+  /// if the segment has left ERROR by the time it processes it.
+  ///
+  /// @return the segments whose reset failed on at least one instance
+  public Set<String> resetErrorReplicas(String tableNameWithType, Set<String> segmentNames) {
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
+
+    Map<String, Set<String>> instanceToResetSegmentsMap = new HashMap<>();
+    for (String segmentName : segmentNames) {
+      Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+      Map<String, String> idealStateMap = idealState.getInstanceStateMap(segmentName);
+      if (externalViewStateMap == null || idealStateMap == null) {
+        continue;
+      }
+      for (Map.Entry<String, String> entry : externalViewStateMap.entrySet()) {
+        String instance = entry.getKey();
+        if (!SegmentStateModel.ERROR.equals(entry.getValue())) {
+          continue;
+        }
+        if (idealStateMap.containsKey(instance)) {
+          instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
+        } else {
+          LOGGER.warn("Skipping reset of ERROR segment: {} of table: {} on instance: {} which the ideal state no "
+              + "longer assigns it to", segmentName, tableNameWithType, instance);
+        }
+      }
+    }
+
+    Set<String> failedSegments = new HashSet<>();
+    for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
+      String instance = entry.getKey();
+      Set<String> resetSegments = entry.getValue();
+      try {
+        resetPartitions(instance, tableNameWithType, resetSegments, true);
+      } catch (Exception e) {
+        LOGGER.error("Failed to reset ERROR segments: {} of table: {} on instance: {}", resetSegments,
+            tableNameWithType, instance, e);
+        failedSegments.addAll(resetSegments);
+      }
+    }
+    return failedSegments;
+  }
+
   private void resetPartitionAllState(String instance, String tableNameWithType, Set<String> segmentNames,
       List<String> failedInstances) {
     try {
@@ -3310,9 +3531,22 @@ public class PinotHelixResourceManager {
   /// However instead of resetting only the ERROR state to its initial state. we reset all state regardless.
   @VisibleForTesting
   void resetPartitionAllState(String instanceName, String resourceName, Set<String> resetPartitionNames) {
+    resetPartitions(instanceName, resourceName, resetPartitionNames, false);
+  }
+
+  /// Resets the given partitions on the instance to the initial state.
+  ///
+  /// With `errorStateOnly`, like [HelixAdmin#resetPartition(String, String, String, List)], only the partitions in
+  /// ERROR state in the instance's current state are reset, and each message is sent from ERROR, so the instance
+  /// discards it if the partition has left ERROR by the time it processes it. A partition with a pending state
+  /// transition message is skipped. Otherwise every partition is reset from its current state, and a pending state
+  /// transition message for any of them fails the call.
+  @VisibleForTesting
+  void resetPartitions(String instanceName, String resourceName, Set<String> resetPartitionNames,
+      boolean errorStateOnly) {
     LOGGER.info("Resetting partitions: {} for resource: {} on instance: {}", resetPartitionNames, resourceName,
         instanceName);
-    HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
+    HelixDataAccessor accessor = getHelixZkManager().getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = accessor.keyBuilder();
 
     // check the instance is alive
@@ -3335,6 +3569,7 @@ public class PinotHelixResourceManager {
     CurrentState curState = accessor.getProperty(keyBuilder.currentState(instanceName, sessionId, resourceName));
 
     // check there is no pending messages for the partitions exist
+    Set<String> partitionsWithPendingMessage = new HashSet<>();
     List<Message> messages = accessor.getChildValues(keyBuilder.messages(instanceName), true);
     for (Message message : messages) {
       if (!Message.MessageType.STATE_TRANSITION.name().equalsIgnoreCase(message.getMsgType()) || !sessionId.equals(
@@ -3342,9 +3577,12 @@ public class PinotHelixResourceManager {
           || !resetPartitionNames.contains(message.getPartitionName())) {
         continue;
       }
-      throw new RuntimeException("Can't reset state for " + resourceName + "." + resetPartitionNames + " on "
-          + instanceName + ", because a pending message " + message + " exists for resource "
-          + message.getResourceName());
+      if (!errorStateOnly) {
+        throw new RuntimeException(
+            "Can't reset state for " + resourceName + "." + resetPartitionNames + " on " + instanceName
+                + ", because a pending message " + message + " exists for resource " + message.getResourceName());
+      }
+      partitionsWithPendingMessage.add(message.getPartitionName());
     }
 
     String adminName;
@@ -3359,6 +3597,19 @@ public class PinotHelixResourceManager {
     List<Message> resetMessages = new ArrayList<>();
     List<PropertyKey> messageKeys = new ArrayList<>();
     for (String partitionName : resetPartitionNames) {
+      String fromState = curState.getState(partitionName);
+      if (errorStateOnly) {
+        if (!SegmentStateModel.ERROR.equals(fromState)) {
+          LOGGER.info("Skipping reset of partition: {} for resource: {} on instance: {} in state: {}", partitionName,
+              resourceName, instanceName, fromState);
+          continue;
+        }
+        if (partitionsWithPendingMessage.contains(partitionName)) {
+          LOGGER.info("Skipping reset of partition: {} for resource: {} on instance: {} with a pending message",
+              partitionName, resourceName, instanceName);
+          continue;
+        }
+      }
       // send currentState to initialState message
       String msgId = UUID.randomUUID().toString();
       Message message = new Message(Message.MessageType.STATE_TRANSITION, msgId);
@@ -3369,7 +3620,7 @@ public class PinotHelixResourceManager {
       message.setResourceName(resourceName);
       message.setTgtSessionId(sessionId);
       message.setStateModelDef(stateModelDef);
-      message.setFromState(curState.getState(partitionName));
+      message.setFromState(fromState);
       message.setToState(stateModel.getInitialState());
       message.setStateModelFactoryName(idealState.getStateModelFactoryName());
 
@@ -3384,7 +3635,21 @@ public class PinotHelixResourceManager {
       messageKeys.add(keyBuilder.message(instanceName, message.getId()));
     }
 
-    accessor.setChildren(messageKeys, resetMessages);
+    if (resetMessages.isEmpty()) {
+      return;
+    }
+    boolean[] results = accessor.setChildren(messageKeys, resetMessages);
+    List<String> failedPartitions = new ArrayList<>();
+    for (int i = 0; i < results.length; i++) {
+      if (!results[i]) {
+        failedPartitions.add(resetMessages.get(i).getPartitionName());
+      }
+    }
+    if (!failedPartitions.isEmpty()) {
+      throw new RuntimeException(
+          "Failed to send reset messages for partitions: " + failedPartitions + " of resource: " + resourceName
+              + " on instance: " + instanceName);
+    }
   }
 
   /// Sends a segment refresh message to:
@@ -3511,7 +3776,7 @@ public class PinotHelixResourceManager {
     Map<String, String> propToUpdate = new HashMap<>();
     propToUpdate.put(Helix.QUERY_RATE_LIMIT_DISABLED, Boolean.toString("DISABLE".equals(state)));
     HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(
+        new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(
             brokerInstanceName).build();
     _helixAdmin.setConfig(scope, propToUpdate);
   }
@@ -3534,8 +3799,8 @@ public class PinotHelixResourceManager {
     Set<String> segments = idealStateMap.keySet();
 
     if (!includeReplacedSegments) {
-      SegmentLineage segmentLineage = SegmentLineageAccessHelper
-          .getSegmentLineage(getPropertyStore(), tableNameWithType);
+      SegmentLineage segmentLineage =
+          SegmentLineageAccessHelper.getSegmentLineage(getPropertyStore(), tableNameWithType);
       SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
     }
 
@@ -3718,7 +3983,8 @@ public class PinotHelixResourceManager {
   }
 
   public boolean hasUser(String username, String component) {
-    return ZKMetadataProvider.getAllUserConfig(_propertyStore).stream()
+    return ZKMetadataProvider.getAllUserConfig(_propertyStore)
+        .stream()
         .anyMatch(user -> user.isExist(username, ComponentType.valueOf(component)));
   }
 
@@ -3960,8 +4226,7 @@ public class PinotHelixResourceManager {
 
     // Replace all tags with minion_drained to prevent any task assignments
     List<String> updatedTags = List.of(Helix.DRAINED_MINION_INSTANCE);
-    instanceConfig.getRecord().setListField(
-        InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), updatedTags);
+    instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), updatedTags);
 
     // Save to Helix
     if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceName), instanceConfig)) {
@@ -3969,8 +4234,7 @@ public class PinotHelixResourceManager {
     }
 
     LOGGER.info("Successfully drained minion instance: {}", instanceName);
-    return PinotResourceManagerResponse.success(
-        "Successfully drained minion instance: " + instanceName);
+    return PinotResourceManagerResponse.success("Successfully drained minion instance: " + instanceName);
   }
 
   /// Utility to perform a safety check of the operation to drop an instance.
@@ -3995,15 +4259,24 @@ public class PinotHelixResourceManager {
     if (!InstanceTypeUtils.isMinion(instanceName)) {
       getAllResources().forEach(resource -> {
         IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
-        for (String partition : idealState.getPartitionSet()) {
-          if (idealState.getInstanceSet(partition).contains(instanceName)) {
-            response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
-            break;
-          }
+        if (isInstanceInIdealState(idealState, instanceName)) {
+          response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
         }
       });
     }
     return response.setSafe(response.getIssues().isEmpty());
+  }
+
+  /// Returns whether the given instance is in the given IdealState: it is assigned a partition (a segment of a table),
+  /// or it is in the partition assignment of a table (see [PartitionAssignmentUtils]), whose new segments are assigned
+  /// to the instances of their partition.
+  private static boolean isInstanceInIdealState(IdealState idealState, String instanceName) {
+    for (String partition : idealState.getPartitionSet()) {
+      if (idealState.getInstanceSet(partition).contains(instanceName)) {
+        return true;
+      }
+    }
+    return PartitionAssignmentUtils.getAllInstances(idealState).contains(instanceName);
   }
 
   /// Restores previous tags for a drained minion instance if applicable.
@@ -4030,19 +4303,17 @@ public class PinotHelixResourceManager {
     List<String> preDrainTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
     if (preDrainTags == null || preDrainTags.isEmpty()) {
       // No previous tags to restore, just return null to continue with normal flow
-      instanceConfig.getRecord().setListField(
-          InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>());
+      instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>());
     } else {
-      instanceConfig.getRecord().setListField(
-          InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>(preDrainTags));
+      instanceConfig.getRecord()
+          .setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), new ArrayList<>(preDrainTags));
       // Clear the stored pre-drain tags
       instanceConfig.getRecord().getListFields().remove(Helix.PREVIOUS_TAGS);
     }
 
     // Save the updated config
     if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceName), instanceConfig)) {
-      return PinotResourceManagerResponse.failure(
-          "Failed to restore tags for minion instance: " + instanceName);
+      return PinotResourceManagerResponse.failure("Failed to restore tags for minion instance: " + instanceName);
     }
 
     LOGGER.info("Successfully restored tags for minion instance: {}", instanceName);
@@ -4248,20 +4519,28 @@ public class PinotHelixResourceManager {
   /// server instances. With BiMap, both mappings are easily available
   public BiMap<String, String> getDataInstanceAdminEndpoints(Set<String> instances)
       throws InvalidConfigException {
-    BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
+    BiMap<String, String> instanceToEndpoint = HashBiMap.create(instances.size());
     for (String instance : instances) {
       String instanceAdminEndpoint;
       try {
         instanceAdminEndpoint = _instanceAdminEndpointCache.get(instance);
       } catch (Exception e) {
-        String errorMessage = "Caught exception while getting instance admin endpoint for instance: " + instance
-            + ". Error message: " + e.getMessage();
+        String errorMessage =
+            "Caught exception while getting instance admin endpoint for instance: " + instance + ". Error message: "
+                + e.getMessage();
         LOGGER.error(errorMessage, e);
         throw new InvalidConfigException(errorMessage);
       }
-      endpointToInstance.put(instance, instanceAdminEndpoint);
+      instanceToEndpoint.put(instance, instanceAdminEndpoint);
     }
-    return endpointToInstance;
+    return instanceToEndpoint;
+  }
+
+  /// Returns the service identity provider used for outbound Server admin API requests.
+  ///
+  /// Callers must resolve the headers for each request so providers that rotate credentials are honored.
+  public AuthProvider getServerAdminAuthProvider() {
+    return _serverAdminAuthProvider;
   }
 
   /// Helper method to return a list of tables that exists and matches the given table name and type, or throws
@@ -4338,18 +4617,10 @@ public class PinotHelixResourceManager {
     // Create a segment lineage entry id
     String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
 
-    // Check that all the segments from 'segmentsFrom' exist in the table
-    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, true));
-    for (String segment : segmentsFrom) {
-      Preconditions.checkState(segmentsForTable.contains(segment),
-          "Segment: %s from 'segmentsFrom' does not exist in table: %s", segment, tableNameWithType);
-    }
-
-    // Check that all the segments from 'segmentTo' does not exist in the table
-    for (String segment : segmentsTo) {
-      Preconditions.checkState(!segmentsForTable.contains(segment), "Segment: %s from 'segmentsTo' exists in table: %s",
-          segment, tableNameWithType);
-    }
+    validateSegmentsForStartReplace(tableNameWithType, segmentsFrom, segmentsTo,
+        new HashSet<>(getSegmentsFor(tableNameWithType, true)));
+    Set<String> segmentsFromSet = new HashSet<>(segmentsFrom);
+    Set<String> segmentsToSet = new HashSet<>(segmentsTo);
     List<String> segmentsToCleanUp = new ArrayList<>();
     int attemptCount;
     synchronized (getLineageUpdaterLock(tableNameWithType)) {
@@ -4376,6 +4647,12 @@ public class PinotHelixResourceManager {
           Preconditions.checkState(segmentLineage.getLineageEntry(segmentLineageEntryId) == null,
               "Entry id: %s already exists in the segment lineage for table: %s", segmentLineageEntryId,
               tableNameWithType);
+
+          // The check before the lock can be stale because a concurrent 'endReplaceSegments' or revert may change which
+          // segments are served. Re-run it against the lineage read here, which the versioned write below guards.
+          Set<String> servedSegments = new HashSet<>(getSegmentsFor(tableNameWithType, false));
+          SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(servedSegments, segmentLineage);
+          validateSegmentsForStartReplace(tableNameWithType, segmentsFrom, segmentsTo, servedSegments);
 
           Iterator<Map.Entry<String, LineageEntry>> entryIterator =
               segmentLineage.getLineageEntries().entrySet().iterator();
@@ -4404,8 +4681,8 @@ public class PinotHelixResourceManager {
             //    at any time in case of REFRESH use case.
             if (forceCleanup) {
               if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && (
-                  !Collections.disjoint(segmentsFrom, lineageEntry.getSegmentsFrom()) || !Collections.disjoint(
-                      segmentsTo, lineageEntry.getSegmentsTo()))) {
+                  !Collections.disjoint(segmentsFromSet, lineageEntry.getSegmentsFrom()) || !Collections.disjoint(
+                      segmentsToSet, lineageEntry.getSegmentsTo()))) {
                 LOGGER.info(
                     "Detected the incomplete lineage entry with overlapped 'segmentsFrom' or 'segmentsTo'. Deleting or "
                         + "reverting the lineage entry to unblock the new segment protocol. tableNameWithType={}, "
@@ -4499,8 +4776,9 @@ public class PinotHelixResourceManager {
           }
         });
       } catch (Exception e) {
-        String errorMsg = "Failed to update the segment lineage during startReplaceSegments. (tableName = "
-            + tableNameWithType + ", segmentsFrom = " + segmentsFrom + ", segmentsTo = " + segmentsTo + ")";
+        String errorMsg =
+            "Failed to update the segment lineage during startReplaceSegments. (tableName = " + tableNameWithType
+                + ", segmentsFrom = " + segmentsFrom + ", segmentsTo = " + segmentsTo + ")";
         LOGGER.error(errorMsg, e);
         throw new RuntimeException(errorMsg, e);
       }
@@ -4521,6 +4799,20 @@ public class PinotHelixResourceManager {
     return segmentLineageEntryId;
   }
 
+  /// Checks that every segment in 'segmentsFrom' is served and no segment in 'segmentsTo' is. 'servedSegments' must
+  /// exclude the segments hidden by the segment lineage.
+  private static void validateSegmentsForStartReplace(String tableNameWithType, List<String> segmentsFrom,
+      List<String> segmentsTo, Set<String> servedSegments) {
+    for (String segment : segmentsFrom) {
+      Preconditions.checkState(servedSegments.contains(segment),
+          "Segment: %s from 'segmentsFrom' does not exist in table: %s", segment, tableNameWithType);
+    }
+    for (String segment : segmentsTo) {
+      Preconditions.checkState(!servedSegments.contains(segment), "Segment: %s from 'segmentsTo' exists in table: %s",
+          segment, tableNameWithType);
+    }
+  }
+
   /// Computes the end segment replace phase
   ///
   /// 1. Compute validation
@@ -4536,7 +4828,7 @@ public class PinotHelixResourceManager {
     long endReplaceSegmentsTs = System.currentTimeMillis();
     int attemptCount;
     try {
-      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
+      attemptCount = _endReplaceSegmentsRetryPolicy.attempt(() -> {
         long endReplaceSegmentsTsForAttempt = System.currentTimeMillis();
         // Fetch the segment lineage and look up the lineage entry based on the entry id.
         SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
@@ -4626,8 +4918,9 @@ public class PinotHelixResourceManager {
         }
       });
     } catch (Exception e) {
-      String errorMsg = "Failed to update the segment lineage during endReplaceSegments. (tableName = "
-          + tableNameWithType + ", segmentLineageEntryId = " + segmentLineageEntryId + ")";
+      String errorMsg =
+          "Failed to update the segment lineage during endReplaceSegments. (tableName = " + tableNameWithType
+              + ", segmentLineageEntryId = " + segmentLineageEntryId + ")";
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
@@ -4660,7 +4953,7 @@ public class PinotHelixResourceManager {
   ///                     on it.
   protected void preSegmentReplaceUpdateRouting(String tableNameWithType, List<String> segmentsTo,
       List<String> segmentsFrom) {
-    // No-op by default
+    _pageCacheWarmupControllerExecutor.triggerPageCacheWarmup(tableNameWithType, segmentsTo);
   }
 
   /// List the segment lineage
@@ -4765,8 +5058,9 @@ public class PinotHelixResourceManager {
         }
       });
     } catch (Exception e) {
-      String errorMsg = "Failed to update the segment lineage during revertReplaceSegments. (tableName = "
-          + tableNameWithType + ", segmentLineageEntryId = " + segmentLineageEntryId + ")";
+      String errorMsg =
+          "Failed to update the segment lineage during revertReplaceSegments. (tableName = " + tableNameWithType
+              + ", segmentLineageEntryId = " + segmentLineageEntryId + ")";
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
@@ -4801,8 +5095,9 @@ public class PinotHelixResourceManager {
 
         // If the lineage entry doesn't match with the previously fetched lineage, we need to fail the request.
         if (!currentLineageEntry.equals(lineageEntryToMatch)) {
-          String errorMsg = "Aborting the to update lineage entry since we find that the entry has been modified for "
-              + "table " + tableConfig.getTableName() + ", entry id: " + lineageEntryId;
+          String errorMsg =
+              "Aborting the to update lineage entry since we find that the entry has been modified for " + "table "
+                  + tableConfig.getTableName() + ", entry id: " + lineageEntryId;
           LOGGER.error(errorMsg);
           throw new RuntimeException(errorMsg);
         }
@@ -4835,7 +5130,7 @@ public class PinotHelixResourceManager {
 
   private boolean waitForSegmentsBecomeOnline(String tableNameWithType, List<String> segmentsToCheck)
       throws InterruptedException {
-    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+    long endTimeMs = System.currentTimeMillis() + _segmentReplaceExternalViewMaxWaitMs;
     String segmentNotOnline;
     do {
       segmentNotOnline = null;
@@ -4849,7 +5144,7 @@ public class PinotHelixResourceManager {
       if (segmentNotOnline == null) {
         return true;
       }
-      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+      Thread.sleep(_segmentReplaceExternalViewCheckIntervalMs);
     } while (System.currentTimeMillis() < endTimeMs);
     LOGGER.warn("Timed out while waiting for segment: {} to become ONLINE for table: {}", segmentNotOnline,
         tableNameWithType);
@@ -4947,7 +5242,8 @@ public class PinotHelixResourceManager {
     }
 
     // Map of instanceId -> InstanceConfig
-    Map<String, InstanceConfig> instanceConfigMap = HelixHelper.getInstanceConfigs(_helixZkManager).stream()
+    Map<String, InstanceConfig> instanceConfigMap = HelixHelper.getInstanceConfigs(_helixZkManager)
+        .stream()
         .collect(Collectors.toMap(InstanceConfig::getInstanceName, Function.identity()));
 
     Map<String, List<InstanceInfo>> result = new HashMap<>();
@@ -5014,7 +5310,8 @@ public class PinotHelixResourceManager {
     }
     if (hasOfflineTable && hasRealtimeTable) {
       Set<String> offlineTables = new HashSet<>(getLiveBrokersForTable(ev, offlineTableName));
-      return getLiveBrokersForTable(ev, realtimeTableName).stream().filter(offlineTables::contains)
+      return getLiveBrokersForTable(ev, realtimeTableName).stream()
+          .filter(offlineTables::contains)
           .collect(Collectors.toList());
     } else {
       return getLiveBrokersForTable(ev, hasOfflineTable ? offlineTableName : realtimeTableName);
@@ -5105,8 +5402,8 @@ public class PinotHelixResourceManager {
       _queryWorkloadManager.propagateWorkloadUpdateMessage(queryWorkloadConfig);
       // Update the workload config in property store only if the propagation is successful
       if (!ZKMetadataProvider.setQueryWorkloadConfig(_propertyStore, queryWorkloadConfig)) {
-        throw new RuntimeException("Failed to set workload config for queryWorkloadName: "
-            + queryWorkloadConfig.getQueryWorkloadName());
+        throw new RuntimeException(
+            "Failed to set workload config for queryWorkloadName: " + queryWorkloadConfig.getQueryWorkloadName());
       }
     } catch (Exception e) {
       String errorMsg = "Failed to propagate workload update message for queryWorkloadName: " + workloadName;
@@ -5148,13 +5445,12 @@ public class PinotHelixResourceManager {
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     Preconditions.checkNotNull(tableConfig, "Table " + tableNameWithType + "exists but null tableConfig");
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
-    IdealState idealState = _helixAdmin
-        .getResourceIdealState(getHelixClusterName(), tableNameWithType);
+    IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), tableNameWithType);
     if (idealState == null) {
       throw new IllegalStateException("Null IdealState of the table " + tableNameWithType);
     }
-    List<PartitionGroupConsumptionStatus> lst = _pinotLLCRealtimeSegmentManager
-        .getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+    List<PartitionGroupConsumptionStatus> lst =
+        _pinotLLCRealtimeSegmentManager.getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
     List<WatermarkInductionResult.Watermark> watermarks = lst.stream().map(status -> {
       int seq = status.getSequenceNumber();
       long startOffset;
@@ -5243,7 +5539,7 @@ public class PinotHelixResourceManager {
         // and consistency tracking, so the built-in machinery here intentionally does not manage it.
         if (tableConfig.hasMaterializedViewTaskWithDefinedSql()) {
           LOGGER.info("MV table {} uses a non-built-in MV task type; its definition metadata is owned "
-              + "by that task type's runtime — skipping built-in MaterializedViewTask metadata persist",
+                  + "by that task type's runtime — skipping built-in MaterializedViewTask metadata persist",
               tableNameWithType);
         } else {
           LOGGER.warn("MV table {} has no MaterializedViewTask config; skipping definition metadata persist",
@@ -5286,23 +5582,20 @@ public class PinotHelixResourceManager {
 
       // partitionExprMaps comes from analyzer post-validation; we re-extract from the
       // already-validated definedSQL + viewSchema, which is cheap (single Calcite parse).
-      Map<String, String> partitionExprMaps =
-          MaterializedViewAnalyzer.extractPartitionExprMaps(definedSql, viewSchema);
+      Map<String, String> partitionExprMaps = MaterializedViewAnalyzer.extractPartitionExprMaps(definedSql, viewSchema);
 
-      MaterializedViewDefinitionMetadata definition = MaterializedViewDefinitionMetadataBuilder.build(
-          tableNameWithType, tableConfig, viewSchema, sourceTableConfig, sourceSchema,
-          sourceRawTableName, definedSql, partitionExprMaps);
+      MaterializedViewDefinitionMetadata definition =
+          MaterializedViewDefinitionMetadataBuilder.build(tableNameWithType, tableConfig, viewSchema, sourceTableConfig,
+              sourceSchema, sourceRawTableName, definedSql, partitionExprMaps);
       if (MaterializedViewDefinitionMetadataUtils.createIfAbsent(_propertyStore, definition)) {
-        LOGGER.info("Adding table {}: Persisted MV definition metadata (baseTables={})",
-            tableNameWithType, definition.getBaseTables());
+        LOGGER.info("Adding table {}: Persisted MV definition metadata (baseTables={})", tableNameWithType,
+            definition.getBaseTables());
       } else {
-        LOGGER.info("Adding table {}: MV definition metadata already exists; leaving in place",
-            tableNameWithType);
+        LOGGER.info("Adding table {}: MV definition metadata already exists; leaving in place", tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.warn("Adding table {}: Best-effort MV definition metadata persist failed; "
-              + "consistency manager will fall back to extractSourceTableName",
-          tableNameWithType, e);
+          + "consistency manager will fall back to extractSourceTableName", tableNameWithType, e);
     }
   }
 
@@ -5403,12 +5696,11 @@ public class PinotHelixResourceManager {
         mvsNeedingZnodePersist.add(cfg);
         registered++;
       } catch (Exception e) {
-        LOGGER.warn("MV reverse-index backfill: failed to register {} in memory; skipping",
-            tableNameWithType, e);
+        LOGGER.warn("MV reverse-index backfill: failed to register {} in memory; skipping", tableNameWithType, e);
       }
     }
-    LOGGER.info("MV reverse-index backfill phase 1: scanned {} MV(s), registered {} missing entries",
-        mvRawNames.size(), registered);
+    LOGGER.info("MV reverse-index backfill phase 1: scanned {} MV(s), registered {} missing entries", mvRawNames.size(),
+        registered);
 
     if (mvsNeedingZnodePersist.isEmpty()) {
       return;
@@ -5425,12 +5717,11 @@ public class PinotHelixResourceManager {
         persistMaterializedViewDefinitionMetadataBestEffort(cfg);
         znodeAttempted++;
       } catch (Exception e) {
-        LOGGER.warn("MV reverse-index backfill: best-effort znode persist threw for {}; continuing",
-            cfg.getTableName(), e);
+        LOGGER.warn("MV reverse-index backfill: best-effort znode persist threw for {}; continuing", cfg.getTableName(),
+            e);
       }
     }
-    LOGGER.info("MV reverse-index backfill phase 2: attempted znode persist for {} MV(s)",
-        znodeAttempted);
+    LOGGER.info("MV reverse-index backfill phase 2: attempted znode persist for {} MV(s)", znodeAttempted);
   }
 
   /// Resolves the `baseTables` list for an MV during reverse-index backfill, using the
@@ -5451,16 +5742,16 @@ public class PinotHelixResourceManager {
     }
     String definedSql = taskCfg.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
     if (definedSql == null || definedSql.isEmpty()) {
-      LOGGER.warn("MV reverse-index backfill: MV table {} has no definedSQL; skipping",
-          tableNameWithType);
+      LOGGER.warn("MV reverse-index backfill: MV table {} has no definedSQL; skipping", tableNameWithType);
       return null;
     }
     try {
       String sourceTable = MaterializedViewAnalyzer.extractSourceTableName(definedSql);
       return List.of(sourceTable);
     } catch (Exception e) {
-      LOGGER.warn("MV reverse-index backfill: failed to extract source table from definedSQL "
-          + "for MV table {}; skipping", tableNameWithType, e);
+      LOGGER.warn(
+          "MV reverse-index backfill: failed to extract source table from definedSQL " + "for MV table {}; skipping",
+          tableNameWithType, e);
       return null;
     }
   }
@@ -5525,14 +5816,13 @@ public class PinotHelixResourceManager {
         // drop, leaking a ghost reverse-index entry that subsequently blocks legitimate
         // DROP TABLE on its (now genuinely independent) base table.
         Map<String, String> mvTaskCfgs = tableConfig.getMaterializedViewTaskConfigs();
-        String definedSqlForDrop = mvTaskCfgs == null
-            ? null : mvTaskCfgs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+        String definedSqlForDrop =
+            mvTaskCfgs == null ? null : mvTaskCfgs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
         if (definedSqlForDrop != null && !definedSqlForDrop.isEmpty()) {
           try {
             String src = MaterializedViewAnalyzer.extractSourceTableName(definedSqlForDrop);
             mgr.onMaterializedViewTableDropped(tableNameWithType, List.of(src));
-            LOGGER.info("MV table {} dropped via definedSQL fallback (definition znode absent)",
-                tableNameWithType);
+            LOGGER.info("MV table {} dropped via definedSQL fallback (definition znode absent)", tableNameWithType);
             return;
           } catch (Exception ignore) {
             // fall through to the warn below — the SQL is unparseable so the in-memory entry
@@ -5540,8 +5830,8 @@ public class PinotHelixResourceManager {
             // reverse it.  Operator action required.
           }
         }
-        LOGGER.warn("MV table {} dropped without recoverable definition; "
-            + "consistency reverse index may be stale", tableNameWithType);
+        LOGGER.warn("MV table {} dropped without recoverable definition; " + "consistency reverse index may be stale",
+            tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.warn("Failed to unregister MV table {} from consistency manager", tableNameWithType, e);
@@ -5572,7 +5862,7 @@ public class PinotHelixResourceManager {
       // signal a full-range invalidation so the consistency manager marks every affected
       // partition STALE.
       LOGGER.warn("Base table {} segment update reports startTimeMs={}, endTimeMs={}; treating "
-              + "as full-range MV invalidation.", tableNameWithType, startTimeMs, endTimeMs);
+          + "as full-range MV invalidation.", tableNameWithType, startTimeMs, endTimeMs);
       mgr.onBaseTableFullInvalidation(rawTableName);
       return;
     }
@@ -5615,8 +5905,7 @@ public class PinotHelixResourceManager {
         mgr.onBaseTableDataChange(rawTableName, minStart, maxEnd);
       }
     } catch (Exception e) {
-      LOGGER.warn("Failed to notify MV consistency manager for segment replace on table: {}",
-          tableNameWithType, e);
+      LOGGER.warn("Failed to notify MV consistency manager for segment replace on table: {}", tableNameWithType, e);
     }
   }
 }

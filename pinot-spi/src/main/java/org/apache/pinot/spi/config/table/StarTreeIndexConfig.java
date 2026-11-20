@@ -38,6 +38,8 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
   private final List<StarTreeAggregationConfig> _aggregationConfigs;
   // The upper bound of records to be scanned at the leaf node
   private final int _maxLeafRecords;
+  // Whether the star-tree pre-aggregates with null-aware semantics
+  private final boolean _nullHandlingEnabled;
 
   @JsonCreator
   public StarTreeIndexConfig(
@@ -46,7 +48,8 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
       List<String> skipStarNodeCreationForDimensions,
       @JsonProperty(value = "functionColumnPairs") @Nullable List<String> functionColumnPairs,
       @JsonProperty(value = "aggregationConfigs") @Nullable List<StarTreeAggregationConfig> aggregationConfigs,
-      @JsonProperty(value = "maxLeafRecords") int maxLeafRecords) {
+      @JsonProperty(value = "maxLeafRecords") int maxLeafRecords,
+      @JsonProperty(value = "nullHandlingEnabled") boolean nullHandlingEnabled) {
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(dimensionsSplitOrder),
         "'dimensionsSplitOrder' must be configured");
     _dimensionsSplitOrder = dimensionsSplitOrder;
@@ -55,8 +58,18 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
     _functionColumnPairs = CollectionUtils.isNotEmpty(functionColumnPairs) ? functionColumnPairs : null;
     _aggregationConfigs = CollectionUtils.isNotEmpty(aggregationConfigs) ? aggregationConfigs : null;
     _maxLeafRecords = maxLeafRecords;
+    _nullHandlingEnabled = nullHandlingEnabled;
     Preconditions.checkArgument(_functionColumnPairs != null || _aggregationConfigs != null,
         "Either 'functionColumnPairs' or 'aggregationConfigs' must be configured");
+  }
+
+  /// Convenience constructor for a star-tree that is not null-aware, matching the behavior before
+  /// `nullHandlingEnabled` was introduced.
+  public StarTreeIndexConfig(List<String> dimensionsSplitOrder,
+      @Nullable List<String> skipStarNodeCreationForDimensions, @Nullable List<String> functionColumnPairs,
+      @Nullable List<StarTreeAggregationConfig> aggregationConfigs, int maxLeafRecords) {
+    this(dimensionsSplitOrder, skipStarNodeCreationForDimensions, functionColumnPairs, aggregationConfigs,
+        maxLeafRecords, false);
   }
 
   public List<String> getDimensionsSplitOrder() {
@@ -80,5 +93,15 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
 
   public int getMaxLeafRecords() {
     return _maxLeafRecords;
+  }
+
+  /// Returns whether this star-tree pre-aggregates with null-aware semantics.
+  ///
+  /// A null-aware star-tree keeps null dimension values in their own group instead of folding them into the column's
+  /// default null value, and excludes null metric values from the pre-aggregation. It can therefore only serve queries
+  /// with null handling enabled, while a regular star-tree can only serve queries with null handling disabled (or
+  /// enabled queries over columns that happen to contain no nulls).
+  public boolean isNullHandlingEnabled() {
+    return _nullHandlingEnabled;
   }
 }

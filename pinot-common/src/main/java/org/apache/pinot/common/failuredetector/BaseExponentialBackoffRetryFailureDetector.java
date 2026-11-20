@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.common.failuredetector;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
@@ -39,15 +43,26 @@ import org.slf4j.LoggerFactory;
 
 /// The `BaseExponentialBackoffRetryFailureDetector` is a base failure detector implementation that retries the
 /// unhealthy servers with exponential increasing delays.
+///
+/// Every check of a server -- a retry, or a check after a query to it timed out -- runs on a small pool rather than on
+/// the retry thread, because a check can wait out a ping timeout and one dead server must not hold up the checks of the
+/// others. A retry runs the registered retriers; a check after a timeout runs the registered checkers only.
 @ThreadSafe
 public abstract class BaseExponentialBackoffRetryFailureDetector implements FailureDetector {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseExponentialBackoffRetryFailureDetector.class);
+  private static final int MAX_CONCURRENT_CHECKS = 16;
 
   protected final String _name = getClass().getSimpleName();
   protected final ConcurrentHashMap<String, RetryInfo> _unhealthyServerRetryInfoMap = new ConcurrentHashMap<>();
   protected final DelayQueue<RetryInfo> _retryInfoDelayQueue = new DelayQueue<>();
+  /// Servers with a check after a timeout in flight, so a burst of timeouts against one server checks it once.
+  protected final Set<String> _serversBeingChecked = ConcurrentHashMap.newKeySet();
+  /// Both iterated concurrently by the checks.
+  protected final List<Function<String, ServerState>> _unhealthyServerRetriers = new CopyOnWriteArrayList<>();
+  protected final List<Function<String, ServerState>> _serverNotRespondedCheckers = new CopyOnWriteArrayList<>();
+  protected final ThreadPoolExecutor _checkExecutor = createCheckExecutor();
+  private final Object _unhealthyServerGaugeLock = new Object();
 
-  protected final List<Function<String, ServerState>> _unhealthyServerRetriers = new ArrayList<>();
   protected Consumer<String> _healthyServerNotifier;
   protected Consumer<String> _unhealthyServerNotifier;
   protected BrokerMetrics _brokerMetrics;
@@ -75,6 +90,11 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   @Override
   public void registerUnhealthyServerRetrier(Function<String, ServerState> unhealthyServerRetrier) {
     _unhealthyServerRetriers.add(unhealthyServerRetrier);
+  }
+
+  @Override
+  public void registerServerNotRespondedChecker(Function<String, ServerState> serverNotRespondedChecker) {
+    _serverNotRespondedCheckers.add(serverNotRespondedChecker);
   }
 
   @Override
@@ -107,24 +127,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
             markServerHealthy(instanceId, retryInfo._hostName);
             continue;
           }
-          LOGGER.info("Retry unhealthy server: {}", instanceId);
-          boolean recovered = true;
-          for (Function<String, ServerState> unhealthyServerRetrier : _unhealthyServerRetriers) {
-            ServerState serverState = unhealthyServerRetrier.apply(instanceId);
-            if (serverState == ServerState.UNHEALTHY) {
-              recovered = false;
-              break;
-            }
-          }
-          if (recovered) {
-            markServerHealthy(instanceId, retryInfo._hostName);
-          } else {
-            // Update the retry info and add it back to the delay queue
-            retryInfo._retryDelayNs = (long) (retryInfo._retryDelayNs * _retryDelayFactor);
-            retryInfo._retryTimeNs = System.nanoTime() + retryInfo._retryDelayNs;
-            retryInfo._numRetries++;
-            _retryInfoDelayQueue.offer(retryInfo);
-          }
+          _checkExecutor.execute(() -> retry(retryInfo));
         } catch (Exception e) {
           if (_running) {
             LOGGER.error("Caught exception in the retry thread, continuing with errors", e);
@@ -137,26 +140,96 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
     _retryThread.start();
   }
 
+  /// Retries one unhealthy server: marks it healthy if it checks out, otherwise requeues it with a longer delay. A
+  /// retrier that throws counts as a failed check, so the server is retried again rather than stranded as unhealthy.
+  private void retry(RetryInfo retryInfo) {
+    String instanceId = retryInfo._instanceId;
+    LOGGER.info("Retry unhealthy server: {}", instanceId);
+    boolean recovered = false;
+    try {
+      recovered = !isReportedUnhealthy(instanceId, _unhealthyServerRetriers);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while retrying unhealthy server: {}, retrying again later", instanceId, e);
+    }
+    if (recovered) {
+      markServerHealthy(instanceId, retryInfo._hostName);
+    } else {
+      retryInfo._retryDelayNs = (long) (retryInfo._retryDelayNs * _retryDelayFactor);
+      retryInfo._retryTimeNs = System.nanoTime() + retryInfo._retryDelayNs;
+      retryInfo._numRetries++;
+      _retryInfoDelayQueue.offer(retryInfo);
+    }
+  }
+
+  /// Returns whether any of the given retriers or checkers reports the server unhealthy.
+  private static boolean isReportedUnhealthy(String instanceId, List<Function<String, ServerState>> checks) {
+    for (Function<String, ServerState> check : checks) {
+      if (check.apply(instanceId) == ServerState.UNHEALTHY) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @Override
   public void markServerHealthy(String instanceId, @Nullable String hostName) {
     _unhealthyServerRetryInfoMap.computeIfPresent(instanceId, (id, retryInfo) -> {
       LOGGER.info("Mark server: {} {} as healthy", instanceId, hostName);
-      _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() - 1);
       _healthyServerNotifier.accept(instanceId);
       return null;
     });
+    updateUnhealthyServerGauge();
   }
 
   @Override
   public void markServerUnhealthy(String instanceId, @Nullable String hostName) {
     _unhealthyServerRetryInfoMap.computeIfAbsent(instanceId, id -> {
       LOGGER.warn("Mark server: {} {} as unhealthy", instanceId, hostName);
-      _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() + 1);
       _unhealthyServerNotifier.accept(instanceId);
       RetryInfo retryInfo = new RetryInfo(id, hostName);
       _retryInfoDelayQueue.offer(retryInfo);
       return retryInfo;
     });
+    updateUnhealthyServerGauge();
+  }
+
+  /// Sets the gauge from the map's size, rather than adjusting it by one inside the compute: two servers changing state
+  /// at once would both read the same size there and leave the gauge off by one. Under the lock the last writer reads
+  /// a size that already includes every change made before it.
+  private void updateUnhealthyServerGauge() {
+    synchronized (_unhealthyServerGaugeLock) {
+      _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size());
+    }
+  }
+
+  /// {@inheritDoc}
+  ///
+  /// Checks the server with the registered checkers, off the caller's thread, and marks it unhealthy if any of them
+  /// reports it unhealthy. A server already unhealthy, or already being checked, is left alone.
+  @Override
+  public void notifyServerNotResponded(String instanceId, @Nullable String hostName) {
+    if (!_running || _serverNotRespondedCheckers.isEmpty() || _unhealthyServerRetryInfoMap.containsKey(instanceId)
+        || !_serversBeingChecked.add(instanceId)) {
+      return;
+    }
+    try {
+      _checkExecutor.execute(() -> {
+        try {
+          // Skip marking once stopping: shutdownNow() interrupts the check, which then looks like a failed one.
+          if (isReportedUnhealthy(instanceId, _serverNotRespondedCheckers) && _running) {
+            LOGGER.warn("Server: {} {} left a query unanswered and failed the follow-up check", instanceId, hostName);
+            markServerUnhealthy(instanceId, hostName);
+          }
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while checking server: {} after a query timed out", instanceId, e);
+        } finally {
+          _serversBeingChecked.remove(instanceId);
+        }
+      });
+    } catch (RejectedExecutionException e) {
+      // Only when stopping.
+      _serversBeingChecked.remove(instanceId);
+    }
   }
 
   @Override
@@ -168,6 +241,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   public void stop() {
     LOGGER.info("Stopping {}", _name);
     _running = false;
+    _checkExecutor.shutdownNow();
 
     try {
       _retryThread.interrupt();
@@ -175,6 +249,20 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
     } catch (InterruptedException e) {
       throw new RuntimeException("Interrupted while waiting for retry thread to finish", e);
     }
+  }
+
+  /// Bounded, with its threads created on demand and reclaimed when idle, so an idle broker holds none.
+  private static ThreadPoolExecutor createCheckExecutor() {
+    AtomicInteger threadIndex = new AtomicInteger();
+    ThreadPoolExecutor executor =
+        new ThreadPoolExecutor(MAX_CONCURRENT_CHECKS, MAX_CONCURRENT_CHECKS, 60L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(), runnable -> {
+          Thread thread = new Thread(runnable, "failure-detector-check-" + threadIndex.getAndIncrement());
+          thread.setDaemon(true);
+          return thread;
+        });
+    executor.allowCoreThreadTimeOut(true);
+    return executor;
   }
 
   /// Encapsulates the retry related information.

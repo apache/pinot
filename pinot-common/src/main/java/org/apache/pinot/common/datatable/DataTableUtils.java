@@ -85,4 +85,33 @@ public class DataTableUtils {
       return new String(bytes, UTF_8);
     }
   }
+
+  /// Decodes a string array serialized as an `int` array size followed by entries in the [#decodeString] format.
+  ///
+  /// A single scratch byte array is reused across entries and grown only when a longer entry is encountered, so
+  /// decoding does not allocate a temporary byte array per entry. Leaves the buffer positioned after the last entry.
+  public static String[] decodeStringArray(ByteBuffer buffer)
+      throws IOException {
+    int size = buffer.getInt();
+    String[] strings = new String[size];
+    byte[] bytes = null;
+    for (int i = 0; i < size; i++) {
+      int length = buffer.getInt();
+      if (length == 0) {
+        strings[i] = StringUtils.EMPTY;
+        continue;
+      }
+      if (length < 0) {
+        // Preserve the exception raised by allocating the entry buffer in decodeString().
+        throw new NegativeArraySizeException(Integer.toString(length));
+      }
+      if (bytes == null || bytes.length < length) {
+        bytes = new byte[length];
+      }
+      buffer.get(bytes, 0, length);
+      // String copies the decoded contents, so the next entry can reuse the scratch bytes.
+      strings[i] = new String(bytes, 0, length, UTF_8);
+    }
+    return strings;
+  }
 }

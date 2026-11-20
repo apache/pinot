@@ -24,16 +24,25 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongSet> {
-  public ArrayAggDistinctLongFunction(ExpressionContext expression, FieldSpec.DataType dataType,
+  private static final int LONG_SET_TYPE = 15;
+
+  public ArrayAggDistinctLongFunction(ExpressionContext expression, DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    return true;
   }
 
   @Override
@@ -42,6 +51,18 @@ public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongS
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     LongOpenHashSet valueSet =
         aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new LongOpenHashSet(length);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set to merge in.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.addAll(ObjectSerDeUtils.LONG_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.LONG)));
+        }
+      });
+      aggregationResultHolder.setValue(valueSet);
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       long[] values = blockValSet.getLongValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -74,9 +95,8 @@ public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongS
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(LongSet longSet) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongSet.getValue(),
-        ObjectSerDeUtils.LONG_SET_SER_DE.serialize(longSet));
+  public SerializedResult serializeIntermediateResult(LongSet longSet) {
+    return new SerializedValue<>(LONG_SET_TYPE, longSet, ObjectSerDeUtils.LONG_SET_SER_DE);
   }
 
   @Override

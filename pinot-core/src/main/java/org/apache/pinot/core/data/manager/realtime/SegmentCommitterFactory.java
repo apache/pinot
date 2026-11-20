@@ -79,8 +79,10 @@ public class SegmentCommitterFactory {
 
     if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
       return new PauselessSegmentCommitter(_logger, _protocolHandler, params, segmentUploader,
-          peerSegmentDownloadScheme);
+          peerSegmentDownloadScheme, _serverMetrics);
     }
-    return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader, peerSegmentDownloadScheme);
+    return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader, peerSegmentDownloadScheme,
+        instanceDataManagerConfig.isUploadSegmentMetadataTarGz(),
+        instanceDataManagerConfig.getUploadSegmentMetadataTarGzTimeoutMs(), _serverMetrics);
   }
 }

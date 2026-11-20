@@ -21,14 +21,22 @@ package org.apache.pinot.core.operator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.FetchContext;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.query.RemoteAccessStats;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -123,5 +131,32 @@ public class InstanceResponseOperatorTest {
 
     assertTrue(responseBlock.getResponseMetadata()
         .containsKey(MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName()));
+  }
+
+  /// Releasing the fetched buffers reports the remote accesses recorded on the fetch contexts to the query execution.
+  @Test
+  public void testReleaseReportsRemoteAccessesOfFetchContexts() {
+    FetchContext fetchContext1 = new FetchContext(UUID.randomUUID(), "segment1", Set.of("col"));
+    FetchContext fetchContext2 = new FetchContext(UUID.randomUUID(), "segment2", Set.of("col"));
+    IndexSegment segment1 = mock(IndexSegment.class);
+    IndexSegment segment2 = mock(IndexSegment.class);
+    doAnswer(_ -> {
+      fetchContext1.getRemoteAccessStats().addRemoteAccesses(3, 300);
+      return null;
+    }).when(segment1).release(fetchContext1);
+    doAnswer(_ -> {
+      fetchContext2.getRemoteAccessStats().addRemoteAccesses(4, 400);
+      return null;
+    }).when(segment2).release(fetchContext2);
+    InstanceResponseOperator operator = new InstanceResponseOperator(mock(BaseCombineOperator.class),
+        List.of(new SegmentContext(segment1), new SegmentContext(segment2)), List.of(fetchContext1, fetchContext2),
+        mock(QueryContext.class));
+
+    try (QueryThreadContext threadContext = QueryThreadContext.openForSseTest()) {
+      operator.releaseAll();
+      RemoteAccessStats remoteAccessStats = threadContext.getRemoteAccessStats();
+      assertEquals(remoteAccessStats.getNumRemoteAccesses(), 7);
+      assertEquals(remoteAccessStats.getRemoteAccessBytes(), 700);
+    }
   }
 }

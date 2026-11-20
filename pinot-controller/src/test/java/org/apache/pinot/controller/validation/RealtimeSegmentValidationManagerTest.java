@@ -31,6 +31,7 @@ import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentMa
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -185,6 +186,7 @@ public class RealtimeSegmentValidationManagerTest {
         UtilizationChecker.CheckPurpose.REALTIME_INGESTION)).thenReturn(isResourceUtilizationWithinLimits);
     when(_pinotHelixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
     when(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig)).thenReturn(isQuotaExceeded);
+    when(_storageQuotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.ENFORCED);
 
     boolean result = _realtimeSegmentValidationManager.shouldEnsureConsuming(tableName);
 
@@ -200,5 +202,52 @@ public class RealtimeSegmentValidationManagerTest {
         new HashSet<>(List.of(ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY));
     _realtimeSegmentValidationManager.onChange(changedConfigSet, newConfig);
     Assert.assertEquals(_realtimeSegmentValidationManager.getDisasterRecoveryMode(), DisasterRecoveryMode.ALWAYS);
+  }
+
+  @Test
+  public void testShouldEnsureConsumingInShadowModeDoesNotPause() {
+    String tableName = "testTable_REALTIME";
+    PauseStatusDetails pauseStatus = mock(PauseStatusDetails.class);
+    TableConfig tableConfig = mock(TableConfig.class);
+
+    when(pauseStatus.getPauseFlag()).thenReturn(false);
+    when(pauseStatus.getReasonCode()).thenReturn(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
+    when(_llcRealtimeSegmentManager.getPauseStatusDetails(tableName)).thenReturn(pauseStatus);
+    when(_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION)).thenReturn(UtilizationChecker.CheckResult.PASS);
+    when(_pinotHelixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+    when(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig)).thenReturn(true);
+    when(_storageQuotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.SHADOW);
+
+    boolean result = _realtimeSegmentValidationManager.shouldEnsureConsuming(tableName);
+
+    // quota is breached but enforcement mode is SHADOW, so consumption should not be paused
+    Assert.assertTrue(result);
+    verify(_llcRealtimeSegmentManager, never()).pauseConsumption(eq(tableName),
+        eq(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED), anyString());
+  }
+
+  @Test
+  public void testSwitchingToShadowModeResumesQuotaPausedTable() {
+    String tableName = "testTable_REALTIME";
+    PauseStatusDetails pauseStatus = mock(PauseStatusDetails.class);
+    TableConfig tableConfig = mock(TableConfig.class);
+
+    when(pauseStatus.getPauseFlag()).thenReturn(true);
+    when(pauseStatus.getReasonCode()).thenReturn(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
+    when(_llcRealtimeSegmentManager.getPauseStatusDetails(tableName)).thenReturn(pauseStatus);
+    when(_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION)).thenReturn(UtilizationChecker.CheckResult.PASS);
+    when(_pinotHelixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+    when(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig)).thenReturn(true);
+    when(_storageQuotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.SHADOW);
+
+    boolean result = _realtimeSegmentValidationManager.shouldEnsureConsuming(tableName);
+
+    Assert.assertTrue(result);
+    verify(_llcRealtimeSegmentManager, never()).pauseConsumption(eq(tableName),
+        eq(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED), anyString());
+    verify(_llcRealtimeSegmentManager).updatePauseStateInIdealState(eq(tableName), eq(false),
+        eq(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED), anyString());
   }
 }

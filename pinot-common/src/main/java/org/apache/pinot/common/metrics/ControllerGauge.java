@@ -70,6 +70,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
   NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
   MAX_SUBTASK_WAIT_TIME_MS("MaxSubtaskWaitTimeMs", false),
+  // Time since the job last made progress, while the table still has subtasks waiting: 0 while a subtask runs,
+  // otherwise the time since a subtask last started or finished. Unlike MAX_SUBTASK_WAIT_TIME_MS (the age of the job),
+  // it stays low while a long job keeps draining.
+  MAX_SUBTASK_QUEUE_STALL_TIME_MS("MaxSubtaskQueueStallTimeMs", false),
   NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
   MAX_SUBTASK_RUNNING_TIME_MS("MaxSubtaskRunningTimeMs", false),
   NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
@@ -207,6 +211,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   // Metric used to track errors during the periodic table retention management
   RETENTION_MANAGER_ERROR("retentionManagerError", false),
+
+  /// Status of the latest completed table size retention pass: 1 when a configured policy cannot run safely, deletion
+  /// fails, or protected data keeps the table above its cap; 0 when the configured policy succeeds within the cap.
+  /// Published once when each configured pass completes; absent when size retention is disabled or unsupported.
+  SIZE_RETENTION_BLOCKED("sizeRetentionBlocked", false),
 
   // Gauge to reflect whether pauseless is enabled or not
   PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),

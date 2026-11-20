@@ -1,0 +1,60 @@
+{
+  "object_parameter_functions": {
+    "comments": "Scalar functions with an Object parameter get the external Java value of the column type. In the leaf stage the call runs in ScalarTransformFunctionWrapper, above a stage boundary it runs in FunctionOperand; for column arguments both must return the same result.",
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "bigDecimalCol", "type": "BIG_DECIMAL"},
+          {"name": "boolCol", "type": "BOOLEAN"},
+          {"name": "strCol", "type": "STRING"},
+          {"name": "bytesCol", "type": "BYTES"},
+          {"name": "intArrayCol", "type": "INT", "isSingleValue": false},
+          {"name": "strArrayCol", "type": "STRING", "isSingleValue": false}
+        ],
+        "inputs": [
+          [1, 10000000001, 1.5, 1.25, "1.125", true, "a", "AA01", [1, 2], ["a", "b"]],
+          ["------"],
+          [2, 10000000002, 2.5, 2.25, "2.375", false, "b", "AA02", [3], ["c"]]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "jsonFormat on columns in the leaf stage",
+        "sql": "SELECT intCol, jsonFormat(intCol), jsonFormat(longCol), jsonFormat(floatCol), jsonFormat(doubleCol), jsonFormat(bigDecimalCol), jsonFormat(boolCol), jsonFormat(strCol), jsonFormat(bytesCol), jsonFormat(intArrayCol), jsonFormat(strArrayCol) FROM {tbl}",
+        "outputs": [
+          [1, "1", "10000000001", "1.5", "1.25", "1.125", "true", "\"a\"", "\"qgE=\"", "[1,2]", "[\"a\",\"b\"]"],
+          [2, "2", "10000000002", "2.5", "2.25", "2.375", "false", "\"b\"", "\"qgI=\"", "[3]", "[\"c\"]"]
+        ]
+      },
+      {
+        "description": "jsonFormat on columns above a stage boundary",
+        "sql": "SELECT intCol, jsonFormat(intCol), jsonFormat(longCol), jsonFormat(floatCol), jsonFormat(doubleCol), jsonFormat(bigDecimalCol), jsonFormat(boolCol), jsonFormat(strCol), jsonFormat(bytesCol), jsonFormat(intArrayCol), jsonFormat(strArrayCol) FROM (SELECT * FROM {tbl} ORDER BY intCol LIMIT 10)",
+        "outputs": [
+          [1, "1", "10000000001", "1.5", "1.25", "1.125", "true", "\"a\"", "\"qgE=\"", "[1,2]", "[\"a\",\"b\"]"],
+          [2, "2", "10000000002", "2.5", "2.25", "2.375", "false", "\"b\"", "\"qgI=\"", "[3]", "[\"c\"]"]
+        ]
+      },
+      {
+        "description": "toThetaSketch on a column in the leaf stage",
+        "sql": "SELECT intCol, toBase64(toThetaSketch(intCol)) FROM {tbl}",
+        "outputs": [
+          [1, "AQMDAAA6zJMV+X3LvYahBQ=="],
+          [2, "AQMDAAA6zJPDl/wSgXCdHg=="]
+        ]
+      },
+      {
+        "description": "toThetaSketch on a column above a stage boundary",
+        "sql": "SELECT intCol, toBase64(toThetaSketch(intCol)) FROM (SELECT intCol FROM {tbl} GROUP BY intCol)",
+        "outputs": [
+          [1, "AQMDAAA6zJMV+X3LvYahBQ=="],
+          [2, "AQMDAAA6zJPDl/wSgXCdHg=="]
+        ]
+      }
+    ]
+  }
+}

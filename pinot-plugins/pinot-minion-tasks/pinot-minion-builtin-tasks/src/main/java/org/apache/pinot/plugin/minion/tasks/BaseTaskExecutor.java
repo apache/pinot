@@ -210,23 +210,39 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     return spec;
   }
 
-  /// Copies the local segment tar file to the output PinotFS. Requires
-  /// [BatchConfigProperties#OUTPUT_SEGMENT_DIR_URI] in configs.
+  /// Copies the local segment tar to the output PinotFS under its own name. Fails if the target exists unless
+  /// [BatchConfigProperties#OVERWRITE_OUTPUT] is set.
   ///
   /// @return the URI of the segment tar on the output filesystem
   protected URI moveSegmentToOutputPinotFS(Map<String, String> configs, File localSegmentTarFile)
       throws Exception {
+    return moveSegmentToOutputPinotFS(configs, localSegmentTarFile, localSegmentTarFile.getName(),
+        Boolean.parseBoolean(configs.get(BatchConfigProperties.OVERWRITE_OUTPUT)));
+  }
+
+  /// Copies the local segment tar to `<outputDir>/<outputFileName>`, replacing an existing file only if asked.
+  protected URI moveSegmentToOutputPinotFS(Map<String, String> configs, File localSegmentTarFile,
+      String outputFileName, boolean overwrite)
+      throws Exception {
     URI outputSegmentDirURI = URI.create(configs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, outputSegmentDirURI)) {
       URI outputSegmentTarURI = URI.create(MinionTaskUtils.normalizeDirectoryURI(outputSegmentDirURI)
-          + URIUtils.encode(localSegmentTarFile.getName()));
-      if (!Boolean.parseBoolean(configs.get(BatchConfigProperties.OVERWRITE_OUTPUT))
-          && outputFileFS.exists(outputSegmentTarURI)) {
+          + URIUtils.encode(outputFileName));
+      if (!overwrite && outputFileFS.exists(outputSegmentTarURI)) {
         throw new RuntimeException("Output file: " + outputSegmentTarURI + " already exists. Set 'overwriteOutput' to "
             + "true to ignore this error");
       }
       outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
       return outputSegmentTarURI;
+    }
+  }
+
+  /// Best-effort delete on the output PinotFS. Failures are logged, so cleanup never masks the push outcome.
+  protected void deleteFromOutputPinotFS(Map<String, String> configs, URI fileURI) {
+    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, fileURI)) {
+      outputFileFS.delete(fileURI, true);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to delete: {} from the output PinotFS", fileURI, e);
     }
   }
 

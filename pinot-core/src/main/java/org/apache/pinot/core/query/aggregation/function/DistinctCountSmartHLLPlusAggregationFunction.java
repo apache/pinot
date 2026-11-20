@@ -30,8 +30,9 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.segment.local.utils.HyperLogLogPlusUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -44,8 +45,9 @@ import org.roaringbitmap.RoaringBitmap;
 /// The `DistinctCountSmartHLLPlusAggregationFunction` calculates the number of distinct values for a given
 /// expression (both single-valued and multi-valued are supported).
 ///
-/// For aggregation-only queries, the distinct values are stored in a Set initially. Once the number of distinct values
-/// exceeds a threshold, the Set will be converted into a HyperLogLogPlus, and approximate result will be returned.
+/// The distinct values are stored in a Set initially. Once the number of distinct values exceeds a threshold, the
+/// Set will be converted into a HyperLogLogPlus, and approximate result will be returned. The threshold is applied per
+/// accumulator, which means per group for a group-by query.
 ///
 /// The function takes an optional second argument for parameters:
 /// - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
@@ -55,13 +57,14 @@ import org.roaringbitmap.RoaringBitmap;
 /// Example of second argument: 'threshold=10;p=12;sp=25'
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCountSmartSketchAggregationFunction {
+  private static final int HYPER_LOG_LOG_PLUS_TYPE = 40;
 
   private final int _threshold;
   private final int _p;
   private final int _sp;
 
-  public DistinctCountSmartHLLPlusAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public DistinctCountSmartHLLPlusAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
 
     if (arguments.size() > 1) {
       Parameters parameters = new Parameters(arguments.get(1).getLiteral().getStringValue());
@@ -103,12 +106,14 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       if (blockValSet.isSingleValue()) {
         int[] dictIds = blockValSet.getDictionaryIdsSV();
-        dictIdBitmap.addN(dictIds, 0, length);
+        forEachNotNull(length, blockValSet, (from, to) -> dictIdBitmap.addN(dictIds, from, to - from));
       } else {
         int[][] dictIds = blockValSet.getDictionaryIdsMV();
-        for (int i = 0; i < length; i++) {
-          dictIdBitmap.add(dictIds[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            dictIdBitmap.add(dictIds[i]);
+          }
+        });
       }
       return;
     }
@@ -130,39 +135,51 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
       switch (storedType) {
         case INT:
           int[] intValues = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
-            hllPlus.offer(intValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hllPlus.offer(intValues[i]);
+            }
+          });
           break;
         case LONG:
           long[] longValues = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
-            hllPlus.offer(longValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hllPlus.offer(longValues[i]);
+            }
+          });
           break;
         case FLOAT:
           float[] floatValues = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
-            hllPlus.offer(floatValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hllPlus.offer(floatValues[i]);
+            }
+          });
           break;
         case DOUBLE:
           double[] doubleValues = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
-            hllPlus.offer(doubleValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hllPlus.offer(doubleValues[i]);
+            }
+          });
           break;
         case STRING:
           String[] stringValues = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
-            hllPlus.offer(stringValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hllPlus.offer(stringValues[i]);
+            }
+          });
           break;
         case BYTES:
           byte[][] bytesValues = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
-            hllPlus.offer(bytesValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hllPlus.offer(bytesValues[i]);
+            }
+          });
           break;
         default:
           throw getIllegalDataTypeException(valueType, true);
@@ -171,43 +188,53 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
       switch (storedType) {
         case INT:
           int[][] intValues = blockValSet.getIntValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (int value : intValues[i]) {
-              hllPlus.offer(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (int value : intValues[i]) {
+                hllPlus.offer(value);
+              }
             }
-          }
+          });
           break;
         case LONG:
           long[][] longValues = blockValSet.getLongValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (long value : longValues[i]) {
-              hllPlus.offer(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (long value : longValues[i]) {
+                hllPlus.offer(value);
+              }
             }
-          }
+          });
           break;
         case FLOAT:
           float[][] floatValues = blockValSet.getFloatValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (float value : floatValues[i]) {
-              hllPlus.offer(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (float value : floatValues[i]) {
+                hllPlus.offer(value);
+              }
             }
-          }
+          });
           break;
         case DOUBLE:
           double[][] doubleValues = blockValSet.getDoubleValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (double value : doubleValues[i]) {
-              hllPlus.offer(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (double value : doubleValues[i]) {
+                hllPlus.offer(value);
+              }
             }
-          }
+          });
           break;
         case STRING:
           String[][] stringValues = blockValSet.getStringValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (String value : stringValues[i]) {
-              hllPlus.offer(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (String value : stringValues[i]) {
+                hllPlus.offer(value);
+              }
             }
-          }
+          });
           break;
         default:
           throw getIllegalDataTypeException(valueType, false);
@@ -300,17 +327,20 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Object o) {
-    if (o instanceof HyperLogLogPlus) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.HyperLogLogPlus.getValue(),
-          ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize((HyperLogLogPlus) o));
+  public SerializedResult serializeIntermediateResult(Object o) {
+    if (o instanceof HyperLogLogPlus hyperLogLogPlus) {
+      return new SerializedBytes(HYPER_LOG_LOG_PLUS_TYPE,
+          ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus));
     }
     return BaseDistinctAggregateAggregationFunction.serializeSet((Set) o);
   }
 
   @Override
-  public Object deserializeIntermediateResult(@Nullable CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+  public Object deserializeIntermediateResult(CustomObject customObject) {
+    if (customObject.getType() == HYPER_LOG_LOG_PLUS_TYPE) {
+      return ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(customObject.getBuffer());
+    }
+    return BaseDistinctAggregateAggregationFunction.deserializeSet(customObject);
   }
 
   @Override
@@ -324,6 +354,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
       return 0;
     }
     if (intermediateResult instanceof HyperLogLogPlus) {
+      markApproximatedResult();
       return (int) ((HyperLogLogPlus) intermediateResult).cardinality();
     } else {
       return ((Set) intermediateResult).size();
@@ -347,6 +378,20 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
       hllPlus.offer(dictionary.get(iterator.next()));
     }
     return hllPlus;
+  }
+
+  @Override
+  protected void addSetToSketch(Object sketch, Set valueSet, DataType storedType) {
+    HyperLogLogPlus hllPlus = (HyperLogLogPlus) sketch;
+    if (storedType == DataType.BYTES) {
+      for (Object value : valueSet) {
+        hllPlus.offer(((ByteArray) value).getBytes());
+      }
+    } else {
+      for (Object value : valueSet) {
+        hllPlus.offer(value);
+      }
+    }
   }
 
   @Override
@@ -403,6 +448,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
             break;
           case SP_KEY:
             _sp = Integer.parseInt(value);
+            HyperLogLogPlusUtils.validateSp(_sp);
             break;
           default:
             throw new IllegalArgumentException("Invalid parameter key: " + key);

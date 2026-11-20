@@ -1,6 +1,6 @@
 ---
 name: review-concurrency-state
-description: Review Apache Pinot diffs for concurrency, state management, visibility, atomic state transitions, lock changes, Helix IdealState updates, upsert metadata safety, consumer/stream ingestion races, and shared-observer correctness. Trigger keywords — synchronized, volatile, AtomicReference, ConcurrentHashMap, ReentrantLock, StampedLock, Helix, IdealState, ZkClient, version-checked write, upsert metadata, consumer coordinator, stream partition.
+description: Review Apache Pinot concurrency and state safety when locks, shared callbacks, lifecycle, or distributed metadata change.
 domain: kb/code-review-principles.md#2-state-management--concurrency
 triggers:
   - diff adds/removes synchronized / volatile / Atomic* / lock types

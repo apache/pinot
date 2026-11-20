@@ -25,17 +25,25 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
@@ -494,5 +502,32 @@ public class ForwardIndexTypeTest {
   public void testStandardIndex() {
     assertSame(StandardIndexes.forward(), StandardIndexes.forward(), "Standard index should use the same as "
         + "the ForwardIndexType static instance");
+  }
+
+  /// codecSpec applies only at immutable segment creation/conversion time. The mutable (consuming)
+  /// forward index must build the standard in-memory format, ignoring the configured codecSpec, so
+  /// realtime tables with a codecSpec keep consuming normally.
+  @Test
+  public void testCodecSpecBuildsStandardMutableIndexForRealtime()
+      throws Exception {
+    MutableIndexContext context = mock(MutableIndexContext.class);
+    when(context.getFieldSpec()).thenReturn(new DimensionFieldSpec("dimInt", DataType.INT, true));
+    when(context.getSegmentName()).thenReturn("testSegment");
+    when(context.getCapacity()).thenReturn(16);
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("DELTA,LZ4")
+        .build();
+
+    try (DirectMemoryManager memoryManager = new DirectMemoryManager("testSegment")) {
+      when(context.getMemoryManager()).thenReturn(memoryManager);
+      MutableIndex mutableIndex = StandardIndexes.forward().createMutableIndex(context, config);
+      assertNotNull(mutableIndex);
+      try {
+        assertTrue(mutableIndex instanceof FixedByteSVMutableForwardIndex,
+            "Expected the standard SV mutable forward index, got: " + mutableIndex.getClass());
+      } finally {
+        mutableIndex.close();
+      }
+    }
   }
 }

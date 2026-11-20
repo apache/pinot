@@ -23,7 +23,6 @@ import javax.annotation.Nullable;
 
 
 /// Fixed segment name generator which always returns the fixed segment name.
-@SuppressWarnings("serial")
 public class FixedSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentName;
 

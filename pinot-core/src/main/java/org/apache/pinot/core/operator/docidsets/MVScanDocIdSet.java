@@ -39,6 +39,11 @@ public final class MVScanDocIdSet implements BlockDocIdSet {
   }
 
   @Override
+  public boolean isScanBased() {
+    return true;
+  }
+
+  @Override
   public long getNumEntriesScannedInFilter() {
     return _docIdIterator.getNumEntriesScanned();
   }

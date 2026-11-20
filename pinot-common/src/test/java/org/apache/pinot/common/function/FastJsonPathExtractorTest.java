@@ -21,15 +21,8 @@ package org.apache.pinot.common.function;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.StreamReadFeature;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jayway.jsonpath.Configuration;
-import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.Predicate;
-import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
-import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,17 +55,9 @@ public class FastJsonPathExtractorTest {
   private static final JsonFactory STRICT_FACTORY =
       JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
 
-  /// Mirrors `JsonExtractScalarTransformFunction.JSON_PARSER_CONTEXT`.
-  private static final ParseContext PLAIN_CONTEXT = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider())
-          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
-
-  /// Mirrors `JsonExtractScalarTransformFunction.JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL`, the one production
-  /// context that is not reachable through [JsonFunctions].
-  private static final ParseContext BIG_DECIMAL_CONTEXT = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider(
-              new ObjectMapper().configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)))
-          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
+  /// Production Jayway contexts from [JsonFunctions], shared with `JsonExtractScalarTransformFunction`.
+  private static final ParseContext PLAIN_CONTEXT = JsonFunctions.PARSE_CONTEXT;
+  private static final ParseContext BIG_DECIMAL_CONTEXT = JsonFunctions.PARSE_CONTEXT_WITH_BIG_DECIMAL;
 
   static {
     /// JsonFunctions registers Pinot's JsonPath cache in its static initializer, and Jayway rejects that
@@ -397,6 +382,7 @@ public class FastJsonPathExtractorTest {
     assertEquals(invoke("jsonPathStringFast", json, "$.user.country", "DEFAULT"), "US");
     assertEquals(invoke("jsonPathStringFirstMatch", json, "$.user.country", "DEFAULT"), "US");
     assertEquals(invoke("jsonPathStringFast", json, "$.missing", "DEFAULT"), "DEFAULT");
+    assertEquals(invoke("jsonPathLongFast", json, "$.user.age", -7L), 41L);
     assertEquals(invoke("jsonPathLongFirstMatch", json, "$.user.age", -7L), 41L);
     assertEquals(invoke("jsonPathDoubleFast", json, "$.user.score", -7.5d), 9.5d);
     /// A complex path must still resolve through the function by falling back to Jayway, i.e. produce exactly

@@ -19,8 +19,11 @@
 package org.apache.pinot.segment.local.utils;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 
@@ -30,6 +33,10 @@ import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 public class ReloadJobStatus {
   private final String _jobId;
   private final AtomicInteger _failureCount = new AtomicInteger(0);
+  // Names of the segments an only-if-needed reload left in place because their loaded copy was already up to date.
+  // Kept by name (rather than as a count) so the status check can tell a skipped segment apart from one that a later
+  // operation reloaded, and so a skipped segment that was since dropped is not counted.
+  private final Set<String> _skippedSegments = ConcurrentHashMap.newKeySet();
   private final long _createdTimeMs;
   private final List<SegmentReloadFailureResponse> _failedSegmentDetails = new ArrayList<>();
 
@@ -50,6 +57,18 @@ public class ReloadJobStatus {
     return _failureCount.incrementAndGet();
   }
 
+  public boolean hasSkippedSegments() {
+    return !_skippedSegments.isEmpty();
+  }
+
+  public boolean isSkipped(String segmentName) {
+    return _skippedSegments.contains(segmentName);
+  }
+
+  public void addSkippedSegments(Collection<String> segmentNames) {
+    _skippedSegments.addAll(segmentNames);
+  }
+
   public long getCreatedTimeMs() {
     return _createdTimeMs;
   }
@@ -65,6 +84,7 @@ public class ReloadJobStatus {
   @Override
   public String toString() {
     return "ReloadJobStatus{jobId='" + _jobId + "', failureCount=" + _failureCount.get()
+        + ", skippedCount=" + _skippedSegments.size()
         + ", failedSegmentDetailsCount=" + _failedSegmentDetails.size()
         + ", createdTimeMs=" + _createdTimeMs + '}';
   }

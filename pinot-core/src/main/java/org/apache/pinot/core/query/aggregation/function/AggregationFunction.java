@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -28,7 +30,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils.SizedObjectSerDe;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.memory.PinotOutputStream;
 
 
 /// Interface for aggregation functions.
@@ -64,9 +68,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 ///   matching value was null. It carries no per-function meaning, which is what makes it correct for the aggregation
 ///   methods to skip null rows outright rather than fold them in.
 ///   `null` is not the only way that state is represented, though: an empty accumulator — an empty set, value list,
-///   digest, sketch or map — means the same thing, and still arrives. A peer that serialized one sends it, and so do
-///   the functions in the first deviation below, which never receive the option and substitute one rather than
-///   returning `null`. So [#extractFinalResult] accepts both.
+///   digest, sketch or map — means the same thing, and still arrives. A peer that serialized one sends it, and so
+///   does any function whose disabled-mode answer is an empty accumulator rather than a constant, since it
+///   substitutes one in that mode to keep the answer it has always given. So [#extractFinalResult] accepts both.
 ///   `null` is the representation to produce where there is a choice, because it is the only one always available:
 ///   `MAXSTRING`, `MINSTRING` and `ANYVALUE` are object-backed and have no empty value to substitute.
 /// - [#extractFinalResult] decides what that means for this aggregation, and is the only method that does. `COUNT`
@@ -95,44 +99,36 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// these is therefore a behavioural change and not a documentation fix, because it widens what the rest of the
 /// engine must carry.
 ///
-/// TODO: Known deviations from the above.
-///   1. Several aggregation functions never receive the query's null handling option at all, so they cannot skip
-///      null rows and fold the column's default value into the aggregate whatever the query asked for: the
-///      sketch-backed distinct counts (`DISTINCTCOUNTBITMAP`, `DISTINCTCOUNTHLL`, `DISTINCTCOUNTTHETASKETCH`,
-///      `DISTINCTCOUNTCPCSKETCH`, `FASTHLL`, `SEGMENTPARTITIONEDDISTINCTCOUNT` and the raw and smart variants of
-///      each), the tuple and frequency sketches, the covariance functions, `HISTOGRAM`, `IDSET`, `STUNION`, the
-///      array sums, and the funnel family. Whether a function takes the option is visible at its construction site,
-///      which is the reliable way to tell.
-///      The family names are not a safe shorthand for this, in either direction. The exact distinct functions
-///      (`DISTINCTCOUNT`, `DISTINCTSUM`, `DISTINCTAVG`, `DISTINCTCOUNTOFFHEAP`) do take the option and skip null
-///      rows through their shared base, as do the variance and standard-deviation functions and the
-///      first/last-with-time functions, so "the distinct-count family" and "the statistical functions" both include
-///      members that honour the option and members that cannot.
-///      These same functions also substitute an empty accumulator in [#extractAggregationResult],
-///      [#extractGroupByResult] or both, rather than returning `null` and letting [#extractFinalResult] render the
-///      disabled-mode value. That is not a separate defect: without the option [#extractFinalResult] cannot tell the
-///      two modes apart, so it has nothing to decide with and the substitution is the only thing holding the answer.
-///      Which of the two paths substitutes is inconsistent across them and sometimes within one, so such a function
-///      can answer differently depending on whether the query groups — a filtered aggregation makes that observable,
-///      since one group key space is shared by every aggregation in a query and a group created by one of them can
-///      hold no rows for another.
-///      Conforming them alongside the option is more than moving a branch. The value to preserve is often not a
-///      constant, and the function that substitutes is frequently not the one that renders: the raw variants
-///      delegate extraction to the plain function and serialize what it returns, so conforming the plain function
-///      alone changes the raw variant's answer from a serialized empty sketch to `NULL` without touching the raw
-///      variant at all.
-///   2. The multi-stage engine constructs every aggregation function with null handling enabled and never consults the
-///      query's null handling option, so a query that disables it still gets enabled-mode semantics there. The two
-///      engines can therefore answer the same query differently: with null handling disabled, `SUM` over a query
-///      whose segments are all pruned is `NULL` on the multi-stage engine and `0` on the single-stage engine. This
-///      may be intended, the multi-stage engine being the SQL-conformant one, but it means the mode described above
-///      is not actually per-query everywhere.
+/// ### Multi-input functions
+///
+/// A function that reads more than one column decides for itself which of them a `null` disqualifies the row on,
+/// because that follows from what each column is for rather than from a single rule. The covariances skip a row
+/// unless both value columns are non-null. A funnel skips a row whose timestamp or correlation key is null, since
+/// neither an event with no position in the window nor a row belonging to no key can contribute, but it does not
+/// skip a row for a null step: a step expression is a predicate, and a predicate over a null operand is UNKNOWN,
+/// which SQL treats as not satisfied wherever a boolean is consumed, so a null step already means that step did not
+/// match.
+///
+/// ### Functions outside this contract
+///
+/// Every user-facing aggregation receives the option. Three do not, and none of them is an aggregate a query can
+/// ask for by name: `ParentExprMinMax` and `ChildExprMinMax` are produced by the query rewriter rather than written
+/// by users, and `TimeSeriesAggregationFunction` is built from time-series plan context rather than from a
+/// [org.apache.pinot.common.request.context.FunctionContext]. Whether a function takes the option is visible at its
+/// construction site in [AggregationFunctionFactory], which is the reliable way to tell.
+///
+/// TODO: Known deviation from the above.
+///   The multi-stage engine constructs every aggregation function with null handling enabled and never consults the
+///   query's null handling option, so a query that disables it still gets enabled-mode semantics there. The two
+///   engines can therefore answer the same query differently: with null handling disabled, `SUM` over a query
+///   whose segments are all pruned is `NULL` on the multi-stage engine and `0` on the single-stage engine. This
+///   may be intended, the multi-stage engine being the SQL-conformant one, but it means the mode described above
+///   is not actually per-query everywhere.
 ///
 /// @param <IntermediateResult> Intermediate result generated from segment
-/// @param <FinalResult> Final result used in broker response
+/// @param <FinalResult> Final result, in the stored form of [#getFinalResultColumnType()], see [#extractFinalResult]
 @ThreadSafe
-@SuppressWarnings("rawtypes")
-public interface AggregationFunction<IntermediateResult, FinalResult extends Comparable> {
+public interface AggregationFunction<IntermediateResult, FinalResult> {
 
   /// Returns the type of the aggregation function.
   AggregationFunctionType getType();
@@ -206,38 +202,157 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// [AggregationFunction].
   IntermediateResult merge(IntermediateResult intermediateResult1, IntermediateResult intermediateResult2);
 
+  /// Merges a serialized intermediate result into `intermediateResult`, which may be `null`, and returns the merged
+  /// result. The result may be `intermediateResult` itself, modified in place.
+  ///
+  /// The default deserializes `serialized` and merges it with [#merge]. Override it when the function can read the
+  /// serialized form straight into `intermediateResult`, to skip a full-size copy of the incoming value. This matters
+  /// for large intermediate results, such as the value list of an exact percentile, which are humongous objects for G1.
+  /// As for [#deserializeIntermediateResult], the returned result must not reference the buffer of `serialized`.
+  ///
+  /// Call [AggregationFunctionUtils#mergeSerialized] instead of calling this directly: it settles a `null` serialized
+  /// value.
+  @Nullable
+  default IntermediateResult mergeSerializedIntermediateResult(@Nullable IntermediateResult intermediateResult,
+      CustomObject serialized) {
+    IntermediateResult incoming = deserializeIntermediateResult(serialized);
+    if (intermediateResult == null) {
+      return incoming;
+    }
+    if (incoming == null) {
+      return intermediateResult;
+    }
+    return merge(intermediateResult, incoming);
+  }
+
   /// Returns the [ColumnDataType] of the intermediate result.
   ///
   /// This column data type is used for transferring data in data table.
   ColumnDataType getIntermediateResultColumnType();
 
-  /// Serializes the intermediate result into a custom object. This method should be implemented if the intermediate
-  /// result type is OBJECT.
-  default SerializedIntermediateResult serializeIntermediateResult(IntermediateResult intermediateResult) {
+  /// Serializes the intermediate result. This method should be implemented if the intermediate result type is OBJECT.
+  default SerializedResult serializeIntermediateResult(IntermediateResult intermediateResult) {
     throw new UnsupportedOperationException("Cannot serialize intermediate result for function: " + getType());
   }
 
-  /// Serialized intermediate result. Type can be used to identify the intermediate result type when deserializing it.
-  class SerializedIntermediateResult {
+  /// An intermediate result in its serialized form: the wire type value, the payload size, and the payload, written to
+  /// either kind of destination. The type is a value the aggregation function declares as its own constant to tell
+  /// apart the payload formats it produces, so values only need to be distinct within one function. A function
+  /// deserializes only the types it serializes.
+  ///
+  /// Data table and data block builders write the payload into their paged streams with [#getSize()] and
+  /// [#writeTo(PinotOutputStream)]. A destination that holds one contiguous buffer, such as an Arrow vector, reserves
+  /// [#getSize()] bytes and fills them with [#writeTo(ByteBuffer)]. An implementation may read the intermediate result
+  /// when the payload is written, so the payload must be written before the intermediate result changes. A caller that
+  /// keeps the serialized form for later takes a snapshot instead: `new SerializedBytes(serialized.getType(),
+  /// serialized.getBytes())`.
+  interface SerializedResult {
+
+    /// Returns the wire type value of the intermediate result.
+    int getType();
+
+    /// Returns the number of payload bytes.
+    int getSize();
+
+    /// Returns the payload.
+    byte[] getBytes();
+
+    /// Writes the payload at the current position of the big-endian `buffer`, which has at least [#getSize()] bytes
+    /// remaining, and advances the position by the payload size. Only the position changes, and the buffer is not
+    /// retained.
+    void writeTo(ByteBuffer buffer);
+
+    /// Writes the payload to `output`.
+    void writeTo(PinotOutputStream output)
+        throws IOException;
+  }
+
+  /// Serialized intermediate result backed by its payload bytes.
+  final class SerializedBytes implements SerializedResult {
     private final int _type;
     private final byte[] _bytes;
 
-    public SerializedIntermediateResult(int type, byte[] buffer) {
+    public SerializedBytes(int type, byte[] bytes) {
       _type = type;
-      _bytes = buffer;
+      _bytes = bytes;
     }
 
+    @Override
     public int getType() {
       return _type;
     }
 
+    @Override
+    public int getSize() {
+      return _bytes.length;
+    }
+
+    @Override
     public byte[] getBytes() {
       return _bytes;
+    }
+
+    @Override
+    public void writeTo(ByteBuffer buffer) {
+      buffer.put(_bytes);
+    }
+
+    @Override
+    public void writeTo(PinotOutputStream output)
+        throws IOException {
+      output.write(_bytes);
+    }
+  }
+
+  /// Serialized intermediate result that serializes its value on demand through a [SizedObjectSerDe]: the size comes
+  /// from the codec without serializing, and the payload is written straight into a buffer or an output stream. The
+  /// value must not change until the payload is written.
+  ///
+  /// @param <T> Type of the value
+  final class SerializedValue<T> implements SerializedResult {
+    private final int _type;
+    private final T _value;
+    private final SizedObjectSerDe<T> _serDe;
+
+    public SerializedValue(int type, T value, SizedObjectSerDe<T> serDe) {
+      _type = type;
+      _value = value;
+      _serDe = serDe;
+    }
+
+    @Override
+    public int getType() {
+      return _type;
+    }
+
+    @Override
+    public int getSize() {
+      return _serDe.getSerializedSize(_value);
+    }
+
+    @Override
+    public byte[] getBytes() {
+      return _serDe.serialize(_value);
+    }
+
+    @Override
+    public void writeTo(ByteBuffer buffer) {
+      _serDe.serialize(_value, buffer);
+    }
+
+    @Override
+    public void writeTo(PinotOutputStream output)
+        throws IOException {
+      _serDe.serialize(_value, output);
     }
   }
 
   /// Deserializes the intermediate result from the custom object. This method should be implemented if the intermediate
   /// result type is OBJECT.
+  ///
+  /// The returned result must not reference the buffer of `customObject` or any view of it: the caller may reuse or
+  /// release that memory, which can be off-heap, as soon as this method returns. A result that reads lazily from its
+  /// serialized form has to read from a heap copy of the bytes.
   default IntermediateResult deserializeIntermediateResult(CustomObject customObject) {
     throw new UnsupportedOperationException("Cannot deserialize intermediate result for function: " + getType());
   }
@@ -247,7 +362,25 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// This column data type is used for constructing the result table
   ColumnDataType getFinalResultColumnType();
 
+  // TODO: Make final results behave the same in SSE and MSE, and before and after transport. Each change below alters
+  //   the types on the wire or in MSE plans, so it needs a rollout gate for mixed-version clusters.
+  //   - Raw sketch functions order their STRING final results by the sketch estimate where the object is compared (SSE
+  //     group trim and reduce of intermediate results, MSE group trim), but by the serialized sketch after transport
+  //     (SSE reduce of final results, MSE sort). Return a custom object that keeps the estimate order everywhere.
+  //   - SUMPRECISION returns a STRING final result in SSE but BIG_DECIMAL in MSE, so SSE orders it as a string after
+  //     transport and cannot merge the final results of several servers. Return BIG_DECIMAL in SSE as well.
+  //   - OBJECT final results have no serialization of their own: an aggregation cannot return them from servers, and a
+  //     group-by serializes them as intermediate results.
   /// Extracts the final result used in the broker response from the given intermediate result.
+  /// When final results are extracted for group-by sorting, preserve the intermediate information needed for
+  /// subsequent merging and final extraction.
+  ///
+  /// The final result is the value a column of [#getFinalResultColumnType()] stores, e.g. `int[]` for `INT_ARRAY` and
+  /// `int` for `BOOLEAN`, so it can be transported, sorted and merged without conversion. Sorting compares it in the
+  /// order of the column type, see [org.apache.pinot.spi.utils.StoredValueComparator]. A `STRING` final result may
+  /// instead be an object that is stored as its [Object#toString()] and orders by its own [Comparable] implementation,
+  /// e.g. the serialized sketch of a raw sketch function, which orders by the estimate of the sketch. An `OBJECT` final
+  /// result is a custom object, which must implement [Comparable] to be sorted.
   ///
   /// A `null` intermediate result means nothing was aggregated, and this method decides what that means for this
   /// particular aggregation. It is the only place where that per-function answer is expressed, so it must never
@@ -261,18 +394,47 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   @Nullable
   FinalResult extractFinalResult(@Nullable IntermediateResult intermediateResult);
 
-  /// Merges two final results, neither of which is `null`. This can be used to optimized certain functions (e.g.
+  /// Merges two final results, neither of which is `null`. This can be used to optimize certain functions (e.g.
   /// DISTINCT_COUNT) when data is partitioned on each server, where we may directly request servers to return final
-  /// result and merge them on broker.
+  /// result and merge them on broker. Final results are only merged across partitions of the aggregated values, so no
+  /// value is aggregated into both final results.
+  ///
+  /// Final results are merged in the form they are transported in, the value their column stores: a `STRING` final
+  /// result is a string even where [#extractFinalResult] returns an object stored as its string, e.g. the serialized
+  /// sketch of a raw sketch function. The merged result takes the same form. Like other column values, a final result
+  /// can be shared, e.g. when the multi-stage engine broadcasts a block to several stages, so the merge must not modify
+  /// either final result. It may return one of them unchanged.
   ///
   /// Call [AggregationFunctionUtils#mergeFinalResult] instead of calling this directly, on the same terms as [#merge].
   default FinalResult mergeFinalResult(FinalResult finalResult1, FinalResult finalResult2) {
     throw new UnsupportedOperationException("Cannot merge final results for function: " + getType());
   }
 
+  /// Returns whether [#extractFinalResult] has returned an approximate result for a function that can also answer
+  /// exactly. The SMART functions start exact and switch a group to a sketch once it crosses their conversion
+  /// threshold. A merge with a sketch always returns a sketch, so the extraction sees the switch, and records it here.
+  /// Read it after extracting, to report the result as approximate.
+  ///
+  /// A function instance belongs to one query, and so does the flag. Group trimming also extracts final results, so a
+  /// group that is trimmed away can still set it. Functions that are always exact or always approximate keep the
+  /// default.
+  default boolean hasApproximatedResult() {
+    return false;
+  }
+
   /// Returns whether a star-tree index with the specified properties can be used for this aggregation function.
   default boolean canUseStarTree(Map<String, Object> functionParameters) {
     // Implementations can override this method to perform additional checks on the function parameters
+    return true;
+  }
+
+  /// Returns whether intermediate results of DIFFERENT groups may be merged together. Most functions merge
+  /// intermediates commutatively regardless of which group produced them, but some are only mergeable across
+  /// SEGMENTS for the SAME group: e.g. SEGMENTPARTITIONEDDISTINCTCOUNT and partitioned FUNNELCOUNT keep a count
+  /// that is already final within one segment and one group, so merging two groups of the same segment
+  /// double-counts entities present in both. The grouping-sets base-aggregation derive merges base groups into
+  /// coarser grouping sets and must not be used for such functions.
+  default boolean canMergeIntermediatesAcrossGroups() {
     return true;
   }
 

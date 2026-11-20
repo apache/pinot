@@ -19,16 +19,19 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
-import com.google.common.base.Utf8;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,6 +74,21 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_SP);
     LOGGER.info("Initialized NoDictColumnStatisticsCollector for column: {}", column);
+  }
+
+  /// Constructs a collector directly from a [FieldSpec], without a [StatsCollectorConfig]. Lets callers
+  /// that operate outside schema-driven segment generation (e.g. OPEN_STRUCT materialized child columns,
+  /// whose synthetic columns exist in no schema) reuse this no-dictionary collector, same as the other
+  /// per-type collectors already do.
+  public NoDictColumnStatisticsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    super(fieldSpec, fieldConfig, partitionFunction);
+    _isFixedWidth = _storedType.isFixedWidth();
+    _isAscii = _storedType == DataType.STRING;
+    _hllPlus = new HyperLogLogPlus(
+        CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P,
+        CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_SP);
+    LOGGER.info("Initialized NoDictColumnStatisticsCollector for column: {}", fieldSpec.getName());
   }
 
   @Override
@@ -187,7 +205,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       case BIG_DECIMAL:
         return BigDecimalUtils.byteSize((BigDecimal) value);
       case STRING:
-        return Utf8.encodedLength((String) value);
+        return Utf8Utils.encodedLength((String) value);
       case BYTES:
         return ((byte[]) value).length;
       default:

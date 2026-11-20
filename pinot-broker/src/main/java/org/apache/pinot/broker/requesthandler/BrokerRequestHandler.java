@@ -29,6 +29,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -46,6 +47,59 @@ public interface BrokerRequestHandler {
   void start();
 
   void shutDown();
+
+  /// Warms this handler's data plane so the first real query does not pay for it, and reports whether the
+  /// handler reached its warmth floor. Called during startup after Helix convergence, before readiness is
+  /// granted.
+  ///
+  /// Implementations must honour three contracts, because the caller depends on each:
+  ///   - **Bounded — must return by `deadlineMs`.** This is the load-bearing clause of the feature: a
+  ///     warmup that runs past the deadline stalls a rolling restart. `deadlineMs` is an absolute
+  ///     [System#currentTimeMillis] value, and every wait an implementation performs (each probe, each
+  ///     blocking get) must be bounded by the remaining budget, not a fixed constant. Time already spent
+  ///     waiting for the cluster view to converge counts against the same budget, so the rolling-restart
+  ///     cost stays bounded by one number.
+  ///   - **Must never throw.** The caller opens the readiness gate off this call; an exception must be
+  ///     swallowed and treated as "did not reach the floor", never propagated.
+  ///   - **Safe to run against a handler that is already serving.** Nothing stops this being invoked on a
+  ///     started, traffic-serving handler -- [org.apache.pinot.integration.tests] does exactly that, and an
+  ///     admin endpoint wiring it later would too -- so an implementation must not mutate shared serving
+  ///     state or assume it is the only in-flight work.
+  ///
+  /// This gate composes with any other startup gate the broker registers (e.g. [#preConnectServers(long)]):
+  /// each gate is independent with its own budget, and readiness is granted only once **all** are satisfied.
+  ///
+  /// @return `true` if the handler reached its warmth floor, `false` if the deadline passed first. Either
+  ///         way the caller proceeds; the result is for logging and metrics.
+  default boolean warmUp(BrokerWarmupConfig config, long deadlineMs) {
+    return true;
+  }
+
+  /// Opens broker-to-server channels ahead of traffic so the first real query does not pay the blocking
+  /// connect -- and, when broker-to-server TLS is on, the handshake -- on its critical path. Called once
+  /// at startup after Helix has converged, when `pinot.broker.startup.preconnect.enabled` is set.
+  ///
+  /// Only the single-connection SSE handler opens Netty channels, so the default is a no-op. Returns the
+  /// number of channels connected before `deadlineMs` (an absolute [System#currentTimeMillis] value).
+  default int preConnectServers(long deadlineMs) {
+    return 0;
+  }
+
+  /// Called when the routing manager enables a server: when it first appears, and when it is enabled again after it
+  /// was disabled (as while it restarts) or excluded. A handler that caches connections to the server must assume they
+  /// point at a previous process and drop them, so the next query reconnects instead of writing into a half-open
+  /// socket. The default is a no-op; invoked on the Helix callback thread under the routing manager's lock, so it must
+  /// be quick and must not block.
+  default void onServerEnabled(ServerInstance serverInstance) {
+  }
+
+  /// Called when the routing manager sees a server removed from the cluster altogether (its instance config is
+  /// gone), and with the instance at the previous address when a server is back under the same id at a different
+  /// address. A handler that caches connections to that instance drops them: nothing will be routed there any more,
+  /// and a server later added back under the same id, or moved back to that address, is a new process. Same contract
+  /// as [#onServerEnabled].
+  default void onServerRemoved(ServerInstance serverInstance) {
+  }
 
   BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)

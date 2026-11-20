@@ -535,10 +535,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       throws Exception {
     String tableName = "legacyNonDeterministicTransform";
     DEFAULT_INSTANCE.addDummySchema(tableName);
-
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", "now()")));
-    TableConfig legacyTableConfig = getOfflineTableBuilder(tableName)
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("timeColumn", "now()")));
+    TableConfig legacyTableConfig = getRealtimeTableBuilder(tableName)
         .setIngestionConfig(ingestionConfig)
         .build();
 
@@ -550,20 +549,20 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Seed the config below the REST validation layer to model a table persisted before this validation existed.
     DEFAULT_INSTANCE.getHelixResourceManager().addTable(legacyTableConfig);
 
-    TableConfig update = getTableConfig(tableName, "OFFLINE");
+    TableConfig update = getTableConfig(tableName, "REALTIME");
     update.getValidationConfig().setRetentionTimeValue("10");
     JsonNode validationResponse = JsonUtils.stringToJsonNode(tableClient().validateTableConfig(update.toJsonString()));
-    assertTrue(validationResponse.has("OFFLINE"));
+    assertTrue(validationResponse.has("REALTIME"));
 
     JsonNode response = JsonUtils.stringToJsonNode(updateTable(tableName, update.toJsonString()));
     assertTrue(response.has("status"));
 
-    TableConfig stored = getTableConfig(tableName, "OFFLINE");
+    TableConfig stored = getTableConfig(tableName, "REALTIME");
     assertEquals(stored.getValidationConfig().getRetentionTimeValue(), "10");
     assertEquals(stored.getIngestionConfig().getTransformConfigs().get(0).getTransformFunction(), "now()");
 
     IngestionConfig changedIngestionConfig = new IngestionConfig();
-    changedIngestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", "plus(now(), 1)")));
+    changedIngestionConfig.setTransformConfigs(List.of(new TransformConfig("timeColumn", "plus(now(), 1)")));
     update.setIngestionConfig(changedIngestionConfig);
     PinotAdminException validationError =
         expectThrows(PinotAdminException.class, () -> tableClient().validateTableConfig(update.toJsonString()));

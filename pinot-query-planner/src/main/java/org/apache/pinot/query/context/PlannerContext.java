@@ -32,8 +32,9 @@ import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlExplainFormat;
-import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.pinot.calcite.rex.SearchSealer;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.validate.Validator;
@@ -50,7 +51,7 @@ import org.apache.pinot.query.validate.Validator;
 public class PlannerContext implements AutoCloseable, Context {
   private final PlannerImpl _planner;
 
-  private final SqlValidator _validator;
+  private final Validator _validator;
 
   private final RelOptPlanner _relOptPlanner;
   private final LogicalPlanner _relTraitPlanner;
@@ -61,12 +62,15 @@ public class PlannerContext implements AutoCloseable, Context {
   private final SqlExplainFormat _sqlExplainFormat;
   @Nullable
   private final PhysicalPlannerContext _physicalPlannerContext;
+  private final SearchSealer _searchSealer;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
       SqlExplainFormat sqlExplainFormat, @Nullable PhysicalPlannerContext physicalPlannerContext) {
     _planner = new PlannerImpl(config);
-    _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
+    _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory,
+        QueryOptionsUtils.isPreferSelectAliasInGroupBy(options, envConfig.defaultPreferSelectAliasInGroupBy()),
+        envConfig.meterGroupByAliasShadowedByColumn());
     _options = options;
     _envConfig = envConfig;
     _relOptPlanner = new LogicalPlanner(optProgram, this, config.getTraitDefs());
@@ -75,6 +79,7 @@ public class PlannerContext implements AutoCloseable, Context {
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = sqlExplainFormat;
     _physicalPlannerContext = physicalPlannerContext;
+    _searchSealer = createSearchSealer(options, envConfig);
   }
 
   /// Test factory: creates a minimal [PlannerContext] without going through
@@ -97,13 +102,19 @@ public class PlannerContext implements AutoCloseable, Context {
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = null;
     _physicalPlannerContext = null;
+    _searchSealer = createSearchSealer(options, envConfig);
+  }
+
+  private static SearchSealer createSearchSealer(Map<String, String> options, QueryEnvironment.Config envConfig) {
+    return new SearchSealer(
+        QueryOptionsUtils.getSealedInListThreshold(options, envConfig.defaultSealedInListThreshold()));
   }
 
   public PlannerImpl getPlanner() {
     return _planner;
   }
 
-  public SqlValidator getValidator() {
+  public Validator getValidator() {
     return _validator;
   }
 
@@ -156,6 +167,11 @@ public class PlannerContext implements AutoCloseable, Context {
   @Nullable
   public PhysicalPlannerContext getPhysicalPlannerContext() {
     return _physicalPlannerContext;
+  }
+
+  /// Returns the query's [SearchSealer], which hides large IN lists from Calcite during optimization.
+  public SearchSealer getSearchSealer() {
+    return _searchSealer;
   }
 
   public boolean isUsePhysicalOptimizer() {

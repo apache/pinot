@@ -18,13 +18,24 @@
  */
 package org.apache.pinot.segment.local.io.writer.impl;
 
+import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class MutableOffHeapByteArrayStoreTest implements PinotBuffersAfterClassCheckRule {
@@ -57,15 +68,134 @@ public class MutableOffHeapByteArrayStoreTest implements PinotBuffersAfterClassC
       }
       int index = store.add(dataIn);
       byte[] dataOut = store.get(index);
-      Assert.assertTrue(Arrays.equals(dataIn, dataOut));
+      assertTrue(Arrays.equals(dataIn, dataOut));
+    }
+  }
+
+  @Test
+  public void byteBufferTest()
+      throws Exception {
+    try (MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "bytesColumn", 1, 1)) {
+      byte[] firstValue = {1};
+      byte[] secondValue = {2, 3, 4};
+      int firstIndex = store.add(firstValue);
+      int secondIndex = store.add(secondValue);
+
+      ByteBuffer firstBuffer = store.getByteBuffer(firstIndex);
+      byte[] firstResult = new byte[firstBuffer.remaining()];
+      firstBuffer.get(firstResult);
+      assertEquals(firstResult, firstValue);
+
+      ByteBuffer secondBuffer = store.getByteBuffer(secondIndex);
+      assertTrue(secondBuffer.isReadOnly());
+      byte[] secondResult = new byte[secondBuffer.remaining()];
+      secondBuffer.get(secondResult);
+      assertEquals(secondResult, secondValue);
+      assertThrows(ReadOnlyBufferException.class, () -> store.getByteBuffer(secondIndex).put((byte) 0));
+    }
+  }
+
+  @Test
+  public void compareTest()
+      throws Exception {
+    // Start with a tiny buffer so that the values spread across multiple buffers
+    try (MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", 1, 1)) {
+      // Values in ascending unsigned lexicographic order
+      byte[][] values = {{}, {1}, {1, 2}, {1, 2, 3}, {2}, {(byte) 0x80}, {(byte) 0xFF}};
+      int numValues = values.length;
+      int[] indexes = new int[numValues];
+      for (int i = 0; i < numValues; i++) {
+        indexes[i] = store.add(values[i]);
+      }
+      for (int i = 0; i < numValues; i++) {
+        for (int j = 0; j < numValues; j++) {
+          int expected = Integer.compare(i, j);
+          assertEquals(Integer.signum(store.compareValues(indexes[i], indexes[j])), expected);
+          assertEquals(Integer.signum(store.compareValueAt(indexes[i], values[j])), expected);
+        }
+      }
+      // A value that is not in the store sorts between its neighbors
+      byte[] absentValue = {1, 2, 2};
+      assertTrue(store.compareValueAt(indexes[2], absentValue) < 0);
+      assertTrue(store.compareValueAt(indexes[3], absentValue) > 0);
+    }
+  }
+
+  @Test
+  public void getByteBufferDuringConcurrentAppendTest()
+      throws Exception {
+    int numReaders = 4;
+    int numValues = 2_048;
+    ExecutorService executor = Executors.newFixedThreadPool(numReaders + 1);
+    AtomicInteger publishedCount = new AtomicInteger();
+    CountDownLatch start = new CountDownLatch(1);
+    CountDownLatch firstValueRead = new CountDownLatch(numReaders);
+    try (MutableOffHeapByteArrayStore store =
+        new MutableOffHeapByteArrayStore(_memoryManager, "concurrentBytesColumn", 1, 1)) {
+      Future<?> writer = executor.submit(() -> {
+        await(start);
+        assertEquals(store.add(valueForIndex(0)), 0);
+        publishedCount.set(1);
+        await(firstValueRead);
+        for (int i = 1; i < numValues; i++) {
+          assertEquals(store.add(valueForIndex(i)), i);
+          // Publish only after the value and any expanded buffer are visible to readers.
+          publishedCount.set(i + 1);
+        }
+      });
+
+      Future<?>[] readers = new Future<?>[numReaders];
+      for (int i = 0; i < numReaders; i++) {
+        readers[i] = executor.submit(() -> {
+          await(start);
+          int nextIndex = 0;
+          while (nextIndex < numValues) {
+            int readableCount = publishedCount.get();
+            while (nextIndex < readableCount) {
+              ByteBuffer byteBuffer = store.getByteBuffer(nextIndex);
+              assertTrue(byteBuffer.isReadOnly());
+              byte[] actual = new byte[byteBuffer.remaining()];
+              byteBuffer.get(actual);
+              assertEquals(actual, valueForIndex(nextIndex));
+              nextIndex++;
+              if (nextIndex == 1) {
+                firstValueRead.countDown();
+              }
+            }
+            Thread.yield();
+          }
+        });
+      }
+
+      start.countDown();
+      writer.get(30, TimeUnit.SECONDS);
+      for (Future<?> reader : readers) {
+        reader.get(30, TimeUnit.SECONDS);
+      }
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+    }
+  }
+
+  private static byte[] valueForIndex(int index) {
+    return ByteBuffer.allocate(2 * Integer.BYTES).putInt(index).putInt(~index).array();
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(30, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     }
   }
 
   @Test
   public void startSizeTest() {
-    Assert.assertEquals(MutableOffHeapByteArrayStore.getStartSize(1, ONE_GB), ONE_GB + 4);
-    Assert.assertEquals(MutableOffHeapByteArrayStore.getStartSize(3, ONE_GB), Integer.MAX_VALUE);
-    Assert.assertEquals(MutableOffHeapByteArrayStore.getStartSize(5, ONE_GB), Integer.MAX_VALUE);
+    assertEquals(MutableOffHeapByteArrayStore.getStartSize(1, ONE_GB), ONE_GB + 4);
+    assertEquals(MutableOffHeapByteArrayStore.getStartSize(3, ONE_GB), Integer.MAX_VALUE);
+    assertEquals(MutableOffHeapByteArrayStore.getStartSize(5, ONE_GB), Integer.MAX_VALUE);
   }
 
   @Test
@@ -89,25 +219,25 @@ public class MutableOffHeapByteArrayStoreTest implements PinotBuffersAfterClassC
 
       // Add small array
       final int i1 = store.add(b1);
-      Assert.assertTrue(Arrays.equals(store.get(i1), b1));
+      assertTrue(Arrays.equals(store.get(i1), b1));
 
       // And now the larger one, should result in a new buffer
       final int i2 = store.add(b2);
-      Assert.assertTrue(Arrays.equals(store.get(i2), b2));
+      assertTrue(Arrays.equals(store.get(i2), b2));
 
       // And now one more, should result in a new buffer but exact fit.
       final int i3 = store.add(b2);
-      Assert.assertTrue(Arrays.equals(store.get(i3), b2));
+      assertTrue(Arrays.equals(store.get(i3), b2));
 
       // One more buffer when we add the small one again.
       final int i4 = store.add(b1);
-      Assert.assertTrue(Arrays.equals(store.get(i4), b1));
+      assertTrue(Arrays.equals(store.get(i4), b1));
 
       // Test with one more 'get' to ensure that things have not changed.
-      Assert.assertTrue(Arrays.equals(store.get(i1), b1));
-      Assert.assertTrue(Arrays.equals(store.get(i2), b2));
-      Assert.assertTrue(Arrays.equals(store.get(i3), b2));
-      Assert.assertTrue(Arrays.equals(store.get(i4), b1));
+      assertTrue(Arrays.equals(store.get(i1), b1));
+      assertTrue(Arrays.equals(store.get(i2), b2));
+      assertTrue(Arrays.equals(store.get(i3), b2));
+      assertTrue(Arrays.equals(store.get(i4), b1));
 
       byte[] b3 = new byte[5];
       for (int i = 0; i < b3.length; i++) {
@@ -125,14 +255,14 @@ public class MutableOffHeapByteArrayStoreTest implements PinotBuffersAfterClassC
         store.add(b3);
       }
       for (int i = 0; i < iters; i++) {
-        Assert.assertTrue(Arrays.equals(store.get(ix++), b3));
+        assertTrue(Arrays.equals(store.get(ix++), b3));
       }
 
       // Original values should still be good.
-      Assert.assertTrue(Arrays.equals(store.get(i1), b1));
-      Assert.assertTrue(Arrays.equals(store.get(i2), b2));
-      Assert.assertTrue(Arrays.equals(store.get(i3), b2));
-      Assert.assertTrue(Arrays.equals(store.get(i4), b1));
+      assertTrue(Arrays.equals(store.get(i1), b1));
+      assertTrue(Arrays.equals(store.get(i2), b2));
+      assertTrue(Arrays.equals(store.get(i3), b2));
+      assertTrue(Arrays.equals(store.get(i4), b1));
     }
   }
 }

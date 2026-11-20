@@ -83,6 +83,7 @@ import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.config.QueryOptionConfigListener;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -246,6 +247,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
     _config = new ControllerConf(pinotConfiguration.toMap());
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener((changedConfigs, clusterConfigs) -> {
+      boolean disabled =
+          CommonConstants.Groovy.isIngestionGroovyDisabled(clusterConfigs.get(ControllerConf.DISABLE_GROOVY));
+      TableConfigUtils.setDisableGroovy(disabled);
+      _config.setClusterIngestionGroovyDisabled(disabled);
+    });
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
     _controllerMode = _config.getControllerMode();
@@ -254,7 +262,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       HelixSetupUtils.setupHelixClusterWithDefaultConfigs(_helixZkURL, _helixClusterName, getDefaultClusterConfigs());
     }
     ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
+    // Preserve the authoritative cluster policy across custom instance configuration hooks.
+    boolean ingestionGroovyDisabled = _config.getProperty(ControllerConf.DISABLE_GROOVY,
+        ControllerConf.DEFAULT_DISABLE_GROOVY);
     applyCustomConfigs(_config);
+    _config.setClusterIngestionGroovyDisabled(ingestionGroovyDisabled);
 
     PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
     PinotMd5Mode.setPinotMd5Disabled(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
@@ -653,14 +665,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
 
-    // Initialize cluster config change handler
-    LOGGER.info("Initializing cluster config change handler");
-    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
     try {
       // Register cluster config change handler with Helix
       _helixParticipantManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to register cluster config change handler", e);
+      TableConfigUtils.setDisableGroovy(true);
+      _config.setClusterIngestionGroovyDisabled(true);
+      throw new IllegalStateException("Failed to register cluster config change handler", e);
     }
 
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
@@ -668,8 +679,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _segmentCompletionManager =
         new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
             _leadControllerManager, _config.getSegmentCommitTimeoutSeconds(), segmentCompletionConfig);
-
-    _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
     _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
     _connectionManager.setDefaultSocketConfig(
@@ -715,6 +724,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // max.segment.completion.time.millis is seeded from cluster config before serving requests.
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_pinotLLCRealtimeSegmentManager);
     LOGGER.info("Registered PinotLLCRealtimeSegmentManager as cluster config change listener");
+    // Keeps the legacy OPTION(...) syntax mode cluster config in effect for the statements the controller parses on
+    // /sql, including the DML it executes itself (a DELETE carrying legacy options fails in IGNORE and REJECT mode).
+    // The mode is JVM-wide (QueryOptionsUtils.getLegacyOptionSyntaxMode, read by every parse), so it also governs
+    // the other statements the controller parses: the recommender (InputManager), /query/tableNames
+    // (TableNameExtractor) and validateMultiStageQuery. A cluster that rejects or ignores OPTION(...) does so on
+    // those endpoints too, which matches what the broker would do with the same statement at runtime.
+    // The query option validation mode is not applied here: the broker validates every query the controller forwards,
+    // and the REJECT allowlist of registered SET keys is per JVM (broker plugins register their keys in the broker
+    // only), so applying it here would reject options the broker accepts
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(QueryOptionConfigListener.legacySyntaxModeOnly());
 
     LOGGER.info("Init controller periodic tasks scheduler");
     _periodicTaskScheduler = new PeriodicTaskScheduler();
@@ -739,6 +758,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     final MetadataEventNotifierFactory metadataEventNotifierFactory =
         MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX), _helixResourceManager);
+
+    // Created once the components an executor may use exist, see the Javadoc of the hook
+    _sqlQueryExecutor = createSqlQueryExecutor();
 
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
@@ -824,6 +846,27 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
     return new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
+  }
+
+  /// Creates the executor of the DML statements sent to the controller `/sql` endpoint. Override it to execute the
+  /// statements that Pinot parses but does not execute itself, e.g. `DELETE` (see `SqlQueryExecutor#executeDelete`).
+  ///
+  /// It runs once the components an executor may rely on are initialized: `_config`, `_controllerMetrics`,
+  /// `_executorService`, `_leadControllerManager` (started), `_helixResourceManager` (started),
+  /// `_helixTaskResourceManager`, `_pinotLLCRealtimeSegmentManager`, `_connectionManager`, `_taskManager` and the
+  /// other periodic tasks (created, their scheduler started). The admin application is not started yet.
+  ///
+  /// The broker has the same hook, `BaseBrokerStarter#createSqlQueryExecutor`: a statement is executed by the role
+  /// that receives it, so both hooks must be overridden for a DELETE to be executed consistently whichever role it is
+  /// sent to.
+  ///
+  /// The controller applies no row-level security to a `DELETE`: its access control has no row-level security
+  /// surface, while a broker denies a `DELETE` on a table its row-level security filters (see
+  /// `PinotQueryResource#authorizeDelete`). A deployment that relies on the row-level security of its brokers must
+  /// therefore not install an executor that deletes rows here, or must enforce equivalent filtering in that
+  /// executor: otherwise a statement a broker refuses can be sent to the controller and executed.
+  protected SqlQueryExecutor createSqlQueryExecutor() {
+    return new SqlQueryExecutor(_config.generateVipUrl());
   }
 
   /// Scan all table resources in the cluster and ensure table config and schema exist for each table.
@@ -1190,6 +1233,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // Stop controller periodic task.
       LOGGER.info("Stopping controller periodic tasks");
       _periodicTaskScheduler.stop();
+
+      // Also has to be done before stopping HelixResourceManager: the task manager runs its cron jobs on a
+      // scheduler of its own, which is separate from the periodic task scheduler stopped above.
+      LOGGER.info("Stopping task scheduler");
+      _taskManager.stopScheduler();
 
       LOGGER.info("Stopping lead controller manager");
       _leadControllerManager.stop();

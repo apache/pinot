@@ -20,6 +20,8 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
@@ -28,24 +30,18 @@ public class SumMVAggregationFunctionTest extends AbstractAggregationFunctionTes
 
   @Test
   public void aggregationAllNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null"})
+        .andOnSecondInstance(new Object[]{"null"})
         .whenQuery("select sum_mv(mv) from testTable")
-        .thenResultIs("DOUBLE",
-            String.valueOf(
-                2.0 * (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT,
-                    null))
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(2.0 * (int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
         )
         .whenQueryWithNullHandlingEnabled("select sum_mv(mv) from testTable")
         .thenResultIs("DOUBLE", "null");
@@ -53,124 +49,102 @@ public class SumMVAggregationFunctionTest extends AbstractAggregationFunctionTes
 
   @Test
   public void aggregationWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1;2;3"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2;3"})
+        .andOnSecondInstance(new Object[]{"null"})
         .whenQuery("select sum_mv(mv) from testTable")
-        .thenResultIs("DOUBLE", String.valueOf(
-            1 + 2 + 3 + (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT,
-                null)))
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(1 + 2 + 3 + (int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
+        )
         .whenQueryWithNullHandlingEnabled("select sum_mv(mv) from testTable")
-        .thenResultIs("DOUBLE",
-            String.valueOf(1 + 2 + 3));
+        .thenResultIs("DOUBLE", String.valueOf(1 + 2 + 3));
   }
 
   @Test
   public void aggregationGroupBySVAllNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .addSingleValueDimension("sv", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null", "k1"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k1"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1"})
+        .andOnSecondInstance(new Object[]{"null", "k1"})
         .whenQuery("select sum_mv(mv) from testTable group by sv")
-        .thenResultIs("DOUBLE", String.valueOf(
-            2.0 * (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)))
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(2.0 * (int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
+        )
         .whenQueryWithNullHandlingEnabled("select sum_mv(mv) from testTable group by sv")
         .thenResultIs("DOUBLE", "null");
   }
 
   @Test
   public void aggregationGroupBySVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .addSingleValueDimension("sv", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null", "k1"},
-            new Object[]{"1;2;3", "k2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k2"},
-            new Object[]{"1;2;3", "k1"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1"}, new Object[]{"1;2;3", "k2"})
+        .andOnSecondInstance(new Object[]{"null", "k2"}, new Object[]{"1;2;3", "k1"})
         .whenQuery("select sum_mv(mv) from testTable group by sv")
-        .thenResultIs("DOUBLE", String.valueOf(
-                6.0 + (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)),
-            String.valueOf(
-                6.0 + (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)))
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(6.0 + (int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)),
+            String.valueOf(6.0 + (int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
+        )
         .whenQueryWithNullHandlingEnabled("select sum_mv(mv) from testTable group by sv")
         .thenResultIs("DOUBLE", "6", "6");
   }
 
   @Test
   public void aggregationGroupByMVAllNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv1", DataType.INT)
+        .addMultiValueDimension("mv2", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv1", FieldSpec.DataType.INT)
-                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null", "k1;k2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k1;k2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1;k2"})
+        .andOnSecondInstance(new Object[]{"null", "k1;k2"})
         .whenQuery("select sum_mv(mv1) from testTable group by mv2")
-        .thenResultIs("DOUBLE", String.valueOf(
-                2.0 * (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)),
-            String.valueOf(
-                2.0 * (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)))
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(2.0 * (int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)),
+            String.valueOf(2.0 * (int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
+        )
         .whenQueryWithNullHandlingEnabled("select sum_mv(mv1) from testTable group by mv2")
         .thenResultIs("DOUBLE", "null", "null");
   }
 
   @Test
   public void aggregationGroupByMVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv1", DataType.INT)
+        .addMultiValueDimension("mv2", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv1", FieldSpec.DataType.INT)
-                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1;2", "k1;k2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k1;k2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2", "k1;k2"})
+        .andOnSecondInstance(new Object[]{"null", "k1;k2"})
         .whenQuery("select sum_mv(mv1) from testTable group by mv2")
-        .thenResultIs("DOUBLE", String.valueOf(
-                3.0 + (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)),
-            String.valueOf(
-                3.0 + (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)))
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(3.0 + (int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)),
+            String.valueOf(3.0 + (int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
+        )
         .whenQueryWithNullHandlingEnabled("select sum_mv(mv1) from testTable group by mv2")
         .thenResultIs("DOUBLE", "3", "3");
   }

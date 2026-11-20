@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 
 
 /// Interface for managing the state machine transitions related to segment completion
@@ -58,6 +60,19 @@ public interface SegmentCompletionFSM {
   ///
   /// @return `true` if the FSM receives segment created signal, `false` otherwise.
   boolean isImmutableSegmentCreated();
+
+  /// Returns the factory that parses the stream offsets reported for this segment. [SegmentCompletionManager] parses
+  /// the offsets of `segmentConsumed`, `extendBuildTime` and `segmentStoppedConsuming` requests with it, so that a
+  /// request for an existing FSM does not read the table config from ZooKeeper, where the read can wait behind other
+  /// requests on the controller's ZooKeeper session. It is called by concurrent requests without synchronizing on the
+  /// FSM, so it must not block, and the returned factory must be thread safe.
+  ///
+  /// @return the offset factory, or `null` if this FSM does not keep one, in which case the caller resolves it from
+  ///         the table config
+  @Nullable
+  default StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory() {
+    return null;
+  }
 
   /// Processes the event where a server indicates it has consumed up to a specified offset.
   ///

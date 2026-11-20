@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -48,6 +47,7 @@ import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,7 +140,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
         unindexableExtrasFieldName != null ? getAndValidateExtrasFieldType(schema, unindexableExtrasFieldName) : null;
     _mergedTextIndexFieldSpec = schema.getDimensionSpec(_transformerConfig.getMergedTextIndexField());
     _schemaTree = validateSchemaAndCreateTree(schema, _transformerConfig);
-    _jsonKeyValueSeparatorByteCount = Utf8.encodedLength(_transformerConfig.getJsonKeyValueSeparator());
+    _jsonKeyValueSeparatorByteCount = Utf8Utils.encodedLength(_transformerConfig.getJsonKeyValueSeparator());
     _continueOnError = ingestionConfig.isContinueOnError();
     _serverMetrics = ServerMetrics.get();
     _throttledLogger = new ThrottledLogger(_logger, ingestionConfig);

@@ -42,7 +42,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 /// Aggregation function to compute the count of distinct values for a column using off-heap memory.
 public class DistinctCountOffHeapAggregationFunction
-    extends NullableSingleInputAggregationFunction<BaseOffHeapSet, Integer> {
+    extends BaseSingleInputAggregationFunction<BaseOffHeapSet, Integer> {
   // Use empty OffHeap32BitSet as a placeholder for empty result
   // NOTE: It is okay to close it (multiple times) since we are never adding values into it
 
@@ -431,7 +431,7 @@ public class DistinctCountOffHeapAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(BaseOffHeapSet set) {
+  public SerializedResult serializeIntermediateResult(BaseOffHeapSet set) {
     int type;
     if (set instanceof OffHeap32BitSet) {
       type = 0;
@@ -444,7 +444,7 @@ public class DistinctCountOffHeapAggregationFunction
     }
     byte[] bytes = set.serialize();
     set.close();
-    return new SerializedIntermediateResult(type, bytes);
+    return new SerializedBytes(type, bytes);
   }
 
   @Override

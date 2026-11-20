@@ -26,6 +26,7 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -50,18 +51,59 @@ import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
 public class GrpcSendingMailboxTest {
+
+  @Test(dataProvider = "cancellationErrors")
+  @SuppressWarnings("unchecked")
+  public void cancelPreservesQueryErrorCode(Exception exception, QueryErrorCode expectedCode, String expectedMessage)
+      throws IOException {
+    ClientCallStreamObserver<MailboxContent> observer = mock(ClientCallStreamObserver.class);
+    GrpcSendingMailbox mailbox = new GrpcSendingMailbox("test-mailbox", mock(ChannelManager.class), "localhost", 0,
+        Long.MAX_VALUE, new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024, false) {
+      @Override
+      ClientCallStreamObserver<MailboxContent> getContentObserver() {
+        return observer;
+      }
+    };
+
+    mailbox.cancel(exception);
+
+    ArgumentCaptor<MailboxContent> content = ArgumentCaptor.forClass(MailboxContent.class);
+    verify(observer).onNext(content.capture());
+    verify(observer).onCompleted();
+    DataBlock errorBlock = DataBlockUtils.deserialize(List.of(content.getValue().getPayload().asReadOnlyByteBuffer()));
+    assertEquals(errorBlock.getExceptions(), Map.of(expectedCode.getId(), expectedMessage));
+  }
+
+  @DataProvider(name = "cancellationErrors")
+  public Object[][] cancellationErrors() {
+    return new Object[][]{
+        {new QueryException(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "CPU limit"),
+            QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "CPU limit"},
+        {new TerminationException(QueryErrorCode.EXECUTION_TIMEOUT, "execution timed out"),
+            QueryErrorCode.EXECUTION_TIMEOUT, "execution timed out"},
+        {new QueryException(QueryErrorCode.EXECUTION_TIMEOUT, (String) null),
+            QueryErrorCode.EXECUTION_TIMEOUT, "Unknown"},
+        {new RuntimeException("ordinary cancellation"), QueryErrorCode.QUERY_CANCELLATION,
+            "Cancelled by sender with exception: ordinary cancellation"},
+        {null, QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: Unknown"}
+    };
+  }
 
   @Test
   public void sendDataThrowsWhenQueryTerminated() {
@@ -78,6 +120,18 @@ public class GrpcSendingMailboxTest {
       Assert.assertThrows(TerminationException.class, () -> mailbox.send(block));
       Mockito.verifyNoInteractions(channelManager);
     }
+  }
+
+  @Test
+  public void doesNotDeliverBlocksByReference() {
+    GrpcSendingMailbox mailbox =
+        new GrpcSendingMailbox("test-mailbox", Mockito.mock(ChannelManager.class), "localhost", 0, Long.MAX_VALUE,
+            new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024, true);
+
+    // Blocks are serialized within send(MseBlock.Data), so senders that share one block between mailboxes do not
+    // need to give this one a copy. See BroadcastExchange.
+    Assert.assertFalse(mailbox.deliversByReference());
+    Assert.assertFalse(mailbox.isLocal());
   }
 
   /// Regression test for the lazy-initialization data race on `_contentObserver`. Before the fix, both `sendInternal`

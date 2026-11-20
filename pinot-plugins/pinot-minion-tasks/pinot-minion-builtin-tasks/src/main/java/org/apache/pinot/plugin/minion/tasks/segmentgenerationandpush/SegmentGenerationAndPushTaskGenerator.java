@@ -61,6 +61,8 @@ import org.slf4j.LoggerFactory;
 ///   input.fs.className - Optional, the class name of filesystem to read input data. Default to be inferred from
 ///   inputDirURI if not specified.
 ///   input.fs.prop.<keys> - Optional, defines the configs to initialize input filesystem.
+///   includeFileNamePattern - Optional, Java NIO PathMatcher glob or regex pattern for files to include.
+///   excludeFileNamePattern - Optional, Java NIO PathMatcher glob or regex pattern for files to exclude.
 ///
 ///   outputDirURI - Optional, the location of output segments. Use local temp dir with push mode TAR, If not specified.
 ///   output.fs.className - Optional, the class name of filesystem to write output segments. Default to be inferred
@@ -284,8 +286,15 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     // overridden, corresponding files become un-ingested, the generator will generate new tasks, which generates
     // segments with same names, and override existing segments again... It becomes an endless loop
     // We add uuid to segment name to avoid segment collision across multiple rounds of task generation to solve the
-    // problem.
-    singleFileGenerationTaskConfig.put(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, Boolean.toString(true));
+    // problem. Default to true, but respect an explicit value configured in the batch config, either under
+    // segmentNameGenerator.configs (takes precedence) or top-level. Note that explicitly setting it to false makes
+    // segment names repeat across rounds unless the segment name generator produces unique names per input.
+    String appendUuidConfigKey = BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + "."
+        + BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME;
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME,
+        singleFileGenerationTaskConfig.getOrDefault(appendUuidConfigKey,
+            singleFileGenerationTaskConfig.getOrDefault(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME,
+                Boolean.toString(true))));
     if ((outputDirURI == null) || (pushMode == null)) {
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
     } else {

@@ -25,6 +25,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -77,6 +78,13 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   }
 
   @Override
+  public int preConnectServers(long deadlineMs) {
+    // Only the single-stage handler owns the broker-to-server Netty channels; the multi-stage (gRPC)
+    // and time-series paths have nothing to pre-connect here.
+    return _singleStageBrokerRequestHandler.preConnectServers(deadlineMs);
+  }
+
+  @Override
   public void shutDown() {
     _singleStageBrokerRequestHandler.shutDown();
     if (_multiStageBrokerRequestHandler != null) {
@@ -85,6 +93,14 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     if (_timeSeriesRequestHandler != null) {
       _timeSeriesRequestHandler.shutDown();
     }
+  }
+
+  /// Warms only the single-stage handler. It owns the broker-to-server netty channels, which is the data
+  /// plane that starts empty on a fresh broker; the multi-stage handler already warms its own compile path
+  /// in `start()`, and the time-series handler shares the single-stage transport.
+  @Override
+  public boolean warmUp(BrokerWarmupConfig config, long deadlineMs) {
+    return _singleStageBrokerRequestHandler.warmUp(config, deadlineMs);
   }
 
   @Override
@@ -104,9 +120,17 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(request.get(Request.SQL).asText(), request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+        QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
+        requestContext.setErrorCode(errorCode);
+        return new BrokerResponseNative(errorCode, e.getMessage());
       }
+    }
+
+    // gRPC and custom containers can call this handler directly, bypassing the REST DELETE authorization path.
+    if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+      requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
+          "DELETE is only supported by the broker SQL endpoint.");
     }
 
     BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;

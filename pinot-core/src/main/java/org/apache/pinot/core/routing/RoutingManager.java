@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -38,7 +39,6 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface RoutingManager {
-
   /// Get all enabled server instances in the cluster.
   ///
   /// @return all currently enabled server instances.
@@ -55,6 +55,15 @@ public interface RoutingManager {
     return getEnabledServerInstanceMap();
   }
 
+  /// Returns the minimum revision of the capability across the servers, see [InstanceCapability]. 0 means that at least
+  /// one server does not support the capability. The minimum covers every server with an instance config, including
+  /// the disabled ones, so it never overstates what a routable server supports. Never blocks.
+  ///
+  /// The default implementation returns 0: no capability is supported.
+  default int getMinServerCapabilityRevision(InstanceCapability capability) {
+    return 0;
+  }
+
   /// Returns whether the given table is enabled
   /// @param tableNameWithType Table name with type
   /// @return Whether the given table is enabled
@@ -68,6 +77,13 @@ public interface RoutingManager {
   /// @return the route table.
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
+
+  /// Get the routing table and report required segments whose selected server has since disappeared as unavailable.
+  /// Implementations without this capability fall back to regular routing.
+  @Nullable
+  default RoutingTable getRoutingTableWithMissingServerSegments(BrokerRequest brokerRequest, long requestId) {
+    return getRoutingTable(brokerRequest, requestId);
+  }
 
   /// Get the [RoutingTable] for a specific broker request.
   /// @param brokerRequest the broker request constructed from a query.
@@ -89,11 +105,54 @@ public interface RoutingManager {
     return getSegments(brokerRequest);
   }
 
+  /// Returns the segments that the segment pruners *provably eliminated* for the given broker request, i.e. the
+  /// selected segments that cannot hold a row matching the request's filter. Absence from the returned set means
+  /// nothing: a segment may be missing because it matches, because it was never selected, or because the table does
+  /// not exist. Only presence is a proof.
+  ///
+  /// This is the complement of [#getSegments(BrokerRequest)], and the distinction is what makes it usable as a
+  /// planning-time emptiness proof. Deciding "this segment does not match" from *absence* of a survivor conflates
+  /// pruning with the several innocent reasons a segment can be missing from a routing result -- it was classified as
+  /// optional by instance selection, its server left the enabled server map, or it entered the partition metadata
+  /// before it became selectable -- and each of those would silently drop matching data. Deciding it from presence in
+  /// this set cannot.
+  ///
+  /// Instance selection deliberately takes no part, so the result depends only on the request and the pruners, never
+  /// on a request id or on which replica a query happens to pick.
+  ///
+  /// Returns `null` if the table does not exist, as [#getSegments(BrokerRequest)] does, which is not the same as an
+  /// empty set: a broker that does not have the table eliminated nothing because it would have routed nothing, while
+  /// an empty set is a broker that ran the pruners and proved nothing. A caller combining several brokers' verdicts
+  /// has to tell those apart, and gets both from this one lookup rather than from a separate existence check that
+  /// could disagree with it.
+  ///
+  /// The returned set is for reading only: an implementation may hand back an immutable or a shared set, so a caller
+  /// that needs to modify it must copy it first.
+  ///
+  /// The default implementation returns an empty set, i.e. proves nothing about any segment. Note that this is a
+  /// statement about segments only: a caller may still act on emptiness it can see for itself, such as a partition
+  /// that lists no segment at all.
+  @Nullable
+  default Set<String> getPrunedSegments(BrokerRequest brokerRequest) {
+    return Set.of();
+  }
+
   /// Validate routing exist for a table
   ///
   /// @param tableNameWithType the name of the table.
   /// @return true if the route table exists.
   boolean routingExists(String tableNameWithType);
+
+  /// Returns the tables this instance currently has routing for.
+  ///
+  /// Used by broker startup pre-connect to derive the (server, table type) channels this broker actually
+  /// routes to, so it opens exactly those rather than the cross product of every enabled server with every
+  /// table type. The default returns an empty set for implementations that do not track routing per table.
+  ///
+  /// @return table names with type; empty when unknown.
+  default Set<String> getRoutableTables() {
+    return Set.of();
+  }
 
   /// Acquire the time boundary info. Useful for hybrid logical table queries that needs to split between
   /// realtime and offline.

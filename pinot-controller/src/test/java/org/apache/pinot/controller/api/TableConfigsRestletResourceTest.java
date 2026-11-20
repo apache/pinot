@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
@@ -33,6 +34,7 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TunerConfig;
+import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -52,6 +54,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -519,12 +523,12 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Schema schema = createDummySchema(tableName);
 
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", "now()")));
-    TableConfig legacyOfflineConfig = getBaseTableConfigBuilder(tableName, TableType.OFFLINE)
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("timeColumn", "now()")));
+    TableConfig legacyRealtimeConfig = getBaseTableConfigBuilder(tableName, TableType.REALTIME)
         .setIngestionConfig(ingestionConfig)
         .build();
-    TableConfigs tableConfigs = new TableConfigs(tableName, schema, legacyOfflineConfig, null);
-    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, null, legacyRealtimeConfig);
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     try {
       String createError = Assert.expectThrows(Exception.class,
               () -> adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null))
@@ -533,21 +537,21 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
 
       // Seed the config below the REST validation layer to model a table persisted before this validation existed.
       DEFAULT_INSTANCE.addSchema(schema);
-      DEFAULT_INSTANCE.getHelixResourceManager().addTable(legacyOfflineConfig);
+      DEFAULT_INSTANCE.getHelixResourceManager().addTable(legacyRealtimeConfig);
 
       TableConfigs update = adminClient.getTableClient().getTableConfigsObject(tableName);
-      update.getOffline().getValidationConfig().setRetentionTimeValue("10");
+      update.getRealtime().getValidationConfig().setRetentionTimeValue("10");
       adminClient.getTableClient()
           .updateTableConfigs(tableName, update.toPrettyJsonString(), null, false, false);
 
       TableConfigs stored = adminClient.getTableClient().getTableConfigsObject(tableName);
-      Assert.assertEquals(stored.getOffline().getValidationConfig().getRetentionTimeValue(), "10");
-      Assert.assertEquals(stored.getOffline().getIngestionConfig().getTransformConfigs().get(0).getTransformFunction(),
+      Assert.assertEquals(stored.getRealtime().getValidationConfig().getRetentionTimeValue(), "10");
+      Assert.assertEquals(stored.getRealtime().getIngestionConfig().getTransformConfigs().get(0).getTransformFunction(),
           "now()");
 
       IngestionConfig changedIngestionConfig = new IngestionConfig();
-      changedIngestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", "plus(now(), 1)")));
-      update.getOffline().setIngestionConfig(changedIngestionConfig);
+      changedIngestionConfig.setTransformConfigs(List.of(new TransformConfig("timeColumn", "plus(now(), 1)")));
+      update.getRealtime().setIngestionConfig(changedIngestionConfig);
       String updateError = Assert.expectThrows(Exception.class,
               () -> adminClient.getTableClient()
                   .updateTableConfigs(tableName, update.toPrettyJsonString(), null, false, false))
@@ -608,6 +612,56 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
       } else if (DEFAULT_INSTANCE.getHelixResourceManager().getSchema(tableName) != null) {
         adminClient.getSchemaClient().deleteSchema(tableName);
       }
+    }
+  }
+
+  // Exercise legacy FieldSpec transforms supplied through the combined schema/table endpoints.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testSchemaGroovyPolicy()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    ControllerConf controllerConf = DEFAULT_INSTANCE.getControllerConfig();
+    boolean originalDisableGroovy = controllerConf.isDisableIngestionGroovy();
+    String tableName = "tableConfigsSchemaGroovyPolicy";
+    Schema schema = createDummySchema(tableName);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, createOfflineTableConfig(tableName), null);
+    String disabledMessage = "Groovy transform functions are disabled for schema";
+    try {
+      DEFAULT_INSTANCE.setClusterIngestionGroovyConfig(null);
+      schema.getFieldSpecFor("dimA").setTransformFunction("Groovy({dimB.reverse()}, dimB)");
+      assertTrue(expectThrows(Exception.class,
+          () -> adminClient.getTableClient().validateTableConfigs(tableConfigs.toJsonString(), "ALL"))
+          .getMessage().contains(disabledMessage));
+      assertTrue(expectThrows(Exception.class,
+          () -> adminClient.getTableClient().createTableConfigs(tableConfigs.toJsonString(), "ALL", null))
+          .getMessage().contains(disabledMessage));
+      assertTrue(expectThrows(Exception.class, () -> sendPostRequest(
+          DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsTune(), tableConfigs.toJsonString()))
+          .getMessage().contains(disabledMessage));
+
+      schema.getFieldSpecFor("dimA").setTransformFunction("reverse(dimB)");
+      adminClient.getTableClient().createTableConfigs(tableConfigs.toJsonString(), null, null);
+      schema.getFieldSpecFor("dimA").setTransformFunction("Groovy({dimB.reverse()}, dimB)");
+      assertTrue(expectThrows(Exception.class, () -> adminClient.getTableClient()
+          .updateTableConfigs(tableName, tableConfigs.toJsonString(), "ALL", false, false))
+          .getMessage().contains(disabledMessage));
+
+      DEFAULT_INSTANCE.setClusterIngestionGroovyConfig("false");
+      IngestionConfig ingestionConfig = new IngestionConfig();
+      ingestionConfig.setFilterConfig(new FilterConfig("Groovy({dimB.length() > 0}, dimB)"));
+      tableConfigs.getOffline().setIngestionConfig(ingestionConfig);
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toJsonString(), null);
+      adminClient.getTableClient().updateTableConfigs(tableName, tableConfigs.toJsonString(), null, false, false);
+
+      DEFAULT_INSTANCE.setClusterIngestionGroovyConfig("true");
+      schema.getFieldSpecFor("dimA").setTransformFunction("reverse(dimB)");
+      assertTrue(expectThrows(Exception.class,
+          () -> adminClient.getTableClient().validateTableConfigs(tableConfigs.toJsonString(), null))
+          .getMessage().contains("Groovy filter functions are disabled for table config"));
+    } finally {
+      DEFAULT_INSTANCE.setClusterIngestionGroovyConfig(Boolean.toString(originalDisableGroovy));
+      adminClient.getTableClient().deleteTableConfigs(tableName, null);
     }
   }
 
@@ -893,13 +947,6 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     String responseWithMinionSkip =
         adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), "MINION_INSTANCES");
     Assert.assertNotNull(responseWithMinionSkip);
-
-    // ACTIVE_TASKS is still accepted as a skip type for backward compatibility, but the validate/tune preflight
-    // endpoints no longer run active-task validation (it applies only on the create/update path), so passing it is a
-    // no-op here.
-    String responseWithTasksSkip =
-        adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), "ACTIVE_TASKS");
-    Assert.assertNotNull(responseWithTasksSkip);
 
     // Test validation with multiple skip types
     String responseWithMultipleSkips = adminClient.getTableClient()

@@ -245,12 +245,12 @@ public class PinotSegmentRestletResourceTest {
       throws Exception {
     Map<String, String> crcMap = adminClient.getSegmentClient().getSegmentToCrcMap(tableName);
     if (crcMap == null) {
-      crcMap = java.util.Map.of();
+      crcMap = Map.of();
     }
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);
       assertNotNull(metadata);
-      assertEquals(crcMap.get(segmentName), metadata.getCrc());
+      assertEquals(crcMap.get(segmentName), Long.toString(metadata.getCrc()));
     }
     assertEquals(crcMap.size(), expectedSize);
   }

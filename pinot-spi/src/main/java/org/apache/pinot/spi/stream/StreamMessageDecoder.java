@@ -28,6 +28,14 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 /// Interface for a decoder of messages fetched from the stream
+///
+/// Failure contract of the `decode` methods:
+/// - Returning `null` or throwing any exception other than [RetriableDecodeException] drops the message, or stops
+///   consumption if the stream config `stopOnDecodeError` is set.
+/// - Throwing [RetriableDecodeException] means the message may decode later, e.g. once a schema registry is reachable
+///   again. Regardless of `stopOnDecodeError`, the consumer backs off and fetches the message again until it decodes or
+///   the outage outlasts [StreamConfigProperties#DECODE_RETRY_MAX_DURATION_MILLIS] (no limit by default). A segment
+///   that reaches its time threshold or is force committed (also on pause) meanwhile ends before that message.
 /// @param <T>
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -63,6 +71,7 @@ public interface StreamMessageDecoder<T> {
   /// @param payload The buffer from which to read the row.
   /// @return A new row decoded from the buffer. If the returned value is `null` the row is dropped from the
   ///         segment.
+  /// @throws RetriableDecodeException If the message may decode later (see the class doc)
   @Nullable
   GenericRow decode(T payload, GenericRow destination);
 
@@ -74,6 +83,7 @@ public interface StreamMessageDecoder<T> {
   /// @param destination The [GenericRow] to write the decoded row into
   /// @return A new row decoded from the buffer If the returned value is `null` the row is dropped from the
   ///         segment.
+  /// @throws RetriableDecodeException If the message may decode later (see the class doc)
   @Nullable
   GenericRow decode(T payload, int offset, int length, GenericRow destination);
 }

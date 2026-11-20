@@ -34,6 +34,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.segment.local.segment.creator.ColumnarSegmentCreationDataSource;
+import org.apache.pinot.segment.local.segment.creator.RecordProcessingException;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
@@ -286,7 +287,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           _totalRecordReadTimeNs += recordReadStopTimeNs - recordReadStartTimeNs;
         } catch (Exception e) {
           if (!_continueOnError) {
-            throw new RuntimeException("Error occurred while reading row during indexing", e);
+            throw new RecordProcessingException("Error occurred while reading row during indexing", e);
           } else {
             _incompleteRowsFound++;
             LOGGER.debug("Error occurred while reading row during indexing", e);

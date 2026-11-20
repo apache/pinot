@@ -46,6 +46,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -158,8 +161,8 @@ public class ZKOperatorTest {
 
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(segmentName);
-    when(segmentMetadata.getCrc()).thenReturn("12345");
-    when(segmentMetadata.getDataCrc()).thenReturn("432");
+    when(segmentMetadata.getCrc()).thenReturn(12345L);
+    when(segmentMetadata.getDataCrc()).thenReturn(432L);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
 
@@ -200,8 +203,8 @@ public class ZKOperatorTest {
 
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
-    when(segmentMetadata.getCrc()).thenReturn("12345");
-    when(segmentMetadata.getDataCrc()).thenReturn("432");
+    when(segmentMetadata.getCrc()).thenReturn(12345L);
+    when(segmentMetadata.getDataCrc()).thenReturn(432L);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
 
@@ -305,7 +308,7 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getSizeInBytes(), 10);
 
     // Refresh the segment with a different segment (different CRC)
-    when(segmentMetadata.getCrc()).thenReturn("23456");
+    when(segmentMetadata.getCrc()).thenReturn(23456L);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(789L);
     // Add a tiny sleep to guarantee that refresh time is different from the previous round
     Thread.sleep(10);
@@ -332,8 +335,8 @@ public class ZKOperatorTest {
 
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
-    when(segmentMetadata.getCrc()).thenReturn("12345");
-    when(segmentMetadata.getDataCrc()).thenReturn("432");
+    when(segmentMetadata.getCrc()).thenReturn(12345L);
+    when(segmentMetadata.getDataCrc()).thenReturn(432L);
     zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
         "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
 
@@ -345,7 +348,7 @@ public class ZKOperatorTest {
 
     // Uploading a segment with LLC segment name but without start/end offset should fail
     when(segmentMetadata.getName()).thenReturn(LLC_SEGMENT_NAME);
-    when(segmentMetadata.getCrc()).thenReturn("23456");
+    when(segmentMetadata.getCrc()).thenReturn(23456L);
     try {
       zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
           "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
@@ -368,7 +371,7 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getEndOffset(), "1234");
 
     // Refreshing a segment with LLC segment name but without start/end offset should success
-    when(segmentMetadata.getCrc()).thenReturn("34567");
+    when(segmentMetadata.getCrc()).thenReturn(34567L);
     when(segmentMetadata.getStartOffset()).thenReturn(null);
     when(segmentMetadata.getEndOffset()).thenReturn(null);
     zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
@@ -381,7 +384,7 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getEndOffset(), "1234");
 
     // Refreshing a segment with LLC segment name and start/end offset should override the offsets
-    when(segmentMetadata.getCrc()).thenReturn("45678");
+    when(segmentMetadata.getCrc()).thenReturn(45678L);
     when(segmentMetadata.getStartOffset()).thenReturn("1234");
     when(segmentMetadata.getEndOffset()).thenReturn("2345");
     zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
@@ -392,6 +395,99 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getStatus(), Status.UPLOADED);
     assertEquals(segmentZKMetadata.getStartOffset(), "1234");
     assertEquals(segmentZKMetadata.getEndOffset(), "2345");
+  }
+
+  @Test
+  public void testRefreshWithTarDeletesStaleMetadataTar()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    ZKOperator zkOperator = new ZKOperator(_resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
+    HttpHeaders httpHeaders = mock(HttpHeaders.class);
+    File tableDir = new File(DATA_DIR, OFFLINE_TABLE_NAME);
+    String segmentName = "sidecarRefreshSegment";
+    File finalSegmentFile = new File(tableDir, segmentName);
+    File sidecar = new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    FileUtils.write(sidecar, "stale metadata", "UTF-8");
+    File newSegmentFile = new File(TEMP_DIR, "newSegmentTar");
+    FileUtils.write(newSegmentFile, "new segment bytes", "UTF-8");
+    URI finalLocation = finalSegmentFile.toURI();
+
+    SegmentMetadata first = mockSegmentMetadata(segmentName, 1L);
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_CONFIG, first, FileUploadType.SEGMENT, finalLocation,
+        newSegmentFile, "downloadUrl", "downloadUrl", "crypter", 10, true, true, httpHeaders);
+    // A first push has no previous segment, so nothing is invalidated.
+    assertTrue(sidecar.exists());
+
+    FileUtils.write(newSegmentFile, "different segment bytes", "UTF-8");
+    SegmentMetadata refreshed = mockSegmentMetadata(segmentName, 2L);
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_CONFIG, refreshed, FileUploadType.SEGMENT, finalLocation,
+        newSegmentFile, "downloadUrl", "downloadUrl", "crypter", 10, true, true, httpHeaders);
+
+    assertFalse(sidecar.exists());
+    assertEquals(FileUtils.readFileToString(finalSegmentFile, "UTF-8"), "different segment bytes");
+  }
+
+  @Test
+  public void testRefreshWithMetadataPushKeepsSidecarGeneratedByTheSameJob()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    ZKOperator zkOperator = new ZKOperator(_resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
+    HttpHeaders httpHeaders = mock(HttpHeaders.class);
+    File tableDir = new File(DATA_DIR, OFFLINE_TABLE_NAME);
+    String segmentName = "sidecarMetadataPushSameJobSegment";
+    // The batch job staged the segment tar and its fresh sidecar next to each other in the table dir.
+    File sourceTar = new File(tableDir, segmentName + ".tar.gz");
+    FileUtils.write(sourceTar, "segment bytes", "UTF-8");
+    File sidecar = new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    FileUtils.write(sidecar, "current metadata", "UTF-8");
+    URI finalLocation = new File(tableDir, segmentName).toURI();
+
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_CONFIG, mockSegmentMetadata(segmentName, 1L),
+        FileUploadType.METADATA, finalLocation, null, sourceTar.toURI().toString(), finalLocation.toString(),
+        "crypter", 10, true, true, httpHeaders);
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_CONFIG, mockSegmentMetadata(segmentName, 2L),
+        FileUploadType.METADATA, finalLocation, null, sourceTar.toURI().toString(), finalLocation.toString(),
+        "crypter", 10, true, true, httpHeaders);
+
+    assertEquals(FileUtils.readFileToString(sidecar, "UTF-8"), "current metadata");
+    assertEquals(FileUtils.readFileToString(new File(tableDir, segmentName), "UTF-8"), "segment bytes");
+  }
+
+  @Test
+  public void testRefreshWithMetadataPushDeletesStaleSidecarWhenSourceIsElsewhere()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    ZKOperator zkOperator = new ZKOperator(_resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
+    HttpHeaders httpHeaders = mock(HttpHeaders.class);
+    File tableDir = new File(DATA_DIR, OFFLINE_TABLE_NAME);
+    String segmentName = "sidecarMetadataPushOtherDirSegment";
+    File sourceTar = new File(TEMP_DIR, segmentName + ".tar.gz");
+    FileUtils.write(sourceTar, "segment bytes", "UTF-8");
+    // Left by a previous build of the segment at the final location.
+    File sidecar = new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    FileUtils.write(sidecar, "stale metadata", "UTF-8");
+    URI finalLocation = new File(tableDir, segmentName).toURI();
+
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_CONFIG, mockSegmentMetadata(segmentName, 1L),
+        FileUploadType.METADATA, finalLocation, null, sourceTar.toURI().toString(), finalLocation.toString(),
+        "crypter", 10, true, true, httpHeaders);
+    // A first push has no previous segment, so nothing is invalidated.
+    assertTrue(sidecar.exists());
+
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_CONFIG, mockSegmentMetadata(segmentName, 2L),
+        FileUploadType.METADATA, finalLocation, null, sourceTar.toURI().toString(), finalLocation.toString(),
+        "crypter", 10, true, true, httpHeaders);
+
+    assertFalse(sidecar.exists());
+  }
+
+  private SegmentMetadata mockSegmentMetadata(String segmentName, long crc) {
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getName()).thenReturn(segmentName);
+    when(segmentMetadata.getCrc()).thenReturn(crc);
+    when(segmentMetadata.getDataCrc()).thenReturn(crc);
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
+    return segmentMetadata;
   }
 
   @AfterClass

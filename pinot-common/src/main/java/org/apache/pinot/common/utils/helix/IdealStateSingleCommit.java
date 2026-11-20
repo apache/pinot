@@ -27,7 +27,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -42,7 +41,6 @@ public class IdealStateSingleCommit {
   private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateSingleCommit.class);
   private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";
   private static final int NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION = 1000;
-  private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
 
   private IdealStateSingleCommit() {
   }
@@ -64,7 +62,7 @@ public class IdealStateSingleCommit {
           // Make a copy of the idealState above to pass it to the updater
           // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields and
           // list fields
-          IdealState idealStateCopy = cloneIdealState(idealState);
+          IdealState idealStateCopy = HelixHelper.cloneIdealState(idealState);
 
           IdealState updatedIdealState;
           try {
@@ -148,10 +146,5 @@ public class IdealStateSingleCommit {
 
   private static class IdealStateWrapper {
     IdealState _idealState;
-  }
-
-  public static IdealState cloneIdealState(IdealState idealState) {
-    return new IdealState(
-        (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
   }
 }

@@ -21,5 +21,5 @@
 
 ## Quality Bar
 - Accurate and current — verify before writing
-- Actionable — specific commands, step-by-step procedures, validation steps
+- Actionable — concrete commands and completion criteria; require ordered steps only when correctness depends on their order
 - Focused — operationally important details only, skip the obvious

@@ -46,6 +46,7 @@ import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -70,6 +71,10 @@ public class PerfBenchmarkDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkDriver.class);
   private static final long BROKER_TIMEOUT_MS = 60_000L;
   private static final String BROKER_QUERY_PATH = "/query/sql";
+
+  static {
+    ZooKeeperSslContextSupplier.initialize();
+  }
 
   private final PerfBenchmarkDriverConf _conf;
   private final String _zkAddress;
