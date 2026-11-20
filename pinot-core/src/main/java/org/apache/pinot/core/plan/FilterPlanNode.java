@@ -57,6 +57,7 @@ import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.operator.filter.predicate.TextMatchDictIdPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
@@ -352,6 +353,17 @@ public class FilterPlanNode implements PlanNode {
 
               Preconditions.checkState(textIndexReader != null,
                   "Cannot apply TEXT_MATCH on column: %s without text index", column);
+
+              if (textIndexReader.isBuildOnDictionary()) {
+                // Dictionary-based text index: search returns matching dictIds, resolved to docIds by the standard
+                // dictionary-based filter operators (inverted index / scan), exactly like FST/REGEXP_LIKE.
+                TextMatchPredicate textMatchPredicate = (TextMatchPredicate) predicate;
+                predicateEvaluator = TextMatchDictIdPredicateEvaluatorFactory.newPredicateEvaluator(
+                    textMatchPredicate, textIndexReader, dataSource, _queryContext);
+                _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
+                return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource,
+                    numDocs);
+              }
 
               if (textIndexReader.isMultiColumn()) {
                 return new TextMatchFilterOperator(column, textIndexReader, (TextMatchPredicate) predicate, numDocs,

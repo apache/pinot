@@ -67,6 +67,7 @@ cd ${DOCKER_FILE_BASE_DIR}
 
 echo "Building Pinot Docker image with JDK ${JDK_VERSION} and base image tag ${PINOT_BASE_IMAGE_TAG}"
 docker buildx build \
+    --pull \
     --no-cache \
     --platform=${BUILD_PLATFORM} \
     --file Dockerfile \

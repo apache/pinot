@@ -56,6 +56,7 @@ public class SqlOptionsModeTest {
   public void testIgnoredLegacyOptionSyntaxIsStrippedAndDropped() {
     QueryOptionsUtils.setLegacyOptionSyntaxMode(SqlOptionsMode.IGNORE);
     assertEquals(sqlOptionsOf("select * from vegetables OPTION(timeoutMs=1000)"), Map.of());
+    assertEquals(CalciteSqlParser.extractQueryOptions("select * from vegetables OPTION(timeoutMs=1000)"), Map.of());
     // INSERT is unaffected: its suffix is dropped silently, as always
     assertEquals(sqlOptionsOf("INSERT INTO db.tbl FROM FILE 'file:///tmp/file1' OPTION(taskName=myTask-1)"), Map.of());
     // SET statements are unaffected
@@ -86,6 +87,8 @@ public class SqlOptionsModeTest {
     for (String sql : List.of("select * from vegetables OPTION(timeoutMs=1000)",
         "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1' OPTION(taskName=myTask-1)")) {
       SqlCompilationException e = expectThrows(SqlCompilationException.class, () -> sqlOptionsOf(sql));
+      assertEquals(expectThrows(SqlCompilationException.class,
+          () -> CalciteSqlParser.extractQueryOptions(sql)).getMessage(), e.getMessage());
       assertTrue(e.getMessage().contains("OPTION(...)"), e.getMessage());
       assertTrue(e.getMessage().contains("SET"), e.getMessage());
     }
@@ -159,6 +162,31 @@ public class SqlOptionsModeTest {
         expectThrows(QueryException.class, () -> parse("select * from vegetables", "sqlOptionsMode=bogus"));
     assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
     assertTrue(e.getMessage().contains("bogus"), e.getMessage());
+  }
+
+  @Test
+  public void testExtractQueryOptionsHonorsRequestMode() {
+    String sql = "SET timeoutMs=1000; SELECT * FROM vegetables OPTION(skipUpsert=true)";
+    for (String queryOptions : List.of("timeoutMs=2000", "timeoutMs=2000;sqlOptionsMode=allow",
+        "timeoutMs=2000;SQLOPTIONSMODE=IgNoRe")) {
+      ObjectNode request = JsonUtils.newObjectNode().put(Request.QUERY_OPTIONS, queryOptions).put(Request.TRACE, true);
+      assertEquals(RequestUtils.extractQueryOptions(sql, request), RequestUtils.parseQuery(sql, request).getOptions(),
+          queryOptions);
+    }
+    ObjectNode request = JsonUtils.newObjectNode().put(Request.QUERY_OPTIONS, "timeoutMs=2000");
+    assertEquals(RequestUtils.extractQueryOptions(null, request), Map.of("timeoutMs", "2000"));
+  }
+
+  @Test
+  public void testExtractQueryOptionsRejectsForbiddenOptionsAndInvalidModes() {
+    String sql = "SET timeoutMs=1000; SELECT * FROM vegetables";
+    for (String mode : List.of("reject", "bogus")) {
+      ObjectNode request =
+          JsonUtils.newObjectNode().put(Request.QUERY_OPTIONS, "timeoutMs=2000;sqlOptionsMode=" + mode);
+      QueryException expected = expectThrows(QueryException.class, () -> RequestUtils.parseQuery(sql, request));
+      QueryException actual = expectThrows(QueryException.class, () -> RequestUtils.extractQueryOptions(sql, request));
+      assertEquals(actual.getErrorCode(), expected.getErrorCode());
+    }
   }
 
   private static Map<String, String> sqlOptionsOf(String sql) {

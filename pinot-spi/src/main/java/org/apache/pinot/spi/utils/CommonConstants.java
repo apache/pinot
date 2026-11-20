@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 
 
@@ -205,6 +206,7 @@ public class CommonConstants {
     public static class Instance {
       @Deprecated
       public static final String INSTANCE_ID_KEY = "instanceId";
+      @Deprecated
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
       public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
@@ -216,6 +218,17 @@ public class CommonConstants {
 
       public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
       public static final String PINOT_VERSION_KEY = "pinotVersion";
+      /// The map field with the features that an instance supports: the key is the capability name and the value is
+      /// its revision, an integer that only grows. Any instance type may write it at startup. Other components read
+      /// it to decide whether they can use a feature that instances of an older version do not support. A missing
+      /// map or key means revision 0: not supported. See `InstanceCapability` in pinot-common.
+      public static final String CAPABILITIES_KEY = "capabilities";
+      /// The reserved entry of the [#CAPABILITIES_KEY] map with the Pinot version that wrote the map. A reader uses the
+      /// capabilities only when this entry is string-equal to the simple field [#PINOT_VERSION_KEY] of the same
+      /// instance config. A version that predates the capabilities rewrites [#PINOT_VERSION_KEY] at startup but keeps
+      /// the map, so after a rollback the two values differ and the stale map is ignored. Capability names are upper
+      /// case, so they never clash with this key.
+      public static final String CAPABILITIES_PINOT_VERSION_KEY = PINOT_VERSION_KEY;
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
@@ -839,6 +852,20 @@ public class CommonConstants {
     /// Calcite itself stops treating an IN list as a scalar predicate.
     public static final int DEFAULT_SEALED_IN_LIST_THRESHOLD = 20;
 
+    /// Whether the multi-stage engine resolves a simple name in `GROUP BY` to a `SELECT` alias before a column of the
+    /// same name. Calcite 1.42 (CALCITE-7052) resolves the column first, as MySQL and PostgreSQL do. Before that, Pinot
+    /// resolved the alias first. Enable this to keep the old behavior for queries such as
+    /// `SELECT CASE WHEN c = 'a' THEN 'x' ELSE c END AS c, COUNT(*) FROM t GROUP BY c`.
+    ///
+    /// This value can always be overridden by the [Request.QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY] query
+    /// option. Planning outside the broker's multi-stage request handler does not read this broker config and uses
+    /// the default. The query option works everywhere. The controller `/sql` endpoint compiles a query only to find
+    /// its tables: when a `GROUP BY` name that matches an alias and a column makes that compile fail, it retries with
+    /// the option set and lets the broker decide.
+    public static final String CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY =
+        "pinot.broker.multistage.prefer.select.alias.in.group.by";
+    public static final boolean DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -1249,6 +1276,9 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_SEALED_IN_LIST_THRESHOLD]
         public static final String SEALED_IN_LIST_THRESHOLD = "sealedInListThreshold";
+
+        /// Option to customize the value of [Broker#CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY]
+        public static final String PREFER_SELECT_ALIAS_IN_GROUP_BY = "preferSelectAliasInGroupBy";
 
         // Vector search query options
 
@@ -1873,6 +1903,11 @@ public class CommonConstants {
     public static final String DEFAULT_SERVER_QUERY_REGEX_CLASS = "JAVA_UTIL";
     public static final String CONFIG_OF_ENABLE_QUERY_CANCELLATION = "pinot.server.enable.query.cancellation";
     public static final boolean DEFAULT_ENABLE_QUERY_CANCELLATION = true;
+    /// How long after the broker's deadline (`InstanceRequest.deadlineMs`) a request may arrive and still be executed,
+    /// allowing for clock skew between broker and server. A negative value disables the check.
+    public static final String CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS =
+        "pinot.server.request.deadline.clock.skew.ms";
+    public static final long DEFAULT_REQUEST_DEADLINE_CLOCK_SKEW_MS = 10_000L;
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
@@ -2164,6 +2199,7 @@ public class CommonConstants {
   public static class Minion {
     public static final String CONFIG_OF_METRICS_PREFIX = "pinot.minion.";
     public static final String CONFIG_OF_MINION_ID = "pinot.minion.instance.id";
+    public static final String CONFIG_OF_MINION_DATA_DIR = "pinot.minion.instance.dataDir";
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
     // Config keys
@@ -2760,6 +2796,24 @@ public class CommonConstants {
           public static String decodeSegmentListKey(String key) {
             return key.substring(SEGMENT_MAP_ENTRY_PREFIX.length());
           }
+
+          /// Optional segments of a plan: segments the routing manager lets a server skip if it does not have them
+          /// yet, e.g. newly pushed segments not yet ONLINE in the external view. A server that does not know the key
+          /// ignores it and queries only the required segments.
+          public static final String OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX = "$optionalSegmentMapEntry#";
+
+          public static boolean isKeyOptionalSegmentList(String key) {
+            return key.startsWith(OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX);
+          }
+
+          public static String encodeOptionalSegmentListKey(String planId) {
+            return OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX + planId;
+          }
+
+          /// Returns the plan-id corresponding to the encoded optional segment list key.
+          public static String decodeOptionalSegmentListKey(String key) {
+            return key.substring(OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX.length());
+          }
         }
       }
 
@@ -3042,6 +3096,21 @@ public class CommonConstants {
         "pinot.query.runner.mailbox.server.permit.keep.alive.without.calls";
     public static final boolean DEFAULT_OF_MAILBOX_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
 
+    /// Whether the mailbox server and the query server of an instance reject a request addressed to another instance.
+    ///
+    /// Senders identify the instance they mean in the request headers. A request reaches the wrong instance when the
+    /// sender's connection is stale: for example after two server pods restart together and take each other's IP
+    /// addresses, while every server listens on the same port. If the wrong instance accepts the request, the intended
+    /// one waits for data until the query times out, and the wrong one runs the stage plan, or keeps the block in a
+    /// mailbox that nothing reads. When the wrong instance rejects the request, the sender resets the connection and
+    /// the query fails with a clear error, in most cases at once rather than at its deadline.
+    ///
+    /// An instance checks requests against its Helix instance id, which is the id that plans address it by. Requests
+    /// without the headers, as sent by older versions, are always accepted. The value is read when the instance starts,
+    /// on brokers and servers.
+    public static final String KEY_OF_REJECT_MISROUTED_REQUESTS = "pinot.query.runner.reject.misrouted.requests";
+    public static final boolean DEFAULT_REJECT_MISROUTED_REQUESTS = true;
+
     /// Configuration for server port used to receive query plans.
     public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";
     public static final int DEFAULT_QUERY_SERVER_PORT = 0;
@@ -3264,13 +3333,21 @@ public class CommonConstants {
     public static final int DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN = 5;
   }
 
-  /// Configuration for setting up groovy static analyzer.
+  /// Configuration for ingestion Groovy and the Groovy static analyzer.
   /// User can config different configuration for query and ingestion (table creation and update) static analyzer.
   /// The all configuration is the default configuration for both query and ingestion static analyzer.
   public static class Groovy {
+    /// Cluster-only switch for ingestion Groovy. Query Groovy remains independently controlled.
+    public static final String DISABLE_INGESTION_GROOVY = "controller.disable.ingestion.groovy";
+    public static final boolean DEFAULT_DISABLE_INGESTION_GROOVY = true;
     public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.groovy.all.static.analyzer";
     public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.groovy.query.static.analyzer";
     public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
+
+    /// Only an explicit false enables ingestion Groovy; absent or malformed values fail closed.
+    public static boolean isIngestionGroovyDisabled(@Nullable String value) {
+      return value == null || !value.trim().equalsIgnoreCase("false");
+    }
   }
 
   /// ZK paths used by Pinot.

@@ -338,7 +338,8 @@ public abstract class ClusterTest extends ControllerTest {
       _minionBaseApiUrl = "http://localhost:" + minionPort;
     }
     _nextMinionPort = minionPort + 1;
-    minionConf.setProperty(Helix.Instance.DATA_DIR_KEY, TEMP_MINION_DIR + File.separator + "dataDir");
+    minionConf.setProperty(CommonConstants.Minion.CONFIG_OF_MINION_DATA_DIR,
+        TEMP_MINION_DIR + File.separator + "dataDir");
     minionConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     overrideMinionConf(minionConf);
     return minionConf;

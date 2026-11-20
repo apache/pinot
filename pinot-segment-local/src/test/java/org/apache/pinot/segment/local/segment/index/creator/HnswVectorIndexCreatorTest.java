@@ -20,11 +20,36 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.codecs.KnnVectorsWriter;
+import org.apache.lucene.codecs.hnsw.HnswGraphProvider;
+import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsWriter;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.FieldInfos;
+import org.apache.lucene.index.SegmentInfo;
+import org.apache.lucene.index.SegmentReader;
+import org.apache.lucene.index.SegmentWriteState;
+import org.apache.lucene.store.ByteBuffersDirectory;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.MergeInfo;
+import org.apache.lucene.util.InfoStream;
+import org.apache.lucene.util.StringHelper;
+import org.apache.lucene.util.Version;
+import org.apache.lucene.util.hnsw.HnswGraph;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -32,6 +57,11 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class HnswVectorIndexCreatorTest {
@@ -67,6 +97,103 @@ public class HnswVectorIndexCreatorTest {
   public void tearDown()
       throws IOException {
     FileUtils.deleteDirectory(INDEX_DIR);
+  }
+
+  @Test
+  public void testMmapWriterSelection()
+      throws IOException {
+    HnswVectorsFormat mmapFormat = new HnswVectorsFormat(16, 100, 1024, INDEX_DIR.toPath());
+    HnswVectorsFormat heapFormat = new HnswVectorsFormat(16, 100, 1024);
+    IOContext forcedMerge = new IOContext(new MergeInfo(4, 0, false, 1));
+    assertFalse(usesHeapWriter(mmapFormat, forcedMerge));
+    assertTrue(usesHeapWriter(heapFormat, forcedMerge));
+    assertTrue(usesHeapWriter(mmapFormat, IOContext.DEFAULT));
+    assertTrue(usesHeapWriter(mmapFormat, new IOContext(new MergeInfo(4, 0, false, -1))));
+  }
+
+  private static boolean usesHeapWriter(HnswVectorsFormat format, IOContext context)
+      throws IOException {
+    try (ByteBuffersDirectory directory = new ByteBuffersDirectory()) {
+      SegmentInfo segmentInfo = new SegmentInfo(directory, Version.LATEST, Version.LATEST, "_0", 4, false, false,
+          Codec.getDefault(), Map.of(), StringHelper.randomId(), Map.of(), null);
+      SegmentWriteState state = new SegmentWriteState(InfoStream.NO_OUTPUT, directory, segmentInfo, FieldInfos.EMPTY,
+          null, context);
+      try (KnnVectorsWriter writer = format.fieldsWriter(state)) {
+        return writer instanceof Lucene99HnswVectorsWriter;
+      }
+    }
+  }
+
+  @Test
+  public void testForcedMergeIndexCanBeRead()
+      throws IOException {
+    float[][] vectors = new float[128][1024];
+    Random random = new Random(42);
+    for (float[] vector : vectors) {
+      for (int dim = 0; dim < vector.length; dim++) {
+        vector[dim] = random.nextFloat() - 0.5f;
+      }
+    }
+    MergedIndex heapIndex = mergeAndReadGraph("embeddingHeap", vectors, true);
+    MergedIndex mmapIndex = mergeAndReadGraph("embeddingMmap", vectors, false);
+    assertEquals(mmapIndex.graph(), heapIndex.graph());
+    assertEquals(mmapIndex.nearestDocs(), heapIndex.nearestDocs());
+  }
+
+  private static MergedIndex mergeAndReadGraph(String column, float[][] vectors, boolean optOut)
+      throws IOException {
+    // A low connection limit exercises pruning during the final merge.
+    Map<String, String> properties = new HashMap<>(Map.of("vectorDimension", "1024", "maxCon", "4",
+        "maxBufferSizeMB", "0.15"));
+    if (optOut) {
+      properties.put(VectorIndexConfig.MMAP_GRAPH_ON_MERGE, "false");
+    }
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    Path path = INDEX_DIR.toPath().resolve(column + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator(column, INDEX_DIR, config);
+        FSDirectory directory = FSDirectory.open(path)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      long leaves = Arrays.stream(directory.listAll()).filter(name -> name.endsWith(".si")).count();
+      assertTrue(leaves > 1 && leaves < 10, "Expected multiple Lucene segments below the background merge threshold");
+      creator.seal();
+    }
+    int[] nearestDocs = new int[vectors.length];
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader(column, INDEX_DIR, vectors.length, config)) {
+      reader.setEfSearch(vectors.length);
+      for (int i = 0; i < vectors.length; i++) {
+        int[] matches = reader.getDocIds(vectors[i], 1).toArray();
+        assertEquals(matches.length, 1);
+        nearestDocs[i] = matches[0];
+      }
+    }
+    try (FSDirectory directory = FSDirectory.open(path); DirectoryReader reader = DirectoryReader.open(directory)) {
+      assertEquals(reader.leaves().size(), 1);
+      assertEquals(reader.numDocs(), vectors.length);
+      SegmentReader segment = (SegmentReader) reader.leaves().getFirst().reader();
+      PerFieldKnnVectorsFormat.FieldsReader fields = (PerFieldKnnVectorsFormat.FieldsReader) segment.getVectorReader();
+      HnswGraph graph = ((HnswGraphProvider) fields.getFieldReader(column)).getGraph(column);
+      List<Map<Integer, List<Integer>>> levels = new ArrayList<>(graph.numLevels());
+      for (int level = 0; level < graph.numLevels(); level++) {
+        Map<Integer, List<Integer>> edges = new HashMap<>();
+        HnswGraph.NodesIterator nodes = graph.getNodesOnLevel(level);
+        while (nodes.hasNext()) {
+          int node = nodes.nextInt();
+          graph.seek(level, node);
+          List<Integer> neighbors = new ArrayList<>();
+          for (int neighbor = graph.nextNeighbor(); neighbor != NO_MORE_DOCS; neighbor = graph.nextNeighbor()) {
+            neighbors.add(neighbor);
+          }
+          edges.put(node, neighbors);
+        }
+        levels.add(edges);
+      }
+      return new MergedIndex(levels, nearestDocs);
+    }
+  }
+
+  private record MergedIndex(List<Map<Integer, List<Integer>>> graph, int[] nearestDocs) {
   }
 
   @Test

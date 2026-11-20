@@ -225,7 +225,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int dispatchMaxInboundMessageSizeBytes = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
-    _mailboxService = new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig);
+    _mailboxService = new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig, null, brokerId);
     _queryDispatcher =
         new QueryDispatcher(_mailboxService, failureDetector, tlsConfig, isQueryCancellationEnabled(), cancelTimeout,
             dispatchKeepAliveTimeMs, dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls, _streamStatsDefault,
@@ -603,6 +603,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sealedInListThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SEALED_IN_LIST_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD);
+    boolean preferSelectAliasInGroupBy = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY,
+        CommonConstants.Broker.DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY);
     boolean defaultUnnestColumnPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_UNNEST_COLUMN_PRUNING,
         CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
@@ -642,6 +645,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultDisabledPlannerRules(_defaultDisabledPlannerRules)
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
         .defaultSealedInListThreshold(sealedInListThreshold)
+        .defaultPreferSelectAliasInGroupBy(preferSelectAliasInGroupBy)
+        .meterGroupByAliasShadowedByColumn(true)
         .build();
   }
 
@@ -757,8 +762,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(subquery);
       RequestUtils.setOptions(sqlNodeAndOptions, queryOptions);
-      QueryEnvironment queryEnv = new QueryEnvironment(
-          getQueryEnvConf(httpHeaders, sqlNodeAndOptions.getOptions(), requestId), _multiClusterRoutingContext);
+      // The subquery is compiled again later, either on its own or inside the query, so do not mark the meter here
+      ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, sqlNodeAndOptions.getOptions(),
+          requestId).withMeterGroupByAliasShadowedByColumn(false);
+      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf, _multiClusterRoutingContext);
       queryEnv.validate(sqlNodeAndOptions);
       return true;
     } catch (RuntimeException e) {
@@ -926,7 +933,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     // Short-circuit: if all leaf stages are empty (all segments pruned or table has no data),
     // run only the broker reduce stage locally. No server dispatch is attempted.
     boolean allLeafStagesEmpty = dispatchableSubPlan.isAllLeafStagesEmpty();
-    int estimatedNumQueryThreads = getEstimatedNumQueryThreads(dispatchableSubPlan);
+    // A query estimated above the throttler limit takes the whole limit, so it runs alone instead of never
+    int estimatedNumQueryThreads =
+        Math.min(getEstimatedNumQueryThreads(dispatchableSubPlan), _queryThrottler.getMaxPermits());
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
       // these requests.
