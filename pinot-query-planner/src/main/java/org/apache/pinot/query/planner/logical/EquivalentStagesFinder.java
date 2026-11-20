@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -111,10 +112,9 @@ public class EquivalentStagesFinder {
           return _equivalentStages.getGroup(stage).contains(visitedStage);
         }
 
+        // Fields of MailboxSendNode that are deliberately not compared here are listed, with the reason, in
+        // NodeEquivalenceFieldCoverageTest.NOT_COMPARED.
         return areBaseNodesEquivalent(stage, visitedStage)
-            // Commented out fields are used in equals() method of MailboxSendNode but not needed for equivalence.
-            // Receiver stage is not important for equivalence
-//            && stage.getReceiverStageId() == visitedStage.getReceiverStageId()
             && stage.getExchangeType() == visitedStage.getExchangeType()
             // TODO: Distribution type not needed for equivalence in the first substituted send nodes. Their different
             //  distribution can be implemented in synthetic stages. But it is important in recursive send nodes
@@ -184,6 +184,9 @@ public class EquivalentStagesFinder {
         return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getAggCalls(), that.getAggCalls())
             && Objects.equals(node1.getFilterArgs(), that.getFilterArgs())
             && Objects.equals(node1.getGroupKeys(), that.getGroupKeys())
+            // Group keys only hold the union of the grouping columns, so two different sets of grouping sets over the
+            // same columns are indistinguishable without this check (and produce the same data schema).
+            && Objects.equals(node1.getGroupingSets(), that.getGroupingSets())
             && node1.getAggType() == that.getAggType()
             && node1.isLeafReturnFinalResult() == that.isLeafReturnFinalResult()
             && Objects.equals(node1.getCollations(), that.getCollations())
@@ -208,12 +211,9 @@ public class EquivalentStagesFinder {
           return false;
         }
 
+        // Fields of MailboxReceiveNode that are deliberately not compared here are listed, with the reason, in
+        // NodeEquivalenceFieldCoverageTest.NOT_COMPARED.
         return areBaseNodesEquivalent(node1, node2)
-            // Commented out fields are used in equals() method of MailboxReceiveNode but not needed for equivalence.
-            // sender stage id will be different for sure, but we want (and already did) to compare sender equivalence
-            // instead
-//          && node1.getSenderStageId() == that.getSenderStageId()
-
             // TODO: Keys should probably be removed from the equivalence check, but would require to verify both
             //  keys are present in the data schema. We are not doing that for now.
             && Objects.equals(node1.getKeys(), that.getKeys())
@@ -245,6 +245,9 @@ public class EquivalentStagesFinder {
             && Objects.equals(node1.getLeftKeys(), that.getLeftKeys())
             && Objects.equals(node1.getRightKeys(), that.getRightKeys())
             && Objects.equals(node1.getNonEquiConditions(), that.getNonEquiConditions())
+            // ASOF joins keep their whole comparison here rather than in the non-equi conditions, so without this
+            // check two ASOF joins differing only on the match condition look equivalent.
+            && Objects.equals(node1.getMatchCondition(), that.getMatchCondition())
             && node1.getJoinStrategy() == that.getJoinStrategy();
       }
 
@@ -318,6 +321,9 @@ public class EquivalentStagesFinder {
             && Objects.equals(node1.getKeys(), that.getKeys())
             && Objects.equals(node1.getCollations(), that.getCollations())
             && node1.getWindowFrameType() == that.getWindowFrameType()
+            // The frame exclusion changes which rows feed the window function, so two windows that only differ on it
+            // compute different values and must not be spooled together.
+            && node1.getExclude() == that.getExclude()
             && Objects.equals(node1.getConstants(), that.getConstants());
       }
 
@@ -350,9 +356,25 @@ public class EquivalentStagesFinder {
         UnnestNode that = (UnnestNode) node2;
         return areBaseNodesEquivalent(node1, node2)
             && Objects.equals(node1.getArrayExprs(), that.getArrayExprs())
-            && node1.isWithOrdinality() == that.isWithOrdinality()
-            && Objects.equals(node1.getElementIndexes(), that.getElementIndexes())
-            && node1.getOrdinalityIndex() == that.getOrdinalityIndex();
+            // Compare the context as a whole so that this stays in step with the fields it holds. Unrolling a subset
+            // of them here is how passthroughInputIndexes and prunedPassthrough came to be missed.
+            && Objects.equals(node1.getTableFunctionContext(), that.getTableFunctionContext());
+      }
+
+      @Override
+      public Boolean visitMvAggregate(MvAggregateNode node1, PlanNode node2) {
+        if (!(node2 instanceof MvAggregateNode)) {
+          return false;
+        }
+        MvAggregateNode that = (MvAggregateNode) node2;
+        return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getAggCalls(), that.getAggCalls())
+            && Objects.equals(node1.getFilterArgs(), that.getFilterArgs())
+            && Objects.equals(node1.getGroupKeys(), that.getGroupKeys())
+            && node1.getAggType() == that.getAggType()
+            && node1.isLeafReturnFinalResult() == that.isLeafReturnFinalResult()
+            && Objects.equals(node1.getCollations(), that.getCollations())
+            && node1.getLimit() == that.getLimit()
+            && Objects.equals(node1.getMvKeyIndexes(), that.getMvKeyIndexes());
       }
     }
   }

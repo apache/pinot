@@ -51,6 +51,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// SELECT GROOVY('{"returnType":"LONG", "isSingleValue":false}', 'arg0.findIndexValues{it==1}', products) FROM myTable
 /// SELECT GROOVY('{"returnType":"INT", "isSingleValue":true}', 'arg0 \* arg1 \* 10', arraylength(units), columnB ) FROM
 /// bob
+///
+/// Listed in DeleteStatement.SCRIPT_FUNCTIONS: a DELETE predicate must not call this function.
 public class GroovyTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "groovy";
 
@@ -131,7 +133,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       // construct arguments string for GroovyFunctionEvaluator
       String argumentsStr = IntStream.range(0, _numGroovyArgs).mapToObj(i -> ARGUMENT_PREFIX + i)
           .collect(Collectors.joining(GROOVY_ARG_DELIMITER));
-      _groovyFunctionEvaluator = new GroovyFunctionEvaluator(String.format(GROOVY_TEMPLATE_WITH_ARGS,
+      _groovyFunctionEvaluator = GroovyFunctionEvaluator.forQuery(String.format(GROOVY_TEMPLATE_WITH_ARGS,
           ((LiteralTransformFunction) groovyTransformFunction).getStringLiteral(),
               argumentsStr));
 
@@ -139,7 +141,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       _fetchElementFunctions = new BiFunction[_numGroovyArgs];
       initFunctions();
     } else {
-      _groovyFunctionEvaluator = new GroovyFunctionEvaluator(String.format(GROOVY_TEMPLATE_WITHOUT_ARGS,
+      _groovyFunctionEvaluator = GroovyFunctionEvaluator.forQuery(String.format(GROOVY_TEMPLATE_WITHOUT_ARGS,
           ((LiteralTransformFunction) groovyTransformFunction).getStringLiteral()));
     }
     _sourceArrays = new Object[_numGroovyArgs];

@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.6.0-SNAPSHOT</version>
+    <version>1.7.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-pulsar</artifactId>
@@ -39,14 +39,25 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pulsar</groupId>
-      <artifactId>pulsar-client</artifactId>
+      <artifactId>pulsar-client-all</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
+    <!-- Pulsar declares these with runtime scope, which takes precedence over the provided scope inherited through
+         pinot-spi and removes them from the compile classpath -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+      <scope>provided</scope>
     </dependency>
 
-    <dependency>
-      <groupId>org.apache.pulsar</groupId>
-      <artifactId>pulsar-client-admin</artifactId>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers-pulsar</artifactId>

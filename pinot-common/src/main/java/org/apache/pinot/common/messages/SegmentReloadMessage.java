@@ -33,6 +33,7 @@ public class SegmentReloadMessage extends Message {
   public static final String RELOAD_SEGMENT_MSG_SUB_TYPE = "RELOAD_SEGMENT";
 
   private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
+  private static final String ONLY_IF_NEEDED_KEY = "onlyIfNeeded";
   private static final String SEGMENT_NAMES = "segmentNames";
   private static final String RELOAD_JOB_ID_KEY = "reloadJobId";
 
@@ -61,6 +62,20 @@ public class SegmentReloadMessage extends Message {
   /// @param reloadJobId       reload job id to associate with the reload operation
   public SegmentReloadMessage(String tableNameWithType, @Nullable List<String> segmentNames, boolean forceDownload,
       @Nullable String reloadJobId) {
+    this(tableNameWithType, segmentNames, forceDownload, false, reloadJobId);
+  }
+
+  /// This msg asks server to reload a list of specified segments with an explicit reload job id.
+  ///
+  /// @param tableNameWithType the table where the segments are from.
+  /// @param segmentNames      a list of specified segments to reload, or null for all segments.
+  /// @param forceDownload     whether to download segments from deep store when reloading.
+  /// @param onlyIfNeeded      whether to reload only the segments whose loaded copy is out of date (CRC change, tier
+  ///                          change or preprocessing needed). Ignored when `forceDownload` is true. Servers that do
+  ///                          not recognize this field reload every targeted segment.
+  /// @param reloadJobId       reload job id to associate with the reload operation
+  public SegmentReloadMessage(String tableNameWithType, @Nullable List<String> segmentNames, boolean forceDownload,
+      boolean onlyIfNeeded, @Nullable String reloadJobId) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setResourceName(tableNameWithType);
     setMsgSubType(RELOAD_SEGMENT_MSG_SUB_TYPE);
@@ -76,6 +91,9 @@ public class SegmentReloadMessage extends Message {
     }
 
     znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
+    if (onlyIfNeeded) {
+      znRecord.setBooleanField(ONLY_IF_NEEDED_KEY, true);
+    }
     if (CollectionUtils.isNotEmpty(segmentNames)) {
       // TODO: use the new List field and deprecate the partition name in next release.
       setPartitionName(segmentNames.get(0));
@@ -92,6 +110,10 @@ public class SegmentReloadMessage extends Message {
 
   public boolean shouldForceDownload() {
     return getRecord().getBooleanField(FORCE_DOWNLOAD_KEY, false);
+  }
+
+  public boolean shouldReloadOnlyIfNeeded() {
+    return getRecord().getBooleanField(ONLY_IF_NEEDED_KEY, false);
   }
 
   @Nullable

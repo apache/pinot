@@ -42,7 +42,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// - Minimal object allocations
 /// - Optimized for the specific case of INT column aggregation
 /// - Proper null handling support using foldNotNull and forEachNotNull
-public class SumIntAggregationFunction extends NullableSingleInputAggregationFunction<Long, Long> {
+public class SumIntAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
   public static final String FUNCTION_NAME = "sumInt";
   private static final long DEFAULT_VALUE = 0L;
 

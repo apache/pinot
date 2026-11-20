@@ -61,7 +61,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     ImmutableRoaringBitmap bitmap = getMatchingDocIdBitmap();
     record(bitmap);
-    return new BitmapDocIdSet(bitmap, _numDocs);
+    return BitmapDocIdSet.create(bitmap, _numDocs);
   }
 
   @Override

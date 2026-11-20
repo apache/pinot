@@ -26,7 +26,7 @@ import java.util.Base64;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -153,6 +153,6 @@ public class ULLTest extends CustomDataQueryClusterIntegrationTest {
     UltraLogLog ull = UltraLogLog.create(4); // test on a smaller P to save some ram & ensure we support custom P values
     UltraLogLogUtils.hashObject(RANDOM.nextInt(100))
         .ifPresent(ull::add);
-    return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(ull);
+    return ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.serialize(ull);
   }
 }

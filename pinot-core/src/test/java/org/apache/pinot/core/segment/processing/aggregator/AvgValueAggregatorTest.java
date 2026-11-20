@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.processing.aggregator;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -42,12 +41,12 @@ public class AvgValueAggregatorTest {
   }
 
   private static byte[] serialize(double sum, long count) {
-    return ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(new AvgPair(sum, count));
+    return new AvgPair(sum, count).toBytes();
   }
 
   private AvgPair aggregate(byte[] value1, byte[] value2) {
     byte[] result = (byte[]) _aggregator.aggregate(value1, value2, _functionParameters);
-    return ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(result);
+    return AvgPair.fromBytes(result);
   }
 
   @Test
@@ -79,7 +78,7 @@ public class AvgValueAggregatorTest {
     byte[] result = (byte[]) _aggregator.aggregate(new byte[0], new byte[0], _functionParameters);
     // Both empty (default null value for BYTES columns) -> a valid serialized empty AvgPair (sum=0, count=0), not an
     // empty byte[] that AvgPair deserialization (and the query-time AVG function) cannot read.
-    AvgPair merged = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(result);
+    AvgPair merged = AvgPair.fromBytes(result);
     assertEquals(merged.getSum(), 0.0);
     assertEquals(merged.getCount(), 0L);
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
@@ -54,7 +55,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainCompletionListener;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.operator.LeafOperator;
+import org.apache.pinot.query.runtime.operator.ExplainableOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
@@ -220,7 +221,8 @@ public class QueryRunner {
 
     _opChainScheduler = new OpChainSchedulerService(instanceId, _executorService, serverConf);
     if (_mailboxService == null) {
-      _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
+      _mailboxService =
+          new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig, null, instanceId);
     }
 
     if (instanceDataManager != null) {
@@ -332,11 +334,10 @@ public class QueryRunner {
       // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
     } catch (RuntimeException e) {
-      // register() can fail after the op chain was built — the query was cancelled/terminated before scheduling
-      // (checkTermination / cancelled-query cache), or the executor rejected the task (e.g. under load shedding). In
-      // those cases the op chain is never scheduled, so the scheduler's FutureCallback, which normally close()s the
-      // chain on completion, never fires — leaking any operator resources that are released only in close(). Close the
-      // built chain here (idempotent; guarded so a close failure cannot mask the original error).
+      // register() can fail after the op chain was built, when the executor rejects the task (e.g. under load
+      // shedding). In that case the op chain is never scheduled, so the scheduler's FutureCallback, which normally
+      // close()s the chain on completion, never fires — leaking any operator resources that are released only in
+      // close(). Close the built chain here (idempotent; guarded so a close failure cannot mask the original error).
       if (opChain != null) {
         try {
           opChain.close();
@@ -427,7 +428,7 @@ public class QueryRunner {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext(metadata.get(Request.MetadataKeys.TimeSeries.LANGUAGE),
               extractTimeBuckets(metadata), deadlineMs, metadata, extractPlanToSegmentMap(metadata),
-              Map.of());
+              extractPlanToOptionalSegmentMap(metadata), Map.of());
       final List<BaseTimeSeriesOperator> fragmentOpChains = fragmentRoots.stream().map(x -> {
         return _timeSeriesPhysicalPlanVisitor.compile(x, context);
       }).collect(Collectors.toList());
@@ -608,8 +609,10 @@ public class QueryRunner {
 
     Map<PlanNode, ExplainedNode> leafNodes = new HashMap<>();
     BiConsumer<PlanNode, MultiStageOperator> leafNodesConsumer = (node, operator) -> {
-      if (operator instanceof LeafOperator) {
-        leafNodes.put(node, ((LeafOperator) operator).explain());
+      // Any leaf-stage operator that can describe itself contributes its explain subtree, so EXPLAIN
+      // reflects what actually executes instead of the pre-execution plan.
+      if (operator instanceof ExplainableOperator) {
+        leafNodes.put(node, ((ExplainableOperator) operator).explain());
       }
     };
     // compile OpChain
@@ -666,10 +669,27 @@ public class QueryRunner {
     for (var entry : metadataMap.entrySet()) {
       if (Request.MetadataKeys.TimeSeries.isKeySegmentList(entry.getKey())) {
         String planId = Request.MetadataKeys.TimeSeries.decodeSegmentListKey(entry.getKey());
-        String[] segments = entry.getValue().split(",");
-        result.put(planId, Stream.of(segments).map(String::strip).collect(Collectors.toList()));
+        result.put(planId, decodeSegmentList(entry.getValue()));
       }
     }
     return result;
+  }
+
+  private Map<String, List<String>> extractPlanToOptionalSegmentMap(Map<String, String> metadataMap) {
+    Map<String, List<String>> result = new HashMap<>();
+    for (var entry : metadataMap.entrySet()) {
+      if (Request.MetadataKeys.TimeSeries.isKeyOptionalSegmentList(entry.getKey())) {
+        String planId = Request.MetadataKeys.TimeSeries.decodeOptionalSegmentListKey(entry.getKey());
+        result.put(planId, decodeSegmentList(entry.getValue()));
+      }
+    }
+    return result;
+  }
+
+  /// An empty value is an empty list, not one segment named "".
+  @VisibleForTesting
+  static List<String> decodeSegmentList(String encoded) {
+    return Stream.of(encoded.split(",")).map(String::strip).filter(segment -> !segment.isEmpty())
+        .collect(Collectors.toList());
   }
 }

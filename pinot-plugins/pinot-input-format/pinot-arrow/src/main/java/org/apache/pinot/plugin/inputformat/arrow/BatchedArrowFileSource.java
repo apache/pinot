@@ -39,6 +39,7 @@ import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.message.ArrowBlock;
 import org.apache.arrow.vector.types.pojo.DictionaryEncoding;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.pinot.common.utils.ArrowAllocators;
 
 
 /// Reads an Apache Arrow IPC file **one record batch at a time** through the seekable
@@ -76,7 +77,7 @@ final class BatchedArrowFileSource implements Closeable {
 
   BatchedArrowFileSource(File dataFile, long allocatorLimit, boolean extractRawTimeValues)
       throws IOException {
-    _allocator = new RootAllocator(allocatorLimit);
+    _allocator = ArrowAllocators.newRootAllocator(allocatorLimit);
     _extractRawTimeValues = extractRawTimeValues;
     boolean initialized = false;
     try {

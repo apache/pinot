@@ -30,8 +30,8 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -44,8 +44,9 @@ import org.roaringbitmap.RoaringBitmap;
 /// The `DistinctCountSmartULLAggregationFunction` calculates the number of distinct values for a given expression
 /// (both single-valued and multi-valued are supported).
 ///
-/// For aggregation-only queries, the distinct values are stored in a Set initially. Once the number of distinct values
-/// exceeds a threshold, the Set will be converted into an UltraLogLog, and approximate result will be returned.
+/// The distinct values are stored in a Set initially. Once the number of distinct values exceeds a threshold, the
+/// Set will be converted into an UltraLogLog, and approximate result will be returned. The threshold is applied per
+/// accumulator, which means per group for a group-by query.
 ///
 /// The function takes an optional second argument for parameters:
 /// - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
@@ -54,13 +55,15 @@ import org.roaringbitmap.RoaringBitmap;
 /// Example of second argument: 'threshold=10;p=16'
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountSmartSketchAggregationFunction {
+  private static final int ULTRA_LOG_LOG_TYPE = 46;
+
   // placeholder handled by base class
 
   private final int _threshold;
   private final int _p;
 
-  public DistinctCountSmartULLAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public DistinctCountSmartULLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
     int numExpressions = arguments.size();
     // This function expects 1 or 2 arguments.
     Preconditions.checkArgument(numExpressions <= 2, "DistinctCountSmartULL expects 1 or 2 arguments, got: %s",
@@ -101,12 +104,14 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       if (blockValSet.isSingleValue()) {
         int[] dictIds = blockValSet.getDictionaryIdsSV();
-        dictIdBitmap.addN(dictIds, 0, length);
+        forEachNotNull(length, blockValSet, (from, to) -> dictIdBitmap.addN(dictIds, from, to - from));
       } else {
         int[][] dictIds = blockValSet.getDictionaryIdsMV();
-        for (int i = 0; i < length; i++) {
-          dictIdBitmap.add(dictIds[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            dictIdBitmap.add(dictIds[i]);
+          }
+        });
       }
       return;
     }
@@ -127,44 +132,56 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
       switch (storedType) {
         case INT: {
           int[] intValues = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(intValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(intValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         case LONG: {
           long[] longValues = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(longValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(longValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         case FLOAT: {
           float[] floatValues = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(floatValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(floatValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         case DOUBLE: {
           double[] doubleValues = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(doubleValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(doubleValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         case STRING: {
           String[] stringValues = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         case BYTES: {
           byte[][] bytesValues = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(bytesValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(bytesValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         default:
@@ -174,56 +191,68 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
       switch (storedType) {
         case INT: {
           int[][] intValues = blockValSet.getIntValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (int value : intValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (int value : intValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         case LONG: {
           long[][] longValues = blockValSet.getLongValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (long value : longValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (long value : longValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         case FLOAT: {
           float[][] floatValues = blockValSet.getFloatValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (float value : floatValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (float value : floatValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         case DOUBLE: {
           double[][] doubleValues = blockValSet.getDoubleValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (double value : doubleValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (double value : doubleValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         case STRING: {
           String[][] stringValues = blockValSet.getStringValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (String value : stringValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (String value : stringValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         case BYTES: {
           byte[][][] bytesValues = blockValSet.getBytesValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (byte[] value : bytesValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (byte[] value : bytesValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         default:
@@ -330,17 +359,19 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Object o) {
-    if (o instanceof UltraLogLog) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.UltraLogLog.getValue(),
-          ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize((UltraLogLog) o));
+  public SerializedResult serializeIntermediateResult(Object o) {
+    if (o instanceof UltraLogLog ultraLogLog) {
+      return new SerializedValue<>(ULTRA_LOG_LOG_TYPE, ultraLogLog, ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE);
     }
     return BaseDistinctAggregateAggregationFunction.serializeSet((Set) o);
   }
 
   @Override
   public Object deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+    if (customObject.getType() == ULTRA_LOG_LOG_TYPE) {
+      return ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(customObject.getBuffer());
+    }
+    return BaseDistinctAggregateAggregationFunction.deserializeSet(customObject);
   }
 
   @Override
@@ -354,6 +385,7 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
       return 0;
     }
     if (intermediateResult instanceof UltraLogLog) {
+      markApproximatedResult();
       return (int) Math.round(((UltraLogLog) intermediateResult).getDistinctCountEstimate());
     } else {
       return ((Set) intermediateResult).size();
@@ -419,6 +451,20 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
   // DictIdsWrapper is provided by the base class
 
   // threshold accessor for base class is provided by getThreshold()
+
+  @Override
+  protected void addSetToSketch(Object sketch, Set valueSet, DataType storedType) {
+    UltraLogLog ull = (UltraLogLog) sketch;
+    if (storedType == DataType.BYTES) {
+      for (Object value : valueSet) {
+        UltraLogLogUtils.hashObject(((ByteArray) value).getBytes()).ifPresent(ull::add);
+      }
+    } else {
+      for (Object value : valueSet) {
+        UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+      }
+    }
+  }
 
   @Override
   protected Object convertSetToSketch(Set valueSet, DataType storedType) {

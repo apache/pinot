@@ -78,6 +78,7 @@ public class ExternalViewReader {
 
   public List<String> getLiveBrokers() {
     List<String> brokerUrls = new ArrayList<>();
+    Map<String, String> hostPortByBroker = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
@@ -89,7 +90,7 @@ public class ExternalViewReader {
         for (Entry<String, JsonNode> brokerEntry : resource.properties()) {
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
-            brokerUrls.add(getHostPort(brokerName));
+            brokerUrls.add(resolveHostPort(brokerName, hostPortByBroker));
           }
         }
       }
@@ -98,6 +99,20 @@ public class ExternalViewReader {
       // ignore
     }
     return brokerUrls;
+  }
+
+  /// Resolves a broker's address, reading its instance config at most once per enclosing call.
+  ///
+  /// A broker's address is a property of the broker, not of the table being examined, but the
+  /// callers walk the broker resource table by table and so meet the same broker once per table it
+  /// serves. Resolving through this map turns those N x M reads into one per distinct broker.
+  ///
+  /// The map is supplied by the caller and lives only for that call, deliberately. An instance
+  /// field would have to be both synchronised, since these methods are called concurrently, and
+  /// invalidated whenever a broker's host or port changes; a per-call map can be neither stale nor
+  /// contended, and the redundancy it removes is entirely within a single traversal anyway.
+  private String resolveHostPort(String brokerName, Map<String, String> hostPortByBroker) {
+    return hostPortByBroker.computeIfAbsent(brokerName, this::getHostPort);
   }
 
   @VisibleForTesting
@@ -148,6 +163,7 @@ public class ExternalViewReader {
 
   public Map<String, List<String>> getTableToBrokersMap() {
     Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
+    Map<String, String> hostPortByBroker = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
@@ -162,7 +178,7 @@ public class ExternalViewReader {
         for (Entry<String, JsonNode> brokerEntry : resource.properties()) {
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
-            brokerUrls.add(getHostPort(brokerName));
+            brokerUrls.add(resolveHostPort(brokerName, hostPortByBroker));
           }
         }
       }

@@ -115,7 +115,9 @@ public class InstanceAssignmentConfigUtils {
     SegmentsValidationAndRetentionConfig segmentConfig = tableConfig.getValidationConfig();
     int numReplicaGroups = tableConfig.getReplication();
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = segmentConfig.getReplicaGroupStrategyConfig();
-    Preconditions.checkState(replicaGroupStrategyConfig != null, "Failed to find the replica-group strategy config");
+    Preconditions.checkState(replicaGroupStrategyConfig != null,
+        "Replica-group segment assignment requires the OFFLINE instance assignment to be configured in "
+            + "'instanceAssignmentConfigMap'");
     String partitionColumn = replicaGroupStrategyConfig.getPartitionColumn();
     boolean minimizeDataMovement = segmentConfig.isMinimizeDataMovement();
     if (partitionColumn != null) {

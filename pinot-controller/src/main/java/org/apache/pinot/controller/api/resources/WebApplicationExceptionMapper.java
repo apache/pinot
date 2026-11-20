@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.google.common.annotations.VisibleForTesting;
+import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.SimpleHttpErrorInfo;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +35,8 @@ import org.slf4j.LoggerFactory;
 @Provider
 public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable> {
   private static final Logger LOGGER = LoggerFactory.getLogger(WebApplicationExceptionMapper.class);
+  @VisibleForTesting
+  static final int MAX_CAUSES_LENGTH = 2048;
 
   @Override
   public Response toResponse(Throwable t) {
@@ -40,7 +46,18 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable>
     } else {
       status = ((WebApplicationException) t).getResponse().getStatus();
     }
-    SimpleHttpErrorInfo errorInfo = new SimpleHttpErrorInfo(status, t.getMessage());
+    SimpleHttpErrorInfo errorInfo = new SimpleHttpErrorInfo(status, getErrorMessage(t));
     return Response.status(status).entity(errorInfo).type(MediaType.APPLICATION_JSON).build();
+  }
+
+  /// Appends the cause chain only for exceptions created with [ControllerApplicationException#withCausesInResponse].
+  @VisibleForTesting
+  @Nullable
+  static String getErrorMessage(Throwable t) {
+    if (t instanceof ControllerApplicationException
+        && ((ControllerApplicationException) t).shouldIncludeCausesInResponse()) {
+      return ExceptionUtils.appendCauses(t.getMessage(), t.getCause(), MAX_CAUSES_LENGTH);
+    }
+    return t.getMessage();
   }
 }

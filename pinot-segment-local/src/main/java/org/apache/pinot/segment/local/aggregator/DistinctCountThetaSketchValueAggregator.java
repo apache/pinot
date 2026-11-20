@@ -24,7 +24,7 @@ import org.apache.datasketches.theta.ThetaSetOperationBuilder;
 import org.apache.datasketches.theta.ThetaSketch;
 import org.apache.datasketches.theta.ThetaUnion;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -116,7 +116,9 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   @Override
   public Object getInitialAggregatedValue(Object rawValue) {
-    // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index.
+    // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index, and the builder
+    //   never passes a null raw value: a null-aware star-tree leaves the aggregated value null until the group
+    //   sees its first non-null input.
     assert rawValue != null;
     ThetaUnion thetaUnion = _setOperationBuilder.buildUnion();
     if (rawValue instanceof byte[]) { // Serialized ThetaSketch
@@ -190,9 +192,9 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   @Override
   public byte[] serializeAggregatedValue(Object value) {
     if (value instanceof ThetaUnion) {
-      return CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(((ThetaUnion) value).getResult());
+      return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(((ThetaUnion) value).getResult());
     } else if (value instanceof ThetaSketch) {
-      return CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(((ThetaSketch) value));
+      return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(((ThetaSketch) value));
     } else {
       throw new IllegalStateException(
           "Unsupported data type for Theta Sketch aggregation: " + value.getClass().getSimpleName());
@@ -201,6 +203,6 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   @Override
   public ThetaSketch deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(bytes);
+    return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(bytes);
   }
 }

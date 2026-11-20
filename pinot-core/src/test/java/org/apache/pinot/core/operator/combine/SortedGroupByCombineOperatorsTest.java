@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -72,6 +73,16 @@ public class SortedGroupByCombineOperatorsTest {
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT).build();
+
+  // Schema/table for testSafeTrim*CombineWithTransformGroupByKeys below: two independent key columns so a
+  // multi-key transform GROUP BY can be exercised.
+  private static final String COL_A = "colA";
+  private static final String COL_B = "colB";
+  private static final TableConfig TRANSFORM_KEY_TABLE_CONFIG =
+      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+  private static final Schema TRANSFORM_KEY_SCHEMA =
+      new Schema.SchemaBuilder().addSingleValueDimension(COL_A, FieldSpec.DataType.INT)
+          .addSingleValueDimension(COL_B, FieldSpec.DataType.INT).build();
 
   private static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
   private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
@@ -284,6 +295,84 @@ public class SortedGroupByCombineOperatorsTest {
       assertEquals(row[0], i);
       assertEquals(row[1], 2L);
     }
+  }
+
+  // ----
+  // Multi-key transform GROUP BY (regression test for the OrderByComparatorFactory bug where the ORDER BY ->
+  // GROUP BY index map was keyed by ExpressionContext#getIdentifier(), which is null for any transform expression.
+  // With two transform-based GROUP BY keys, both collapsed onto the same null map entry, so the merge comparator
+  // resolved every ORDER BY expression to the same column index instead of its own.)
+  @Test
+  public void testSafeTrimPairWiseCombineWithTransformGroupByKeys()
+      throws Exception {
+    assertTransformGroupByKeysCombine(1);
+  }
+
+  @Test
+  public void testSafeTrimSequentialCombineWithTransformGroupByKeys()
+      throws Exception {
+    assertTransformGroupByKeysCombine(10_000_000);
+  }
+
+  /// segment 1 has 5 rows with (colA=0, colB=0); segment 2 has 5 rows with (colA=1, colB=0). Both GROUP BY keys are
+  /// transform expressions, so both have a null identifier. Before the fix, that made the merge comparator compare
+  /// every record only by its second key (colB), which is 0 in both segments, so `SortedRecordsMerger` treated the
+  /// two distinct (colA, colB) groups as equal and merged their counts into a single row instead of keeping two.
+  private void assertTransformGroupByKeysCombine(int sortAggregateSingleThreadedNumSegmentsThreshold)
+      throws Exception {
+    IndexSegment segment1 = createTransformKeySegment("transformKeySegment_0", 0, 0, 5);
+    IndexSegment segment2 = createTransformKeySegment("transformKeySegment_1", 1, 0, 5);
+    try {
+      String query = "SET sortAggregateSingleThreadedNumSegmentsThreshold="
+          + sortAggregateSingleThreadedNumSegmentsThreshold + "; "
+          + "SELECT CEIL(colA), CEIL(colB), COUNT(*) FROM testTable GROUP BY CEIL(colA), CEIL(colB) "
+          + "ORDER BY CEIL(colA), CEIL(colB) LIMIT 100";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      List<PlanNode> planNodes = new ArrayList<>(2);
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(segment1), queryContext));
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(segment2), queryContext));
+      queryContext.setEndTimeMs(
+          System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR, null);
+      BaseCombineOperator combineOperator = combinePlanNode.run();
+      GroupByResultsBlock combineResult = (GroupByResultsBlock) combineOperator.nextBlock();
+
+      List<Object[]> rows = combineResult.getRows();
+      assertEquals(rows.size(), 2, "expected 2 distinct (colA, colB) groups, got: " + Arrays.deepToString(
+          rows.toArray()));
+      assertEquals(rows.get(0)[0], 0.0);
+      assertEquals(rows.get(0)[1], 0.0);
+      assertEquals(rows.get(0)[2], 5L);
+      assertEquals(rows.get(1)[0], 1.0);
+      assertEquals(rows.get(1)[1], 0.0);
+      assertEquals(rows.get(1)[2], 5L);
+    } finally {
+      segment1.destroy();
+      segment2.destroy();
+    }
+  }
+
+  private IndexSegment createTransformKeySegment(String segmentName, int colAValue, int colBValue, int numRecords)
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(numRecords);
+    for (int i = 0; i < numRecords; i++) {
+      GenericRow record = new GenericRow();
+      record.putValue(COL_A, colAValue);
+      record.putValue(COL_B, colBValue);
+      records.add(record);
+    }
+
+    SegmentGeneratorConfig segmentGeneratorConfig =
+        new SegmentGeneratorConfig(TRANSFORM_KEY_TABLE_CONFIG, TRANSFORM_KEY_SCHEMA);
+    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
+    segmentGeneratorConfig.setSegmentName(segmentName);
+    segmentGeneratorConfig.setOutDir(TEMP_DIR.getPath());
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+    driver.build();
+
+    return ImmutableSegmentLoader.load(new File(TEMP_DIR, segmentName), ReadMode.mmap);
   }
 
   // ----

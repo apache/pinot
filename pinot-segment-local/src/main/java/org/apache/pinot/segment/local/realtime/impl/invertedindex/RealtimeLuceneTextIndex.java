@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -257,7 +258,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       while (luceneDocIDIterator.hasNext()) {
         int luceneDocId = luceneDocIDIterator.next();
         Document document = indexSearcher.doc(luceneDocId);
-        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME));
         actualDocIDs.add(pinotDocId);
       }
     } catch (Exception e) {
@@ -339,8 +340,27 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   public SearcherManager getSearcherManager() {
     return _searcherManager;
   }
+
   @Override
   public int getSearchableDocCount() {
-    return _refreshListener.getLastRefreshNumDocs();
+    // The refresh listener records a lower bound that can miss documents added during a refresh.
+    SearcherManager searcherManager = _searcherManager;
+    IndexSearcher indexSearcher = null;
+    try {
+      indexSearcher = searcherManager.acquire();
+      // This is a doc-id fence, so deleted document slots must remain within its bounds.
+      return indexSearcher.getIndexReader().maxDoc();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to get searchable document count for realtime text index for segment "
+          + _segmentName + " for column " + _column, e);
+    } finally {
+      if (indexSearcher != null) {
+        try {
+          searcherManager.release(indexSearcher);
+        } catch (IOException e) {
+          LOGGER.error("Failed while releasing searcher manager for column {}", _column, e);
+        }
+      }
+    }
   }
 }

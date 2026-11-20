@@ -92,4 +92,20 @@ public interface InstanceDataManagerConfig {
   boolean shouldCheckCRCOnSegmentLoad();
 
   boolean isDimensionTablePreloadDisabled();
+
+  /// Whether to upload a metadata tar sidecar with each committed REALTIME segment. Needs the direct server-to-store
+  /// uploader and non-pauseless consumption; controller-upload commits and pauseless consumption create no sidecars.
+  /// Keeping the sidecar after segment deletion is a controller setting (`controller.deleted.segments.preserveMetadata`
+  /// with positive retention).
+  default boolean isUploadSegmentMetadataTarGz() {
+    return false;
+  }
+
+  /// Default for [#getUploadSegmentMetadataTarGzTimeoutMs].
+  int DEFAULT_UPLOAD_SEGMENT_METADATA_TAR_GZ_TIMEOUT_MS = 10_000;
+
+  /// Maximum time the segment commit waits for the best-effort metadata tar upload.
+  default int getUploadSegmentMetadataTarGzTimeoutMs() {
+    return DEFAULT_UPLOAD_SEGMENT_METADATA_TAR_GZ_TIMEOUT_MS;
+  }
 }

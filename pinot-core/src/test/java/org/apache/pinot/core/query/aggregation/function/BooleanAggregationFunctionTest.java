@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
 
@@ -26,153 +26,109 @@ public class BooleanAggregationFunctionTest extends AbstractAggregationFunctionT
 
   @Test
   void aggregationAllNullsWithNullHandlingDisabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select bool_or(myField) from testTable")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(false)
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select bool_or(myField) from testTable")
         .thenResultIs("BOOLEAN", "false");
   }
 
   @Test
   void aggregationAllNullsWithNullHandlingEnabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select bool_and(myField) from testTable")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select bool_and(myField) from testTable")
         .thenResultIs("BOOLEAN", "null");
   }
 
   @Test
   void aggregationGroupBySVAllNullsWithNullHandlingDisabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', bool_and(myField) from testTable group by 'literal'")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(false)
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', bool_and(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | BOOLEAN", "literal | false");
   }
 
   @Test
   void aggregationGroupBySVAllNullsWithNullHandlingEnabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', bool_or(myField) from testTable group by 'literal'")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', bool_or(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | BOOLEAN", "literal | null");
   }
 
   @Test
   void andAggregationWithNullHandlingDisabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "true"
-        ).andOnSecondInstance("myField",
-            "null",
-            "true"
-        ).whenQuery("select bool_and(myField) from testTable")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(false)
+        .onFirstInstance("myField", "null", "true")
+        .andOnSecondInstance("myField", "null", "true")
+        .whenQuery("select bool_and(myField) from testTable")
         .thenResultIs("BOOLEAN", "false");
   }
 
   @Test
   void andAggregationWithNullHandlingEnabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "true"
-        ).andOnSecondInstance("myField",
-            "null",
-            "null"
-        ).whenQuery("select bool_and(myField) from testTable")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "true")
+        .andOnSecondInstance("myField", "null", "null")
+        .whenQuery("select bool_and(myField) from testTable")
         .thenResultIs("BOOLEAN", "true");
   }
 
   @Test
   void andAggregationGroupBySVWithNullHandlingDisabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "true"
-        ).andOnSecondInstance("myField",
-            "null",
-            "true"
-        ).whenQuery("select 'literal', bool_and(myField) from testTable group by 'literal'")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(false)
+        .onFirstInstance("myField", "null", "true")
+        .andOnSecondInstance("myField", "null", "true")
+        .whenQuery("select 'literal', bool_and(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | BOOLEAN", "literal | false");
   }
 
   @Test
   void andAggregationGroupBySVWithNullHandlingEnabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "true"
-        ).andOnSecondInstance("myField",
-            "null",
-            "null"
-        ).whenQuery("select 'literal', bool_and(myField) from testTable group by 'literal'")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "true")
+        .andOnSecondInstance("myField", "null", "null")
+        .whenQuery("select 'literal', bool_and(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | BOOLEAN", "literal | true");
   }
 
   @Test
   void orAggregationWithNullHandlingDisabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "false"
-        ).andOnSecondInstance("myField",
-            "null",
-            "false"
-        ).whenQuery("select bool_or(myField) from testTable")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(false)
+        .onFirstInstance("myField", "null", "false")
+        .andOnSecondInstance("myField", "null", "false")
+        .whenQuery("select bool_or(myField) from testTable")
         .thenResultIs("BOOLEAN", "false");
   }
 
   @Test
   void orAggregationWithNullHandlingEnabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "true"
-        ).andOnSecondInstance("myField",
-            "null",
-            "null"
-        ).whenQuery("select bool_or(myField) from testTable")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "true")
+        .andOnSecondInstance("myField", "null", "null")
+        .whenQuery("select bool_or(myField) from testTable")
         .thenResultIs("BOOLEAN", "true");
   }
 
   @Test
   void orAggregationGroupBySVWithNullHandlingDisabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "true"
-        ).andOnSecondInstance("myField",
-            "null",
-            "true"
-        ).whenQuery("select 'literal', bool_or(myField) from testTable group by 'literal'")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(false)
+        .onFirstInstance("myField", "null", "true")
+        .andOnSecondInstance("myField", "null", "true")
+        .whenQuery("select 'literal', bool_or(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | BOOLEAN", "literal | true");
   }
 
   @Test
   void orAggregationGroupBySVWithNullHandlingEnabled() {
-    new DataTypeScenario(FieldSpec.DataType.BOOLEAN).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "false"
-        ).andOnSecondInstance("myField",
-            "null",
-            "false"
-        ).whenQuery("select 'literal', bool_or(myField) from testTable group by 'literal'")
+    new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "false")
+        .andOnSecondInstance("myField", "null", "false")
+        .whenQuery("select 'literal', bool_or(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | BOOLEAN", "literal | false");
   }
 }

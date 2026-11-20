@@ -22,6 +22,11 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.codecs.lucene912.Lucene912Codec;
@@ -98,6 +103,42 @@ public class VectorIndexUtils {
         || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION).exists();
+  }
+
+  /// Bulk form of [#hasVectorIndex]: which of `columns` have a vector index sidecar in `segDir`.
+  ///
+  /// Prefer this over calling [#hasVectorIndex] in a loop over a segment's columns. It lists the
+  /// directory once rather than performing `columns × extensions` existence probes. Finding
+  /// `<column><extension>` in the listing is equivalent to that path existing, so the answer is the
+  /// same.
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithVectorIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
+    }
+    Set<String> entries = listEntryNames(segDir);
+    Set<String> columnsWithIndex = new HashSet<>();
+    for (String column : columns) {
+      if (entries.contains(column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.VECTOR_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.VECTOR_V99_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION)) {
+        columnsWithIndex.add(column);
+      }
+    }
+    return columnsWithIndex;
+  }
+
+  /// Names of the entries directly inside `dir`, files and directories alike (an HNSW vector index is
+  /// a Lucene directory), or empty when it cannot be listed.
+  private static Set<String> listEntryNames(File dir) {
+    String[] names = dir.list();
+    return names == null ? Set.of() : new HashSet<>(Arrays.asList(names));
   }
 
   /// Returns `true` when the V1/V2 segment directory holds an IVF vector index in the
@@ -284,6 +325,11 @@ public class VectorIndexUtils {
   }
 
   public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig) {
+    return getIndexWriterConfig(vectorIndexConfig, null);
+  }
+
+  public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig,
+      @Nullable Path mmapMergeDirectory) {
     IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
 
     double maxBufferSizeMB = Double.parseDouble(vectorIndexConfig.getProperties()
@@ -303,8 +349,7 @@ public class VectorIndexUtils {
     int maxDimensions = Integer.parseInt(vectorIndexConfig.getProperties()
         .getOrDefault("maxDimensions", String.valueOf(HnswVectorsFormat.DEFAULT_MAX_DIMENSIONS)));
 
-    HnswVectorsFormat knnVectorsFormat =
-        new HnswVectorsFormat(maxCon, beamWidth, maxDimensions);
+    HnswVectorsFormat knnVectorsFormat = new HnswVectorsFormat(maxCon, beamWidth, maxDimensions, mmapMergeDirectory);
 
     Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(vectorIndexConfig.getProperties()
         .getOrDefault("mode", Lucene912Codec.Mode.BEST_SPEED.name()));

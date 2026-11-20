@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.LongConsumer;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
@@ -38,6 +39,8 @@ import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.segment.spi.memory.PinotOutputStream;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /// An efficient serde that implements [DataBlockSerde.Version#V1_V2] using trying to make as fewer copies as
@@ -196,7 +199,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
       Header header = Header.deserialize(stream);
 
       if (finalOffsetConsumer != null) {
-        finalOffsetConsumer.accept(offset + calculateEndOffset(buffer, header));
+        finalOffsetConsumer.accept(calculateEndOffset(buffer, offset, header));
       }
 
       switch (type) {
@@ -212,7 +215,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
               bufferView(buffer, header._variableSizeDataStart + offset, header._variableSizeDataLength));
         case METADATA: {
           ErrorsAndMetadata exceptions = deserializeExceptions(stream, header);
-          List<DataBuffer> metadata = deserializeMetadata(buffer, header);
+          List<DataBuffer> metadata = deserializeMetadata(buffer, offset, header);
           return exceptions.asBlock(metadata);
         }
         default:
@@ -222,8 +225,9 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     }
   }
 
-  private static List<DataBuffer> deserializeMetadata(DataBuffer buffer, Header header) {
-    long currentOffset = header._metadataStart;
+  /// Reads the stats of the block that starts at `offset` of `buffer`.
+  private static List<DataBuffer> deserializeMetadata(DataBuffer buffer, long offset, Header header) {
+    long currentOffset = offset + header._metadataStart;
     int statsSize = buffer.getInt(currentOffset);
     currentOffset += Integer.BYTES;
 
@@ -244,8 +248,9 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     return stats;
   }
 
-  private long calculateEndOffset(DataBuffer buffer, Header header) {
-    long currentOffset = header._metadataStart;
+  /// Returns the offset in `buffer` right after the block that starts at `offset`.
+  private long calculateEndOffset(DataBuffer buffer, long offset, Header header) {
+    long currentOffset = offset + header._metadataStart;
     int statsSize = buffer.getInt(currentOffset);
     currentOffset += Integer.BYTES;
 
@@ -310,8 +315,25 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
     int dictionarySize = stream.readInt();
     String[] stringDictionary = new String[dictionarySize];
+    // Reuse one scratch array across entries instead of allocating a temporary byte array per entry as
+    // PinotInputStream.readInt4UTF() does.
+    byte[] bytes = null;
     for (int i = 0; i < dictionarySize; i++) {
-      stringDictionary[i] = stream.readInt4UTF();
+      int length = stream.readInt();
+      if (length == 0) {
+        stringDictionary[i] = StringUtils.EMPTY;
+        continue;
+      }
+      if (length < 0) {
+        // Preserve the exception raised by allocating the entry buffer in readInt4UTF().
+        throw new NegativeArraySizeException(Integer.toString(length));
+      }
+      if (bytes == null || bytes.length < length) {
+        bytes = new byte[length];
+      }
+      stream.readFully(bytes, 0, length);
+      // String copies the decoded contents, so the next entry can reuse the scratch bytes.
+      stringDictionary[i] = new String(bytes, 0, length, UTF_8);
     }
     return stringDictionary;
   }

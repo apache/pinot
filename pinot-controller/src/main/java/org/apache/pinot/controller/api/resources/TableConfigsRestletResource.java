@@ -30,9 +30,9 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
@@ -76,6 +76,7 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils.ValidationType;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
@@ -190,11 +191,12 @@ public class TableConfigsRestletResource {
   @ManualAuthorization // performed after parsing table configs
   public ConfigSuccessResponse addConfig(
       String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = TableConfigValidationUtils.VALIDATION_TYPES_TO_SKIP_DESCRIPTION)
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @DefaultValue("false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders httpHeaders, @Context Request request)
       throws Exception {
+    EnumSet<ValidationType> skipTypes = TableConfigValidationUtils.parseValidationTypesToSkip(typesToSkip);
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     try {
       tableConfigsAndUnrecognizedProps =
@@ -213,7 +215,15 @@ public class TableConfigsRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
-    validateConfig(tableConfigs, databaseName, typesToSkip);
+    // Authorize before validation can compile schema or table transform functions.
+    String endpointUrl = request.getRequestURL().toString();
+    AccessControl accessControl = _accessControlFactory.create();
+    AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.CREATE_TABLE)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
+
+    validateConfig(tableConfigs, databaseName, skipTypes);
     tableConfigs.setTableName(rawTableName);
 
     TableConfig offlineTableConfig = tableConfigs.getOffline();
@@ -221,15 +231,6 @@ public class TableConfigsRestletResource {
     Schema schema = tableConfigs.getSchema();
 
     try {
-      // validate permission
-      String endpointUrl = request.getRequestURL().toString();
-      AccessControl accessControl = _accessControlFactory.create();
-      AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders, endpointUrl,
-          accessControl);
-      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.CREATE_TABLE)) {
-        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-      }
-
       if (offlineTableConfig != null) {
         applyTuning(offlineTableConfig, schema);
         if (!ignoreActiveTasks) {
@@ -353,13 +354,14 @@ public class TableConfigsRestletResource {
   public ConfigSuccessResponse updateConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
       String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+      @ApiParam(value = TableConfigValidationUtils.VALIDATION_TYPES_TO_SKIP_DESCRIPTION)
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload,
       @ApiParam(value = "Force update the table schema") @DefaultValue("false") @QueryParam("forceTableSchemaUpdate")
       boolean forceTableSchemaUpdate, String tableConfigsStr, @Context HttpHeaders headers)
       throws Exception {
+    EnumSet<ValidationType> skipTypes = TableConfigValidationUtils.parseValidationTypesToSkip(typesToSkip);
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(headers);
     tableName = DatabaseUtils.translateTableName(tableName, databaseName);
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
@@ -368,7 +370,7 @@ public class TableConfigsRestletResource {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      validateConfig(tableConfigs, databaseName, typesToSkip);
+      validateConfig(tableConfigs, databaseName, skipTypes);
       Preconditions.checkState(
           DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName).equals(tableName),
           "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
@@ -440,8 +442,7 @@ public class TableConfigsRestletResource {
   @ApiOperation(value = "Validate the TableConfigs", notes = "Validate the TableConfigs")
   @ManualAuthorization // performed after parsing TableConfigs
   public String validateConfig(String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
-          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES)")
+      @ApiParam(value = TableConfigValidationUtils.VALIDATION_TYPES_TO_SKIP_DESCRIPTION)
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
@@ -462,8 +463,7 @@ public class TableConfigsRestletResource {
           + "returning the result that would be stored on create/update")
   @ManualAuthorization // performed after parsing TableConfigs
   public String tuneConfig(String tableConfigsStr,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: "
-          + "(ALL|TASK|UPSERT|TENANT|MINION_INSTANCES)")
+      @ApiParam(value = TableConfigValidationUtils.VALIDATION_TYPES_TO_SKIP_DESCRIPTION)
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
@@ -483,6 +483,7 @@ public class TableConfigsRestletResource {
 
   private Pair<TableConfigs, Map<String, Object>> parseAndValidateTableConfigs(String tableConfigsStr,
       @Nullable String typesToSkip, HttpHeaders httpHeaders, Request request) {
+    EnumSet<ValidationType> skipTypes = TableConfigValidationUtils.parseValidationTypesToSkip(typesToSkip);
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     try {
       tableConfigsAndUnrecognizedProps =
@@ -494,8 +495,17 @@ public class TableConfigsRestletResource {
     }
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-    validateConfig(tableConfigs, databaseName, typesToSkip);
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
+
+    // Authorize before validation can compile schema or table transform functions.
+    String endpointUrl = request.getRequestURL().toString();
+    AccessControl accessControl = _accessControlFactory.create();
+    AccessControlUtils.validatePermission(rawTableName, AccessType.READ, httpHeaders, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
+
+    validateConfig(tableConfigs, databaseName, skipTypes);
     tableConfigs.setTableName(rawTableName);
 
     // Cluster-aware validations are exclusive to the validate/tune pre-flight endpoints so that users get fail-fast
@@ -503,7 +513,6 @@ public class TableConfigsRestletResource {
     // equivalent checks inline or via PinotHelixResourceManager). Active-task validation is intentionally excluded
     // here: it applies only on the create/update path (gated by the ignoreActiveTasks flag) so that validate/tune of an
     // existing table with running tasks is not blocked.
-    Set<TableConfigUtils.ValidationType> skipTypes = TableConfigUtils.parseTypesToSkipString(typesToSkip);
     try {
       if (tableConfigs.getOffline() != null) {
         validateClusterAwareConfig(tableConfigs.getOffline(), skipTypes);
@@ -519,24 +528,14 @@ public class TableConfigsRestletResource {
           String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
     }
 
-    // validate permission
-    String endpointUrl = request.getRequestURL().toString();
-    AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils.validatePermission(rawTableName, AccessType.READ, httpHeaders, endpointUrl, accessControl);
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
-      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-    }
     return tableConfigsAndUnrecognizedProps;
   }
 
-  private void validateClusterAwareConfig(TableConfig tableConfig, Set<TableConfigUtils.ValidationType> skipTypes) {
-    if (skipTypes.contains(TableConfigUtils.ValidationType.ALL)) {
-      return;
-    }
-    if (!skipTypes.contains(TableConfigUtils.ValidationType.TENANT)) {
+  private void validateClusterAwareConfig(TableConfig tableConfig, @Nullable EnumSet<ValidationType> skipTypes) {
+    if (!ValidationType.TENANT.isSkipped(skipTypes)) {
       _pinotHelixResourceManager.validateTableTenantConfig(tableConfig);
     }
-    if (!skipTypes.contains(TableConfigUtils.ValidationType.MINION_INSTANCES)) {
+    if (!ValidationType.MINION_INSTANCES.isSkipped(skipTypes)) {
       _pinotHelixResourceManager.validateTableTaskMinionInstanceTagConfig(tableConfig);
     }
   }
@@ -550,7 +549,8 @@ public class TableConfigsRestletResource {
 
   /// Validates the provided TableConfigs. Hybrid table validation is performed only on the provided
   /// configs and does not check for conflicts with existing tables in the cluster.
-  private void validateConfig(TableConfigs tableConfigs, String database, @Nullable String typesToSkip) {
+  private void validateConfig(TableConfigs tableConfigs, String database,
+      @Nullable EnumSet<ValidationType> skipTypes) {
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), database);
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
@@ -565,6 +565,7 @@ public class TableConfigsRestletResource {
 
       Preconditions.checkState(rawTableName.equals(schemaName),
           "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
+      TableConfigValidationUtils.validateSchemaGroovy(schema, _controllerConf);
       SchemaUtils.validateIngestionTransformVolatility(schema, _pinotHelixResourceManager.getSchema(schemaName));
       SchemaUtils.validate(schema);
       if (offlineTableConfig != null) {
@@ -573,9 +574,9 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
-        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip,
+        TableConfigUtils.validate(offlineTableConfig, schema, skipTypes,
             _pinotHelixResourceManager.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)));
-        TaskConfigUtils.validateTaskConfigs(tableConfigs.getOffline(), schema, _pinotTaskManager, typesToSkip);
+        TaskConfigUtils.validateTaskConfigs(tableConfigs.getOffline(), schema, _pinotTaskManager, skipTypes);
         TableConfigValidatorRegistry.validate(offlineTableConfig, schema);
       }
       if (realtimeTableConfig != null) {
@@ -584,9 +585,9 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
-        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip,
+        TableConfigUtils.validate(realtimeTableConfig, schema, skipTypes,
             _pinotHelixResourceManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)));
-        TaskConfigUtils.validateTaskConfigs(tableConfigs.getRealtime(), schema, _pinotTaskManager, typesToSkip);
+        TaskConfigUtils.validateTaskConfigs(tableConfigs.getRealtime(), schema, _pinotTaskManager, skipTypes);
         TableConfigValidatorRegistry.validate(realtimeTableConfig, schema);
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {

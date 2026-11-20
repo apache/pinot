@@ -83,7 +83,8 @@ public class LLCSegmentCompletionHandlers {
   // We don't want to document these in swagger since they are internal APIs
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_EXTEND_BUILD_TIME)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Produces(MediaType.APPLICATION_JSON)
   public String extendBuildTime(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -114,12 +115,14 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_CONSUMED)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentConsumed(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode,
       @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
@@ -133,6 +136,7 @@ public class LLCSegmentCompletionHandlers {
         .withSegmentName(segmentName)
         .withStreamPartitionMsgOffset(streamPartitionMsgOffset)
         .withReason(stopReason)
+        .withReasonCodeParam(stopReasonCode)
         .withMemoryUsedBytes(memoryUsedBytes)
         .withNumRows(numRows);
     LOGGER.info("Processing segmentConsumed: {}", requestParams);
@@ -144,12 +148,14 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentStoppedConsuming(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
       LOGGER.error("Invalid call: segmentName={}, instanceId={}, streamPartitionMsgOffset={}", segmentName, instanceId,
           streamPartitionMsgOffset);
@@ -160,7 +166,8 @@ public class LLCSegmentCompletionHandlers {
         .withInstanceId(instanceId)
         .withSegmentName(segmentName)
         .withStreamPartitionMsgOffset(streamPartitionMsgOffset)
-        .withReason(stopReason);
+        .withReason(stopReason)
+        .withReasonCodeParam(stopReasonCode);
     LOGGER.info("Processing segmentStoppedConsuming: {}", requestParams);
 
     String response = _segmentCompletionManager.segmentStoppedConsuming(requestParams).toJsonString();
@@ -170,7 +177,8 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_START)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitStart(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -179,7 +187,9 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
       LOGGER.error("Invalid call: segmentName={}, instanceId={}, streamPartitionMsgOffset={}", segmentName, instanceId,
           streamPartitionMsgOffset);
@@ -194,7 +204,9 @@ public class LLCSegmentCompletionHandlers {
         .withBuildTimeMillis(buildTimeMillis)
         .withWaitTimeMillis(waitTimeMillis)
         .withNumRows(numRows)
-        .withSegmentSizeBytes(segmentSizeBytes);
+        .withSegmentSizeBytes(segmentSizeBytes)
+        .withReason(stopReason)
+        .withReasonCodeParam(stopReasonCode);
     LOGGER.info("Processing segmentCommitStart: {}", requestParams);
 
     String response = _segmentCompletionManager.segmentCommitStart(requestParams).toJsonString();
@@ -269,7 +281,10 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason, FormDataMultiPart metadataFiles) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode,
+      @QueryParam(SegmentCompletionProtocol.PARAM_METADATA_TAR_LOCATION) String metadataTarLocation,
+      FormDataMultiPart metadataFiles) {
     if (instanceId == null || segmentName == null || segmentLocation == null || metadataFiles == null
         || streamPartitionMsgOffset == null) {
       LOGGER.error("Invalid call: segmentName={}, instanceId={}, segmentLocation={}, streamPartitionMsgOffset={}",
@@ -282,13 +297,15 @@ public class LLCSegmentCompletionHandlers {
         .withInstanceId(instanceId)
         .withSegmentName(segmentName)
         .withSegmentLocation(segmentLocation)
+        .withMetadataTarLocation(metadataTarLocation)
         .withStreamPartitionMsgOffset(streamPartitionMsgOffset)
         .withSegmentSizeBytes(segmentSizeBytes)
         .withBuildTimeMillis(buildTimeMillis)
         .withWaitTimeMillis(waitTimeMillis)
         .withNumRows(numRows)
         .withMemoryUsedBytes(memoryUsedBytes)
-        .withReason(stopReason);
+        .withReason(stopReason)
+        .withReasonCodeParam(stopReasonCode);
     LOGGER.info("Processing segmentCommitEndWithMetadata: {}", requestParams);
 
     SegmentMetadataImpl segmentMetadata;
@@ -309,7 +326,8 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_BUILD_DETERMINISTIC_FAILURE)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Produces(MediaType.APPLICATION_JSON)
   public String reduceSegmentSize(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,

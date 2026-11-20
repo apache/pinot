@@ -23,6 +23,9 @@ import org.apache.pinot.common.Utils;
 
 /// Enumeration containing all the timers exposed by the Pinot broker.
 public enum BrokerTimer implements AbstractMetrics.Timer {
+  /// Time the broker spends to update the routing of a table after a change to its ideal state or external view.
+  /// Includes reading both znodes and rebuilding the routing components. Emitted per table and globally, only for
+  /// successful updates.
   ROUTING_TABLE_UPDATE_TIME(true),
   CLUSTER_CHANGE_QUEUE_TIME(true), // metric tracking the freshness lag for consuming segments
   FRESHNESS_LAG_MS(false),
@@ -54,6 +57,18 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   REALTIME_TOTAL_CPU_TIME_NS(false),
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS(true),
+  // Wall-clock duration of startup warmup, from the moment it begins (Helix convergence) to the moment
+  // readiness is released. Distinguishes "warmed to the floor" from "hit the budget ceiling".
+  STARTUP_WARMUP_DURATION_MS(true),
+  // How long the startup server pre-connect (open broker->server channels, including TLS handshake)
+  // took, from Helix convergence to the last channel connecting or the budget expiring.
+  STARTUP_PRECONNECT_DURATION_MS(true),
+  // Time to establish a single broker->server Netty channel (TCP connect, plus the TLS handshake on the
+  // startup pre-connect path). Complements the NETTY_CONNECTION_CONNECT_TIME_MS gauge, which only keeps
+  // the last value, by keeping a burst of connections on a cold broker analyzable across the whole
+  // distribution. NOTE: must not be named after that gauge -- both derive their metric name from the
+  // enum constant, and a gauge and a timer sharing one name collide in the metrics registry.
+  NETTY_CONNECTION_CONNECT_LATENCY_MS(true),
   // GRPC query execution time
   GRPC_QUERY_EXECUTION_MS(true),
   // Audit logging timers

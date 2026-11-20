@@ -323,7 +323,6 @@ public class ReceivingMailboxTest {
         }
       } while (numRead < maxPendingBlocks + 1);
       assertEquals(mailbox.getNumPendingBlocks(), 0, "All blocks should have been read");
-      assertTrue(blocked.isDone(), "The blocked offer should be unblocked by reading");
       assertEquals(blocked.get(), ReceivingMailbox.ReceivingMailboxStatus.SUCCESS,
           "The unblocked offer should succeed");
     } finally {

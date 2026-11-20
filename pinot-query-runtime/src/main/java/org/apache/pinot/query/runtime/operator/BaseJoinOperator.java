@@ -95,8 +95,10 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     _resultColumnSize = _resultSchema.size();
     List<RexExpression> nonEquiConditions = node.getNonEquiConditions();
     _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
+    boolean nullHandlingEnabled = QueryOptionsUtils.isNullHandlingEnabled(context.getOpChainMetadata());
     for (RexExpression nonEquiCondition : nonEquiConditions) {
-      _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, _resultSchema));
+      _nonEquiEvaluators.add(
+          TransformOperandFactory.getTransformOperand(nonEquiCondition, _resultSchema, nullHandlingEnabled));
     }
     Map<String, String> metadata = context.getOpChainMetadata();
     PlanNode.NodeHint nodeHint = node.getNodeHint();
@@ -116,8 +118,10 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     _resultColumnSize = _resultSchema.size();
     List<RexExpression> nonEquiConditions = node.getNonEquiConditions();
     _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
+    boolean nullHandlingEnabled = QueryOptionsUtils.isNullHandlingEnabled(context.getOpChainMetadata());
     for (RexExpression nonEquiCondition : nonEquiConditions) {
-      _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, nonEquiEvaluationSchema));
+      _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, nonEquiEvaluationSchema,
+          nullHandlingEnabled));
     }
     Map<String, String> metadata = context.getOpChainMetadata();
     PlanNode.NodeHint nodeHint = node.getNodeHint();
@@ -191,12 +195,12 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     LOGGER.trace("Returning {} for join operator", mseBlock);
     if (mseBlock.isEos()) {
       _eos = (MseBlock.Eos) mseBlock;
-      onEosProduced();
+      // The right table is dead weight from here on, whether this is a successful end of stream or an error block
+      // propagated from the left input. Release it now rather than waiting for close()/cancel() to do it.
+      releaseBuffers();
     }
     return mseBlock;
   }
-
-  protected abstract void onEosProduced();
 
   protected void buildRightTable() {
     LOGGER.trace("Building right table for join operator");

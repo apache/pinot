@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.index.metadata;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
@@ -66,6 +67,34 @@ public class ColumnMetadataSparseKeysTest {
     _tempFile = File.createTempFile("sparse-keys-metadata", ".properties");
     CommonsConfigurationUtils.saveToFile(config, _tempFile);
     return CommonsConfigurationUtils.fromFile(_tempFile);
+  }
+
+  /// The type manifest is the sparse tier's answer to a dense child's own column metadata, so it has to survive
+  /// the same save/load round trip the key manifest does -- the commas between entries are exactly what
+  /// LegacyListDelimiterHandler fragments.
+  @Test
+  public void testSparseKeyTypesRoundTripThroughSaveLoad() throws Exception {
+    PropertiesConfiguration config = baseParentProps();
+    config.setProperty(Column.getKeyFor(COLUMN, Column.SPARSE_KEY_TYPES),
+        "{\"region\":\"STRING\",\"latencyMs\":\"LONG\",\"freeform\":\"INT\"}");
+
+    PropertiesConfiguration reloaded = saveAndReload(config);
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(reloaded, 10, COLUMN);
+    assertEquals(metadata.getSparseKeyTypes(),
+        Map.of("region", DataType.STRING, "latencyMs", DataType.LONG, "freeform", DataType.INT));
+  }
+
+  /// A segment built before types were recorded carries no manifest, and must load rather than fail -- readers
+  /// fall back to the STRING every sparse key used to read as.
+  @Test
+  public void testSparseKeyTypesAbsentOnOlderSegment() throws Exception {
+    PropertiesConfiguration config = baseParentProps();
+    config.setProperty(Column.getKeyFor(COLUMN, Column.SPARSE_KEYS), "[\"region\",\"latencyMs\"]");
+
+    PropertiesConfiguration reloaded = saveAndReload(config);
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(reloaded, 10, COLUMN);
+    assertEquals(metadata.getSparseKeys(), List.of("region", "latencyMs"));
+    assertNull(metadata.getSparseKeyTypes());
   }
 
   @Test

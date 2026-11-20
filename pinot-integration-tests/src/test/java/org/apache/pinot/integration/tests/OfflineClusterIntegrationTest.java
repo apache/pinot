@@ -308,11 +308,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   /// Ensure table is at the same state after the test.
   @AfterMethod
-  public void checkTableSetup()
-      throws IOException {
+  public void checkTableSetup() {
     assertEquals(getOfflineTableConfig(), _tableConfig);
     assertEquals(getSchema(getTableName()), _schema);
-    assertEquals(getTableSize(getTableName()), _tableSize);
+    // Table size is reported by the servers and transiently returns -1 while a segment reload from the preceding test
+    // is still in flight, so poll until it converges. A test that actually changed the table never converges and still
+    // fails, and a failure here is a configuration failure that skips all remaining tests in the class.
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return getTableSize(getTableName()) == _tableSize;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Table size did not converge back to " + _tableSize);
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
@@ -3649,7 +3657,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1Json.get("rows").get(0).get(1).asText(), "Execution Plan\n"
         + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
         + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], "
-        + "isSortOnReceiver=[true])\n"
+        + "isSortOnReceiver=[false])\n"
         + "    LogicalProject(count=[$1], name=[$0])\n"
         + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\n"

@@ -182,7 +182,7 @@ public class ClusterInfoAccessor {
   public String getVipUrlForLeadController(String tableNameWithType) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     if (_leadControllerManager.isLeaderForTable(rawTableName)) {
-      LOGGER.info("Controller is leader for table {}", tableNameWithType);
+      LOGGER.debug("Controller is leader for table {}", tableNameWithType);
       return getVipUrl();
     }
 

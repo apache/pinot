@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -32,9 +33,8 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.RoutingConfig;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
@@ -57,6 +57,7 @@ import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPol
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -99,7 +100,8 @@ public class TableConfigSerDeUtilsTest {
     }
     {
       // With quota config
-      QuotaConfig quotaConfig = new QuotaConfig("30g", "100.00");
+      QuotaConfig quotaConfig =
+          new QuotaConfig("30g", "100.00", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.DISABLED);
       TableConfig tableConfig = tableConfigBuilder.setQuotaConfig(quotaConfig).build();
 
       checkQuotaConfig(tableConfig);
@@ -145,24 +147,26 @@ public class TableConfigSerDeUtilsTest {
       checkTenantConfigWithTagOverride(tableConfigToCompare);
     }
     {
-      // With SegmentAssignmentStrategyConfig
-      ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig("memberId", 5);
-      TableConfig tableConfig = tableConfigBuilder.setSegmentAssignmentConfigMap(
-              Map.of(InstancePartitionsType.OFFLINE.toString(),
-                  new SegmentAssignmentConfig("ReplicaGroupSegmentAssignmentStrategy")))
-          .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig)
+      // With partitioned instance assignment config and segment assignment config
+      InstanceAssignmentConfig instanceAssignmentConfig =
+          new InstanceAssignmentConfig(new InstanceTagPoolConfig("tenant_OFFLINE", false, 0, null), null,
+              new InstanceReplicaGroupPartitionConfig(true, 0, 2, 0, 4, 1, false, null), null, false);
+      TableConfig tableConfig = tableConfigBuilder
+          .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig))
+          .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
+              new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY, "memberId")))
           .build();
 
-      checkSegmentAssignmentStrategyConfig(tableConfig);
+      checkSegmentAssignmentConfig(tableConfig);
 
       // Serialize then de-serialize
       TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
       assertEquals(tableConfigToCompare, tableConfig);
-      checkSegmentAssignmentStrategyConfig(tableConfigToCompare);
+      checkSegmentAssignmentConfig(tableConfigToCompare);
 
       tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
-      checkSegmentAssignmentStrategyConfig(tableConfigToCompare);
+      checkSegmentAssignmentConfig(tableConfigToCompare);
     }
     {
       // With completion config
@@ -373,6 +377,69 @@ public class TableConfigSerDeUtilsTest {
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
     }
+    {
+      // With hybrid table retention strategy
+      String hybridTableRetentionStrategy = "hybridTableRetentionStrategy";
+      for (Enablement hybridTableRetentionStrategyValue : Enablement.values()) {
+        TableConfig tableConfig = tableConfigBuilder.build();
+        tableConfig.getValidationConfig().setHybridTableRetentionStrategy(hybridTableRetentionStrategyValue);
+
+        // Only serialized when not DEFAULT
+        JsonNode validationConfigJson = tableConfig.toJsonNode().get(TableConfig.VALIDATION_CONFIG_KEY);
+        if (hybridTableRetentionStrategyValue == Enablement.DEFAULT) {
+          assertFalse(validationConfigJson.has(hybridTableRetentionStrategy));
+        } else {
+          assertEquals(validationConfigJson.get(hybridTableRetentionStrategy).asText(),
+              hybridTableRetentionStrategyValue.name());
+        }
+
+        // Serialize then de-serialize
+        TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+        assertEquals(tableConfigToCompare, tableConfig);
+        assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(),
+            hybridTableRetentionStrategyValue);
+
+        tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+        assertEquals(tableConfigToCompare, tableConfig);
+        assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(),
+            hybridTableRetentionStrategyValue);
+      }
+
+      // DEFAULT and not serialized when unset
+      TableConfig tableConfig = tableConfigBuilder.build();
+      assertEquals(tableConfig.getValidationConfig().getHybridTableRetentionStrategy(), Enablement.DEFAULT);
+      assertFalse(tableConfig.toJsonNode().get(TableConfig.VALIDATION_CONFIG_KEY).has(hybridTableRetentionStrategy));
+
+      // Explicit null deserializes to DEFAULT
+      ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
+      ((ObjectNode) tableConfigJson.get(TableConfig.VALIDATION_CONFIG_KEY)).putNull(hybridTableRetentionStrategy);
+      TableConfig tableConfigToCompare = JsonUtils.jsonNodeToObject(tableConfigJson, TableConfig.class);
+      assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(), Enablement.DEFAULT);
+      assertEquals(tableConfigToCompare, tableConfig);
+
+      // Omitted field deserializes to DEFAULT
+      TableConfig explicitlySetTableConfig = tableConfigBuilder.build();
+      explicitlySetTableConfig.getValidationConfig().setHybridTableRetentionStrategy(Enablement.ENABLE);
+      tableConfigJson = (ObjectNode) explicitlySetTableConfig.toJsonNode();
+      ObjectNode validationConfigJson = (ObjectNode) tableConfigJson.get(TableConfig.VALIDATION_CONFIG_KEY);
+      assertTrue(validationConfigJson.has(hybridTableRetentionStrategy));
+      validationConfigJson.remove(hybridTableRetentionStrategy);
+      tableConfigToCompare = JsonUtils.jsonNodeToObject(tableConfigJson, TableConfig.class);
+      assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(), Enablement.DEFAULT);
+      assertEquals(tableConfigToCompare, tableConfig);
+
+      // Explicit DEFAULT deserializes to DEFAULT and is not serialized
+      tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
+      ((ObjectNode) tableConfigJson.get(TableConfig.VALIDATION_CONFIG_KEY)).put(hybridTableRetentionStrategy,
+          Enablement.DEFAULT.name());
+      tableConfigToCompare = JsonUtils.jsonNodeToObject(tableConfigJson, TableConfig.class);
+      assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(), Enablement.DEFAULT);
+      assertFalse(
+          tableConfigToCompare.toJsonNode().get(TableConfig.VALIDATION_CONFIG_KEY).has(hybridTableRetentionStrategy));
+      assertEquals(tableConfigToCompare, tableConfig);
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfigToCompare));
+      assertEquals(tableConfigToCompare, tableConfig);
+    }
   }
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {
@@ -421,6 +488,8 @@ public class TableConfigSerDeUtilsTest {
     assertNotNull(quotaConfig);
     assertEquals(quotaConfig.getStorage(), "30G");
     assertEquals(quotaConfig.getMaxQueriesPerSecond(), "100.0");
+    assertEquals(quotaConfig.getStorageQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
+    assertEquals(quotaConfig.getQueryQuotaEnforcementMode(), QuotaEnforcementMode.DISABLED);
   }
 
   private void checkTenantConfigWithoutTagOverride(TableConfig tableConfig) {
@@ -441,18 +510,27 @@ public class TableConfigSerDeUtilsTest {
     assertNull(tenantConfig.getTagOverrideConfig().getRealtimeCompleted());
   }
 
-  private void checkSegmentAssignmentStrategyConfig(TableConfig tableConfig) {
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+  private void checkSegmentAssignmentConfig(TableConfig tableConfig) {
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    assertNotNull(instanceAssignmentConfigMap);
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        instanceAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
+    assertNotNull(instanceAssignmentConfig);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        instanceAssignmentConfig.getReplicaGroupPartitionConfig();
+    assertTrue(replicaGroupPartitionConfig.isReplicaGroupBased());
+    assertEquals(replicaGroupPartitionConfig.getNumReplicaGroups(), 2);
+    assertEquals(replicaGroupPartitionConfig.getNumPartitions(), 4);
+    assertEquals(replicaGroupPartitionConfig.getNumInstancesPerPartition(), 1);
+
     Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
     assertNotNull(segmentAssignmentConfigMap);
     SegmentAssignmentConfig segmentAssignmentConfig =
         segmentAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
     assertNotNull(segmentAssignmentConfig);
-    assertEquals(segmentAssignmentConfig.getAssignmentStrategy(), "ReplicaGroupSegmentAssignmentStrategy");
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = validationConfig.getReplicaGroupStrategyConfig();
-    assertNotNull(replicaGroupStrategyConfig);
-    assertEquals(replicaGroupStrategyConfig.getPartitionColumn(), "memberId");
-    assertEquals(replicaGroupStrategyConfig.getNumInstancesPerPartition(), 5);
+    assertEquals(segmentAssignmentConfig.getAssignmentStrategy(),
+        AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY);
+    assertEquals(segmentAssignmentConfig.getPartitionColumn(), "memberId");
   }
 
   private void checkCompletionConfig(TableConfig tableConfig) {

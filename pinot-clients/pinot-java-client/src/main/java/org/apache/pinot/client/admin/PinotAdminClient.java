@@ -53,6 +53,7 @@ public class PinotAdminClient implements AutoCloseable {
   private BrokerAdminClient _brokerClient;
   private ZookeeperAdminClient _zookeeperClient;
   private FileIngestClient _fileIngestClient;
+  private PageCacheWarmupAdminClient _pageCacheWarmupClient;
 
   /// Creates a PinotAdminClient with the specified controller address.
   ///
@@ -259,6 +260,16 @@ public class PinotAdminClient implements AutoCloseable {
       _queryClient = new QueryAdminClient(_transport, _controllerAddress, _headers);
     }
     return _queryClient;
+  }
+
+  /// Gets the page-cache warmup administration client.
+  ///
+  /// @return Page-cache warmup query administration operations
+  public PageCacheWarmupAdminClient getPageCacheWarmupClient() {
+    if (_pageCacheWarmupClient == null) {
+      _pageCacheWarmupClient = new PageCacheWarmupAdminClient(_transport, _controllerAddress, _headers);
+    }
+    return _pageCacheWarmupClient;
   }
 
   @Override

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -36,6 +37,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -152,10 +154,24 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitSort(SortNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    // Final sort (receives from sort exchange) needs singleton worker
-    boolean isFinalSort = node.getInputs().get(0) instanceof MailboxReceiveNode;
-    dispatchablePlanMetadata.setRequireSingleton(isFinalSort);
+    dispatchablePlanMetadata.setRequireSingleton(isFinalSort(node));
     return null;
+  }
+
+  /// A final sort orders (or trims with fetch/offset) every row its stage receives, so it needs a singleton worker,
+  /// which also rotates the hotspot server across queries. A Sort without fetch/offset over a hash-partitioned exchange
+  /// orders each partition only - it feeds a `PARTITION BY ... ORDER BY` window or a `WITHIN GROUP` aggregate - so it
+  /// keeps the partitioned worker assignment.
+  private static boolean isFinalSort(SortNode node) {
+    if (!(node.getInputs().get(0) instanceof MailboxReceiveNode)) {
+      return false;
+    }
+    if (node.getFetch() >= 0 || node.getOffset() >= 0) {
+      return true;
+    }
+    MailboxReceiveNode receiveNode = (MailboxReceiveNode) node.getInputs().get(0);
+    return receiveNode.getDistributionType() != RelDistribution.Type.HASH_DISTRIBUTED
+        || receiveNode.getKeys().isEmpty();
   }
 
   @Override
@@ -194,6 +210,15 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitUnnest(UnnestNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     getOrCreateDispatchablePlanMetadata(node, context);
+    return null;
+  }
+
+  @Override
+  public Void visitMvAggregate(MvAggregateNode node, DispatchablePlanContext context) {
+    node.getInputs().get(0).visit(this, context);
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.setRequireSingleton(
+        node.getGroupKeys().isEmpty() && node.getAggType().equals(AggregateNode.AggType.FINAL));
     return null;
   }
 }

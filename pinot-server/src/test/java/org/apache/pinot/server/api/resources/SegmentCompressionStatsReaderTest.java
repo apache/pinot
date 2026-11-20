@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import javax.ws.rs.WebApplicationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsContribution;
 import org.apache.pinot.common.restlet.resources.SegmentCompressionStatsContribution;
 import org.apache.pinot.common.restlet.resources.ServerCompressionStatsResponse;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -44,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -121,6 +125,80 @@ public class SegmentCompressionStatsReaderTest {
   }
 
   @Test
+  public void testRawCodecPipelineWithoutLegacyCompressionTypeIsComplete() {
+    ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+    when(columnMetadata.getColumnName()).thenReturn("value");
+    when(columnMetadata.getIndexSizeFor(StandardIndexes.forward())).thenReturn(20L);
+    when(columnMetadata.getForwardIndexEncoding()).thenReturn(FieldConfig.EncodingType.RAW);
+    when(columnMetadata.getRawForwardIndexUncompressedValueSizeInBytes()).thenReturn(80L);
+    when(columnMetadata.getRawForwardIndexChunkCompressionType()).thenReturn(null);
+
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getName()).thenReturn("v7");
+    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>(Map.of("value", columnMetadata)));
+
+    SegmentCompressionStatsContribution contribution = SegmentCompressionStatsReader.read(segmentMetadata, true);
+    assertTrue(contribution.isComplete());
+    assertEquals(contribution.getUncompressedValueSizeInBytes(), 80L);
+    assertEquals(contribution.getForwardIndexAndDictionaryStorageSizeInBytes(), 20L);
+    ColumnCompressionStatsContribution.EncodingContribution encoding =
+        contribution.getColumnCompressionStats().get("value").getEncodingBreakdown().get(0);
+    assertEquals(encoding.getEncoding(), FieldConfig.EncodingType.RAW);
+    assertNull(encoding.getChunkCompressionType());
+  }
+
+  @Test
+  public void testV7SegmentCreationPersistsAndReportsCompressionStats()
+      throws Exception {
+    File outputDir = Files.createTempDirectory("SegmentCompressionStatsReaderV7Test").toFile();
+    String segmentName = "trackedV7";
+    try {
+      Schema schema = new Schema.SchemaBuilder().setSchemaName(segmentName)
+          .addSingleValueDimension("value", DataType.INT)
+          .build();
+      ObjectNode forward = JsonUtils.newObjectNode();
+      forward.put("codecSpec", "DELTA,LZ4");
+      ObjectNode indexes = JsonUtils.newObjectNode();
+      indexes.set("forward", forward);
+      FieldConfig fieldConfig = new FieldConfig.Builder("value")
+          .withEncodingType(FieldConfig.EncodingType.RAW)
+          .withIndexes(indexes)
+          .build();
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(segmentName)
+          .setFieldConfigList(List.of(fieldConfig))
+          .setCompressionStatsEnabled(true)
+          .build();
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+      config.setOutDir(outputDir.getAbsolutePath());
+      config.setSegmentName(segmentName);
+      List<GenericRow> rows = new ArrayList<>();
+      for (int i = 0; i < 10; i++) {
+        GenericRow row = new GenericRow();
+        row.putValue("value", i);
+        rows.add(row);
+      }
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, new GenericRowRecordReader(rows));
+      driver.build();
+
+      SegmentMetadata metadata = new SegmentMetadataImpl(new File(outputDir, segmentName));
+      ColumnMetadata columnMetadata = metadata.getColumnMetadataFor("value");
+      assertEquals(columnMetadata.getRawForwardIndexUncompressedValueSizeInBytes(), 10L * Integer.BYTES);
+      assertNull(columnMetadata.getRawForwardIndexChunkCompressionType());
+
+      SegmentCompressionStatsContribution contribution = SegmentCompressionStatsReader.read(metadata, true);
+      assertTrue(contribution.isComplete());
+      assertEquals(contribution.getUncompressedValueSizeInBytes(), 10L * Integer.BYTES);
+      ColumnCompressionStatsContribution.EncodingContribution encoding =
+          contribution.getColumnCompressionStats().get("value").getEncodingBreakdown().get(0);
+      assertEquals(encoding.getEncoding(), FieldConfig.EncodingType.RAW);
+      assertNull(encoding.getChunkCompressionType());
+    } finally {
+      FileUtils.deleteQuietly(outputDir);
+    }
+  }
+
+  @Test
   public void testServerRejectsOversizedColumnContributionResponse() {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>(Map.of(
@@ -132,6 +210,18 @@ public class SegmentCompressionStatsReaderTest {
         () -> TablesResource.addColumnContributions(
             ServerCompressionStatsResponse.MAX_COLUMN_CONTRIBUTIONS_PER_RESPONSE, segment, null));
     assertEquals(exception.getResponse().getStatus(), 413);
+  }
+
+  @Test
+  public void testColumnContributionCountExcludesVirtualColumns() {
+    SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
+    ImmutableSegment segment = mock(ImmutableSegment.class);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(segment.getPhysicalColumnNames()).thenReturn(Set.of("physical"));
+
+    assertEquals(TablesResource.addColumnContributions(0, segment, null), 1);
+    assertEquals(TablesResource.addColumnContributions(0, segment, Set.of("virtual")), 0);
+    assertEquals(TablesResource.addColumnContributions(0, segment, Set.of("physical", "virtual")), 1);
   }
 
   private static void assertCompleteZeroByteStats(SegmentCompressionStatsContribution contribution) {

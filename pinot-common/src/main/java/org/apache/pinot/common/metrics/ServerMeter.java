@@ -33,6 +33,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SECONDARY_QUERIES("queries", false),
   NUM_SECONDARY_QUERIES_SCHEDULED("queries", false),
   SERVER_OUT_OF_CAPACITY_EXCEPTIONS("exceptions", false),
+  /// Requests that reached the server after the broker's deadline plus the clock-skew allowance and were answered with
+  /// a timeout error instead of being executed.
+  QUERIES_EXPIRED_ON_ARRIVAL("queries", true),
 
   QUERY_EXECUTION_EXCEPTIONS("exceptions", false),
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
@@ -45,6 +48,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_ROWS_FETCHED("rows", false),
   REALTIME_ROWS_FILTERED("rows", false),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
+  // Messages fetched again after their decoder threw RetriableDecodeException
+  REALTIME_DECODE_RETRIES("retries", false),
   INCOMPLETE_REALTIME_ROWS_CONSUMED("rows", false),
   REALTIME_CLP_TOO_MANY_ENCODED_VARS("rows", false),
   REALTIME_CLP_UNENCODABLE("rows", false),
@@ -60,9 +65,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
   DEDUP_PRELOAD_FAILURE("count", false),
+  UPSERT_METADATA_REVERT_FAILURES("failures", false),
   UPSERT_KEYS_IN_WRONG_SEGMENT("rows", false),
   PARTIAL_UPSERT_OUT_OF_ORDER("rows", false),
   PARTIAL_UPSERT_KEYS_NOT_REPLACED("rows", false),
+  FULL_UPSERT_KEYS_NOT_REPLACED("rows", false),
   UPSERT_OUT_OF_ORDER("rows", false),
   DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   TOTAL_KEYS_MARKED_FOR_DELETION("rows", false),
@@ -72,6 +79,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_PRELOAD_FAILURE("count", false),
+  UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD("segments", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
   LLC_CONTROLLER_RESPONSE_COMMIT("messages", true),
@@ -100,11 +108,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_BUILD_WITH_CRC_MISMATCH("segments", false),
   SEGMENT_BUILD_FAILURE("segments", false),
   SEGMENT_UPLOAD_FAILURE("segments", false),
   SEGMENT_UPLOAD_SUCCESS("segments", false),
   // Emitted only by Server to Deep-store segment uploader.
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
+  METADATA_TAR_UPLOAD_FAILURE("segments", false),
+  METADATA_TAR_UPLOAD_SUCCESS("segments", false),
+  // Emitted only by the Server to Deep-store metadata tar uploader.
+  METADATA_TAR_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   RESIZE_TIME_MS("resizeTimeMs", false),
   STAR_TREE_INDEX_BUILD_FAILURES("segments", false),
@@ -155,6 +168,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES("tables", true, "Number of failures to refresh table config and schema"),
 
+  // PageCacheWarmup related metrics
+  PAGE_CACHE_WARMUP_QUERIES("pageCacheWarmupQueries", true),
+  PAGE_CACHE_WARMUP_SERVER_ERRORS("pageCacheWarmupServerErrors", true),
+
   // Multi-stage
   /// Number of times the max number of rows in the hash table has been reached.
   /// It is increased at most one by one each time per stage.
@@ -173,6 +190,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   /// It is increased in one by each worker that reaches the limit within the stage.
   /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
   AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
+  /// Number of times a grouping-set query's combine derived the grouping sets from BASE (union) groups, i.e. the
+  /// opt-in `groupingSetsBaseAggregation` optimization actually ran on this server (at least one segment emitted
+  /// base-layout groups). Lets users who opt in verify the optimization applied.
+  GROUPING_SETS_BASE_AGGREGATION("times", true),
   /// The number of blocks that have been sent to the next stage without being serialized.
   /// This is the sum of all blocks sent by all workers in the stage.
   MULTI_STAGE_IN_MEMORY_MESSAGES("messages", true),
@@ -196,6 +217,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   MULTI_STAGE_SUBMISSION_STARTED_TASKS("tasks", true),
   /// Number of tasks completed by the MSE query submission executor
   MULTI_STAGE_SUBMISSION_COMPLETED_TASKS("tasks", true),
+  /// Number of MSE requests (mailbox streams and stage plans) this server rejected because they were addressed to
+  /// another instance and reached this one through a stale connection of the sender.
+  MULTI_STAGE_MISROUTED_REQUESTS_REJECTED("requests", true),
+  /// Number of mailbox streams this server sent that the receiving instance rejected as addressed to another
+  /// instance. Each one makes this server reset its connection to that address, at most once a second.
+  MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER("requests", true),
 
   // predownload metrics
   PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
@@ -240,7 +267,15 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DROPPED_RECORD_COUNT("rows", false),
   CORRUPTED_RECORD_COUNT("rows", false),
   OPEN_STRUCT_TYPE_COERCION_FAILURES("values", false,
-      "Number of OPEN_STRUCT values dropped because the value could not be coerced to the key's inferred type"),
+      "Number of OPEN_STRUCT values dropped because the value could not be coerced to the key's declared or "
+          + "already-established type"),
+  OPEN_STRUCT_TYPE_INFERENCE_FAILURES("values", false,
+      "Number of OPEN_STRUCT values stored as their serialized string form because the value's Java type maps to "
+          + "no Pinot DataType. A value that is instead dropped for failing coercion against a key's "
+          + "already-established non-STRING type is counted by openStructTypeCoercionFailures, not here"),
+  OPEN_STRUCT_IGNORED_KEY_DROPS("values", false,
+      "Number of OPEN_STRUCT map entries dropped at ingestion because the key is listed in the "
+          + "column's ignoredKeys config"),
   // Workload related metrics
   WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", true, "Number of times workload budget exceeded"),
   WORKLOAD_QUERIES("queries", false),

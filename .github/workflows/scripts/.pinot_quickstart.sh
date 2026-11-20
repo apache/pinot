@@ -264,7 +264,7 @@ wait_for_query 8000 \
   '.resultTable.rows[0][0] == 97889' \
   'multi-stage count(*) on baseballStats' || PASS=0
 
-# Ordered so the assertion does not depend on how segments are spread across the 3 servers. Every row must have
+# Ordered so the assertion does not depend on how segments are spread across the servers. Every row must have
 # resolved a team name, otherwise the join produced rows without matching the dimension table.
 wait_for_query 8000 \
   'SET useMultistageEngine=true; SELECT a.playerName, a.teamID, b.teamName FROM baseballStats_OFFLINE AS a JOIN dimBaseballTeams_OFFLINE AS b ON a.teamID = b.teamID ORDER BY a.playerName, a.teamID LIMIT 10' \

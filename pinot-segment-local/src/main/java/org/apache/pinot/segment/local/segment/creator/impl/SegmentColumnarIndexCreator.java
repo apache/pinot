@@ -155,24 +155,27 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
       @Nullable int[] sortedDocIds, @Nullable RoaringBitmap validDocIds)
       throws IOException {
     List<IndexCreator> creators = _colIndexes.get(columnName).getIndexCreators();
-    if (sortedDocIds != null) {
-      for (int docId : sortedDocIds) {
-        if (validDocIds == null || validDocIds.contains(docId)) {
-          indexOpenStructDoc(dataSource, docId, creators);
+    try (OpenStructDataSource.MapValueReader mapValueReader = dataSource.openMapValueReader()) {
+      if (sortedDocIds != null) {
+        for (int docId : sortedDocIds) {
+          if (validDocIds == null || validDocIds.contains(docId)) {
+            indexOpenStructDoc(mapValueReader, docId, creators);
+          }
         }
-      }
-    } else {
-      for (int docId = 0; docId < numDocs; docId++) {
-        if (validDocIds == null || validDocIds.contains(docId)) {
-          indexOpenStructDoc(dataSource, docId, creators);
+      } else {
+        for (int docId = 0; docId < numDocs; docId++) {
+          if (validDocIds == null || validDocIds.contains(docId)) {
+            indexOpenStructDoc(mapValueReader, docId, creators);
+          }
         }
       }
     }
   }
 
-  private static void indexOpenStructDoc(OpenStructDataSource dataSource, int docId, List<IndexCreator> creators)
+  private static void indexOpenStructDoc(OpenStructDataSource.MapValueReader mapValueReader, int docId,
+      List<IndexCreator> creators)
       throws IOException {
-    Map<String, Object> value = dataSource.getMapValue(docId);
+    Map<String, Object> value = mapValueReader.getMapValue(docId);
     Object toIndex = value != null ? value : Map.of();
     for (IndexCreator creator : creators) {
       creator.add(toIndex, -1);

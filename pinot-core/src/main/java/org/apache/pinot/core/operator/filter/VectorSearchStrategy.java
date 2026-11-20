@@ -71,17 +71,32 @@ public final class VectorSearchStrategy {
   public static Decision decide(int numDocs, int estimatedFilteredDocs, boolean hasVectorIndex,
       boolean indexSupportsPreFilter, boolean isMutableSegment, @Nullable VectorBackendType backendType,
       @Nullable VectorSearchParams searchParams) {
+    return decide(numDocs, estimatedFilteredDocs, hasVectorIndex, indexSupportsPreFilter, isMutableSegment,
+        backendType, searchParams, true);
+  }
+
+  /// Decides only the search mode without constructing the explanation carried by [Decision].
+  public static VectorSearchMode decideMode(int numDocs, int estimatedFilteredDocs, boolean hasVectorIndex,
+      boolean indexSupportsPreFilter, boolean isMutableSegment, @Nullable VectorBackendType backendType,
+      @Nullable VectorSearchParams searchParams) {
+    return decide(numDocs, estimatedFilteredDocs, hasVectorIndex, indexSupportsPreFilter, isMutableSegment,
+        backendType, searchParams, false).getMode();
+  }
+
+  private static Decision decide(int numDocs, int estimatedFilteredDocs, boolean hasVectorIndex,
+      boolean indexSupportsPreFilter, boolean isMutableSegment, @Nullable VectorBackendType backendType,
+      @Nullable VectorSearchParams searchParams, boolean includeReason) {
 
     // No index → always exact scan
     if (!hasVectorIndex) {
       return new Decision(VectorSearchMode.EXACT_SCAN, -1.0,
-          "no_vector_index", numDocs, estimatedFilteredDocs);
+          includeReason ? "no_vector_index" : "", numDocs, estimatedFilteredDocs);
     }
 
     // Very small segment → exact scan is cheaper
     if (numDocs < MIN_ANN_SEGMENT_SIZE) {
       return new Decision(VectorSearchMode.EXACT_SCAN, -1.0,
-          "segment_too_small (numDocs=" + numDocs + " < " + MIN_ANN_SEGMENT_SIZE + ")",
+          includeReason ? "segment_too_small (numDocs=" + numDocs + " < " + MIN_ANN_SEGMENT_SIZE + ")" : "",
           numDocs, estimatedFilteredDocs);
     }
 
@@ -89,7 +104,7 @@ public final class VectorSearchStrategy {
     boolean hasFilter = estimatedFilteredDocs < numDocs;
     if (!hasFilter) {
       return new Decision(VectorSearchMode.POST_FILTER_ANN, 1.0,
-          "no_filter", numDocs, estimatedFilteredDocs);
+          includeReason ? "no_filter" : "", numDocs, estimatedFilteredDocs);
     }
 
     double selectivity = numDocs > 0 ? (double) estimatedFilteredDocs / numDocs : 1.0;
@@ -97,7 +112,9 @@ public final class VectorSearchStrategy {
     // Very few docs pass filter → exact scan on filtered set
     if (estimatedFilteredDocs < EXACT_SCAN_THRESHOLD) {
       return new Decision(VectorSearchMode.EXACT_SCAN, selectivity,
-          "filter_too_selective (filteredDocs=" + estimatedFilteredDocs + " < " + EXACT_SCAN_THRESHOLD + ")",
+          includeReason
+              ? "filter_too_selective (filteredDocs=" + estimatedFilteredDocs + " < " + EXACT_SCAN_THRESHOLD + ")"
+              : "",
           numDocs, estimatedFilteredDocs);
     }
 
@@ -105,21 +122,26 @@ public final class VectorSearchStrategy {
     if (selectivity < HIGH_SELECTIVITY_THRESHOLD) {
       if (indexSupportsPreFilter && !isMutableSegment) {
         return new Decision(VectorSearchMode.FILTER_THEN_ANN, selectivity,
-            "high_selectivity (ratio=" + String.format("%.4f", selectivity) + " < "
-                + HIGH_SELECTIVITY_THRESHOLD + ")",
+            includeReason
+                ? "high_selectivity (ratio=" + String.format("%.4f", selectivity) + " < "
+                    + HIGH_SELECTIVITY_THRESHOLD + ")"
+                : "",
             numDocs, estimatedFilteredDocs);
       }
       // Pre-filter not supported → fall back to exact scan on filtered set
       return new Decision(VectorSearchMode.EXACT_SCAN, selectivity,
-          "high_selectivity_no_prefilter_support (ratio=" + String.format("%.4f", selectivity) + ")",
+          includeReason
+              ? "high_selectivity_no_prefilter_support (ratio=" + String.format("%.4f", selectivity) + ")" : "",
           numDocs, estimatedFilteredDocs);
     }
 
     // Low selectivity → post-filter ANN
     if (selectivity > LOW_SELECTIVITY_THRESHOLD) {
       return new Decision(VectorSearchMode.POST_FILTER_ANN, selectivity,
-          "low_selectivity (ratio=" + String.format("%.4f", selectivity) + " > "
-              + LOW_SELECTIVITY_THRESHOLD + ")",
+          includeReason
+              ? "low_selectivity (ratio=" + String.format("%.4f", selectivity) + " > "
+                  + LOW_SELECTIVITY_THRESHOLD + ")"
+              : "",
           numDocs, estimatedFilteredDocs);
     }
 
@@ -133,14 +155,16 @@ public final class VectorSearchStrategy {
       double midpoint = (HIGH_SELECTIVITY_THRESHOLD + LOW_SELECTIVITY_THRESHOLD) / 2;
       if (selectivity < midpoint) {
         return new Decision(VectorSearchMode.FILTER_THEN_ANN, selectivity,
-            "cost_model_prefilter (ratio=" + String.format("%.4f", selectivity) + " < midpoint="
-                + String.format("%.4f", midpoint) + ")",
+            includeReason
+                ? "cost_model_prefilter (ratio=" + String.format("%.4f", selectivity) + " < midpoint="
+                    + String.format("%.4f", midpoint) + ")"
+                : "",
             numDocs, estimatedFilteredDocs);
       }
     }
 
     return new Decision(VectorSearchMode.POST_FILTER_ANN, selectivity,
-        "cost_model_postfilter (ratio=" + String.format("%.4f", selectivity) + ")",
+        includeReason ? "cost_model_postfilter (ratio=" + String.format("%.4f", selectivity) + ")" : "",
         numDocs, estimatedFilteredDocs);
   }
 

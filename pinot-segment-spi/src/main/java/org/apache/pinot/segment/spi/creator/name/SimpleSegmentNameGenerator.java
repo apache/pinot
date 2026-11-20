@@ -32,7 +32,6 @@ import javax.annotation.Nullable;
 /// - Maximum time value
 /// - Segment name postfix
 /// - Sequence id
-@SuppressWarnings("serial")
 public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;

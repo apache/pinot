@@ -47,7 +47,7 @@ public class QueryEnvironmentTestBase {
   protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
       Map.of("a_REALTIME", List.of("a1", "a2"), "b_REALTIME", List.of("b1"), "c_OFFLINE",
-          List.of("c1"), "d_OFFLINE", List.of("d1"), "e_OFFLINE", List.of("e1"));
+          List.of("c1"), "d_OFFLINE", List.of("d1"), "e_OFFLINE", List.of("e1"), "f_OFFLINE", List.of("f1"));
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
       Map.of("a_REALTIME", List.of("a3"), "c_OFFLINE", List.of("c2", "c3"),
           "d_REALTIME", List.of("d2"), "d_OFFLINE", List.of("d3"), "e_REALTIME",
@@ -79,6 +79,11 @@ public class QueryEnvironmentTestBase {
     TABLE_SCHEMAS.put("e", getSchemaBuilder("e")
         .addMultiValueDimension("mcol1", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mcol2", FieldSpec.DataType.LONG)
+        .build());
+    // Column-based null handling: every column, including the multi-value one, is nullable.
+    TABLE_SCHEMAS.put("f_OFFLINE", getSchemaBuilder("f")
+        .addMultiValueDimension("mcol1", FieldSpec.DataType.STRING)
+        .setEnableColumnBasedNullHandling(true)
         .build());
   }
 
@@ -258,6 +263,8 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'LONG', '0') FROM a"},
         new Object[]{"SELECT JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'STRING_ARRAY') FROM a"},
         new Object[]{"SELECT JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'TIMESTAMP_ARRAY') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR_FORY(col1, '$.foo', 'LONG', '0') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR_FORY(col1, '$.foo', 'DOUBLE_ARRAY') FROM a"},
         new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp BETWEEN TIMESTAMP '2016-01-01 00:00:00' AND "
               + "TIMESTAMP '2016-01-01 10:00:00'"},
         new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp >= CAST(1454284798000 AS TIMESTAMP)"},
@@ -333,7 +340,7 @@ public class QueryEnvironmentTestBase {
         }
         TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo =
             new TablePartitionReplicatedServersInfo(tableNameWithType, partitionColumn, "Hashcode", numPartitions,
-                partitionIdToInfoMap, List.of());
+                partitionIdToInfoMap, List.of(), Set.of());
         partitionInfoMap.put(tableNameWithType, tablePartitionReplicatedServersInfo);
       }
     }

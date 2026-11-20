@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -85,7 +86,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     Object[] finalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      Comparable result = aggregationFunction.extractFinalResult(intermediateResults[i]);
+      Object result = aggregationFunction.extractFinalResult(intermediateResults[i]);
       finalResults[i] = result != null ? aggregationFunction.getFinalResultColumnType().convert(result) : null;
     }
     brokerResponseNative.setResultTable(reduceToResultTable(getPrePostAggregationDataSchema(dataSchema), finalResults));
@@ -181,11 +182,11 @@ public class AggregationDataTableReducer implements DataTableReducer {
   private void reduceWithFinalResult(DataSchema dataSchema, Collection<DataTable> dataTables,
       BrokerResponseNative brokerResponseNative) {
     int numAggregationFunctions = _aggregationFunctions.length;
-    Comparable[] finalResults = new Comparable[numAggregationFunctions];
+    Object[] finalResults = new Object[numAggregationFunctions];
     for (DataTable dataTable : dataTables) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         QueryThreadContext.checkTerminationAndSampleUsage("AggregationDataTableReducer");
-        Comparable finalResultToMerge;
+        Object finalResultToMerge;
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         RoaringBitmap nullBitmap = dataTable.getNullRowIds(i);
         if (nullBitmap != null && nullBitmap.contains(0)) {
@@ -200,7 +201,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     Object[] convertedFinalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      Comparable result = finalResults[i];
+      Object result = finalResults[i];
       convertedFinalResults[i] = result != null ? aggregationFunction.getFinalResultColumnType().convert(result) : null;
     }
     brokerResponseNative.setResultTable(
@@ -211,10 +212,29 @@ public class AggregationDataTableReducer implements DataTableReducer {
   private ResultTable reduceToResultTable(DataSchema dataSchema, Object[] finalResults) {
     PostAggregationHandler postAggregationHandler = new PostAggregationHandler(_queryContext, dataSchema);
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
-    Object[] row = postAggregationHandler.getResult(finalResults);
 
-    RewriterResult resultRewriterResult =
-        ResultRewriteUtils.rewriteResult(resultDataSchema, List.<Object[]>of(row));
+    // An aggregation without GROUP BY produces a single group covering the whole table, and HAVING filters that
+    // group away or keeps it. The predicate is evaluated on the row before post-aggregation, the same way
+    // GroupByDataTableReducer does it.
+    //
+    // Null awareness is requested unconditionally rather than from requiresNullAwareKeyEvaluation(): that flag only
+    // reports the query's null-handling option, but this reducer materializes a null final result whichever way the
+    // option is set, because an aggregation over an empty whole-table group has no value to report. The flag only
+    // gates the "a null never matches" early return in PredicateRowMatcher, so without it a null result would be
+    // unboxed and throw.
+    List<Object[]> matchedRows;
+    FilterContext havingFilter = _queryContext.getHavingFilter();
+    if (havingFilter != null && !new HavingFilterHandler(havingFilter, postAggregationHandler, true).isMatch(
+        finalResults)) {
+      matchedRows = List.of();
+    } else {
+      matchedRows = List.<Object[]>of(postAggregationHandler.getResult(finalResults));
+    }
+
+    // The result rewriters may replace the DataSchema (ParentAggregationResultRewriter drops the internal parent
+    // columns), so they have to run even when HAVING filtered the single row away. Otherwise the same query would
+    // report a different schema depending on its data.
+    RewriterResult resultRewriterResult = ResultRewriteUtils.rewriteResult(resultDataSchema, matchedRows);
     resultDataSchema = resultRewriterResult.getDataSchema();
     List<Object[]> rows = resultRewriterResult.getRows();
 
@@ -222,7 +242,10 @@ public class AggregationDataTableReducer implements DataTableReducer {
     int numColumns = columnDataTypes.length;
     for (Object[] rewrittenRow : rows) {
       for (int j = 0; j < numColumns; j++) {
-        rewrittenRow[j] = columnDataTypes[j].format(rewrittenRow[j]);
+        Object value = rewrittenRow[j];
+        if (value != null) {
+          rewrittenRow[j] = columnDataTypes[j].format(value);
+        }
       }
     }
 

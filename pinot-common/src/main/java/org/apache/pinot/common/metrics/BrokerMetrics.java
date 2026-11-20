@@ -47,6 +47,13 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
     return BROKER_METRICS_INSTANCE.get();
   }
 
+  /// A shared no-op instance backed by a [org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry]: every
+  /// record is discarded. For paths that must supply a [BrokerMetrics] but must not pollute the real
+  /// counters -- e.g. startup warmup priming the reduce path with synthetic queries.
+  public static BrokerMetrics noop() {
+    return NOOP;
+  }
+
   /// Constructs the broker metrics.
   ///
   /// @param metricsRegistry The metric registry used to register timers and meters.

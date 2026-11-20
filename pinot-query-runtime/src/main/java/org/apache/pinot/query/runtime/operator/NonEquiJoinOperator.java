@@ -37,7 +37,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
   private static final String BUILD_JOINED_ROWS_SCOPE = "NonEquiJoinOperator#buildJoinedRows";
   private static final String BUILD_NON_MATCH_RIGHT_ROWS_SCOPE = "NonEquiJoinOperator#buildNonMatchRightRows";
 
-  private final List<Object[]> _rightTable;
+  private List<Object[]> _rightTable;
   // Track matched right rows for right join and full join to output non-matched right rows.
   // TODO: Revisit whether we should use IntList or RoaringBitmap for smaller memory footprint.
   @Nullable
@@ -69,9 +69,18 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
     }
   }
 
+  /// Replaces `_rightTable` with a fresh, empty list rather than clearing it: `clear()` would keep the element array
+  /// it grew to. A new `ArrayList` rather than `List.of()` because the field is read — and, if the operator were ever
+  /// re-entered, written — unconditionally, so it must stay both non-null and mutable.
   @Override
-  protected void onEosProduced() {
+  protected void releaseBuffers() {
+    _rightTable = new ArrayList<>();
     _matchedRightRows = null;
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return !_rightTable.isEmpty() || _matchedRightRows != null;
   }
 
   @Override

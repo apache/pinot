@@ -26,7 +26,7 @@ import org.testng.annotations.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
-/// Unit tests for DefaultClusterConfigChangeHandler focusing on the getChangedProperties method.
+/// Unit tests for the default methods of [PinotClusterConfigProvider].
 public class PinotClusterConfigProviderTest {
 
   @Test
@@ -195,6 +195,21 @@ public class PinotClusterConfigProviderTest {
 
     // Then
     assertThat(changedProperties).isEmpty();
+  }
+
+  @Test
+  public void testCopyWithoutNullValues() {
+    // Given
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
+    Map<String, String> clusterConfigs = new HashMap<>();
+    clusterConfigs.put("key1", "value1");
+    clusterConfigs.put("key2", null);
+
+    // When
+    Map<String, String> copy = handler.copyWithoutNullValues(clusterConfigs);
+
+    // Then
+    assertThat(copy).hasSize(1).containsEntry("key1", "value1");
   }
 
   public static class PinotClusterConfigProviderMock implements PinotClusterConfigProvider {

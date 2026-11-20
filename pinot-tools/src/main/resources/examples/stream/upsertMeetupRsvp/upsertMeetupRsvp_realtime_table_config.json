@@ -27,7 +27,6 @@
       "replicaGroupPartitionConfig": {
         "replicaGroupBased": true,
         "numReplicaGroups": 1,
-        "partitionColumn": "event_id",
         "numPartitions": 2,
         "numInstancesPerPartition": 1
       }

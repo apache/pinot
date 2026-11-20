@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -150,10 +151,35 @@ public class GenerateArrayTransformFunctionTest {
       arrayExpressions.add(ExpressionContext.forLiteral(DataType.INT, j));
     }
 
+    // Argument validation now lives in ArrayFunctions, shared with the multi-stage engine, and rejects a bad step
+    // with IllegalArgumentException rather than IllegalStateException.
     try {
       GenerateArrayTransformFunction intArray = new GenerateArrayTransformFunction(arrayExpressions);
       Assert.fail();
-    } catch (IllegalStateException ignored) {
+    } catch (IllegalArgumentException ignored) {
     }
+  }
+
+  /// The element type is the widest of the argument types, as in the multi-stage engine, whose leaf stage projections
+  /// are evaluated here and must produce the type the multi-stage planner inferred.
+  @Test
+  public void testElementTypeIsTheWidestArgumentType() {
+    GenerateArrayTransformFunction longArray = new GenerateArrayTransformFunction(
+        List.of(ExpressionContext.forLiteral(DataType.INT, 0), ExpressionContext.forLiteral(DataType.LONG, 4L),
+            ExpressionContext.forLiteral(DataType.INT, 2)));
+    Assert.assertEquals(longArray.getResultMetadata().getDataType(), DataType.LONG);
+    Assert.assertEquals(longArray.getLongArrayLiteral(), new long[]{0L, 2L, 4L});
+
+    GenerateArrayTransformFunction doubleArray = new GenerateArrayTransformFunction(
+        List.of(ExpressionContext.forLiteral(DataType.INT, 0), ExpressionContext.forLiteral(DataType.INT, 1),
+            ExpressionContext.forLiteral(DataType.DOUBLE, 0.5)));
+    Assert.assertEquals(doubleArray.getResultMetadata().getDataType(), DataType.DOUBLE);
+    Assert.assertEquals(doubleArray.getDoubleArrayLiteral(), new double[]{0.0, 0.5, 1.0});
+
+    GenerateArrayTransformFunction bigDecimalArray = new GenerateArrayTransformFunction(
+        List.of(ExpressionContext.forLiteral(DataType.INT, 0), ExpressionContext.forLiteral(DataType.INT, 1),
+            ExpressionContext.forLiteral(DataType.BIG_DECIMAL, new BigDecimal("0.5"))));
+    Assert.assertEquals(bigDecimalArray.getResultMetadata().getDataType(), DataType.DOUBLE);
+    Assert.assertEquals(bigDecimalArray.getDoubleArrayLiteral(), new double[]{0.0, 0.5, 1.0});
   }
 }

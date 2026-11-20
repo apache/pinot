@@ -30,7 +30,8 @@ public interface MapDataSource extends DataSource {
   /// Returns the map FieldSpec.
   ComplexFieldSpec.MapFieldSpec getFieldSpec();
 
-  /// Returns the DataSource for the given map key's values.
+  /// Returns the DataSource for the given map key's values. A key absent from the map resolves to an all-null
+  /// DataSource typed as the map's value field, so the result is never `null`.
   DataSource getDataSource(String key);
 
   /// Returns DataSources for all keys present in this segment.

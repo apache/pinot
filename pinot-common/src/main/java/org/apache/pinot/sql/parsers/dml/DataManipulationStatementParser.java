@@ -18,19 +18,30 @@
  */
 package org.apache.pinot.sql.parsers.dml;
 
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 
 
+/// Parses the DML statements that Pinot executes: `INSERT INTO ... FROM FILE` and `DELETE`.
 public class DataManipulationStatementParser {
   private DataManipulationStatementParser() {
   }
 
+  /// Parses a DML statement. An invalid `DELETE` returns a SQL parsing error.
   public static DataManipulationStatement parse(SqlNodeAndOptions sqlNodeAndOptions) {
     SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
     if (sqlNode instanceof SqlInsertFromFile) {
       return InsertIntoFile.parse(sqlNodeAndOptions);
+    }
+    if (sqlNode instanceof SqlDelete) {
+      try {
+        return DeleteStatement.parse(sqlNodeAndOptions);
+      } catch (IllegalArgumentException e) {
+        throw QueryErrorCode.SQL_PARSING.asException(e.getMessage(), e);
+      }
     }
     throw new UnsupportedOperationException("Unsupported DML SqlKind - " + sqlNode.getKind());
   }

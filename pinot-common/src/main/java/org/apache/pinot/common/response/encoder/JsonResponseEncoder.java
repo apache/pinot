@@ -24,11 +24,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -65,12 +64,14 @@ public class JsonResponseEncoder implements ResponseEncoder {
       JsonNode jsonRow = JsonUtils.stringToJsonNode(rowString);
       Object[] row = new Object[jsonRow.size()];
       for (int columnIdx = 0; columnIdx < jsonRow.size(); columnIdx++) {
-        DataSchema.ColumnDataType columnDataType = schema.getColumnDataType(columnIdx);
+        ColumnDataType columnDataType = schema.getColumnDataType(columnIdx);
         JsonNode jsonValue = jsonRow.get(columnIdx);
-        if (columnDataType.isArray()) {
+        if (jsonValue.isNull()) {
+          row[columnIdx] = null;
+        } else if (columnDataType.isArray()) {
           row[columnIdx] = extractArray(columnDataType, jsonValue);
-        } else if (columnDataType == DataSchema.ColumnDataType.MAP) {
-          row[columnIdx] = extractMap(jsonValue);
+        } else if (columnDataType == ColumnDataType.MAP) {
+          row[columnIdx] = JsonUtils.jsonNodeToMap(jsonValue);
         } else {
           row[columnIdx] = extractValue(columnDataType, jsonValue);
         }
@@ -80,85 +81,7 @@ public class JsonResponseEncoder implements ResponseEncoder {
     return new ResultTable(schema, rows);
   }
 
-  private Object[] extractArray(JsonNode jsonValue) {
-    Object[] array = new Object[jsonValue.size()];
-    for (int k = 0; k < jsonValue.size(); k++) {
-      if (jsonValue.get(k).isNull()) {
-        array[k] = null;
-      } else if (jsonValue.get(k).isBoolean()) {
-        array[k] = jsonValue.get(k).asBoolean();
-      } else if (jsonValue.get(k).isInt()) {
-        array[k] = jsonValue.get(k).asInt();
-      } else if (jsonValue.get(k).isLong()) {
-        array[k] = jsonValue.get(k).asLong();
-      } else if (jsonValue.get(k).isFloat()) {
-        array[k] = jsonValue.get(k).floatValue();
-      } else if (jsonValue.get(k).isDouble()) {
-        array[k] = jsonValue.get(k).asDouble();
-      } else if (jsonValue.get(k).isTextual()) {
-        array[k] = jsonValue.get(k).textValue();
-      } else if (jsonValue.isArray()) {
-        array[k] = extractArray(jsonValue.get(k));
-      } else if (jsonValue.isObject()) {
-        array[k] = extractMap(jsonValue.get(k));
-      } else {
-        array[k] = jsonValue.get(k).toString();
-      }
-    }
-    return array;
-  }
-
-  private Object extractValue(JsonNode jsonValue) {
-    if (jsonValue.isNull()) {
-      return null;
-    }
-    if (jsonValue.isBoolean()) {
-      return jsonValue.asBoolean();
-    }
-    if (jsonValue.isShort()) {
-      return jsonValue.shortValue();
-    }
-    if (jsonValue.isBigInteger()) {
-      return jsonValue.bigIntegerValue();
-    }
-    if (jsonValue.isBigDecimal()) {
-      return jsonValue.decimalValue();
-    }
-    if (jsonValue.isInt()) {
-      return jsonValue.asInt();
-    }
-    if (jsonValue.isLong()) {
-      return jsonValue.asLong();
-    }
-    if (jsonValue.isFloat()) {
-      return jsonValue.floatValue();
-    }
-    if (jsonValue.isDouble()) {
-      return jsonValue.asDouble();
-    }
-    if (jsonValue.isTextual()) {
-      return jsonValue.textValue();
-    }
-    if (jsonValue.isArray()) {
-      return extractArray(jsonValue);
-    }
-    if (jsonValue.isObject()) {
-      return extractMap(jsonValue);
-    }
-    return jsonValue.toString();
-  }
-
-  private Map<String, Object> extractMap(JsonNode jsonValue) {
-    Map<String, Object> map = new HashMap<>();
-    jsonValue.properties().forEach(entry -> {
-      String key = entry.getKey();
-      Object value = extractValue(entry.getValue());
-      map.put(key, value);
-    });
-    return map;
-  }
-
-  private static Object extractArray(DataSchema.ColumnDataType columnDataType, JsonNode jsonValue) {
+  private static Object extractArray(ColumnDataType columnDataType, JsonNode jsonValue) {
     switch (columnDataType) {
       case BOOLEAN_ARRAY:
         boolean[] booleanArray = new boolean[jsonValue.size()];
@@ -205,7 +128,7 @@ public class JsonResponseEncoder implements ResponseEncoder {
     }
   }
 
-  private static Object extractValue(DataSchema.ColumnDataType columnDataType, JsonNode jsonValue) {
+  private static Object extractValue(ColumnDataType columnDataType, JsonNode jsonValue) {
     if (jsonValue.isNull()) {
       return null;
     }

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.queries.FluentQueryTest;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
@@ -28,19 +28,14 @@ public class PercentileKLLMVAggregationFunctionTest extends AbstractAggregationF
 
   @Test
   public void testAggregationMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.DOUBLE)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.DOUBLE)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1.0;2.0;3.0;4.0;5.0"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"6.0;7.0;8.0;9.0;10.0"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1.0;2.0;3.0;4.0;5.0"})
+        .andOnSecondInstance(new Object[]{"6.0;7.0;8.0;9.0;10.0"})
         // All values: 1-10, p50 should be around 5
         .whenQuery("select percentilekll(mv, 50) from testTable")
         .thenResultIs("DOUBLE", "5.0");
@@ -48,48 +43,39 @@ public class PercentileKLLMVAggregationFunctionTest extends AbstractAggregationF
 
   @Test
   public void testAggregationMVGroupBySV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.DOUBLE)
+        .addSingleValueDimension("sv", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.DOUBLE)
-                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1.0;2.0;3.0;4.0;5.0", "k1"},
-            new Object[]{"10.0;20.0;30.0", "k2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"6.0;7.0;8.0;9.0;10.0", "k1"},
-            new Object[]{"40.0;50.0", "k2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1.0;2.0;3.0;4.0;5.0", "k1"}, new Object[]{"10.0;20.0;30.0", "k2"})
+        .andOnSecondInstance(new Object[]{"6.0;7.0;8.0;9.0;10.0", "k1"}, new Object[]{"40.0;50.0", "k2"})
         .whenQuery("select sv, percentilekll(mv, 50) from testTable group by sv order by sv")
-        .thenResultIs("STRING | DOUBLE",
+        .thenResultIs(
+            "STRING | DOUBLE",
             "k1 | 5.0",   // values: 1-10, p50 ~= 5
-            "k2 | 30.0"); // values: 10, 20, 30, 40, 50, p50 ~= 30
+            "k2 | 30.0"   // values: 10, 20, 30, 40, 50, p50 ~= 30
+        );
   }
 
   @Test
   public void testAggregationMVGroupByMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("nums", DataType.DOUBLE)
+        .addMultiValueDimension("tags", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("nums", FieldSpec.DataType.DOUBLE)
-                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            // Column order is alphabetical: nums, tags
-            new Object[]{"1.0;2.0;3.0", "tag1;tag2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"4.0;5.0;6.0", "tag1;tag2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1.0;2.0;3.0", "tag1;tag2"})  // Column order is alphabetical: nums, tags
+        .andOnSecondInstance(new Object[]{"4.0;5.0;6.0", "tag1;tag2"})
         .whenQuery("select tags, percentilekll(nums, 50) from testTable group by tags order by tags")
-        .thenResultIs("STRING | DOUBLE",
+        .thenResultIs(
+            "STRING | DOUBLE",
             "tag1 | 3.0",  // nums: 1, 2, 3, 4, 5, 6, p50 ~= 3
-            "tag2 | 3.0"); // nums: 1, 2, 3, 4, 5, 6, p50 ~= 3
+            "tag2 | 3.0"   // nums: 1, 2, 3, 4, 5, 6, p50 ~= 3
+        );
   }
 }

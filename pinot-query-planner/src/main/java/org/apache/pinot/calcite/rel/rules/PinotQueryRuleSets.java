@@ -27,12 +27,10 @@ import org.apache.calcite.rel.rules.AggregateProjectPullUpConstantsRule;
 import org.apache.calcite.rel.rules.AggregateRemoveRule;
 import org.apache.calcite.rel.rules.AggregateUnionAggregateRule;
 import org.apache.calcite.rel.rules.CoreRules;
-import org.apache.calcite.rel.rules.FilterAggregateTransposeRule;
 import org.apache.calcite.rel.rules.FilterMergeRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
 import org.apache.calcite.rel.rules.JoinPushExpressionsRule;
-import org.apache.calcite.rel.rules.ProjectAggregateMergeRule;
 import org.apache.calcite.rel.rules.ProjectFilterTransposeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectRemoveRule;
@@ -72,8 +70,8 @@ public class PinotQueryRuleSets {
       PinotFilterIntoJoinRule
           .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
       // push filter through an aggregation
-      FilterAggregateTransposeRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE).toRule(),
+      PinotFilterAggregateTransposeRule
+          .instanceWithDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE),
       // push filter through set operation
       FilterSetOpTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.FILTER_SET_OP_TRANSPOSE).toRule(),
@@ -178,8 +176,13 @@ public class PinotQueryRuleSets {
 
       // convert CASE-style filtered aggregates into true filtered aggregates
       // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
+      // put it before APPROXIMATE_AGGREGATE_REWRITE, see PinotApproximateAggregateRewriteRule
       AggregateCaseToFilterRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.AGGREGATE_CASE_TO_FILTER).toRule()
+          .withDescription(PlannerRuleNames.AGGREGATE_CASE_TO_FILTER).toRule(),
+
+      // Must run after AGGREGATE_CASE_TO_FILTER and before PinotAggregateExchangeNodeInsertRule (POST_LOGICAL). The
+      // rule's class doc says why.
+      PinotApproximateAggregateRewriteRule.INSTANCE
   );
 
   // Filter pushdown rules run using a RuleCollection since we want to push down a filter as much as possible in a
@@ -187,8 +190,8 @@ public class PinotQueryRuleSets {
   public static final List<RelOptRule> FILTER_PUSHDOWN_RULES = List.of(
       PinotFilterIntoJoinRule
           .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
-      FilterAggregateTransposeRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE).toRule(),
+      PinotFilterAggregateTransposeRule
+          .instanceWithDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE),
       FilterSetOpTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.FILTER_SET_OP_TRANSPOSE).toRule(),
       FilterProjectTransposeRule.Config.DEFAULT
@@ -238,8 +241,10 @@ public class PinotQueryRuleSets {
       UnionMergeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.UNION_MERGE).toRule(),
       // Drop unused aggregate calls when a Project on top of the Aggregate doesn't reference them. Default-on.
-      ProjectAggregateMergeRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.PROJECT_AGGREGATE_MERGE).toRule(),
+      // Pinot fork of Calcite's ProjectAggregateMergeRule: the stock rule rebuilds the aggregate and silently
+      // drops its aggOptions hints, because Calcite only restores the hints of the node the rule matched on
+      // (the Project). See PinotProjectAggregateMergeRule.
+      PinotProjectAggregateMergeRule.instanceWithDescription(PlannerRuleNames.PROJECT_AGGREGATE_MERGE),
       PruneEmptyRules.CorrelateLeftEmptyRuleConfig.DEFAULT
           .withDescription(PlannerRuleNames.PRUNE_EMPTY_CORRELATE_LEFT).toRule(),
       PruneEmptyRules.CorrelateRightEmptyRuleConfig.DEFAULT

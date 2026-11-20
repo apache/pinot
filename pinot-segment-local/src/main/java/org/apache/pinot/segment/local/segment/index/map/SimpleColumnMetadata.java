@@ -32,10 +32,20 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class SimpleColumnMetadata implements ColumnMetadata {
   private final FieldSpec _fieldSpec;
   private final int _totalDocs;
+  private final int _maxNumberOfMultiValues;
 
   public SimpleColumnMetadata(FieldSpec fieldSpec, int totalDocs) {
+    this(fieldSpec, totalDocs, UNAVAILABLE);
+  }
+
+  /// `maxNumberOfMultiValues` is the one stat a multi-value column cannot leave UNAVAILABLE: the scan iterators
+  /// size their matcher buffers from it (`new int[maxNumValuesPerMVEntry]`), so `-1` throws
+  /// `NegativeArraySizeException` out of a field initializer before any predicate is evaluated. Single-value
+  /// callers keep the UNAVAILABLE default.
+  public SimpleColumnMetadata(FieldSpec fieldSpec, int totalDocs, int maxNumberOfMultiValues) {
     _fieldSpec = fieldSpec;
     _totalDocs = totalDocs;
+    _maxNumberOfMultiValues = maxNumberOfMultiValues;
   }
 
   @Override
@@ -102,7 +112,7 @@ public class SimpleColumnMetadata implements ColumnMetadata {
 
   @Override
   public int getMaxNumberOfMultiValues() {
-    return UNAVAILABLE;
+    return _maxNumberOfMultiValues;
   }
 
   @Override

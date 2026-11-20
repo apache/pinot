@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.apache.pinot.spi.utils.SqlUtils;
 
 
 /// Quoting helpers used by the canonical DDL emitter.
@@ -62,7 +63,7 @@ final class SqlIdentifiers {
   /// bare otherwise. Embedded double quotes are escaped per SQL convention (`"` → `""`).
   static String quote(String identifier) {
     if (mustQuote(identifier)) {
-      return "\"" + identifier.replace("\"", "\"\"") + "\"";
+      return SqlUtils.quoteIdentifier(identifier);
     }
     return identifier;
   }

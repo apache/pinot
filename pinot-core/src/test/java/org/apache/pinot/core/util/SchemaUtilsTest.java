@@ -190,12 +190,17 @@ public class SchemaUtilsTest {
 
   @Test
   public void testCompatibilityGrandfathersExistingNonDeterministicTransform() {
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("eventTimeMs", DataType.LONG).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addMetric("eventTimeMs", DataType.LONG)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("eventTimeMs", "now()")));
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(getStreamConfigs())
+        .setIngestionConfig(ingestionConfig)
+        .build();
 
     // A new table using this transform is still rejected.
     Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, schema));
@@ -287,6 +292,29 @@ public class SchemaUtilsTest {
     pinotSchema.getFieldSpecFor("x").setTransformFunction("Groovy({y + 10}, y)");
     pinotSchema.getFieldSpecFor("z").setTransformFunction("Groovy({x*w*20}, x, w)");
     checkValidationFails(pinotSchema);
+  }
+
+  /// Regression test: when a transformed column is reused as an argument to another transform, the validation error
+  /// must list the actual conflicting columns. Historically this message reported a boolean ("true"/"false") because
+  /// {@link java.util.Set#retainAll} was passed as the format argument.
+  @Test
+  public void testChainedTransformErrorMessageListsConflictingColumns() {
+    Schema pinotSchema =
+        new Schema.SchemaBuilder().addSingleValueDimension("x", DataType.INT).addSingleValueDimension("z", DataType.INT)
+            .build();
+    pinotSchema.getFieldSpecFor("x").setTransformFunction("Groovy({y + 10}, y)");
+    pinotSchema.getFieldSpecFor("z").setTransformFunction("Groovy({x*w*20}, x, w)");
+
+    try {
+      SchemaUtils.validate(pinotSchema);
+      Assert.fail("Schema validation should have failed for chained transforms.");
+    } catch (IllegalStateException e) {
+      String message = e.getMessage();
+      Assert.assertNotNull(message);
+      // The chained column set has a single deterministic element here, so the formatted set form is "[x]".
+      Assert.assertEquals(message,
+          "Columns: [x] are a result of transformations, and cannot be used as arguments to other transform functions");
+    }
   }
 
   @Test

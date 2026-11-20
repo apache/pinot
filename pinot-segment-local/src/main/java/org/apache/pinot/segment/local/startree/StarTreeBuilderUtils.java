@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.startree;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -28,7 +27,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -36,6 +37,7 @@ import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -48,6 +50,7 @@ import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -144,7 +147,7 @@ public class StarTreeBuilderUtils {
     for (String dimension : dimensions) {
       headerSizeInBytes += Integer.BYTES; // For dimension index
       headerSizeInBytes += Integer.BYTES; // For length of dimension name
-      headerSizeInBytes += Utf8.encodedLength(dimension); // For dimension name
+      headerSizeInBytes += Utf8Utils.encodedLength(dimension); // For dimension name
     }
 
     headerSizeInBytes += Integer.BYTES; // For number of nodes.
@@ -263,6 +266,10 @@ public class StarTreeBuilderUtils {
       if (builderConfig.getMaxLeafRecords() != metadata.getMaxLeafRecords()) {
         return true;
       }
+      // Switching null handling on or off changes how the whole star-tree is pre-aggregated, so it has to be rebuilt
+      if (builderConfig.isNullHandlingEnabled() != metadata.isNullHandlingEnabled()) {
+        return true;
+      }
       TreeMap<AggregationFunctionColumnPair, AggregationSpec> newSpecs = builderConfig.getAggregationSpecs();
       TreeMap<AggregationFunctionColumnPair, AggregationSpec> existingSpecs = metadata.getAggregationSpecs();
       if (newSpecs.size() != existingSpecs.size()) {
@@ -281,6 +288,37 @@ public class StarTreeBuilderUtils {
       }
     }
     return false;
+  }
+
+  /// Returns the first dimension of the given star-tree that the segment can no longer back with a dictionary
+  /// encoded forward index, or `null` if the star-tree is loadable.
+  ///
+  /// A star-tree stores its dimension values as dictionary ids in a fixed-bit forward index whose bit width is read
+  /// from the *main* column metadata at load time. Re-encoding a dimension column to raw (e.g. after adding it to
+  /// `noDictionaryColumns`) therefore leaves the star-tree unreadable, and loading the segment fails.
+  @Nullable
+  public static String findUnloadableDimension(StarTreeV2Metadata starTreeMetadata, SegmentMetadata segmentMetadata) {
+    for (String dimension : starTreeMetadata.getDimensionsSplitOrder()) {
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(dimension);
+      if (columnMetadata == null || !columnMetadata.hasDictionary()) {
+        return dimension;
+      }
+    }
+    return null;
+  }
+
+  /// Returns the dimensions that make the given star-trees unloadable, or an empty set if they are all loadable.
+  /// See [#findUnloadableDimension(StarTreeV2Metadata, SegmentMetadata)].
+  public static Set<String> findUnloadableDimensions(List<StarTreeV2Metadata> metadataList,
+      SegmentMetadata segmentMetadata) {
+    Set<String> dimensions = new TreeSet<>();
+    for (StarTreeV2Metadata starTreeMetadata : metadataList) {
+      String dimension = findUnloadableDimension(starTreeMetadata, segmentMetadata);
+      if (dimension != null) {
+        dimensions.add(dimension);
+      }
+    }
+    return dimensions;
   }
 
   /// Returns `true` if the given star-tree builder configs are equal, `false` otherwise.

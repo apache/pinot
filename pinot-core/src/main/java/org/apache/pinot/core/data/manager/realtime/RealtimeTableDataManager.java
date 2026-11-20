@@ -54,6 +54,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -68,6 +69,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils.ReadinessSnapshot;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -127,6 +129,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
+  private static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS =
+      TimeUnit.MILLISECONDS.toNanos(READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
 
   public static final long DEFAULT_SEGMENT_DOWNLOAD_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10); // 10 minutes
   public static final long SLEEP_INTERVAL_MS = 30000; // 30 seconds sleep interval
@@ -136,6 +140,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   protected Cache<String, StreamMetadataProvider> _streamMetadataProviderCache;
 
+  // Share rejection checks across waiting consumers. Both fields are guarded by _readinessSnapshotLock.
+  private final Object _readinessSnapshotLock = new Object();
+  private ReadinessSnapshot _readinessSnapshot;
+  private long _readinessSnapshotTimeNs;
+
   private final BooleanSupplier _isServerReadyToConsumeData;
   private final BooleanSupplier _isServerReadyToServeQueries;
   private final ServerIngestionOomProtectionManager.ServerThrottleState _serverIngestionOomProtectionThrottleState;
@@ -144,7 +153,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private IngestionDelayTracker _ingestionDelayTracker;
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
-  private BooleanSupplier _isTableReadyToConsumeData;
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private boolean _enforceConsumptionInOrder = false;
 
@@ -235,41 +243,78 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _enforceConsumptionInOrder = isEnforceConsumptionInOrder();
     _streamMetadataProviderCache = getStreamMetadataProviderCache();
 
-    // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
-    BooleanSupplier readyForDedupOrPartialUpsert;
-    if (isDedupEnabled() || isPartialUpsertEnabled()) {
-      readyForDedupOrPartialUpsert = new BooleanSupplier() {
-        volatile boolean _allSegmentsLoaded;
-        long _lastCheckTimeMs;
-
-        @Override
-        public boolean getAsBoolean() {
-          if (_allSegmentsLoaded) {
-            return true;
-          } else {
-            synchronized (this) {
-              if (_allSegmentsLoaded) {
-                return true;
-              }
-              long currentTimeMs = System.currentTimeMillis();
-              if (currentTimeMs - _lastCheckTimeMs <= READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS) {
-                return false;
-              }
-              _lastCheckTimeMs = currentTimeMs;
-              _allSegmentsLoaded = TableStateUtils.isAllSegmentsLoaded(_helixManager, _tableNameWithType);
-              return _allSegmentsLoaded;
-            }
-          }
-        }
-      };
-    } else {
-      readyForDedupOrPartialUpsert = () -> true;
-    }
-    _isTableReadyToConsumeData = () -> readyForDedupOrPartialUpsert.getAsBoolean()
-        && _isServerReadyToConsumeData.getAsBoolean();
     _serverIngestionOomProtectionManager = new ServerIngestionOomProtectionManager(
         () -> getCachedTableConfigAndSchema().getLeft(), () -> isUpsertEnabled() || isDedupEnabled(),
         _serverIngestionOomProtectionThrottleState);
+  }
+
+  /// Checks the assigned history again for each consumer, including partitions added after table initialization.
+  /// The consumer thread polls this supplier before acquiring its permit, so segment loading is never blocked by it.
+  /// TODO: Coordinate history removal (e.g. RESET or manual delete) with an already running consumer. This startup
+  /// check does not prevent later removal from discarding a key's base value before its next partial update.
+  @VisibleForTesting
+  BooleanSupplier createReadyToConsumeDataSupplier(LLCSegmentName llcSegmentName) {
+    if (!requiresHistoryForConsumption()) {
+      return _isServerReadyToConsumeData;
+    }
+    long consumerCreationTimeNs = readinessCheckTimeNs();
+    return () -> {
+      if (!_isServerReadyToConsumeData.getAsBoolean()) {
+        return false;
+      }
+      try {
+        return isReadyToConsume(llcSegmentName, consumerCreationTimeNs);
+      } catch (Exception e) {
+        // Helix and its ZooKeeper client fail with several exception types. The consumer has not read anything yet, so
+        // a failed check only delays it.
+        _logger.warn("Failed to check readiness for segment: {}, will retry", llcSegmentName, e);
+        return false;
+      }
+    };
+  }
+
+  /// Dedup and order-sensitive upsert modes need their assigned history before admitting a consumer.
+  boolean requiresHistoryForConsumption() {
+    return isDedupEnabled()
+        || (_tableUpsertMetadataManager != null
+            && _tableUpsertMetadataManager.getContext().isTableTypeInconsistentDuringConsumption());
+  }
+
+  private boolean isReadyToConsume(LLCSegmentName consumer, long consumerCreationTimeNs) {
+    ReadinessSnapshot snapshot;
+    synchronized (_readinessSnapshotLock) {
+      long nowNs = readinessCheckTimeNs();
+      if (_readinessSnapshot == null
+          || _readinessSnapshotTimeNs - consumerCreationTimeNs < 0
+          || nowNs - _readinessSnapshotTimeNs >= READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS) {
+        // A new consumer must see its own assignment. Record the read's start time, not its completion time.
+        snapshot = TableStateUtils.getReadinessSnapshot(_helixManager, _tableNameWithType,
+            this::isPartitionMetadataInitialized);
+        _readinessSnapshot = snapshot;
+        _readinessSnapshotTimeNs = nowNs;
+        return snapshot.isReadyToConsume(consumer, this::isPartitionMetadataInitialized, true);
+      }
+      snapshot = _readinessSnapshot;
+    }
+    // Local completion can clear a cached rejection immediately, without waiting for the next ZooKeeper poll.
+    // A cached success must never authorize consumption: assignment, current state, or partition metadata may change.
+    return snapshot.isReadyToConsume(consumer, this::isPartitionMetadataInitialized)
+        && TableStateUtils.isReadyToConsume(_helixManager, _tableNameWithType, consumer,
+            this::isPartitionMetadataInitialized);
+  }
+
+  private boolean isPartitionMetadataInitialized(String segmentName) {
+    SegmentDataManager manager = _segmentDataManagerMap.get(segmentName);
+    // Pauseless release publishes completed mutable metadata; ordinary rollover publishes a ready immutable manager
+    // before releasing the permit. Mere immutable presence is insufficient because initial upsert loading registers
+    // the manager before its metadata is populated. Always inspect the currently registered manager.
+    return manager instanceof RealtimeSegmentDataManager realtime && realtime.hasReleasedConsumerSemaphore()
+        || manager instanceof ImmutableSegmentDataManager immutable && immutable.isPartitionMetadataInitialized();
+  }
+
+  @VisibleForTesting
+  long readinessCheckTimeNs() {
+    return System.nanoTime();
   }
 
   @VisibleForTesting
@@ -453,18 +498,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     handleDedupPreload(zkMetadata, indexLoadingConfig);
   }
 
-  /// Handles upsert preload if the upsert preload is enabled.
-  private void handleUpsertPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
-    if (_tableUpsertMetadataManager == null || !_tableUpsertMetadataManager.getContext().isPreloadEnabled()) {
-      return;
-    }
-    Integer partitionId = SegmentUtils.getSegmentPartitionId(zkMetadata, null);
-    Preconditions.checkState(partitionId != null,
-        "Failed to get partition id for segment: %s in upsert-enabled table: %s", zkMetadata.getSegmentName(),
-        _tableNameWithType);
-    _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
-  }
-
   /// Handles dedup preload if the dedup preload is enabled.
   private void handleDedupPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
     if (_tableDedupMetadataManager == null || !_tableDedupMetadataManager.getContext().isPreloadEnabled()) {
@@ -474,7 +507,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkState(partitionId != null,
         "Failed to get partition id for segment: %s in dedup-enabled table: %s", zkMetadata.getSegmentName(),
         _tableNameWithType);
-    _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
+    PartitionDedupMetadataManager partitionManager;
+    synchronized (_segmentDataManagerMap) {
+      Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot preload table: %s",
+          _tableNameWithType);
+      partitionManager = _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId);
+    }
+    partitionManager.preloadSegments(indexLoadingConfig);
   }
 
   protected void doAddOnlineSegment(String segmentName)
@@ -482,15 +521,24 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
     Preconditions.checkState(zkMetadata.getStatus() != Status.IN_PROGRESS,
         "Segment: %s of table: %s is not committed, cannot make it ONLINE", segmentName, _tableNameWithType);
-    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig().withSegmentTier(zkMetadata.getTier());
     handleSegmentPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager == null) {
       addNewOnlineSegment(zkMetadata, indexLoadingConfig);
     } else if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       _logger.info("Changing segment: {} from CONSUMING to ONLINE", segmentName);
-      ((RealtimeSegmentDataManager) segmentDataManager).goOnlineFromConsuming(zkMetadata);
+      // Table shutdown can drain and release the consuming segment while this thread catches it up or builds it.
+      // Hold a reference for the transition so the mutable segment is destroyed by the last release rather than
+      // underneath the build; shutdown still offloads it without waiting for the transition to finish.
+      Preconditions.checkState(segmentDataManager.increaseReferenceCount(),
+          "Table data manager is already shut down, cannot change segment: %s from CONSUMING to ONLINE in table: %s",
+          segmentName, _tableNameWithType);
+      try {
+        ((RealtimeSegmentDataManager) segmentDataManager).goOnlineFromConsuming(zkMetadata);
+      } finally {
+        releaseSegment(segmentDataManager);
+      }
     } else if (zkMetadata.getStatus().isCompleted()) {
       // For pauseless ingestion, the segment is marked ONLINE before it's built and before the COMMIT_END_METADATA
       // call completes.
@@ -553,13 +601,46 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _logger.warn("Segment: {} is already completed, skipping adding it as CONSUMING segment", segmentName);
       return;
     }
-    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-    handleSegmentPreload(zkMetadata, indexLoadingConfig);
-    SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
-    if (segmentDataManager != null) {
-      _logger.warn("Segment: {} ({}) already exists, skipping adding it as CONSUMING segment", segmentName,
-          segmentDataManager instanceof RealtimeSegmentDataManager ? "CONSUMING" : "COMPLETED");
-      return;
+    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig();
+    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    int partitionGroupId = llcSegmentName.getPartitionGroupId();
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager;
+    PartitionDedupMetadataManager partitionDedupMetadataManager;
+    synchronized (_segmentDataManagerMap) {
+      Preconditions.checkState(!_shutDown,
+          "Table data manager is already shut down, cannot add CONSUMING segment: %s to table: %s", segmentName,
+          _tableNameWithType);
+      // Partition owners must be visible before shutdown stops/closes them. Preload and construction can be slow,
+      // so run them outside this monitor and check admission again before publishing the segment.
+      partitionUpsertMetadataManager = _tableUpsertMetadataManager != null
+          ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId)
+          : null;
+      partitionDedupMetadataManager = _tableDedupMetadataManager != null
+          ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
+          : null;
+    }
+    if (partitionUpsertMetadataManager != null && _tableUpsertMetadataManager.getContext().isPreloadEnabled()) {
+      partitionUpsertMetadataManager.preloadSegments(indexLoadingConfig);
+    }
+    if (partitionDedupMetadataManager != null && _tableDedupMetadataManager.getContext().isPreloadEnabled()) {
+      partitionDedupMetadataManager.preloadSegments(indexLoadingConfig);
+    }
+    beforeConsumingSegmentAdmissionRecheck(segmentName);
+    synchronized (_segmentDataManagerMap) {
+      // Shutdown does not wait for in-flight consuming adds, and after the table is deleted a same-name table can be
+      // recreated over the same data directory. The per-segment lock (from the instance-wide SegmentLocks shared
+      // across table data managers) keeps the recreated table's writers for this segment out until this add returns;
+      // this re-check additionally aborts a stale add before it deletes the previous incarnation's leftover directory
+      // or constructs a segment data manager that shutdown would only reject at publish time.
+      Preconditions.checkState(!_shutDown,
+          "Table data manager is already shut down, cannot add CONSUMING segment: %s to table: %s", segmentName,
+          _tableNameWithType);
+      SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+      if (segmentDataManager != null) {
+        _logger.warn("Segment: {} ({}) already exists, skipping adding it as CONSUMING segment", segmentName,
+            segmentDataManager instanceof RealtimeSegmentDataManager ? "CONSUMING" : "COMPLETED");
+        return;
+      }
     }
 
     _logger.info("Adding new CONSUMING segment: {}", segmentName);
@@ -578,29 +659,51 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     setDefaultTimeValueIfInvalid(tableConfig, schema, zkMetadata);
 
     // Generates only one semaphore for every partition
-    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    int partitionGroupId = llcSegmentName.getPartitionGroupId();
     ConsumerCoordinator consumerCoordinator = getConsumerCoordinator(partitionGroupId);
 
     // Create the segment data manager and register it
-    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-        _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId)
-            : null;
-    PartitionDedupMetadataManager partitionDedupMetadataManager =
-        _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
-            : null;
     RealtimeSegmentDataManager realtimeSegmentDataManager =
         createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
             consumerCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
-            _isTableReadyToConsumeData);
-    registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
-    if (partitionUpsertMetadataManager != null) {
-      partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
+            createReadyToConsumeDataSupplier(llcSegmentName));
+    // A segment can finish construction after table shutdown has drained the registered segments. Publish and start
+    // it together so shutdown either owns its cleanup or rejects it before any consumer is started.
+    // Query threads never take this monitor: they read the segment map lock-free and only take per-segment reference
+    // counts and the upsert view locks. The upsert view locks acquired below (trackSegmentForUpsertView) are leaf
+    // locks that never call back into the table data manager, so holding this monitor while taking them cannot
+    // delay a query. Keep it that way: do not add callbacks from upsert view code into this class.
+    synchronized (_segmentDataManagerMap) {
+      if (!_shutDown) {
+        registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
+        if (partitionUpsertMetadataManager != null) {
+          partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
+        }
+        realtimeSegmentDataManager.startConsumption();
+        incrementSegmentCountGauge();
+        _logger.info("Added new CONSUMING segment: {}", segmentName);
+        return;
+      }
     }
-    realtimeSegmentDataManager.startConsumption();
-    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1);
+    // It was never published or counted in table gauges, so do not use releaseSegment/closeSegment here.
+    realtimeSegmentDataManager.destroy();
+    throw new IllegalStateException(
+        "Table data manager is already shut down, cannot add CONSUMING segment: " + segmentName + " to table: "
+            + _tableNameWithType);
+  }
 
-    _logger.info("Added new CONSUMING segment: {}", segmentName);
+  /// Counts a published CONSUMING segment through the same deprecated `AbstractMetrics.addValueToTableGauge` API that
+  /// `BaseTableDataManager.closeSegment` uses for the matching decrement, so the SEGMENT_COUNT gauge stays balanced
+  /// until both sides migrate together.
+  @SuppressWarnings("deprecation")
+  private void incrementSegmentCountGauge() {
+    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1);
+  }
+
+  /// Invoked while adding a CONSUMING segment, after the initial admission and partition-manager preload, immediately
+  /// before the shutdown re-check that guards the segment data directory cleanup. The per-segment lock is held.
+  /// No-op in production; tests override it to pause an in-flight add inside the shutdown/recreation window.
+  @VisibleForTesting
+  void beforeConsumingSegmentAdmissionRecheck(String segmentName) {
   }
 
   @Override
@@ -619,6 +722,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     long downloadTimeoutMs = getDownloadTimeoutMs(getCachedTableConfigAndSchema().getLeft());
     long deadlineMs = System.currentTimeMillis() + downloadTimeoutMs;
     while (System.currentTimeMillis() < deadlineMs) {
+      // A deleted table's transition can wait here for minutes while holding the shared per-segment lock. Abort so a
+      // recreated same-name table's operations on this segment are not blocked behind, or served by, a stale wait.
+      Preconditions.checkState(!_shutDown,
+          "Table data manager is already shut down, cannot download COMMITTING segment: %s of table: %s", segmentName,
+          _tableNameWithType);
       // ZK Metadata may change during segment download process; fetch it on every retry.
       zkMetadata = fetchZKMetadata(segmentName);
       if (zkMetadata.getStatus().isCompleted()) {
@@ -713,11 +821,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   @Override
-  public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
-    String segmentName = immutableSegment.getSegmentName();
-    Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
-        segmentName, _tableNameWithType);
-
+  protected void doAddSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
     if (isUpsertEnabled()) {
       handleUpsert(immutableSegment, zkMetadata);
       return;
@@ -728,7 +832,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       handleDedup((ImmutableSegmentImpl) immutableSegment);
     }
 
-    super.addSegment(immutableSegment, zkMetadata);
+    super.doAddSegment(immutableSegment, zkMetadata);
   }
 
   private void handleDedup(ImmutableSegmentImpl immutableSegment) {
@@ -764,9 +868,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and replacing CONSUMING segment: {} with committed one", segmentName);
     File indexDir = downloadSegment(zkMetadata);
-    // Get a new index loading config with latest table config and schema to load the segment
-    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig().withSegmentTier(zkMetadata.getTier());
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata),
         zkMetadata);
     _ingestionDelayTracker.markPartitionForVerification(segmentName);
@@ -786,8 +888,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     _logger.info("Replacing CONSUMING segment: {} with the one sealed locally", segmentName);
     File indexDir = new File(_indexDir, segmentName);
-    // Get a new index loading config with latest table config and schema to load the segment
-    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    IndexLoadingConfig indexLoadingConfig = getCachedIndexLoadingConfig();
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
 

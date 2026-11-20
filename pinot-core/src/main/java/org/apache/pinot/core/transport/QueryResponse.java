@@ -55,7 +55,11 @@ public interface QueryResponse {
   /// @return
   long getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance);
 
-  /// Returns the failed server if the query fails.
+  /// Returns the server that went down during the query. Set when the query fails, and also when the query returns
+  /// partial results under `skipUnavailableServers` (used by the failure detector to quarantine the server from
+  /// routing). Because it can be set on a partial success, a non-null value does not by itself imply the query
+  /// failed; check [#getException()] / [#getStatus()] for that. At most one server is tracked per query -
+  /// when several servers go down, this holds the most recent one.
   @Nullable
   ServerRoutingInstance getFailedServer();
 

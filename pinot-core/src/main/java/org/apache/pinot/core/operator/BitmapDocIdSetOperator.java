@@ -30,6 +30,11 @@ import org.roaringbitmap.IntIterator;
 ///
 /// Should call [#nextBlock()] multiple times until it returns `null` (already exhausts all the
 /// documents) or already gathered enough documents (for selection queries).
+///
+/// The same document id buffer (caller-supplied, or allocated internally by the factory methods) is reused for every
+/// returned block: each [#nextBlock()] call overwrites the contents of the previously returned
+/// [org.apache.pinot.core.operator.blocks.DocIdSetBlock]. A caller-supplied buffer is additionally shared with the
+/// caller.
 public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET_BITMAP";
 

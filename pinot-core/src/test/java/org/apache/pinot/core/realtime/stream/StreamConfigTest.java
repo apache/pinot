@@ -359,4 +359,43 @@ public class StreamConfigTest {
     assertEquals(streamConfig.getFlushThresholdSegmentRows(), -1);
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), -1);
   }
+
+  @Test
+  public void testDecodeRetryConfigs() {
+    String streamType = "fakeStream";
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+        "fakeTopic");
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        FakeStreamMessageDecoder.class.getName());
+    assertEquals(new StreamConfig("fakeTable_REALTIME", streamConfigMap).getDecodeRetryMaxBackoffMillis(),
+        StreamConfig.DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS);
+
+    streamConfigMap.put(StreamConfigProperties.DECODE_RETRY_MAX_BACKOFF_MILLIS, "2500");
+    assertEquals(new StreamConfig("fakeTable_REALTIME", streamConfigMap).getDecodeRetryMaxBackoffMillis(), 2500L);
+
+    // Invalid values fall back to the default instead of failing the stream config
+    for (String invalidValue : new String[]{"abc", "0", "-1"}) {
+      streamConfigMap.put(StreamConfigProperties.DECODE_RETRY_MAX_BACKOFF_MILLIS, invalidValue);
+      assertEquals(new StreamConfig("fakeTable_REALTIME", streamConfigMap).getDecodeRetryMaxBackoffMillis(),
+          StreamConfig.DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS, invalidValue);
+    }
+
+    // No limit on the retry duration by default, and 0 disables retries
+    assertEquals(new StreamConfig("fakeTable_REALTIME", streamConfigMap).getDecodeRetryMaxDurationMillis(),
+        Long.MAX_VALUE);
+    for (String value : new String[]{"0", "60000"}) {
+      streamConfigMap.put(StreamConfigProperties.DECODE_RETRY_MAX_DURATION_MILLIS, value);
+      assertEquals(new StreamConfig("fakeTable_REALTIME", streamConfigMap).getDecodeRetryMaxDurationMillis(),
+          Long.parseLong(value));
+    }
+    for (String invalidValue : new String[]{"abc", "-1"}) {
+      streamConfigMap.put(StreamConfigProperties.DECODE_RETRY_MAX_DURATION_MILLIS, invalidValue);
+      assertEquals(new StreamConfig("fakeTable_REALTIME", streamConfigMap).getDecodeRetryMaxDurationMillis(),
+          StreamConfig.DEFAULT_DECODE_RETRY_MAX_DURATION_MILLIS, invalidValue);
+    }
+  }
 }

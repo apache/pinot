@@ -22,17 +22,29 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigValidator;
+import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.ConfigValidationException;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadata;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 public class PinotTableRestletResourceTest {
 
@@ -99,5 +111,40 @@ public class PinotTableRestletResourceTest {
     assertEquals(((LongMsgOffset) streamMetadata1.getPartitionGroupMetadataList().get(0).getStartOffset()).getOffset(),
         200L);
     assertEquals(streamMetadata1.getPartitionGroupMetadataList().get(0).getSequenceNumber(), 5);
+  }
+
+  @Test
+  public void testValidateConfigRunsRegisteredValidators()
+      throws Exception {
+    String tableName = "preflightRegistryTest";
+    String tableNameWithType = tableName + "_OFFLINE";
+
+    // Real schema + real table config keep the validate/apply parity check honest.
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
+        .addSingleValueDimension("d1", FieldSpec.DataType.STRING).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
+
+    PinotHelixResourceManager helixResourceManager = Mockito.mock(PinotHelixResourceManager.class);
+    Mockito.when(helixResourceManager.getTableSchema(tableNameWithType)).thenReturn(schema);
+    Mockito.when(helixResourceManager.getTableConfig(tableNameWithType)).thenReturn(null);
+
+    PinotTableRestletResource resource = new PinotTableRestletResource();
+    resource._pinotHelixResourceManager = helixResourceManager;
+
+    TableConfigValidator rejecting = (tc, s) -> {
+      throw new ConfigValidationException("rejected-by-registry-probe");
+    };
+    TableConfigValidatorRegistry.register(rejecting);
+    try {
+      // Without the registry hookup at the preflight, this call would return a validation response; with it,
+      // the registered validator's rejection propagates as a BAD_REQUEST wrapping the probe's message.
+      ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
+          () -> resource.validateConfig(tableConfig, null));
+      assertNotNull(e.getMessage());
+      assertTrue(e.getMessage().contains("rejected-by-registry-probe"),
+          "Preflight should surface the registered validator's rejection message. Actual: " + e.getMessage());
+    } finally {
+      TableConfigValidatorRegistry.unregister(rejecting);
+    }
   }
 }

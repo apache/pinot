@@ -75,13 +75,14 @@ function installPinotBom() {
   local repoDir=$2
   local repoOption=$3
   local maxRetry=$4
+  local mvnCmd=$5
 
   if [ ! -f "pinot-bom/pom.xml" ]; then
     return
   fi
 
   for i in $(seq 1 $maxRetry); do
-    mvn -U -f pinot-bom/pom.xml install -DskipTests -q -B ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+    ${mvnCmd} -U -f pinot-bom/pom.xml install -DskipTests -q -B ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
     if [ $? -eq 0 ]; then break; fi
     if [ $i -eq $maxRetry ]; then exit 1; fi
     echo ""
@@ -113,27 +114,34 @@ function build() {
   local repoDir="${mvnCache}/${repoId}"
   mkdir -p "${repoDir}"
   local repoOption="-Dmaven.repo.local=${repoDir}"
+  # Build checked-out trees (buildId > 0) with the Maven version pinned by their own wrapper,
+  # if they have one. The system Maven can be too new for an old tree, e.g. the Develocity
+  # extension 2.3.4 pinned by release-1.5.0 fails on Maven 3.10.0.
+  local mvnCmd="mvn"
+  if [ ${buildId} -gt 0 ] && [ -x "./mvnw" ]; then
+    mvnCmd="./mvnw"
+  fi
 
-  installPinotBom "${outFile}" "${repoDir}" "${repoOption}" "${maxRetry}"
+  installPinotBom "${outFile}" "${repoDir}" "${repoOption}" "${maxRetry}" "${mvnCmd}"
 
   if [ ${buildId} -gt 0 ]; then
     # Build it in a different env under different version so that maven cache does
     # not collide
     local pomVersion=$(grep -E "<version>(.*)-SNAPSHOT</version>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1 | cut -d'-' -f1)
-    mvn -U versions:set -DnewVersion="${pomVersion}-compat-${buildId}" -DgenerateBackupPoms=false \
+    ${mvnCmd} -U versions:set -DnewVersion="${pomVersion}-compat-${buildId}" -DgenerateBackupPoms=false \
       -q -B ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1 || exit 1
     if [ -f "pinot-bom/pom.xml" ]; then
-      mvn -U -f pinot-bom/pom.xml versions:set -DnewVersion="${pomVersion}-compat-${buildId}" \
+      ${mvnCmd} -U -f pinot-bom/pom.xml versions:set -DnewVersion="${pomVersion}-compat-${buildId}" \
         -DgenerateBackupPoms=false -q -B ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1 || exit 1
     fi
-    installPinotBom "${outFile}" "${repoDir}" "${repoOption}" "${maxRetry}"
+    installPinotBom "${outFile}" "${repoDir}" "${repoOption}" "${maxRetry}" "${mvnCmd}"
   fi
   buildComponents=":pinot-tools"
   if [ $buildCompatibilityVerifier -gt 0 ]; then
     buildComponents=":pinot-tools,:pinot-compatibility-verifier"
   fi
   for i in $(seq 1 $maxRetry); do
-    mvn -U clean package -am -pl ${buildComponents} -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
+    ${mvnCmd} -U clean package -am -pl ${buildComponents} -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
     if [ $? -eq 0 ]; then break; fi
     if [ $i -eq $maxRetry ]; then exit 1; fi
     echo ""
@@ -145,7 +153,7 @@ function build() {
   done
   if [ $buildTests -eq 1 ]; then
     for i in $(seq 1 $maxRetry); do
-      mvn -U package -am -pl :pinot-integration-tests -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+      ${mvnCmd} -U package -am -pl :pinot-integration-tests -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
       if [ $? -eq 0 ]; then break; fi
       if [ $i -eq $maxRetry ]; then exit 1; fi
       echo ""

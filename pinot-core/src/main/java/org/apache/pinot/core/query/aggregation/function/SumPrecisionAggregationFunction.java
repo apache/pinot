@@ -29,7 +29,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -47,7 +46,9 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 /// - Expression: expression that contains the values to be summed up, can be serialized BigDecimal objects
 /// - Precision (optional): precision to be set to the final result
 /// - Scale (optional): scale to be set to the final result
-public class SumPrecisionAggregationFunction extends NullableSingleInputAggregationFunction<BigDecimal, BigDecimal> {
+public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
+  private static final int BIG_DECIMAL_TYPE = 22;
+
   private final Integer _precision;
   private final Integer _scale;
 
@@ -253,8 +254,9 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
 
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
+            BigDecimal value = BigDecimal.valueOf(intValues[i]);
             for (int groupKey : groupKeysArray[i]) {
-              updateGroupByResult(groupKey, groupByResultHolder, BigDecimal.valueOf(intValues[i]));
+              updateGroupByResult(groupKey, groupByResultHolder, value);
             }
           }
         });
@@ -265,8 +267,9 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
 
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
+            BigDecimal value = BigDecimal.valueOf(longValues[i]);
             for (int groupKey : groupKeysArray[i]) {
-              updateGroupByResult(groupKey, groupByResultHolder, BigDecimal.valueOf(longValues[i]));
+              updateGroupByResult(groupKey, groupByResultHolder, value);
             }
           }
         });
@@ -279,8 +282,9 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
 
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
+            BigDecimal value = new BigDecimal(stringValues[i]);
             for (int groupKey : groupKeysArray[i]) {
-              updateGroupByResult(groupKey, groupByResultHolder, new BigDecimal(stringValues[i]));
+              updateGroupByResult(groupKey, groupByResultHolder, value);
             }
           }
         });
@@ -303,8 +307,9 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
 
         forEachNotNull(length, blockValSet, (from, to) -> {
           for (int i = from; i < to; i++) {
+            BigDecimal value = BigDecimalUtils.deserialize(bytesValues[i]);
             for (int groupKey : groupKeysArray[i]) {
-              updateGroupByResult(groupKey, groupByResultHolder, BigDecimalUtils.deserialize(bytesValues[i]));
+              updateGroupByResult(groupKey, groupByResultHolder, value);
             }
           }
         });
@@ -347,14 +352,13 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(BigDecimal bigDecimal) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BigDecimal.getValue(),
-        ObjectSerDeUtils.BIGDECIMAL_SER_DE.serialize(bigDecimal));
+  public SerializedResult serializeIntermediateResult(BigDecimal bigDecimal) {
+    return new SerializedBytes(BIG_DECIMAL_TYPE, BigDecimalUtils.serialize(bigDecimal));
   }
 
   @Override
   public BigDecimal deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.BIGDECIMAL_SER_DE.deserialize(customObject.getBuffer());
+    return BigDecimalUtils.deserialize(customObject.getBuffer());
   }
 
   @Override
@@ -366,19 +370,25 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
   @Nullable
   @Override
   public BigDecimal extractFinalResult(@Nullable BigDecimal intermediateResult) {
-    if (intermediateResult == null) {
-      return null;
-    }
-    if (_precision == null) {
-      return intermediateResult;
-    }
-    BigDecimal result = intermediateResult.round(new MathContext(_precision, RoundingMode.HALF_EVEN));
-    return _scale == null ? result : result.setScale(_scale, RoundingMode.HALF_EVEN);
+    return intermediateResult != null ? round(intermediateResult) : null;
   }
 
+  /// Merges two final results and rounds the sum to the precision and scale of the function. The final results are
+  /// already rounded, so the merged result can differ from the rounded exact sum: with precision 1 and scale 0,
+  /// partition sums `0.5` and `0.5` have final results `0` and `0`, which merge to `0`, while their exact sum `1.0`
+  /// rounds to `1`.
   @Override
   public BigDecimal mergeFinalResult(BigDecimal finalResult1, BigDecimal finalResult2) {
-    return merge(finalResult1, finalResult2);
+    return round(merge(finalResult1, finalResult2));
+  }
+
+  /// Rounds the sum to the precision and scale of the function, if specified.
+  private BigDecimal round(BigDecimal sum) {
+    if (_precision == null) {
+      return sum;
+    }
+    BigDecimal result = sum.round(new MathContext(_precision, RoundingMode.HALF_EVEN));
+    return _scale == null ? result : result.setScale(_scale, RoundingMode.HALF_EVEN);
   }
 
   public BigDecimal getDefaultResult(GroupByResultHolder groupByResultHolder, int groupKey) {

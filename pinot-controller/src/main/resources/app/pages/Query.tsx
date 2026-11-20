@@ -188,6 +188,7 @@ const queryErrorCodeMap = {
   425: "BrokerRequestSend",
   427: "ServerNotResponding",
   429: "TooManyRequests",
+  430: "WorkloadBudgetExceededError",
   450: "InternalError",
   500: "MergeResponseError",
   503: "QueryCancellationError",
@@ -344,7 +345,7 @@ const QueryPage = () => {
     setQueryLoader(true);
     queryExecuted.current = true;
     let params;
-    let queryOptions = [];
+    let queryOptions = ['applicationName=pinot-controller-console'];
     if(queryTimeout){
       queryOptions.push(`timeoutMs=${queryTimeout}`);
     }

@@ -19,16 +19,19 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.GregorianCalendar;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
-import org.apache.calcite.avatica.util.TimeUnitRange;
+import org.apache.calcite.avatica.util.DateTimeUtils;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.logical.LogicalFilter;
@@ -42,19 +45,30 @@ import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.calcite.util.NlsString;
+import org.apache.calcite.util.DateString;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
+import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
 /// PinotEvaluateLiteralRule that matches the literal only function calls and evaluates them.
+///
+/// The function gets each literal as the Java value that the runtime passes for it, so that the result is the same as
+/// the result of the call at runtime.
 public class PinotEvaluateLiteralRule {
+  private static final BigDecimal MIN_INT = BigDecimal.valueOf(Integer.MIN_VALUE);
+  private static final BigDecimal MAX_INT = BigDecimal.valueOf(Integer.MAX_VALUE);
 
   public static class Project extends RelOptRule {
     public static final Project INSTANCE = new Project(PinotRuleUtils.PINOT_REL_FACTORY, null);
@@ -88,13 +102,19 @@ public class PinotEvaluateLiteralRule {
     List<RexNode> castedNewProjects = new ArrayList<>(numProjects);
     boolean needCast = false;
     for (int i = 0; i < numProjects; i++) {
-      RexNode oldNode = oldProjects.get(i);
       RexNode newNode = newProjects.get(i);
+      RelDataType expectedType = oldProject.getRowType().getFieldList().get(i).getType();
       // Need to cast the result to the original type if the literal type is changed, e.g. VARCHAR literal is typed as
-      // CHAR(STRING_LENGTH) in Calcite, but we need to cast it back to VARCHAR.
-      if (!oldNode.getType().equals(newNode.getType())) {
+      // CHAR(STRING_LENGTH) in Calcite, but we need to cast it back to VARCHAR. Use the project's declared row type
+      // instead of the original expression type because a nullable user-defined function can retain a non-null operand
+      // type while the validated projection is nullable.
+      if (!expectedType.equals(newNode.getType())) {
         needCast = true;
-        newNode = rexBuilder.makeCast(oldNode.getType(), newNode, true);
+        newNode = rexBuilder.makeCast(expectedType, newNode, true, false);
+        if (!expectedType.equals(newNode.getType())) {
+          // A non-null literal cannot carry a nullable type; retain a cast only when normalization did not restore it.
+          newNode = rexBuilder.makeAbstractCast(expectedType, newNode, false);
+        }
       }
       castedNewProjects.add(newNode);
     }
@@ -156,32 +176,66 @@ public class PinotEvaluateLiteralRule {
 
     int numArguments = operands.size();
     ColumnDataType[] argumentTypes = new ColumnDataType[numArguments];
-    Object[] arguments = new Object[numArguments];
+    String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
+    // A SQL NULL JSON input or default becomes either SQL NULL or a type placeholder based on the query's
+    // null-handling option. This Calcite rule does not carry that option, so leave those calls for the
+    // leaf/intermediate runtime. A NULL path or result type is always NULL and remains safe to fold.
+    if (TransformFunctionType.isJsonExtractScalar(canonicalName)
+        && (RexLiteral.isNullLiteral(operands.get(0))
+        || (numArguments == 4 && RexLiteral.isNullLiteral(operands.get(3))))) {
+      return rexCall;
+    }
     for (int i = 0; i < numArguments; i++) {
       RexNode rexNode = operands.get(i);
-      RexLiteral rexLiteral;
-      if (rexNode instanceof RexLiteral) {
-        rexLiteral = (RexLiteral) rexNode;
-      } else {
+      if (!(rexNode instanceof RexLiteral)) {
         // Function operands cannot be evaluated, skip
         return rexCall;
       }
-      argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
-      arguments[i] = getLiteralValue(rexLiteral);
+      argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexNode.getType());
+    }
+    widenIntArgumentTypes(operands, argumentTypes);
+    if (TransformFunctionType.isJsonExtractScalar(canonicalName) && numArguments > 3) {
+      argumentTypes[3] =
+          RexExpressionUtils.fromJsonExtractScalarDefaultLiteral((RexLiteral) operands.get(3)).getDataType();
     }
 
+    if (isDatetimeIntervalArithmetic(rexCall)) {
+      return evaluateDatetimeIntervalArithmetic(rexCall, rexBuilder);
+    }
+    if (isIntervalArithmetic(rexCall)) {
+      return evaluateIntervalArithmetic(rexCall, rexBuilder);
+    }
+    ColumnDataType castTargetType = null;
     if (rexCall.getKind() == SqlKind.CAST) {
       // Handle separately because the CAST operator only has one operand (the value to be cast) and the type to be cast
       // to is determined by the operator's return type. Pinot's CAST function implementation requires two arguments:
       // the value to be cast and the target type.
       argumentTypes = new ColumnDataType[]{argumentTypes[0], ColumnDataType.STRING};
-      arguments = new Object[]{arguments[0], RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType()).name()};
+      castTargetType = RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType());
     }
-    String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null || !functionInfo.isDeterministic()) {
       // Function cannot be evaluated
       return rexCall;
+    }
+    // Convert the literals only for a function that can be evaluated, because some operators take literals that are
+    // not values, for example the Sarg of a SEARCH
+    Object[] arguments = new Object[argumentTypes.length];
+    for (int i = 0; i < numArguments; i++) {
+      RexLiteral literal = (RexLiteral) operands.get(i);
+      if (TransformFunctionType.isJsonExtractScalar(canonicalName) && i == 3) {
+        RexExpression.Literal defaultLiteral = RexExpressionUtils.fromJsonExtractScalarDefaultLiteral(literal);
+        arguments[i] = defaultLiteral.getDataType().toExternal(defaultLiteral.getValue());
+      } else {
+        arguments[i] = getArgumentValue(literal, argumentTypes[i]);
+      }
+    }
+    if (castTargetType != null) {
+      arguments[0] = getCastValue(arguments[0], castTargetType);
+      arguments[1] = castTargetType.name();
+    }
+    if (rexCall.getKind() == SqlKind.ARRAY_VALUE_CONSTRUCTOR) {
+      keepExactArrayElements(operands, arguments);
     }
     RelDataType rexNodeType = rexCall.getType();
     if (rexNodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
@@ -230,17 +284,21 @@ public class PinotEvaluateLiteralRule {
     }
     try {
       if (rexNodeType instanceof ArraySqlType) {
-        List<Object> resultValues = new ArrayList<>();
-
-        // SQL FLOAT and DOUBLE literals are represented as Java double
-        if (resultValue instanceof double[]) {
-          for (double value: (double[]) resultValue) {
-            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
-          }
-        } else {
-          for (Object value : (Object[]) resultValue) {
-            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
-          }
+        RelDataType componentType = rexNodeType.getComponentType();
+        // ArrayLiteralTransformFunction does not support BIG_DECIMAL components. Keep the function call so the
+        // jsonExtractScalar transform produces the BigDecimal array directly on the leaf.
+        if (componentType != null && componentType.getSqlTypeName() == SqlTypeName.DECIMAL) {
+          return rexCall;
+        }
+        int length = Array.getLength(resultValue);
+        if (length == 0) {
+          // An empty ARRAY constructor executes as Object[], which cannot represent Pinot's primitive arrays.
+          return rexCall;
+        }
+        // Read primitive and object arrays reflectively, boxing and converting each element in one pass.
+        List<Object> resultValues = new ArrayList<>(length);
+        for (int i = 0; i < length; i++) {
+          resultValues.add(convertResultValue(Array.get(resultValue, i), componentType));
         }
         return rexBuilder.makeLiteral(resultValues, rexNodeType, false);
       }
@@ -249,6 +307,114 @@ public class PinotEvaluateLiteralRule {
       throw new SqlCompilationException(
           "Caught exception while making literal with value: " + resultValue + " and type: " + rexNodeType, e);
     }
+  }
+
+  /// Returns whether the call is `datetime + interval` (Calcite's `DATETIME_PLUS`) or `datetime - interval`
+  /// (`MINUS_DATE`) with a `TIMESTAMP` or `DATE` result. Calcite puts the interval second for both.
+  private static boolean isDatetimeIntervalArithmetic(RexCall rexCall) {
+    SqlKind kind = rexCall.getKind();
+    SqlTypeName resultType = rexCall.getType().getSqlTypeName();
+    List<RexNode> operands = rexCall.getOperands();
+    return (kind == SqlKind.PLUS || kind == SqlKind.MINUS) && (resultType == SqlTypeName.TIMESTAMP
+        || resultType == SqlTypeName.DATE) && operands.size() == 2 && SqlTypeUtil.isInterval(operands.get(1).getType());
+  }
+
+  /// Evaluates `datetime + interval` or `datetime - interval` with the same semantics as Calcite. It cannot use Pinot's
+  /// `plus` / `minus` functions, because Calcite stores a day-time interval as milliseconds but a year-month interval
+  /// as months: they would add `INTERVAL '1' MONTH` as 1 millisecond. Months are added with the same calendar
+  /// arithmetic as `TIMESTAMPADD(MONTH, ...)`, so `2019-01-31 + INTERVAL '1' MONTH` is `2019-02-28`. Like Calcite, only
+  /// the whole days of a day-time interval are added to a `DATE`.
+  private static RexNode evaluateDatetimeIntervalArithmetic(RexCall rexCall, RexBuilder rexBuilder) {
+    RexLiteral datetime = (RexLiteral) rexCall.getOperands().get(0);
+    RexLiteral interval = (RexLiteral) rexCall.getOperands().get(1);
+    RelDataType resultType = rexCall.getType();
+    if (datetime.isNull() || interval.isNull()) {
+      return rexBuilder.makeNullLiteral(resultType);
+    }
+    Object resultValue;
+    try {
+      long millis = Objects.requireNonNull(datetime.getValueAs(Calendar.class)).getTimeInMillis();
+      // Number of months for a year-month interval, number of milliseconds for a day-time interval
+      long intervalValue = Objects.requireNonNull(interval.getValueAs(BigDecimal.class)).longValueExact();
+      if (rexCall.getKind() == SqlKind.MINUS) {
+        intervalValue = Math.negateExact(intervalValue);
+      }
+      boolean isDate = resultType.getSqlTypeName() == SqlTypeName.DATE;
+      long resultMillis;
+      if (SqlTypeName.YEAR_INTERVAL_TYPES.contains(interval.getType().getSqlTypeName())) {
+        resultMillis = DateTimeFunctions.timestampAdd("MONTH", intervalValue, millis);
+      } else {
+        if (isDate) {
+          intervalValue = intervalValue / DateTimeUtils.MILLIS_PER_DAY * DateTimeUtils.MILLIS_PER_DAY;
+        }
+        resultMillis = Math.addExact(millis, intervalValue);
+      }
+      resultValue = isDate ? DateString.fromDaysSinceEpoch(
+          Math.toIntExact(Math.floorDiv(resultMillis, DateTimeUtils.MILLIS_PER_DAY))) : resultMillis;
+    } catch (Exception e) {
+      throw new SqlCompilationException(
+          "Caught exception while evaluating: " + rexCall + ": " + e.getMessage(), e);
+    }
+    return rexBuilder.makeLiteral(resultValue, resultType, false);
+  }
+
+  /// Returns whether the call is `+`, `-`, `*` or `/` with an interval result and only interval or numeric operands,
+  /// e.g. `INTERVAL '1' MONTH * 2`.
+  private static boolean isIntervalArithmetic(RexCall rexCall) {
+    SqlKind kind = rexCall.getKind();
+    List<RexNode> operands = rexCall.getOperands();
+    return (kind == SqlKind.PLUS || kind == SqlKind.MINUS || kind == SqlKind.TIMES || kind == SqlKind.DIVIDE)
+        && SqlTypeUtil.isInterval(rexCall.getType()) && operands.size() == 2 && operands.stream()
+        .allMatch(operand -> SqlTypeUtil.isInterval(operand.getType()) || SqlTypeUtil.isNumeric(operand.getType()));
+  }
+
+  /// Evaluates interval arithmetic exactly. Pinot's `times` / `divide` functions compute in DOUBLE, so
+  /// `INTERVAL '100' MONTH * 0.29` would be 28.999999999999996 months instead of 29, and `INTERVAL '1' DAY * 0.7` would
+  /// be 1 millisecond short.
+  private static RexNode evaluateIntervalArithmetic(RexCall rexCall, RexBuilder rexBuilder) {
+    RexLiteral left = (RexLiteral) rexCall.getOperands().get(0);
+    RexLiteral right = (RexLiteral) rexCall.getOperands().get(1);
+    RelDataType resultType = rexCall.getType();
+    if (left.isNull() || right.isNull()) {
+      return rexBuilder.makeNullLiteral(resultType);
+    }
+    BigDecimal resultValue;
+    try {
+      // An interval literal holds its number of months or milliseconds
+      BigDecimal leftValue = Objects.requireNonNull(left.getValueAs(BigDecimal.class));
+      BigDecimal rightValue = Objects.requireNonNull(right.getValueAs(BigDecimal.class));
+      switch (rexCall.getKind()) {
+        case PLUS:
+          resultValue = leftValue.add(rightValue);
+          break;
+        case MINUS:
+          resultValue = leftValue.subtract(rightValue);
+          break;
+        case TIMES:
+          resultValue = leftValue.multiply(rightValue);
+          break;
+        default:
+          resultValue = leftValue.divide(rightValue, MathContext.DECIMAL128);
+          break;
+      }
+      resultValue = toIntervalValue(resultValue, resultType);
+    } catch (Exception e) {
+      throw new SqlCompilationException(
+          "Caught exception while evaluating: " + rexCall + ": " + e.getMessage(), e);
+    }
+    return rexBuilder.makeLiteral(resultValue, resultType, false);
+  }
+
+  /// Converts a number to the value that Calcite stores for an interval: a whole number of months for a year-month
+  /// interval, and milliseconds for a day-time interval (like Calcite, fractions of a millisecond are dropped).
+  private static BigDecimal toIntervalValue(BigDecimal value, RelDataType intervalType) {
+    if (SqlTypeName.YEAR_INTERVAL_TYPES.contains(intervalType.getSqlTypeName())) {
+      // Intentionally stricter than Calcite, which truncates to whole months (INTERVAL '1' MONTH / 2 is 0 months):
+      // reject the query instead of silently dropping a fraction of a month
+      Preconditions.checkArgument(value.stripTrailingZeros().scale() <= 0,
+          "Year-month interval must be a whole number of months, got: %s", value);
+    }
+    return value.setScale(0, RoundingMode.DOWN);
   }
 
   private static RelDataType convertDecimalType(RelDataType relDataType, RexBuilder rexBuilder) {
@@ -268,22 +434,137 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
+  /// Makes the INT arguments of a call LONG if one of them is an integer literal beyond the INT range.
+  ///
+  /// This rule makes such a literal. Calcite gives INT arithmetic the type INTEGER, but Pinot evaluates it as LONG, so
+  /// the literal for `3600000 * 100000` has the type INTEGER and the value 360000000000. A call on that literal (for
+  /// example `NOW() - 3600000 * 100000`) must get the full value, not the value that wraps around as an INT. All the
+  /// INT arguments change, so that the arguments of one type (for example the elements of an array) keep one Java
+  /// class.
+  private static void widenIntArgumentTypes(List<RexNode> operands, ColumnDataType[] argumentTypes) {
+    int numArguments = argumentTypes.length;
+    boolean beyondIntRange = false;
+    for (int i = 0; i < numArguments; i++) {
+      if (isIntegerLiteral((RexLiteral) operands.get(i), argumentTypes[i])) {
+        BigDecimal value = (BigDecimal) ((RexLiteral) operands.get(i)).getValue();
+        if (value.compareTo(MIN_INT) < 0 || value.compareTo(MAX_INT) > 0) {
+          beyondIntRange = true;
+          break;
+        }
+      }
+    }
+    if (!beyondIntRange) {
+      return;
+    }
+    for (int i = 0; i < numArguments; i++) {
+      if (isIntegerLiteral((RexLiteral) operands.get(i), argumentTypes[i])) {
+        argumentTypes[i] = ColumnDataType.LONG;
+      }
+    }
+  }
+
+  /// Returns whether the literal is a number with an integer type (for example INTEGER or SMALLINT) that the planner
+  /// maps to INT. A DECIMAL is not an integer type here, see [#canExceedArgumentType]. A NULL literal is not a number.
+  /// A literal that is not a value (for example the Sarg of a SEARCH on INTEGER values) is not a number.
+  private static boolean isIntegerLiteral(RexLiteral rexLiteral, ColumnDataType literalType) {
+    return literalType == ColumnDataType.INT && rexLiteral.getValue() instanceof BigDecimal
+        && SqlTypeName.INT_TYPES.contains(rexLiteral.getType().getSqlTypeName());
+  }
+
+  /// Gives the number elements of an array constructor their exact values (the `BigDecimal` that Calcite stores) if
+  /// one element is NULL or if the elements do not have one Java class.
+  ///
+  /// The array constructor makes a primitive array from the class of its first element, so it cannot take a NULL
+  /// element or an element of a different class. Elements of one array type can have different classes: this rule
+  /// gives the literal that it makes for a DECIMAL(20, 0) call the type BIGINT (a `Long`), but a DECIMAL(20, 0)
+  /// literal from Calcite keeps its exact value (see [#canExceedArgumentType]).
+  private static void keepExactArrayElements(List<RexNode> operands, Object[] arguments) {
+    Class<?> elementClass = null;
+    boolean oneClass = true;
+    for (Object argument : arguments) {
+      if (argument == null || (elementClass != null && argument.getClass() != elementClass)) {
+        oneClass = false;
+        break;
+      }
+      elementClass = argument.getClass();
+    }
+    if (oneClass) {
+      return;
+    }
+    for (int i = 0; i < arguments.length; i++) {
+      Object value = ((RexLiteral) operands.get(i)).getValue();
+      if (value instanceof BigDecimal) {
+        arguments[i] = value;
+      }
+    }
+  }
+
+  /// Returns the value that the runtime passes to a function for the literal (see `FunctionOperand`): the value from
+  /// [RexExpressionUtils#fromRexLiteral], converted with [ColumnDataType#toExternal]. For example, an INTEGER literal
+  /// becomes an `Integer` (Calcite stores a `BigDecimal`), and a TIMESTAMP literal becomes a `Timestamp`.
   @Nullable
-  private static Object getLiteralValue(RexLiteral rexLiteral) {
-    Object value = rexLiteral.getValue();
-    if (value instanceof NlsString) {
-      // STRING
-      return ((NlsString) value).getValue();
-    } else if (value instanceof GregorianCalendar) {
-      // TIMESTAMP
-      return ((GregorianCalendar) value).getTimeInMillis();
-    } else if (value instanceof ByteString) {
-      // BYTES
-      return ((ByteString) value).getBytes();
-    } else if (value instanceof TimeUnitRange) {
-      return ((TimeUnitRange) value).name();
-    } else {
-      return value;
+  private static Object getArgumentValue(RexLiteral rexLiteral, ColumnDataType argumentType) {
+    if (argumentType == ColumnDataType.OBJECT && rexLiteral.getTypeName() != SqlTypeName.SYMBOL) {
+      // The runtime cannot represent this literal (for example an INTERVAL), so keep the value that Calcite stores
+      return rexLiteral.getValue();
+    }
+    if (argumentType == ColumnDataType.LONG && isIntegerLiteral(rexLiteral,
+        RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType()))) {
+      // See widenIntArgumentTypes(). The value comes from an INT literal or from a LONG result, so it is in the LONG
+      // range.
+      return ((BigDecimal) rexLiteral.getValue()).longValue();
+    }
+    if (canExceedArgumentType(rexLiteral, argumentType)) {
+      // Keep the exact value, which the conversion to INT or LONG can wrap around. A value that fits (for example
+      // CAST(5 AS DECIMAL(10, 0))) then stays a BigDecimal, unlike at runtime, but no value wraps around.
+      return rexLiteral.getValue();
+    }
+    RexExpression.Literal literal = RexExpressionUtils.fromRexLiteral(rexLiteral);
+    Object value = literal.getValue();
+    return value != null ? literal.getDataType().toExternal(value) : null;
+  }
+
+  /// Returns the value to pass to the CAST function for a CAST to the given type.
+  ///
+  /// The CAST function cannot convert between TIMESTAMP and INT or FLOAT (the leaf stage can). For such a CAST, returns
+  /// the same value with a type that the function can convert: a LONG for an INT or a TIMESTAMP, and a DOUBLE for a
+  /// FLOAT.
+  @Nullable
+  private static Object getCastValue(@Nullable Object value, ColumnDataType targetType) {
+    if (targetType == ColumnDataType.TIMESTAMP) {
+      if (value instanceof Integer) {
+        return ((Integer) value).longValue();
+      }
+      if (value instanceof Float) {
+        return ((Float) value).doubleValue();
+      }
+    } else if (value instanceof Timestamp && (targetType == ColumnDataType.INT
+        || targetType == ColumnDataType.FLOAT)) {
+      return ((Timestamp) value).getTime();
+    }
+    return value;
+  }
+
+  /// Returns whether the literal is a DECIMAL whose type can hold numbers beyond the range of its INT or LONG argument
+  /// type. The planner gives DECIMAL(p, 0) the type INT or LONG by its precision only, for example INT to
+  /// DECIMAL(10, 0), and LONG to an integer literal beyond the BIGINT range. The decision depends on the type, not on
+  /// the value, so that the literals of one type (for example the elements of an array) get the same Java class.
+  private static boolean canExceedArgumentType(RexLiteral rexLiteral, ColumnDataType argumentType) {
+    // NOTE: Check the SQL type, because RexLiteral.getTypeName() is DECIMAL for every exact number, e.g. INTEGER
+    RelDataType type = rexLiteral.getType();
+    if (type.getSqlTypeName() != SqlTypeName.DECIMAL) {
+      return false;
+    }
+    int precision = type.getPrecision();
+    switch (argumentType) {
+      case INT:
+        // An INT holds every number with up to 9 digits
+        return precision > 9;
+      case LONG:
+        // A LONG holds every number with up to 18 digits
+        return precision > 18;
+      default:
+        return false;
     }
   }
 
@@ -291,6 +572,10 @@ public class PinotEvaluateLiteralRule {
   private static Object convertResultValue(@Nullable Object resultValue, RelDataType relDataType) {
     if (resultValue == null) {
       return null;
+    }
+    if (relDataType.getSqlTypeName() == SqlTypeName.BOOLEAN) {
+      // Scalar BOOLEAN is stored as Integer 0/1. Calcite literals need a Boolean.
+      return BooleanUtils.toBoolean(resultValue);
     }
     if (relDataType.getSqlTypeName() == SqlTypeName.TIMESTAMP) {
       // Return millis since epoch for TIMESTAMP
@@ -309,6 +594,16 @@ public class PinotEvaluateLiteralRule {
     }
     if (relDataType.getSqlTypeName() == SqlTypeName.DECIMAL) {
       return new BigDecimal(resultValue.toString());
+    }
+    // Other functions with an interval result, e.g. ABS(INTERVAL '-1' MONTH). Interval arithmetic is evaluated exactly
+    // in evaluateIntervalArithmetic().
+    if (SqlTypeUtil.isInterval(relDataType)) {
+      if (resultValue instanceof BigDecimal) {
+        return toIntervalValue((BigDecimal) resultValue, relDataType);
+      }
+      double value = ((Number) resultValue).doubleValue();
+      Preconditions.checkArgument(Double.isFinite(value), "Invalid interval value: %s", value);
+      return toIntervalValue(BigDecimal.valueOf(value), relDataType);
     }
     // Use double for FLOAT / DOUBLE literals
     if (relDataType.getSqlTypeName() == SqlTypeName.FLOAT || relDataType.getSqlTypeName() == SqlTypeName.DOUBLE

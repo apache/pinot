@@ -48,6 +48,6 @@ class ZstandardDecompressor implements ChunkDecompressor {
 
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
-    return (int) Zstd.decompressedSize(compressedInput);
+    return (int) Zstd.getFrameContentSize(compressedInput);
   }
 }

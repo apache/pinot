@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.common;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -35,7 +34,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 
@@ -105,11 +103,7 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     Collection<String> tarFilePaths = segmentsUriToTarPathMap.values();
     List<String> segmentNames = new ArrayList<>(tarFilePaths.size());
     for (String tarFilePath : tarFilePaths) {
-      File tarFile = new File(tarFilePath);
-      String fileName = tarFile.getName();
-      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
-      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
-      segmentNames.add(segmentName);
+      segmentNames.add(SegmentPushUtils.getSegmentNameFromTarFile(tarFilePath));
     }
     return segmentNames;
   }
@@ -131,6 +125,9 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     try {
       Map<String, String> segmentsUriToTarPathMap =
           SegmentPushUtils.getSegmentUriToTarPathMap(_outputDirURI, _spec.getPushJobSpec(), _files);
+      if (segmentsUriToTarPathMap.isEmpty()) {
+        return;
+      }
       if (_consistentPushEnabled) {
         List<String> segmentsToReplace = getSegmentsToReplace(segmentsUriToTarPathMap);
         uriToLineageEntryIdMap = ConsistentDataPushUtils.preUpload(_spec, segmentsToReplace);

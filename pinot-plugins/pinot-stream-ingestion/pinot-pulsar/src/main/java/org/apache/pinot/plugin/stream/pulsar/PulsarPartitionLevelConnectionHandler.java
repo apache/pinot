@@ -18,26 +18,28 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminBuilder;
 import org.apache.pulsar.client.api.Authentication;
 import org.apache.pulsar.client.api.AuthenticationFactory;
 import org.apache.pulsar.client.api.ClientBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
-import org.apache.pulsar.client.impl.auth.oauth2.AuthenticationFactoryOAuth2;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 
 /// Manages the Pulsar client connection, given the partition id and [PulsarConfig]
 public class PulsarPartitionLevelConnectionHandler implements Closeable {
+  // Built-in OAuth2 authentication plugin, which the Pulsar client resolves by this name even when it is shaded
+  private static final String OAUTH2_AUTH_PLUGIN_CLASS_NAME =
+      "org.apache.pulsar.client.impl.auth.oauth2.AuthenticationOAuth2";
+
   protected final PulsarConfig _config;
   protected final String _clientId;
   protected final PulsarClient _pulsarClient;
@@ -63,7 +65,7 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
   }
 
   protected PulsarAdmin createPulsarAdmin() {
-    checkArgument(StringUtils.isNotBlank(_config.getServiceHttpUrl()),
+    Preconditions.checkArgument(StringUtils.isNotBlank(_config.getServiceHttpUrl()),
         "Service HTTP URL must be provided to perform admin operations");
 
     PulsarAdminBuilder adminBuilder = PulsarAdmin.builder().serviceHttpUrl(_config.getServiceHttpUrl());
@@ -82,7 +84,7 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
   ///
   /// @return an Authentication object
   private Authentication authenticationConfig()
-      throws MalformedURLException {
+      throws IOException {
     String authenticationToken = _config.getAuthenticationToken();
     if (StringUtils.isNotBlank(authenticationToken)) {
       return AuthenticationFactory.token(authenticationToken);
@@ -95,15 +97,21 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
   ///
   /// @return an OAuth2 Authentication object
   private Authentication oAuth2AuthenticationConfig()
-      throws MalformedURLException {
+      throws IOException {
     String issuerUrl = _config.getIssuerUrl();
     String credentialsFilePath = _config.getCredentialsFilePath();
     String audience = _config.getAudience();
 
-    if (StringUtils.isNotBlank(issuerUrl) && StringUtils.isNotBlank(credentialsFilePath) && StringUtils.isNotBlank(
-        audience)) {
-      return AuthenticationFactoryOAuth2.clientCredentials(new URL(issuerUrl), new URL(credentialsFilePath),
-          audience);
+    if (StringUtils.isNotBlank(issuerUrl)
+        && StringUtils.isNotBlank(credentialsFilePath)
+        && StringUtils.isNotBlank(audience)) {
+      Map<String, String> authParams = Map.of(
+          "type", "client_credentials",
+          "issuerUrl", issuerUrl,
+          "privateKey", credentialsFilePath,
+          "audience", audience
+      );
+      return AuthenticationFactory.create(OAUTH2_AUTH_PLUGIN_CLASS_NAME, JsonUtils.objectToString(authParams));
     }
     return null;
   }

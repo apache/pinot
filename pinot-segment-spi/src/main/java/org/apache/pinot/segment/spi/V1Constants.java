@@ -25,8 +25,17 @@ public class V1Constants {
   public static final String SEGMENT_CREATION_META = "creation.meta";
   public static final String INDEX_MAP_FILE_NAME = "index_map";
   public static final String INDEX_FILE_NAME = "columns.psf";
-  public static final String VALID_DOC_IDS_SNAPSHOT_FILE_NAME = "validdocids.bitmap.snapshot";
-  public static final String QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME = "queryabledocids.bitmap.snapshot";
+  /// The upsert validDocIds bitmap persisted next to the segment. The file name is unchanged, so existing files load.
+  public static final String VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME = "validdocids.bitmap.snapshot";
+  /// The upsert queryableDocIds bitmap persisted next to the segment. The file name is unchanged, so existing files
+  /// load.
+  public static final String QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME = "queryabledocids.bitmap.snapshot";
+  /// @deprecated Use [#VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME]. Kept so plugins built against it still compile.
+  @Deprecated
+  public static final String VALID_DOC_IDS_SNAPSHOT_FILE_NAME = VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME;
+  /// @deprecated Use [#QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME]. Kept so plugins built against it still compile.
+  @Deprecated
+  public static final String QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME = QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME;
   public static final String TTL_WATERMARK_TABLE_PARTITION = "ttl.watermark.partition.";
 
   public static class Str {
@@ -205,6 +214,20 @@ public class V1Constants {
       // strip the escape, leaving invalid JSON on reload. Absent on segments built before the
       // sparse read path — readers must treat every unmaterialized key as potentially sparse.
       public static final String SPARSE_KEYS = "sparseKeys";
+
+      // Shape of the multi-value keys in this OPEN_STRUCT column's sparse column, stored as a JSON
+      // object string mapping key name to the longest value it holds. Dense keys carry their own
+      // shape in their column metadata; a sparse key's lives here, because the blob it is stored in
+      // is JSON and holds both shapes. Absent when no sparse key is multi-value, and on segments
+      // built before multi-value keys — readers must treat an unlisted sparse key as single-value.
+      public static final String SPARSE_MULTI_VALUE_KEYS = "sparseMultiValueKeys";
+
+      // Value type of each key in this OPEN_STRUCT column's sparse column, stored as a JSON object
+      // string mapping key name to DataType name. A dense key carries its type in its own column
+      // metadata; a sparse key's lives here, because the blob it is stored in is JSON and carries no
+      // type of its own. Absent on segments built before this was recorded -- readers must fall back
+      // to STRING for an unlisted sparse key, which is what every sparse key used to read as.
+      public static final String SPARSE_KEY_TYPES = "sparseKeyTypes";
 
       /// Partition function, all optional
       public static final String PARTITION_FUNCTION = "partitionFunction";

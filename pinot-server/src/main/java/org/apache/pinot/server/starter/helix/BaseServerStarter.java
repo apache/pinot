@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -39,13 +40,11 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import nl.altindag.ssl.SSLFactory;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.ExternalView;
@@ -58,6 +57,7 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.lucene.index.IndexWriter;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
@@ -68,6 +68,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -77,6 +78,7 @@ import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
@@ -106,10 +108,12 @@ import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.api.resources.ReingestionConsumptionTimeout;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -121,6 +125,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -140,6 +145,7 @@ import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.apache.pinot.spi.utils.ProtoBufDescriptorFallbackListener;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -184,6 +190,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected volatile boolean _isServerReadyToServeQueries = false;
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
+  protected ReingestionConsumptionTimeout _reingestionConsumptionTimeout;
   // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
   @Nullable
   protected StateTransitionThreadPoolManager _transitionThreadPoolManager;
@@ -284,11 +291,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
         ConsumingSegmentConsistencyModeListener.getInstance());
     LOGGER.info(
         "Registered ConsumingSegmentConsistencyModeListener change listener for dynamic force commit/reload control");
+    // Register configuration change listener for the protobuf descriptor fallback setting
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ProtoBufDescriptorFallbackListener.getInstance());
+    LOGGER.info("Registered ProtoBufDescriptorFallbackListener change listener for dynamic descriptor fallback"
+        + " control");
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
-    _helixManager =
-        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
+    _helixManager = HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId,
+        org.apache.helix.InstanceType.PARTICIPANT, _zkAddress);
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
     initTransitionThreadPoolManager();
@@ -472,6 +483,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     return consumingSegments;
   }
 
+  /// The capabilities that this server advertises in its instance config at startup, see [InstanceCapability]. A
+  /// distribution or a plugin built on Pinot overrides it to add its own capabilities to [InstanceCapability#values()].
+  protected Collection<InstanceCapability> getInstanceCapabilities() {
+    return InstanceCapability.values();
+  }
+
   private void updateInstanceConfigIfNeeded(ServerConf serverConf) {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
 
@@ -521,7 +538,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       updated |= updatePortIfNeeded(simpleFields, Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
           serverConf.getMultiStageMailboxPort());
     }
-    updated |= HelixHelper.updatePinotVersion(instanceConfig);
+    // Also writes the simple field pinotVersion.
+    updated |= HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, getInstanceCapabilities());
 
     // Update environment properties
     if (_pinotEnvironmentProvider != null) {
@@ -655,6 +673,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Server configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
 
+    // Initialize Lucene on the startup thread before Helix can load existing indexes and create realtime indexes
+    // concurrently. Lucene 9.x has a class initialization cycle between IndexWriter, TestSecrets, and
+    // ConcurrentMergeScheduler: https://github.com/apache/lucene/issues/12419.
+    Class.forName(IndexWriter.class.getName());
+
+    // Load the index plugins before joining the cluster, so that an invalid plugin set (for example more than
+    // IndexService.MAX_INDEX_TYPES index types) fails server startup instead of every later segment load.
+    LOGGER.info("Loaded {} index types", IndexService.getInstance().getAllIndexes().size());
+
     LOGGER.info("Initializing server metrics");
     ServerConf serverConf = new ServerConf(_serverConf);
     _serverMetrics = ServerMetricsInitUtils.initServerMetrics(serverConf);
@@ -667,6 +694,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Register cache as cluster config listener for dynamic config updates
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_reloadJobStatusCache);
     LOGGER.info("Registered ServerReloadJobStatusCache as cluster config listener");
+
+    // Register re-ingestion consumption timeout as cluster config listener for dynamic config updates
+    _reingestionConsumptionTimeout = new ReingestionConsumptionTimeout(_serverConf);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_reingestionConsumptionTimeout);
 
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);
@@ -748,11 +779,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Initialize workload budget manager and thread accountant. Workload budget manager must be initialized first
     // because it might be used by the accountant.
-    PinotConfiguration accountingConfig = ThreadAccountantUtils.extractAccountingConfig(_serverConf,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    PinotConfiguration accountingConfig =
+        ThreadAccountantUtils.extractAccountingConfig(_serverConf, InstanceType.SERVER);
     WorkloadBudgetManagerFactory.register(accountingConfig);
-    _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId, InstanceType.SERVER);
 
     // Initialize scan-based query killing
     PinotConfiguration schedulerConfig = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
@@ -837,19 +867,19 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
-    // Register handler to reset GRPC mailbox channel backoff when servers come online
+    // Register handler to refresh the GRPC mailbox channels to servers when they come online
     WorkerQueryServer workerQueryServer = _serverInstance.getWorkerQueryServer();
     if (workerQueryServer != null) {
       MailboxService mailboxService = workerQueryServer.getQueryRunner().getMailboxService();
-      LOGGER.info("Registering ServerGrpcChannelBackoffResetHandler");
+      LOGGER.info("Registering ServerMailboxChannelRefreshHandler");
       try {
         _helixManager.addInstanceConfigChangeListener(
-            new ServerGrpcChannelBackoffResetHandler(_helixAdmin, _helixClusterName, _instanceId, mailboxService));
+            new ServerMailboxChannelRefreshHandler(_helixAdmin, _helixClusterName, _instanceId, mailboxService));
       } catch (Exception e) {
-        LOGGER.error("Failed to register ServerGrpcChannelBackoffResetHandler", e);
+        LOGGER.error("Failed to register ServerMailboxChannelRefreshHandler", e);
       }
     } else {
-      LOGGER.info("Multi-stage query engine not enabled, skipping ServerGrpcChannelBackoffResetHandler registration");
+      LOGGER.info("Multi-stage query engine not enabled, skipping ServerMailboxChannelRefreshHandler registration");
     }
 
     // Start restlet server for admin API endpoint
@@ -940,6 +970,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       try {
         for (File consumerDir : instanceConsumerDirs) {
           if (consumerDir.exists()) {
+            // Consuming segments write to this directory continuously, so use the delete-tolerant walk.
             totalSize += FileUtils.sizeOfDirectory(consumerDir);
           }
         }
@@ -1024,7 +1055,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   /// Can be overridden to perform operations before server starts serving queries.
   protected void preServeQueries() {
+    triggerPageCacheWarmup();
     _segmentOperationsThrottlerSet.startServingQueries();
+  }
+
+  protected void triggerPageCacheWarmup() {
+    try {
+      _serverInstance.startQueryServer();
+      _serverInstance.getPageCacheWarmupServerQueryExecutor().startWarmupOnRestart();
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while pre-serving queries,", e);
+    }
   }
 
   @Override
@@ -1259,7 +1300,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   protected AdminApiApplication createServerAdminApp() {
-    return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf);
+    return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache,
+        _reingestionConsumptionTimeout, _serverConf);
   }
 
   /// Creates the [SegmentMessageHandlerFactory] used to handle user-defined Helix messages for segments.

@@ -38,7 +38,8 @@ public class RexExpressionSerDeTest {
           ColumnDataType.BIG_DECIMAL, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.STRING,
           ColumnDataType.BYTES, ColumnDataType.UUID, ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY,
           ColumnDataType.FLOAT_ARRAY, ColumnDataType.DOUBLE_ARRAY, ColumnDataType.BOOLEAN_ARRAY,
-          ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.STRING_ARRAY, ColumnDataType.UUID_ARRAY,
+          ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.STRING_ARRAY, ColumnDataType.BYTES_ARRAY,
+          ColumnDataType.UUID_ARRAY,
           ColumnDataType.UNKNOWN);
   private static final Random RANDOM = new Random();
 
@@ -165,6 +166,12 @@ public class RexExpressionSerDeTest {
       values[i] = RandomStringUtils.secure().next(RANDOM.nextInt(10));
     }
     verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.STRING_ARRAY, values));
+  }
+
+  @Test
+  public void testBytesArrayLiteral() {
+    ByteArray[] values = {new ByteArray(new byte[0]), new ByteArray(new byte[]{1, 2, 3})};
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.BYTES_ARRAY, values));
   }
 
   @Test

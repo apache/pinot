@@ -22,11 +22,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.floats.FloatArrayList;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -41,6 +36,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -435,6 +433,9 @@ public class DataSchema {
     private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES =
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BIG_DECIMAL_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
+    private static final Map<String, ColumnDataType> NAME_TO_TYPES = Arrays
+        .stream(ColumnDataType.values())
+        .collect(Collectors.toUnmodifiableMap(ColumnDataType::name, Function.identity()));
 
     // stored data type.
     private final ColumnDataType _storedColumnDataType;
@@ -589,6 +590,17 @@ public class DataSchema {
           if (value instanceof Timestamp[]) {
             return fromTimestampArray((Timestamp[]) value);
           }
+          if (value instanceof byte[][]) {
+            byte[][] bytesArray = (byte[][]) value;
+            ByteArray[] internalBytesArray = new ByteArray[bytesArray.length];
+            for (int i = 0; i < bytesArray.length; i++) {
+              internalBytesArray[i] = new ByteArray(bytesArray[i]);
+            }
+            return internalBytesArray;
+          }
+          if (value instanceof UUID[]) {
+            return fromUuidArray(value);
+          }
           return value;
         default:
           return value;
@@ -614,7 +626,9 @@ public class DataSchema {
         case TIMESTAMP:
           return new Timestamp((long) value);
         case BYTES:
-          return ((ByteArray) value).getBytes();
+          return value instanceof ByteArray
+              ? ((ByteArray) value).getBytes()
+              : (byte[]) value;
         case UUID:
           return UuidUtils.toUUID((ByteArray) value);
         case BOOLEAN_ARRAY:
@@ -656,21 +670,21 @@ public class DataSchema {
         case UUID:
           return UuidUtils.toUUID((ByteArray) value);
         case INT_ARRAY:
-          return toIntArray(value);
+          return (int[]) value;
         case LONG_ARRAY:
           return toLongArray(value);
         case FLOAT_ARRAY:
-          return toFloatArray(value);
+          return (float[]) value;
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
         case BIG_DECIMAL_ARRAY:
-          return toBigDecimalArray(value);
+          return (BigDecimal[]) value;
         case BOOLEAN_ARRAY:
-          return toBooleanArray(toIntArray(value));
+          return toBooleanArray((int[]) value);
         case TIMESTAMP_ARRAY:
           return toTimestampArray(toLongArray(value));
         case STRING_ARRAY:
-          return toStringArray(value);
+          return (String[]) value;
         case BYTES_ARRAY:
           return toBytesArray(value);
         case UUID_ARRAY:
@@ -771,22 +785,9 @@ public class DataSchema {
       throw new IllegalStateException(String.format("Cannot convert: '%s' to Map", value));
     }
 
-    private static int[] toIntArray(Object value) {
-      if (value instanceof int[]) {
-        return (int[]) value;
-      } else if (value instanceof IntArrayList) {
-        // For ArrayAggregationFunction
-        return ArrayListUtils.toIntArray((IntArrayList) value);
-      }
-      throw new IllegalStateException(String.format("Cannot convert: '%s' to int[]", value));
-    }
-
     private static long[] toLongArray(Object value) {
       if (value instanceof long[]) {
         return (long[]) value;
-      } else if (value instanceof LongArrayList) {
-        // For FunnelCountAggregationFunction and ArrayAggregationFunction
-        return ArrayListUtils.toLongArray((LongArrayList) value);
       } else {
         int[] intValues = (int[]) value;
         int length = intValues.length;
@@ -798,22 +799,9 @@ public class DataSchema {
       }
     }
 
-    private static float[] toFloatArray(Object value) {
-      if (value instanceof float[]) {
-        return (float[]) value;
-      } else if (value instanceof FloatArrayList) {
-        // For ArrayAggregationFunction
-        return ArrayListUtils.toFloatArray((FloatArrayList) value);
-      }
-      throw new IllegalStateException(String.format("Cannot convert: '%s' to float[]", value));
-    }
-
     private static double[] toDoubleArray(Object value) {
       if (value instanceof double[]) {
         return (double[]) value;
-      } else if (value instanceof DoubleArrayList) {
-        // For HistogramAggregationFunction and ArrayAggregationFunction
-        return ArrayListUtils.toDoubleArray((DoubleArrayList) value);
       } else if (value instanceof int[]) {
         int[] intValues = (int[]) value;
         int length = intValues.length;
@@ -839,16 +827,6 @@ public class DataSchema {
         }
         return doubleValues;
       }
-    }
-
-    private static BigDecimal[] toBigDecimalArray(Object value) {
-      if (value instanceof BigDecimal[]) {
-        return (BigDecimal[]) value;
-      } else if (value instanceof ObjectArrayList) {
-        // For ArrayAggregationFunction
-        return ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) value);
-      }
-      throw new IllegalStateException(String.format("Cannot convert: '%s' to BigDecimal[]", value));
     }
 
     private static String[] formatBigDecimalArray(BigDecimal[] bigDecimalArray) {
@@ -914,32 +892,12 @@ public class DataSchema {
       return formattedTimestampArray;
     }
 
-    private static String[] toStringArray(Object value) {
-      if (value instanceof String[]) {
-        return (String[]) value;
-      } else if (value instanceof ObjectArrayList) {
-        // For ArrayAggregationFunction
-        return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
-      }
-      throw new IllegalStateException(String.format("Cannot convert: '%s' to String[]", value));
-    }
-
     private static byte[][] toBytesArray(Object value) {
       if (value instanceof ByteArray[]) {
         ByteArray[] wrapped = (ByteArray[]) value;
         byte[][] raw = new byte[wrapped.length][];
         for (int i = 0; i < wrapped.length; i++) {
           raw[i] = wrapped[i].getBytes();
-        }
-        return raw;
-      }
-      if (value instanceof ObjectArrayList) {
-        // For ArrayAggregationFunction
-        ObjectArrayList<ByteArray> list = (ObjectArrayList<ByteArray>) value;
-        int size = list.size();
-        byte[][] raw = new byte[size][];
-        for (int i = 0; i < size; i++) {
-          raw[i] = list.get(i).getBytes();
         }
         return raw;
       }
@@ -952,15 +910,6 @@ public class DataSchema {
     private static UUID[] toUuidArray(Object value) {
       if (value instanceof UUID[]) {
         return (UUID[]) value;
-      }
-      if (value instanceof ObjectArrayList) {
-        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
-        int size = list.size();
-        UUID[] uuidArray = new UUID[size];
-        for (int i = 0; i < size; i++) {
-          uuidArray[i] = UuidUtils.toUUID(list.get(i));
-        }
-        return uuidArray;
       }
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
@@ -975,15 +924,6 @@ public class DataSchema {
     private static ByteArray[] fromUuidArray(Object value) {
       if (value instanceof ByteArray[]) {
         return (ByteArray[]) value;
-      }
-      if (value instanceof ObjectArrayList) {
-        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
-        int size = list.size();
-        ByteArray[] wrapped = new ByteArray[size];
-        for (int i = 0; i < size; i++) {
-          wrapped[i] = new ByteArray(UuidUtils.toBytes(list.get(i)));
-        }
-        return wrapped;
       }
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
@@ -1016,15 +956,6 @@ public class DataSchema {
     /// dispatch is delegated to [#formatUuid], so `byte[][]`, [ByteArray]`[]`, `UUID[]` and `String[]` are all
     /// handled by the single `Object[]` branch.
     private static String[] formatUuidArray(Object value) {
-      if (value instanceof ObjectArrayList) {
-        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
-        int size = list.size();
-        String[] formattedUuidArray = new String[size];
-        for (int i = 0; i < size; i++) {
-          formattedUuidArray[i] = formatUuid(list.get(i));
-        }
-        return formattedUuidArray;
-      }
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
       String[] formattedUuidArray = new String[length];
@@ -1065,7 +996,10 @@ public class DataSchema {
         case MAP:
           return MAP;
         case OPEN_STRUCT:
-          return OBJECT;
+          // Selecting the column itself reads the whole struct back as its JSON document, so JSON is both what the
+          // value is and a type the wire format can carry. OBJECT has no serializer, which made `SELECT *` on any
+          // table with an OPEN_STRUCT column fail with "Error serializing response".
+          return JSON;
         case UNKNOWN:
           return UNKNOWN;
         default:
@@ -1151,6 +1085,19 @@ public class DataSchema {
         default:
           throw new IllegalStateException("Cannot convert ColumnDataType: " + this + " to PinotDataType");
       }
+    }
+
+    @Nullable
+    public static ColumnDataType forName(String typeName) {
+      return NAME_TO_TYPES.get(typeName);
+    }
+
+    public static boolean isArray(String typeName) {
+      ColumnDataType type = NAME_TO_TYPES.get(typeName);
+      if (type == null) {
+        return false;
+      }
+      return type.isArray();
     }
 
     /// Renders a single UUID as its canonical lowercase RFC 4122 string. Accepts every representation

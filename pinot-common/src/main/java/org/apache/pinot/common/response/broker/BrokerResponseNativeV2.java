@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.common.response.broker;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,21 +40,23 @@ import org.apache.pinot.common.response.ProcessingException;
 /// TODO: Currently this class cannot be used to deserialize the JSON response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons", "maxRowsInJoinReached",
-    "maxRowsInJoin", "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats", "streamStatsCoverage",
+    "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons", "maxRowsInJoinReached", "maxRowsInJoin",
+    "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats", "streamStatsCoverage",
     "maxRowsInOperator", "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
     "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
-    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "numSegmentsPrunedByValue", "numRemoteAccesses", "remoteAccessBytes", "numDirectRemoteAccesses",
+    "directRemoteAccessBytes", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed",
-    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied"
+    "totalMemAllocatedBytes", "pools", "rlsFiltersApplied", "approximatedResult", "groupsTrimmed",
+    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied",
+    "responseMetadata"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -77,6 +82,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   /// virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of
   /// rows in the table.
   private long _maxRowsInOperator;
+  private long _totalMemAllocatedBytes;
   private String _requestId;
   private String _clientRequestId;
   private String _brokerId;
@@ -91,6 +97,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private Integer _mseLiteLeafStageEffectiveLimit;
   @Nullable
   private Boolean _mseLiteFanOutAdjustedLimitApplied;
+  private final Map<String, JsonNode> _responseMetadata = new HashMap<>();
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
@@ -118,7 +125,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean isPartialResult() {
     return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
-        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached();
+        || isMaxRowsInJoinReached() || isMaxRowsInWindowReached() || isMseLiteLeafStageLimitReached();
   }
 
   @Override
@@ -175,6 +182,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached) {
     _brokerStats.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, mseLiteLeafStageLimitReached);
+  }
+
+  /// Merged from the stats that the operators of every stage report.
+  @JsonProperty("approximatedResult")
+  @Override
+  public boolean isApproximatedResult() {
+    return _brokerStats.getBoolean(StatKey.APPROXIMATED_RESULT);
+  }
+
+  public void mergeApproximatedResult(boolean approximatedResult) {
+    _brokerStats.merge(StatKey.APPROXIMATED_RESULT, approximatedResult);
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -242,6 +260,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return _stageStats;
   }
 
+  /// Removes the given broker stat from the response, so that it reads as 0.
+  public void removeBrokerStat(StatKey key) {
+    _brokerStats.remove(key);
+  }
+
   public void setStageStats(ObjectNode stageStats) {
     _stageStats = stageStats;
   }
@@ -264,6 +287,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeMaxRowsInOperator(long maxRows) {
     _maxRowsInOperator = Math.max(_maxRowsInOperator, maxRows);
+  }
+
+  /// Returns the heap bytes allocated by the query across all its stages and workers, as reported in the stage stats.
+  /// This is the total allocated (including short-lived objects), not the peak heap used. It is 0 unless thread
+  /// allocated bytes measurement is enabled on the brokers and servers.
+  public long getTotalMemAllocatedBytes() {
+    return _totalMemAllocatedBytes;
+  }
+
+  public void addTotalMemAllocatedBytes(long bytes) {
+    _totalMemAllocatedBytes += bytes;
   }
 
   @Override
@@ -403,6 +437,30 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE);
   }
 
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumRemoteAccesses() {
+    return _brokerStats.getLong(StatKey.NUM_REMOTE_ACCESSES);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getRemoteAccessBytes() {
+    return _brokerStats.getLong(StatKey.REMOTE_ACCESS_BYTES);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumDirectRemoteAccesses() {
+    return _brokerStats.getLong(StatKey.NUM_DIRECT_REMOTE_ACCESSES);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getDirectRemoteAccessBytes() {
+    return _brokerStats.getLong(StatKey.DIRECT_REMOTE_ACCESS_BYTES);
+  }
+
   @Override
   public long getBrokerReduceTimeMs() {
     return _brokerReduceTimeMs;
@@ -477,6 +535,22 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return Map.of();
   }
 
+  // JsonIgnore(false) re-enables the property here: the interface default getter is @JsonIgnore
+  // (so it does not register responseMetadata as a known setterless property on legacy impls that
+  // don't override it), and that ignore would otherwise be inherited by this override.
+  @JsonIgnore(false)
+  @JsonProperty("responseMetadata")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Override
+  public Map<String, JsonNode> getResponseMetadata() {
+    return _responseMetadata;
+  }
+
+  @Override
+  public void putResponseMetadata(String key, JsonNode value) {
+    _responseMetadata.put(key, value);
+  }
+
   @Override
   public void setPools(Set<Integer> pools) {
     _pools = pools;
@@ -536,7 +610,12 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
       }
     },
     EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
-    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_REMOTE_ACCESSES(StatMap.Type.LONG),
+    REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    NUM_DIRECT_REMOTE_ACCESSES(StatMap.Type.LONG),
+    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    APPROXIMATED_RESULT(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

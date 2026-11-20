@@ -55,6 +55,13 @@ public class NonAggregationGroupByToDistinctQueryRewriter implements QueryRewrit
     if (pinotQuery.getGroupingSets() != null) {
       return pinotQuery;
     }
+    // DISTINCT has no reduce step that evaluates a HAVING filter, and the rewrite drops the GROUP BY list the filter
+    // is validated against, so a query carrying one is left alone. CalciteSqlParser.validateHavingClause() then
+    // either accepts it -- the aggregation keeps it on the GROUP BY reduce path, which does evaluate HAVING -- or
+    // rejects it, rather than letting the predicate disappear here.
+    if (pinotQuery.getHavingExpression() != null) {
+      return pinotQuery;
+    }
     for (Expression select : pinotQuery.getSelectList()) {
       if (CalciteSqlParser.isAggregateExpression(select)) {
         return pinotQuery;

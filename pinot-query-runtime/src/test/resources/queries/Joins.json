@@ -108,5 +108,61 @@
         "sql": "SELECT c.name, o.total_amount FROM {customers} c JOIN (SELECT customer_id, SUM(amount) as total_amount FROM {orders} GROUP BY customer_id) o ON c.customer_id = o.customer_id ORDER BY c.name"
       }
     ]
+  },
+  "join_with_mv_filter": {
+    "comment": "ARRAY_TO_MV filters in WHERE must be pushed below the join to the leaf stage, the only stage that can run them. An MV predicate matches a row if any value matches.",
+    "tables": {
+      "orders": {
+        "schema": [
+          {"name": "order_id", "type": "STRING"},
+          {"name": "customer_id", "type": "STRING"},
+          {"name": "status", "type": "STRING"},
+          {"name": "tags", "type": "STRING", "isSingleValue": false}
+        ],
+        "inputs": [
+          ["o1", "c1", "open", ["urgent", "vip"]],
+          ["o2", "c1", "open", ["urgent"]],
+          ["o3", "c2", "closed", ["urgent"]],
+          ["o4", "c2", "open", ["vip"]],
+          ["o5", "c3", "open", ["normal"]]
+        ]
+      },
+      "customers": {
+        "schema": [
+          {"name": "customer_id", "type": "STRING"},
+          {"name": "name", "type": "STRING"}
+        ],
+        "inputs": [
+          ["c1", "Alice"],
+          ["c2", "Bob"],
+          ["c3", "Charlie"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "ARRAY_TO_MV equality with another conjunct on the same side",
+        "sql": "SELECT o.order_id, c.name FROM {orders} o JOIN {customers} c ON o.customer_id = c.customer_id WHERE o.status = 'open' AND ARRAY_TO_MV(o.tags) = 'urgent' ORDER BY o.order_id",
+        "outputs": [
+          ["o1", "Alice"],
+          ["o2", "Alice"]
+        ]
+      },
+      {
+        "description": "Two ARRAY_TO_MV equalities on the same column are not folded to false",
+        "sql": "SELECT o.order_id, c.name FROM {orders} o JOIN {customers} c ON o.customer_id = c.customer_id WHERE ARRAY_TO_MV(o.tags) = 'urgent' AND ARRAY_TO_MV(o.tags) = 'vip' ORDER BY o.order_id",
+        "outputs": [
+          ["o1", "Alice"]
+        ]
+      },
+      {
+        "description": "ARRAY_TO_MV IN filter with a filter on the other side and an aggregate above the join",
+        "sql": "SELECT c.name, COUNT(*) FROM {orders} o JOIN {customers} c ON o.customer_id = c.customer_id WHERE ARRAY_TO_MV(o.tags) IN ('urgent', 'vip') AND c.name <> 'Charlie' GROUP BY c.name ORDER BY c.name",
+        "outputs": [
+          ["Alice", 2],
+          ["Bob", 2]
+        ]
+      }
+    ]
   }
 }

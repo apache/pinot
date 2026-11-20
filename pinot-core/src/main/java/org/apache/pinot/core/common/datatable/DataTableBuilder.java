@@ -47,6 +47,7 @@ import org.roaringbitmap.RoaringBitmap;
 @InterfaceStability.Evolving
 public interface DataTableBuilder {
 
+  /// Starts a row. Callers must set every column, using [#setNull] for null values, before calling [#finishRow].
   void startRow();
 
   void setColumn(int colId, int value);
@@ -89,7 +90,7 @@ public interface DataTableBuilder {
   void setColumn(int colId, ByteArray[] values)
       throws IOException;
 
-  void setColumn(int colId, AggregationFunction.SerializedIntermediateResult value)
+  void setColumn(int colId, AggregationFunction.SerializedResult value)
       throws IOException;
 
   /// Writes a `null` for the given column of the current row.

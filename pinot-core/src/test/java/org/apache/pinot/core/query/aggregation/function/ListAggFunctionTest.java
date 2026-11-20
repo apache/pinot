@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
@@ -26,10 +27,12 @@ import org.apache.pinot.core.query.aggregation.function.array.ListAggDistinctFun
 import org.apache.pinot.core.query.aggregation.function.array.ListAggFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class ListAggFunctionTest extends AbstractAggregationFunctionTest {
@@ -52,8 +55,8 @@ public class ListAggFunctionTest extends AbstractAggregationFunctionTest {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.STRING;
+    public DataType getValueType() {
+      return DataType.STRING;
     }
   }
 
@@ -75,8 +78,8 @@ public class ListAggFunctionTest extends AbstractAggregationFunctionTest {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.STRING;
+    public DataType getValueType() {
+      return DataType.STRING;
     }
   }
 
@@ -106,8 +109,7 @@ public class ListAggFunctionTest extends AbstractAggregationFunctionTest {
 
   @Test
   public void testListAggDistinctAggregate() {
-    ListAggDistinctFunction fn =
-        new ListAggDistinctFunction(ExpressionContext.forIdentifier("myField"), ",", false);
+    ListAggDistinctFunction fn = new ListAggDistinctFunction(ExpressionContext.forIdentifier("myField"), ",", false);
     AggregationResultHolder holder = fn.createAggregationResultHolder();
     fn.aggregate(2, holder,
         Map.of(ExpressionContext.forIdentifier("myField"), new TestStringMVBlock(new String[][]{{"A", "B"}, {"C"}})));
@@ -119,8 +121,7 @@ public class ListAggFunctionTest extends AbstractAggregationFunctionTest {
 
   @Test
   public void testListAggDistinctAggregateSV() {
-    ListAggDistinctFunction fn =
-        new ListAggDistinctFunction(ExpressionContext.forIdentifier("svField"), ",", false);
+    ListAggDistinctFunction fn = new ListAggDistinctFunction(ExpressionContext.forIdentifier("svField"), ",", false);
     AggregationResultHolder holder = fn.createAggregationResultHolder();
     fn.aggregate(3, holder,
         Map.of(ExpressionContext.forIdentifier("svField"), new TestStringSVBlock(new String[]{"A", "B", "C"})));
@@ -149,5 +150,36 @@ public class ListAggFunctionTest extends AbstractAggregationFunctionTest {
         Map.of(ExpressionContext.forIdentifier("mvField"), new TestStringMVBlock(new String[][]{{"A"}, {"B", "C"}})));
     assertEquals(fn.extractFinalResult(gb.getResult(0)), "A");
     assertEquals(fn.extractFinalResult(gb.getResult(1)), "A:B:C");
+  }
+
+  @Test
+  public void testMergeFinalResult() {
+    ListAggFunction fn = new ListAggFunction(ExpressionContext.forIdentifier("myField"), ",", false);
+    assertEquals(fn.mergeFinalResult("A,B", "C"), "A,B,C");
+    assertEquals(fn.mergeFinalResult("", "A"), ",A");
+    assertEquals(fn.mergeFinalResult("A", ""), "A,");
+
+    ListAggDistinctFunction distinctFn =
+        new ListAggDistinctFunction(ExpressionContext.forIdentifier("myField"), ",", false);
+    assertEquals(distinctFn.mergeFinalResult("A,B", "C"), "A,B,C");
+    assertEquals(distinctFn.mergeFinalResult("", "A"), ",A");
+    assertEquals(distinctFn.mergeFinalResult("A", ""), "A,");
+  }
+
+  @Test
+  public void testFinalResultOfNullValues() {
+    RoaringBitmap nullBitmap = RoaringBitmap.bitmapOf(0, 1);
+    for (ListAggFunction fn : List.of(
+        new ListAggFunction(ExpressionContext.forIdentifier("myField"), ",", true),
+        new ListAggDistinctFunction(ExpressionContext.forIdentifier("myField"), ",", true)
+    )) {
+      AggregationResultHolder holder = fn.createAggregationResultHolder();
+      fn.aggregate(2, holder, Map.of(ExpressionContext.forIdentifier("myField"),
+          SyntheticBlockValSets.Str.create(nullBitmap, new String[]{"", ""})));
+      String finalResult = fn.extractFinalResult(holder.getResult());
+      assertNull(finalResult);
+      assertEquals(AggregationFunctionUtils.mergeFinalResult(fn, finalResult, "A"), "A");
+      assertEquals(AggregationFunctionUtils.mergeFinalResult(fn, "A", finalResult), "A");
+    }
   }
 }

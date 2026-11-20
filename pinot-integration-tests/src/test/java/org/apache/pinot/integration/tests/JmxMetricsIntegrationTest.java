@@ -110,15 +110,15 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
 
     postQuery("SELECT COUNT(*) FROM mytable");
 
+    // Works with the multi-stage query engine too. The subquery counts as a query of its own.
+    JsonNode response = postQuery("SELECT AirlineID, count(*) FROM mytable WHERE IN_SUBQUERY(airlineID, 'SELECT "
+        + "ID_SET(AirlineID) FROM mytable WHERE Carrier = ''AA''') = 1 GROUP BY AirlineID;");
+    assertFalse(response.get("resultTable").get("rows").isEmpty());
+
     // Run some queries that are known to not work as is with the multi-stage query engine
 
     // MV column requires ARRAY_TO_MV wrapper to be used in filter predicates
-    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE DivAirports = 'JFK'");
-    assertFalse(response.get("resultTable").get("rows").isEmpty());
-
-    // Unsupported function
-    response = postQuery("SELECT AirlineID, count(*) FROM mytable WHERE IN_SUBQUERY(airlineID, 'SELECT "
-        + "ID_SET(AirlineID) FROM mytable WHERE Carrier = ''AA''') = 1 GROUP BY AirlineID;");
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE DivAirports = 'JFK'");
     assertFalse(response.get("resultTable").get("rows").isEmpty());
 
     // Repeated columns in an ORDER BY query
@@ -131,14 +131,14 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
     TestUtils.waitForCondition((aVoid) -> {
       try {
         multiStageMigrationMetricValue.set((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"));
-        return multiStageMigrationMetricValue.get() == 3L;
+        return multiStageMigrationMetricValue.get() == 2L;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 5000, "Expected value of MBean 'pinot.broker.singleStageQueriesInvalidMultiStage' to be: "
-        + 3L + "; actual value: " + multiStageMigrationMetricValue.get());
+        + 2L + "; actual value: " + multiStageMigrationMetricValue.get());
 
-    assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 3L);
+    assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 2L);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

@@ -23,14 +23,15 @@ import java.util.Map;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.roaringbitmap.RoaringBitmap;
@@ -39,25 +40,23 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.testng.Assert.*;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
-/// Covers {@link ItemTransformFunction#getNullBitmap} for both backing column types.
+/// Covers [ItemTransformFunction#getNullBitmap] for both backing column types.
 ///
-/// <p>OPEN_STRUCT keeps a per-key presence bitmap, so {@code getNullBitmap} reads the per-key value set and must return
-/// block-local indices (projected by
-/// {@link org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet}) rather than raw segment-level doc IDs.
+/// OPEN_STRUCT keeps a per-key presence bitmap, so `getNullBitmap` reads the per-key value set and must return
+/// block-local indices (projected by [org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet]) rather than raw
+/// segment-level doc IDs.
 ///
-/// <p>MAP has no per-key null information, so {@code getNullBitmap} must fall back to
-/// {@link BaseTransformFunction#getNullBitmap} — the OR of the argument bitmaps, which yields the MAP column's own
-/// null bitmap. Reading the per-key value set for a MAP column would report "no nulls" for a key that is absent from
-/// every doc, because an absent MAP key resolves to a
-/// {@link org.apache.pinot.segment.local.segment.index.map.NullDataSource} carrying only a forward index.
+/// MAP has no per-key null information for a key present in the column, so `getNullBitmap` must fall back to
+/// [BaseTransformFunction#getNullBitmap], the OR of the argument bitmaps, which yields the MAP column's own null
+/// bitmap. A key absent from the column resolves to an all-null
+/// [org.apache.pinot.segment.local.segment.index.datasource.NullDataSource], whose null value vector is exact, so the
+/// per-key value set is used for it.
 public class ItemTransformFunctionNullBitmapTest {
   private static final String COLUMN = "myMap";
   private static final String KEY = "foo";
@@ -78,9 +77,9 @@ public class ItemTransformFunctionNullBitmapTest {
   @Mock
   private DataSource _keyDataSource;
   @Mock
-  private DataSourceMetadata _keyMetadata;
+  private NullValueVectorReader _keyNullValueVector;
   @Mock
-  private DataSourceMetadata _parentMetadata;
+  private DataSourceMetadata _keyMetadata;
   @Mock
   private IdentifierTransformFunction _identifierArg;
   @Mock
@@ -94,7 +93,7 @@ public class ItemTransformFunctionNullBitmapTest {
     when(forwardIndex.isDictionaryEncoded()).thenReturn(false);
     doReturn(forwardIndex).when(_keyDataSource).getForwardIndex();
     when(_keyDataSource.getDataSourceMetadata()).thenReturn(_keyMetadata);
-    when(_keyMetadata.getDataType()).thenReturn(FieldSpec.DataType.STRING);
+    when(_keyMetadata.getDataType()).thenReturn(DataType.STRING);
     when(_keyMetadata.isSingleValue()).thenReturn(true);
 
     when(_identifierArg.getColumnName()).thenReturn(COLUMN);
@@ -118,6 +117,7 @@ public class ItemTransformFunctionNullBitmapTest {
   @Test
   public void testOpenStructReturnsBlockLocalPerKeyIndices() {
     when(_openStructDataSource.getDataSource(KEY)).thenReturn(_keyDataSource);
+    when(_keyDataSource.getNullValueVector()).thenReturn(_keyNullValueVector);
 
     RoaringBitmap projectedBitmap = RoaringBitmap.bitmapOf(0, 2);
     when(_perKeyBlockValSet.getNullBitmap()).thenReturn(projectedBitmap);
@@ -133,6 +133,7 @@ public class ItemTransformFunctionNullBitmapTest {
   @Test
   public void testOpenStructIgnoresParentColumnBitmap() {
     when(_openStructDataSource.getDataSource(KEY)).thenReturn(_keyDataSource);
+    when(_keyDataSource.getNullValueVector()).thenReturn(_keyNullValueVector);
     when(_perKeyBlockValSet.getNullBitmap()).thenReturn(RoaringBitmap.bitmapOf(0, 2));
 
     RoaringBitmap result = initFunction(_openStructDataSource).getNullBitmap(_projectionBlock);
@@ -144,22 +145,19 @@ public class ItemTransformFunctionNullBitmapTest {
   @Test
   public void testOpenStructReturnsNullWhenNoNulls() {
     when(_openStructDataSource.getDataSource(KEY)).thenReturn(_keyDataSource);
+    when(_keyDataSource.getNullValueVector()).thenReturn(_keyNullValueVector);
     when(_perKeyBlockValSet.getNullBitmap()).thenReturn(null);
 
     assertNull(initFunction(_openStructDataSource).getNullBitmap(_projectionBlock));
   }
 
   /// A key absent from the OPEN_STRUCT segment resolves to an all-null
-  /// {@link org.apache.pinot.segment.local.segment.index.openstruct.OpenStructNullDataSource}, which still exposes
-  /// per-key nulls — so the per-key value set stays authoritative.
+  /// [org.apache.pinot.segment.local.segment.index.datasource.NullDataSource], which still exposes per-key nulls, so
+  /// the per-key value set stays authoritative.
   @Test
   public void testOpenStructAbsentKeyStillUsesPerKeyBitmap() {
-    when(_openStructDataSource.getDataSource(KEY)).thenReturn(null);
-    when(_openStructDataSource.getFieldSpec()).thenReturn(
-        new ComplexFieldSpec(COLUMN, FieldSpec.DataType.OPEN_STRUCT, true,
-            Map.of(KEY, new DimensionFieldSpec(KEY, FieldSpec.DataType.STRING, true))));
-    when(_openStructDataSource.getDataSourceMetadata()).thenReturn(_parentMetadata);
-    when(_parentMetadata.getNumDocs()).thenReturn(NUM_DOCS);
+    when(_openStructDataSource.getDataSource(KEY)).thenReturn(
+        new NullDataSource(new DimensionFieldSpec(KEY, DataType.STRING, true), NUM_DOCS));
 
     RoaringBitmap allNull = RoaringBitmap.bitmapOf(0, 1, 2, 3, 4);
     when(_perKeyBlockValSet.getNullBitmap()).thenReturn(allNull);
@@ -171,7 +169,7 @@ public class ItemTransformFunctionNullBitmapTest {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // MAP — no per-key null info, fall back to the MAP column's own (conservative) bitmap
+  // MAP — a present key has no per-key null info (fall back to the MAP column's bitmap), an absent key is all-null
   // ---------------------------------------------------------------------------------------------
 
   /// The per-key value set reports "no nulls" (MAP keeps no per-key null vector), but the MAP column itself is null
@@ -190,18 +188,20 @@ public class ItemTransformFunctionNullBitmapTest {
   }
 
   /// A MAP key absent from the segment resolves to a
-  /// {@link org.apache.pinot.segment.local.segment.index.map.NullDataSource}, which carries no null value vector.
-  /// The fallback must still surface the MAP column's own nulls rather than reporting none.
+  /// [org.apache.pinot.segment.local.segment.index.datasource.NullDataSource], whose null value vector marks every
+  /// document null, so the per-key value set is authoritative and the MAP column's own bitmap must not widen it.
   @Test
-  public void testMapAbsentKeyFallsBackToParentColumnBitmap() {
-    when(_mapDataSource.getDataSource(KEY)).thenReturn(null);
-    when(_perKeyBlockValSet.getNullBitmap()).thenReturn(null);
-    when(_identifierArg.getNullBitmap(_projectionBlock)).thenReturn(RoaringBitmap.bitmapOf(2));
+  public void testMapAbsentKeyUsesPerKeyBitmap() {
+    when(_mapDataSource.getDataSource(KEY)).thenReturn(
+        new NullDataSource(new DimensionFieldSpec(KEY, DataType.STRING, true), NUM_DOCS));
+
+    RoaringBitmap allNull = RoaringBitmap.bitmapOf(0, 1, 2, 3, 4);
+    when(_perKeyBlockValSet.getNullBitmap()).thenReturn(allNull);
 
     RoaringBitmap result = initFunction(_mapDataSource).getNullBitmap(_projectionBlock);
 
-    assertNotNull(result);
-    assertEquals(result, RoaringBitmap.bitmapOf(2));
+    assertEquals(result, allNull);
+    verify(_identifierArg, never()).getNullBitmap(any());
   }
 
   @Test

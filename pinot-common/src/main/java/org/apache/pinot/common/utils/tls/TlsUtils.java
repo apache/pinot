@@ -342,8 +342,11 @@ public final class TlsUtils {
     SSLFactory sslFactory =
         RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
             tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
-    SslContextBuilder sslContextBuilder =
-        SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
+    // Keep Pinot's existing TLS behavior: verify certificate trust without hostname verification.
+    // Netty 4.2 enables hostname verification by default, which requires a peer hostname.
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
+        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()))
+        .endpointIdentificationAlgorithm(null);
     sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
     sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
 

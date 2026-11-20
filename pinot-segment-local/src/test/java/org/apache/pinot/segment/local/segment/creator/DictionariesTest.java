@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
@@ -76,7 +77,10 @@ import org.testng.annotations.Test;
 
 public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
   private static final String AVRO_DATA = "data/test_sample_data.avro";
-  private static final File INDEX_DIR = new File(DictionariesTest.class.toString());
+  // Per-run unique dir so this test never shares an index directory with DictionaryOptimiserTest
+  // (which derived its path from the same class) when the two run concurrently in parallel forks.
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectoryPath(), DictionariesTest.class.getSimpleName() + "-" + UUID.randomUUID());
   private static final Map<String, Set<Object>> UNIQUE_ENTRIES = new HashMap<>();
 
   private static File _segmentDirectory;
