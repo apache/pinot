@@ -35,7 +35,9 @@ import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.recordtransformer.DataTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.ExpressionTransformer;
+import org.apache.pinot.segment.local.recordtransformer.NullValueTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformerUtils;
 import org.apache.pinot.segment.local.recordtransformer.TransformProvenanceUtils;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
@@ -169,8 +171,8 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
 
     Set<String> transformColumnsToRecompute = getTransformColumnsToRecompute(changedTransformColumns,
         refreshColumnSet, transformFunctionByColumn, transformFingerprintByColumn, segmentMetadata);
-    Map<String, Object> replayDefaultValues = getReplayDefaultValues(refreshColumnSet, transformFunctionByColumn,
-        tableConfig, schema, segmentMetadata);
+    Map<String, Object> replayDefaultValues = getReplayDefaultValues(refreshColumnSet, changedTransformColumns,
+        transformFunctionByColumn, tableConfig, schema, segmentMetadata);
     trustedTransformColumns.removeAll(transformColumnsToRecompute);
 
     if (!needPreprocess && refreshColumnSet.isEmpty() && changedTransformColumns.isEmpty()) {
@@ -198,18 +200,18 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       List<RecordTransformer> recordTransformers = new ArrayList<>(
           RecordTransformerUtils.getDefaultTransformers(tableConfig, schema, fieldsToRead, trustedTransformColumns));
-      // Defaults go after the enrichers, which may supply the value, and before the expressions, which may read it.
-      // Without an expression transformer nothing needs them early; NullValueTransformer fills them as usual.
-      int expressionTransformerIndex = indexOfExpressionTransformer(recordTransformers);
-      if (!replayDefaultValues.isEmpty() && expressionTransformerIndex >= 0) {
-        recordTransformers.add(expressionTransformerIndex, new ReplayDefaultValueTransformer(replayDefaultValues));
+      ReplayDefaultValueTransformer replayDefaults =
+          new ReplayDefaultValueTransformer(replayDefaultValues, changedTransformColumns);
+      if (!replayDefaultValues.isEmpty()) {
+        // Observe producer output after enrichment. Expressions can read the defaults before the normal null pass.
+        recordTransformers.add(indexOfReplayDefaults(recordTransformers), replayDefaults);
       }
       driver.init(config, new RecordReaderSegmentCreationDataSource(recordReader),
           new TransformPipeline(tableConfig.getTableName(), recordTransformers));
       driver.build();
       preserveOriginalColumnMetadata(new File(workingDir, segmentName), originalColumnMetadata,
-          transformColumnsToRecompute, changedTransformColumns, transformFunctionByColumn,
-          replayDefaultValues.keySet());
+          transformColumnsToRecompute, changedTransformColumns, replayDefaultValues.keySet(),
+          replayDefaults.getWhollyDefaultedColumns());
       _eventObserver.notifyProgress(pinotTaskConfig,
           "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
               + driver.getSkippedRowsFound() + ", sanitized rows:" + driver.getSanitizedRowsFound());
@@ -280,7 +282,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
           recomputeRoots.add(column);
         }
       } else if (columnMetadata == null
-          || columnMetadata.getTransformFunctionProvenanceVersion() != ColumnMetadata.UNAVAILABLE) {
+          || TransformProvenanceUtils.hasKnownProvenance(columnMetadata)) {
         changedInputs.add(column);
         recomputeRoots.add(column);
       }
@@ -307,16 +309,19 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
   }
 
   private static Map<String, Object> getReplayDefaultValues(Set<String> refreshColumnSet,
-      Map<String, String> transformFunctionByColumn, TableConfig tableConfig, Schema schema,
-      SegmentMetadataImpl segmentMetadata) {
+      Set<String> changedTransformColumns, Map<String, String> transformFunctionByColumn, TableConfig tableConfig,
+      Schema schema, SegmentMetadataImpl segmentMetadata) {
     Map<String, Object> replayDefaultValues = new HashMap<>();
-    for (String column : refreshColumnSet) {
+    Set<String> candidates = new HashSet<>(refreshColumnSet);
+    // A removed expression is also a candidate even when the schema did not otherwise change.
+    candidates.addAll(changedTransformColumns);
+    for (String column : candidates) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(column);
       if (fieldSpec == null || transformFunctionByColumn.containsKey(column)) {
         continue;
       }
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata == null || columnMetadata.isAutoGenerated()) {
+      if (columnMetadata == null || columnMetadata.isAutoGenerated() || changedTransformColumns.contains(column)) {
         replayDefaultValues.put(column,
             NullValueTransformerUtils.getDefaultNullValue(fieldSpec, tableConfig, schema));
       }
@@ -342,7 +347,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
         // A persisted legacy output is an authoritative barrier because its values may have come from the source.
         // Known-provenance outputs and non-persisted intermediates must follow an upstream value change.
         if ((columnMetadata == null
-            || columnMetadata.getTransformFunctionProvenanceVersion() != ColumnMetadata.UNAVAILABLE)
+            || TransformProvenanceUtils.hasKnownProvenance(columnMetadata))
             && affectedOutputs.add(dependent)) {
           pending.addLast(dependent);
         }
@@ -376,8 +381,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
 
   private static void preserveOriginalColumnMetadata(File refreshedSegmentDir,
       Map<String, ColumnMetadata> originalMetadata, Set<String> transformColumnsToRecompute,
-      Set<String> changedTransformColumns, Map<String, String> transformFunctionByColumn,
-      Set<String> replayDefaultColumns)
+      Set<String> changedTransformColumns, Set<String> replayDefaultColumns, Set<String> whollyDefaultedColumns)
       throws Exception {
     if (originalMetadata.isEmpty() && replayDefaultColumns.isEmpty()) {
       return;
@@ -386,20 +390,12 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     for (Map.Entry<String, ColumnMetadata> entry : originalMetadata.entrySet()) {
       String column = entry.getKey();
       ColumnMetadata columnMetadata = entry.getValue();
-      // A column whose transform was removed was just regenerated from the schema default, which makes it a default
-      // column even if the transform ran at ingestion time: a later default-value change must regenerate it.
-      boolean regeneratedFromDefault =
-          changedTransformColumns.contains(column) && transformFunctionByColumn.get(column) == null;
+      boolean isAutoGenerated = replayDefaultColumns.contains(column)
+          ? whollyDefaultedColumns.contains(column) : columnMetadata.isAutoGenerated();
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column,
               V1Constants.MetadataKeys.Column.IS_AUTO_GENERATED),
-          regeneratedFromDefault || columnMetadata.isAutoGenerated());
-      if (changedTransformColumns.contains(column)) {
-        // A removed transform is deliberately regenerated as schema default values. Record that known no-transform
-        // state so adding an expression later is distinguishable from legacy metadata with unknown provenance.
-        if (transformFunctionByColumn.get(column) == null) {
-          BaseSegmentCreator.addTransformFunction(properties, column, null);
-        }
-      } else if (!transformColumnsToRecompute.contains(column)) {
+          isAutoGenerated);
+      if (!changedTransformColumns.contains(column) && !transformColumnsToRecompute.contains(column)) {
         // Recomputed ancestors keep the provenance emitted by this build. In particular, a continue-on-error fallback
         // must not be overwritten with the old trusted fingerprint.
         if (columnMetadata.getTransformFunctionProvenanceVersion() == ColumnMetadata.UNAVAILABLE) {
@@ -422,10 +418,9 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
         }
       }
     }
-    for (String column : replayDefaultColumns) {
-      // Row replay supplies this value before expressions, but the regular segment-generation path otherwise records
-      // it like a source field. Preserve its default-column identity so a later structural or transform change can
-      // regenerate it instead of treating the previously materialized default as authoritative input.
+    for (String column : whollyDefaultedColumns) {
+      // The generator sees the replayed value as input. Record columns supplied entirely by replay so server reload
+      // can apply a later schema default change.
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column,
           V1Constants.MetadataKeys.Column.IS_AUTO_GENERATED), true);
       BaseSegmentCreator.addTransformFunction(properties, column, null);
@@ -433,13 +428,21 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     SegmentMetadataUtils.savePropertiesConfiguration(properties, refreshedSegmentDir);
   }
 
-  private static int indexOfExpressionTransformer(List<RecordTransformer> recordTransformers) {
+  private static int indexOfReplayDefaults(List<RecordTransformer> recordTransformers) {
+    int defaultPosition = recordTransformers.size();
     for (int i = 0; i < recordTransformers.size(); i++) {
-      if (recordTransformers.get(i) instanceof ExpressionTransformer) {
+      RecordTransformer transformer = recordTransformers.get(i);
+      if (transformer instanceof ExpressionTransformer) {
         return i;
       }
+      if (transformer instanceof DataTypeTransformer) {
+        // The last type transformer writes placeholders for missing schema fields and runs after the enrichers.
+        defaultPosition = i;
+      } else if (transformer instanceof NullValueTransformer && defaultPosition == recordTransformers.size()) {
+        defaultPosition = i;
+      }
     }
-    return -1;
+    return defaultPosition;
   }
 
   private static void closeSegmentDirectoryQuietly(SegmentDirectory segmentDirectory) {
@@ -452,23 +455,42 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     }
   }
 
-  /// Supplies current schema defaults before expression evaluation when replay intentionally omits a mutable default
-  /// column. The ordinary null-value transformer runs after expressions, which is too late for dependent transforms.
-  /// A field an enricher already populated is left alone: [GenericRow#putValue] would not clear the null marker.
+  /// Supplies defaults before expressions and tracks which candidates are absent from every replayed row.
+  /// Explicit nulls are producer values for provenance purposes and retain their null marker.
   private static final class ReplayDefaultValueTransformer implements RecordTransformer {
     private final Map<String, Object> _defaultValues;
+    private final Set<String> _changedTransforms;
+    private final Set<String> _producedColumns = new HashSet<>();
+    private boolean _observedRows;
 
-    private ReplayDefaultValueTransformer(Map<String, Object> defaultValues) {
+    private ReplayDefaultValueTransformer(Map<String, Object> defaultValues, Set<String> changedTransforms) {
       _defaultValues = defaultValues;
+      _changedTransforms = changedTransforms;
     }
 
     @Override
     public void transform(GenericRow record) {
+      _observedRows = true;
       for (Map.Entry<String, Object> entry : _defaultValues.entrySet()) {
-        if (record.getValue(entry.getKey()) == null) {
-          record.putDefaultNullValue(entry.getKey(), entry.getValue());
+        String column = entry.getKey();
+        if (record.getFieldToValueMap().containsKey(column)) {
+          _producedColumns.add(column);
+        }
+        // For a removed transform, leave the missing input for dependent expressions exactly as in fresh ingestion.
+        // The regular null pass will then write the schema default.
+        if (record.getValue(column) == null && !_changedTransforms.contains(column)) {
+          record.putDefaultNullValue(column, entry.getValue());
         }
       }
+    }
+
+    private Set<String> getWhollyDefaultedColumns() {
+      if (!_observedRows) {
+        return Set.of();
+      }
+      Set<String> columns = new HashSet<>(_defaultValues.keySet());
+      columns.removeAll(_producedColumns);
+      return columns;
     }
   }
 
