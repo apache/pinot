@@ -1236,9 +1236,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(results.get(10).asText(), "hello!");
   }
 
-  /// The hint that a leaf-only `GROUP BY ARRAY_TO_MV(col)` uses to plan the MV aggregate: the plan without it fails,
-  /// so the planner plans the MV aggregate, which ignores the hint and runs inside the leaf stage. Without a hint, the
-  /// query keeps the plain leaf aggregate.
+  /// The hint that a leaf-only `GROUP BY ARRAY_TO_MV(col)` uses to plan the MV aggregate: with it, the plain aggregate
+  /// runs above the leaf stage, so the planner plans the MV aggregate, which ignores the hint and runs inside the leaf
+  /// stage. Without a hint, the query keeps the plain leaf aggregate.
   @DataProvider(name = "mvAggregateHint")
   public Object[][] mvAggregateHint() {
     return new Object[][]{{""}, {"/*+ aggOptions(is_skip_leaf_stage_group_by='true') */ "}};
@@ -1441,7 +1441,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     String join = "FROM mytable a JOIN mytable b ON a.FlightNum = b.FlightNum AND a.DaysSinceEpoch = b.DaysSinceEpoch ";
     String query = "SELECT ARRAY_TO_MV(a.RandomAirports), COUNT(*) " + join + "GROUP BY ARRAY_TO_MV(a.RandomAirports)";
-    // The planner plans the MV aggregate because the query fails without it.
+    // The aggregate cannot run in the leaf stage, so the planner plans the MV aggregate.
     Assertions.assertThat(explainPlan("EXPLAIN PLAN FOR " + query)).contains("PinotLogicalMvAggregate");
     JsonNode mvAggregate = postQuery(query);
     assertNoError(mvAggregate);
@@ -1480,8 +1480,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     return new Object[][]{{""}, {"/*+ joinOptions(join_strategy='lookup') */"}};
   }
 
-  /// With the hint `is_skip_leaf_stage_group_by`, the plan without the MV aggregate fails, so the planner plans the MV
-  /// aggregate, which ignores the hint. The result equals the plain aggregate of the query without the hint.
+  /// With the hint `is_skip_leaf_stage_group_by`, the plain aggregate runs above the leaf stage, so the planner plans
+  /// the MV aggregate, which ignores the hint. The result equals the plain aggregate of the query without the hint.
   @Test
   public void testMvAggregateSkipLeafHint()
       throws Exception {
@@ -1531,8 +1531,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(sortedRows(multiStage.get("resultTable").get("rows")), expectedRows);
   }
 
-  /// On a scan, the hint makes the plan without the MV aggregate fail, so the planner plans the MV aggregate (see
-  /// [#mvAggregateHint]). Above a join, the plan without the MV aggregate fails anyway.
+  /// On a scan, the hint makes the planner plan the MV aggregate (see [#mvAggregateHint]). Above a join, the planner
+  /// plans the MV aggregate with or without the hint.
   @DataProvider(name = "mvAggregateFromClauses")
   public Object[][] mvAggregateFromClauses() {
     return new Object[][]{
