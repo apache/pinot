@@ -20,12 +20,20 @@ package org.apache.pinot.segment.local.utils;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
+import org.apache.pinot.segment.local.utils.IngestionUtils.PartitioningListener;
+import org.apache.pinot.segment.local.utils.IngestionUtils.StreamDecoder;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
@@ -36,15 +44,43 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamDataDecoderResult;
+import org.apache.pinot.spi.stream.StreamMessage;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.slf4j.Logger;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
-/// Tests fields extraction from Schema dna TableConfig for ingestion
+
+/// Tests ingestion field extraction and shared stream initialization.
 public class IngestionUtilsTest {
+  private static final Logger LOGGER = mock(Logger.class);
+  private static final ThreadLocal<DecoderState> DECODER_STATE = ThreadLocal.withInitial(DecoderState::new);
 
   /// Transform functions have moved to table config. This test remains for backward compatible handling testing
   @Test
@@ -253,5 +289,177 @@ public class IngestionUtilsTest {
     Set<String> fields = IngestionUtils.getFieldsForRecordExtractor(tableConfig, schema);
     Assert.assertEquals(fields.size(), 3);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("a_b", "f_d", "ab")));
+  }
+
+  @Test
+  public void testPartitionFunctionUsesFullCountAndRetainsOriginalId() {
+    StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    when(provider.fetchPartitionCount(5000L)).thenReturn(4);
+    PartitioningListener listener = mock(PartitioningListener.class);
+    RealtimeSegmentConfig.Builder builder = new RealtimeSegmentConfig.Builder();
+
+    IngestionUtils.configureRealtimePartitioning(builder, partitionConfig(2), 3, provider, 5000L, LOGGER, listener);
+
+    RealtimeSegmentConfig config = builder.build();
+    assertEquals(config.getPartitionColumn(), "key");
+    assertEquals(config.getPartitionId(), 3);
+    assertEquals(config.getPartitionFunction().getNumPartitions(), 4);
+    assertEquals(config.getPartitionFunction().getPartition("7"), 3);
+    verify(listener).onPartitionCountMismatch(2, 4);
+    verify(listener, never()).onPartitionCountFetchFailure(anyInt(), any());
+  }
+
+  @Test
+  public void testPartitionCountLookupFailureUsesConfiguredCount() {
+    StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    IllegalStateException failure = new IllegalStateException("Metadata unavailable");
+    when(provider.fetchPartitionCount(10_000L)).thenThrow(failure);
+    PartitioningListener listener = mock(PartitioningListener.class);
+    RealtimeSegmentConfig.Builder builder = new RealtimeSegmentConfig.Builder();
+
+    IngestionUtils.configureRealtimePartitioning(builder, partitionConfig(4), 3, provider, 10_000L, LOGGER, listener);
+
+    RealtimeSegmentConfig config = builder.build();
+    assertEquals(config.getPartitionFunction().getNumPartitions(), 4);
+    assertEquals(config.getPartitionId(), 3);
+    verify(listener).onPartitionCountFetchFailure(4, failure);
+    verify(listener, never()).onPartitionCountMismatch(anyInt(), anyInt());
+  }
+
+  @DataProvider
+  public Object[][] absentOrUnsupportedPartitionConfig() {
+    return new Object[][]{
+        {null},
+        {new SegmentPartitionConfig(Map.of("a", new ColumnPartitionConfig("Modulo", 4),
+            "b", new ColumnPartitionConfig("Modulo", 4)))}
+    };
+  }
+
+  @Test(dataProvider = "absentOrUnsupportedPartitionConfig")
+  public void testAbsentOrUnsupportedPartitionConfigDoesNotQueryMetadata(
+      @Nullable SegmentPartitionConfig partitionConfig) {
+    StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    PartitioningListener listener = mock(PartitioningListener.class);
+    RealtimeSegmentConfig.Builder builder = new RealtimeSegmentConfig.Builder().setPartitionId(77);
+
+    IngestionUtils.configureRealtimePartitioning(builder, partitionConfig, 3, provider, 5000L, LOGGER, listener);
+
+    RealtimeSegmentConfig config = builder.build();
+    assertNull(config.getPartitionColumn());
+    assertNull(config.getPartitionFunction());
+    assertEquals(config.getPartitionId(), 77);
+    verifyNoInteractions(provider, listener);
+  }
+
+  @DataProvider
+  public Object[][] keyTypes() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "keyTypes")
+  public void testDecoderReceivesProjectedFieldsAndPreservesKeyType(boolean bytesKey)
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("table")
+        .addSingleValueDimension("value", DataType.STRING)
+        .addSingleValueDimension("__key", bytesKey ? DataType.BYTES : DataType.STRING)
+        .build();
+    StreamConfig streamConfig = new StreamConfig("table_REALTIME", streamMap("kafka"));
+    TableConfig table = new TableConfigBuilder(TableType.REALTIME).setTableName("table").build();
+    try {
+      StreamDecoder decoder = IngestionUtils.createStreamDecoder(streamConfig, table, schema, LOGGER,
+          RetryPolicies.noDelayRetryPolicy(1));
+      assertEquals(decoder.decoderClassName(), RecordingDecoder.class.getName());
+      assertTrue(DECODER_STATE.get()._fields.contains("value"));
+      assertEquals(DECODER_STATE.get()._topic, "topic");
+      byte[] key = "key".getBytes(StandardCharsets.UTF_8);
+      byte[] value = "payload".getBytes(StandardCharsets.UTF_8);
+      StreamMessageMetadata metadata = new StreamMessageMetadata.Builder()
+          .setOffset(new LongMsgOffset(0), new LongMsgOffset(1)).build();
+      StreamDataDecoderResult result =
+          decoder.decoder().decode(new StreamMessage<>(key, value, value.length, metadata));
+      assertNull(result.getException());
+      assertNotNull(result.getResult());
+      assertEquals(result.getResult().getValue("value"), "payload");
+      assertEquals(result.getResult().getValue("__key"), bytesKey ? key : "key");
+    } finally {
+      DECODER_STATE.remove();
+    }
+  }
+
+  @Test
+  public void testDecoderInitializationRetriesBeforeReturningUsableDecoder()
+      throws Exception {
+    DECODER_STATE.get()._failuresBeforeSuccess = 2;
+    try {
+      StreamDecoder decoder = createDecoderWithRetryLimit(3);
+      assertNotNull(decoder.decoder());
+      assertEquals(DECODER_STATE.get()._attempts, 3);
+    } finally {
+      DECODER_STATE.remove();
+    }
+  }
+
+  @Test
+  public void testDecoderInitializationDoesNotReturnAfterRetryExhaustion() {
+    DECODER_STATE.get()._failuresBeforeSuccess = 3;
+    try {
+      expectThrows(AttemptsExceededException.class, () -> createDecoderWithRetryLimit(2));
+      assertEquals(DECODER_STATE.get()._attempts, 2);
+    } finally {
+      DECODER_STATE.remove();
+    }
+  }
+
+  private static StreamDecoder createDecoderWithRetryLimit(int attempts)
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("table")
+        .addSingleValueDimension("value", DataType.STRING).build();
+    return IngestionUtils.createStreamDecoder(new StreamConfig("table_REALTIME", streamMap("kafka")),
+        new TableConfigBuilder(TableType.REALTIME).setTableName("table").build(), schema, LOGGER,
+        RetryPolicies.noDelayRetryPolicy(attempts));
+  }
+
+  private static SegmentPartitionConfig partitionConfig(int numPartitions) {
+    return new SegmentPartitionConfig(Map.of("key", new ColumnPartitionConfig("Modulo", numPartitions)));
+  }
+
+  private static Map<String, String> streamMap(String streamType) {
+    Map<String, String> stream = new HashMap<>();
+    stream.put("streamType", streamType);
+    stream.put("stream." + streamType + ".topic.name", "topic");
+    stream.put("stream." + streamType + ".decoder.class.name", RecordingDecoder.class.getName());
+    return stream;
+  }
+
+  /// Mutable initialization observations owned by the thread constructing the plugin decoder.
+  private static final class DecoderState {
+    private int _attempts;
+    private int _failuresBeforeSuccess;
+    private Set<String> _fields;
+    private String _topic;
+  }
+
+  /// A real plugin decoder whose controlled initialization failures exercise the factory retry boundary.
+  public static class RecordingDecoder implements StreamMessageDecoder<byte[]> {
+    @Override
+    public void init(Map<String, String> properties, Set<String> fieldsToRead, String topicName) {
+      DecoderState state = DECODER_STATE.get();
+      if (state._attempts++ < state._failuresBeforeSuccess) {
+        throw new IllegalStateException("Initialization is temporarily unavailable");
+      }
+      state._fields = Set.copyOf(fieldsToRead);
+      state._topic = topicName;
+    }
+
+    @Override
+    public GenericRow decode(byte[] payload, GenericRow destination) {
+      return decode(payload, 0, payload.length, destination);
+    }
+
+    @Override
+    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+      destination.putValue("value", new String(payload, offset, length, StandardCharsets.UTF_8));
+      return destination;
+    }
   }
 }

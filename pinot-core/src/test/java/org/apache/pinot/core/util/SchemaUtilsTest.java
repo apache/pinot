@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -39,17 +41,22 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotSame;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 
 
-/// Tests schema validations
+/// Tests schema validations and realtime segment schema preparation.
 public class SchemaUtilsTest {
   private static final String TABLE_NAME = "testTable";
   private static final String TIME_COLUMN = "timeColumn";
+  private static final long CREATION_TIME = 1_700_000_000_000L;
 
   @Test
   public void testCompatibilityWithTableConfig() {
@@ -633,6 +640,56 @@ public class SchemaUtilsTest {
         deserSchema.getComplexFieldSpecs().get(1).getChildFieldSpec(ComplexFieldSpec.KEY_FIELD));
     Assert.assertEquals(pinotSchema.getComplexFieldSpecs().get(1).getChildFieldSpec(ComplexFieldSpec.VALUE_FIELD),
         deserSchema.getComplexFieldSpecs().get(1).getChildFieldSpec(ComplexFieldSpec.VALUE_FIELD));
+  }
+
+  @Test
+  public void testEachSegmentUsesItsOwnCreationTimeWithoutMutatingCachedSchema()
+      throws Exception {
+    TableConfig tableConfig = realtimeTableConfig();
+    Schema cachedSchema = realtimeSchema();
+    String originalSchema = cachedSchema.toJsonObject().toString();
+    for (int sequence = 0; sequence < 2; sequence++) {
+      long creationTime = CREATION_TIME + sequence * 60_000L;
+      SegmentZKMetadata metadata = segmentMetadata(sequence, creationTime);
+      Schema preparedSchema = SchemaUtils.prepareRealtimeSegmentSchema(tableConfig, cachedSchema, metadata);
+
+      assertNotSame(preparedSchema, cachedSchema);
+      assertEquals(preparedSchema.getSpecForTimeColumn("ts").getDefaultNullValue(), creationTime);
+      assertEquals(preparedSchema.getFieldSpecFor(BuiltInVirtualColumn.SEGMENTNAME).getDefaultNullValue(),
+          metadata.getSegmentName());
+      assertEquals(cachedSchema.toJsonObject().toString(), originalSchema);
+      assertNull(cachedSchema.getFieldSpecFor(BuiltInVirtualColumn.SEGMENTNAME));
+    }
+  }
+
+  @Test
+  public void testValidConfiguredTimeDefaultIsPreserved()
+      throws Exception {
+    Schema cachedSchema = realtimeSchema();
+    long configuredDefault = CREATION_TIME - 60_000L;
+    cachedSchema.getSpecForTimeColumn("ts").setDefaultNullValue(configuredDefault);
+
+    Schema preparedSchema = SchemaUtils.prepareRealtimeSegmentSchema(realtimeTableConfig(), cachedSchema,
+        segmentMetadata(0, CREATION_TIME));
+
+    assertEquals(preparedSchema.getSpecForTimeColumn("ts").getDefaultNullValue(), configuredDefault);
+    assertEquals(cachedSchema.getSpecForTimeColumn("ts").getDefaultNullValue(), configuredDefault);
+  }
+
+  private static TableConfig realtimeTableConfig() {
+    return new TableConfigBuilder(TableType.REALTIME).setTableName("events").setTimeColumnName("ts").build();
+  }
+
+  private static Schema realtimeSchema() {
+    return new Schema.SchemaBuilder().setSchemaName("events")
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+  }
+
+  private static SegmentZKMetadata segmentMetadata(int sequence, long creationTime) {
+    SegmentZKMetadata metadata =
+        new SegmentZKMetadata(new LLCSegmentName("events", 0, sequence, creationTime).getSegmentName());
+    metadata.setCreationTime(creationTime);
+    return metadata;
   }
 
   private void checkValidationFails(Schema pinotSchema, boolean isIgnoreCase) {
