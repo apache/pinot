@@ -18,18 +18,36 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
+import java.io.File;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.common.DataFetcher;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentUtil;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doReturn;
@@ -54,7 +72,10 @@ public class ProjectionBlockOpenStructTest {
 
   /// OPEN_STRUCT parent: an empty index container, so {@code getForwardIndex()} is null.
   private static OpenStructDataSource mockOpenStructDataSource() {
-    return mock(OpenStructDataSource.class);
+    OpenStructDataSource dataSource = mock(OpenStructDataSource.class);
+    when(dataSource.getFieldSpec()).thenReturn(new ComplexFieldSpec(OPEN_STRUCT_COLUMN, DataType.OPEN_STRUCT, true,
+        Map.of()));
+    return dataSource;
   }
 
   private static DataSource mockPlainDataSource() {
@@ -64,7 +85,7 @@ public class ProjectionBlockOpenStructTest {
     doReturn(forwardIndex).when(dataSource).getForwardIndex();
     DataSourceMetadata metadata = mock(DataSourceMetadata.class);
     when(metadata.isSingleValue()).thenReturn(true);
-    when(metadata.getDataType()).thenReturn(FieldSpec.DataType.LONG);
+    when(metadata.getDataType()).thenReturn(DataType.LONG);
     when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
     return dataSource;
   }
@@ -128,7 +149,7 @@ public class ProjectionBlockOpenStructTest {
   @Test
   public void testSelectingOpenStructParentReadsTheWholeDocument() {
     BlockValSet values = project(Map.of("errors", 3L));
-    assertEquals(values.getValueType(), FieldSpec.DataType.STRING);
+    assertEquals(values.getValueType(), DataType.STRING);
     assertTrue(values.isSingleValue());
     assertEquals(values.getStringValuesSV()[0], "{\"errors\":3}");
   }
@@ -259,36 +280,44 @@ public class ProjectionBlockOpenStructTest {
     assertEquals(project(Map.of("tags", List.of("a", "b"))).getStringValuesSV()[0], "{\"tags\":[\"a\",\"b\"]}");
   }
 
-  /// A BOOLEAN key is stored as INT 0/1, and the reconstruction hands that stored number back. The document must read
-  /// it as the boolean it is, the way `SELECT col['flag']` does, not as `1`.
   @Test
-  public void testBooleanKeyRendersAsBoolean() {
-    Map<String, Object> document = new LinkedHashMap<>();
-    document.put("flag", 1);
-    document.put("off", 0);
-    document.put("count", 5);
-    OpenStructDataSource openStruct = mockOpenStructDataSource();
-    when(openStruct.openMapValueReader()).thenReturn(docId -> document);
-    DataSource flag = keyDataSource(FieldSpec.DataType.BOOLEAN);
-    DataSource off = keyDataSource(FieldSpec.DataType.BOOLEAN);
-    DataSource count = keyDataSource(FieldSpec.DataType.INT);
-    when(openStruct.getDataSources()).thenReturn(Map.of("flag", flag, "off", off, "count", count));
+  public void testBooleanKeysInWholeDocument()
+      throws Exception {
+    ComplexFieldSpec parent = new ComplexFieldSpec(OPEN_STRUCT_COLUMN, DataType.OPEN_STRUCT, true, Map.of(
+        "flag", new DimensionFieldSpec("flag", DataType.BOOLEAN, true),
+        "off", new DimensionFieldSpec("off", DataType.BOOLEAN, true),
+        "noncanonical", new DimensionFieldSpec("noncanonical", DataType.BOOLEAN, true),
+        "denseFlags", new DimensionFieldSpec("denseFlags", DataType.BOOLEAN, false),
+        "sparseFlags", new DimensionFieldSpec("sparseFlags", DataType.BOOLEAN, false)));
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("bools").addField(parent).build();
+    FieldConfig field = new FieldConfig.Builder(OPEN_STRUCT_COLUMN).withIndexes(JsonUtils.objectToJsonNode(
+        Map.of("open_struct", Map.of("maxDenseKeys", 3, "denseKeys", List.of("flag", "noncanonical", "denseFlags")))))
+        .build();
+    TableConfig table = new TableConfigBuilder(TableType.OFFLINE).setTableName("bools")
+        .setFieldConfigList(List.of(field)).build();
+    GenericRow row = new GenericRow();
+    row.putValue(OPEN_STRUCT_COLUMN, Map.of("flag", true, "off", false, "noncanonical", 2,
+        "denseFlags", List.of(true, false), "sparseFlags", List.of(false, true), "count", 1,
+        "nested", Map.of("flag", 0)));
 
-    assertEquals(projectWith(openStruct).getStringValuesSV()[0], "{\"flag\":true,\"off\":false,\"count\":5}");
-  }
-
-  /// A boolean that lives in the sparse blob is already a JSON boolean and has no per-key source, so it stays as is.
-  @Test
-  public void testSparseBooleanStaysBoolean() {
-    assertEquals(project(Map.of("flag", true)).getStringValuesSV()[0], "{\"flag\":true}");
-  }
-
-  private static DataSource keyDataSource(FieldSpec.DataType dataType) {
-    DataSource dataSource = mock(DataSource.class);
-    DataSourceMetadata metadata = mock(DataSourceMetadata.class);
-    when(metadata.getDataType()).thenReturn(dataType);
-    when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
-    return dataSource;
+    File tempDir = Files.createTempDirectory("openStructBoolean").toFile();
+    try {
+      File indexDir = PinotSegmentUtil.createSegment(table, schema, "bools", tempDir.getAbsolutePath(),
+          new GenericRowRecordReader(List.of(row)));
+      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+      try {
+        OpenStructDataSource source = (OpenStructDataSource) segment.getDataSource(OPEN_STRUCT_COLUMN);
+        assertEquals(source.getDataSources().keySet(), Set.of("flag", "noncanonical", "denseFlags"));
+        String document = projectWith(source).getStringValuesSV()[0];
+        assertEquals(JsonUtils.stringToMap(document), Map.of("flag", true, "off", false, "noncanonical", false,
+            "denseFlags", List.of(true, false), "sparseFlags", List.of(false, true), "count", 1,
+            "nested", Map.of("flag", 0)));
+      } finally {
+        segment.destroy();
+      }
+    } finally {
+      FileUtils.deleteDirectory(tempDir);
+    }
   }
 
   /// Projects a single-row block whose OPEN_STRUCT column reconstructs to `document`.

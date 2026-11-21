@@ -37,8 +37,10 @@ import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource.MapValueReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructKeyFlattener;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -116,28 +118,27 @@ public class ProjectionBlock implements ValueBlock {
   /// no escape, and that is exactly what makes the container's own entry the thing that disambiguates: a dotted key
   /// whose prefix is not itself a key was never a path, so it stays a key spelled with a dot.
   ///
-  /// `booleanKeys` names the materialized keys declared BOOLEAN, whose stored INT 0/1 reads as a boolean. Only the top
-  /// level carries them: a nested object is the source's own JSON, where a boolean is already one.
+  /// The top-level keys use the segment's declared types. Nested objects retain their original JSON types.
   private static Map<String, Object> renderDocument(Map<String, Object> document, Set<String> booleanKeys) {
     Map<String, Object> rendered = new LinkedHashMap<>(document.size());
     for (Map.Entry<String, Object> entry : document.entrySet()) {
       String key = entry.getKey();
       if (!isPathIntoPresentObject(key, document)) {
-        Object value = entry.getValue();
-        rendered.put(key, value instanceof Number number && booleanKeys.contains(key)
-            ? number.intValue() != 0 : renderValue(value));
+        rendered.put(key, renderValue(entry.getValue(), booleanKeys.contains(key)));
       }
     }
     return rendered;
   }
 
-  /// The materialized keys declared BOOLEAN. A BOOLEAN is stored as INT 0/1 and the reconstruction hands back the
-  /// stored number, so the document needs the declared type to say `true` instead of `1`, the way `col['key']` does.
+  /// Both dense children and the sparse JSON can contain stored integers for declared BOOLEAN keys. On older
+  /// segments a dense child can still report INT, which is also the type returned by a direct key projection.
   private static Set<String> booleanKeys(OpenStructDataSource openStructDataSource) {
     Set<String> booleanKeys = new HashSet<>();
-    for (Map.Entry<String, DataSource> entry : openStructDataSource.getDataSources().entrySet()) {
-      if (entry.getValue().getDataSourceMetadata().getDataType() == DataType.BOOLEAN) {
-        booleanKeys.add(entry.getKey());
+    for (Map.Entry<String, FieldSpec> entry : openStructDataSource.getFieldSpec().getChildFieldSpecs().entrySet()) {
+      String key = entry.getKey();
+      if (entry.getValue().getDataType() == DataType.BOOLEAN && (!openStructDataSource.isMaterialized(key)
+          || openStructDataSource.getDataSourceMetadata(key).getDataType() == DataType.BOOLEAN)) {
+        booleanKeys.add(key);
       }
     }
     return booleanKeys;
@@ -197,7 +198,7 @@ public class ProjectionBlock implements ValueBlock {
       return text;
     }
     try {
-      return renderValue(JsonUtils.stringToObject(text, OBJECT_TYPE_REFERENCE));
+      return renderValue(JsonUtils.stringToObject(text, OBJECT_TYPE_REFERENCE), false);
     } catch (IOException e) {
       return text;
     }
@@ -212,10 +213,12 @@ public class ProjectionBlock implements ValueBlock {
   }
 
   /// Values as JSON renders them, recursing so a nested object is cleaned up the same way the top level is.
-  /// Only BYTES needs a hand: Jackson would base64 it, while every other way of reading this value out of Pinot
-  /// -- `col['key']` included -- gives hex.
+  /// Numeric BOOLEAN values use Pinot's stored representation. BYTES values use the same hex encoding as key reads.
   @Nullable
-  private static Object renderValue(@Nullable Object value) {
+  private static Object renderValue(@Nullable Object value, boolean booleanKey) {
+    if (booleanKey && value instanceof Number) {
+      return BooleanUtils.toBoolean(value);
+    }
     if (value instanceof byte[] bytes) {
       return BytesUtils.toHexString(bytes);
     }
@@ -233,14 +236,14 @@ public class ProjectionBlock implements ValueBlock {
     if (value instanceof List<?> list) {
       List<Object> rendered = new ArrayList<>(list.size());
       for (Object element : list) {
-        rendered.add(renderValue(element));
+        rendered.add(renderValue(element, booleanKey));
       }
       return rendered;
     }
     if (value instanceof Object[] array) {
       List<Object> rendered = new ArrayList<>(array.length);
       for (Object element : array) {
-        rendered.add(renderValue(element));
+        rendered.add(renderValue(element, booleanKey));
       }
       return rendered;
     }
