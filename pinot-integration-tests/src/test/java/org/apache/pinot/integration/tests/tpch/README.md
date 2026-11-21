@@ -18,26 +18,29 @@
     under the License.
 
 -->
-# How to run advanced TPCHQueryIntegrationTest
-## enrich data
-1. Follow https://dev.mysql.com/doc/heatwave/en/mys-hw-tpch-sample-data.html to generate tpch data.
-The current tpch dataset in the `resource` folder was generated using scale factor 0.0001, which is too small for the advanced query test.
-```
-./dbgen -vf -s 0.0001
-```
-If your encounter `fatal error: 'malloc.h' file not found` while building `dbgen` binary, please replace `malloc.h` with
-`stdlib.h` in files having this problem.
-2. Run TblToAvro to convert the data to avro format. Remember to provide the absolute folder path of those `tbl` files.
-3. Copy those replace the current dataset in the `resource` folder.
-```
-export TPCH_AVRO_FILE_SOURCE_FOLDER={the absolute folder path of tbl files}
-export PINOT_TPCH_INTEGRATION_TEST_SOURCE_FOLDER={the absolute folder path of pinot tpch integration test source folder
-cp $TPCH_AVRO_FILE_SOURCE_FOLDER/customer.avro $PINOT_TPCH_INTEGRATION_TEST_SOURCE_FOLDER
-cp $TPCH_AVRO_FILE_SOURCE_FOLDER/lineitem.avro $PINOT_TPCH_INTEGRATION_TEST_SOURCE_FOLDER
-cp $TPCH_AVRO_FILE_SOURCE_FOLDER/nation.avro $PINOT_TPCH_INTEGRATION_TEST_SOURCE_FOLDER
-cp $TPCH_AVRO_FILE_SOURCE_FOLDER/orders.avro $PINOT_TPCH_INTEGRATION_TEST_SOURCE_FOLDER
-cp $TPCH_AVRO_FILE_SOURCE_FOLDER/part.avro $PINOT_TPCH_INTEGRATION_TEST_SOURCE_FOLDER
-cp $TPCH_AVRO_FILE_SOURCE_FOLDER/partsupp.avro $PINOT_TPCH_INTEGRATION_TEST_SOURCE_FOLDER
-cp $TPCH_AVRO_FILE_SOURCE_FOLDER/region.avro $PINOT_TPCH_INTEGRATION_TEST_SOURCE_FOLDER
-cp $TPCH_AVRO_FILE_SOURCE_FOLDER/supplier.avro $PINOT_TPCH_INTEGRATION_TEST_SOURCE_FOLDER
-```
+# TPC-H integration tests
+
+`TPCHQueryIntegrationTest` runs the 22 TPC-H queries on the multi-stage engine and compares the results with H2.
+The data and the queries are in `pinot-tools/src/main/resources/examples/batch/tpch`, the same files that the TPC-H
+quickstart uses. See `queries/README.md` in that folder for the two forms of each query and the table layout that the
+rewritten queries need.
+
+## Data
+
+The data is the TPC-H data at scale factor 0.01 (60,175 `lineitem` rows), generated with `dbgen` from the TPC-H
+tools, version 3.0.1. Pinot stores the dates as strings.
+
+To generate the data again:
+
+1. Build `dbgen` from the TPC-H tools. If the build fails with `fatal error: 'malloc.h' file not found`, replace
+   `malloc.h` with `stdlib.h` in the files that include it.
+2. Generate the `.tbl` files:
+   ```
+   ./dbgen -f -s 0.01
+   ```
+3. Convert them to Avro. `TblToAvro` writes one `<table>.avro` file for each table into the same folder:
+   ```
+   java -cp <test classpath> org.apache.pinot.integration.tests.tpch.TblToAvro <folder with the .tbl files>
+   ```
+4. Copy each `<table>.avro` file to `pinot-tools/src/main/resources/examples/batch/tpch/<table>/rawdata/`.
+5. If the scale factor changes, update the row counts in `TPCHQueryIntegrationTest#NUM_ROWS`.
