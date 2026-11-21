@@ -245,8 +245,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // Minimum interval between the data-loss ERROR log line and segment error entry for a segment. The
   // STREAM_DATA_LOSS gauge is still set for every batch that reports loss; only the diagnostics are throttled.
   private static final long DATA_LOSS_REPORT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
-  // 8 min max timeout for the retry policy
-  private static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
+  // 8 min max timeout for both initial creation on the consumer thread and mid-consumption recreation.
+  @VisibleForTesting
+  static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
       RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 2.0f);
 
   // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
@@ -262,6 +263,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final Schema _schema;
   private final LLCSegmentName _llcSegmentName;
   private final AtomicBoolean _streamConsumerClosed = new AtomicBoolean(false);
+  // Serializes publishing a started consumer, claiming it for recreation, and claiming it for offload.
+  private final Object _streamConsumerLock = new Object();
   // Semaphore for each partitionGroupId only, which is to prevent two different stream consumers
   // from consuming with the same partitionGroupId in parallel in the same host.
   // See the comments in {@link RealtimeTableDataManager}.
@@ -337,7 +340,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
   private final TransformPipeline _transformPipeline;
-  private PartitionGroupConsumer _partitionGroupConsumer = null;
+  private volatile PartitionGroupConsumer _partitionGroupConsumer;
+  // Read by the ONLINE transition after stop() has joined the consumer thread.
+  private boolean _consumptionInitialized;
   private StreamMetadataProvider _partitionMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
@@ -1073,6 +1078,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _segmentLogger.info("Starting consumption on segment: {}, maxRowCount: {}, maxEndTime: {}.", _llcSegmentName,
             _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
 
+        if (_shouldStop || _streamConsumerClosed.get()) {
+          return;
+        }
+        if (_partitionGroupConsumer == null) {
+          if (!makeStreamConsumer("Starting")) {
+            return;
+          }
+          _idleTimer.markStreamCreated();
+        }
+
+        // ONLINE can stop the worker during creation and reuse the consumer for catch-up. Complete the metadata
+        // work while still holding the permit, even when stop() arrives after the consumer starts.
         // TODO:
         //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is
         //   no guarantee that the previous consuming segment is already persisted (replaced with immutable segment). It
@@ -1116,6 +1133,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             && _partitionDedupMetadataManager.getContext().getMetadataTTL() > 0) {
           _partitionDedupMetadataManager.removeExpiredPrimaryKeys();
         }
+        _consumptionInitialized = true;
 
         // NOTE: _shouldStop is set to true when stop() is called to terminate the consumer thread. We check this flag
         //       after every operation that can take a long time, such as consuming messages, communicating with
@@ -1770,11 +1788,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// Closes the stream consumer so that no more data can be consumed into this segment. Does NOT release the consumer
   /// semaphore, see [#closeStreamConsumerAndReleaseSemaphore()] and [#doOffload()].
   private void closeStreamConsumer() {
-    if (_streamConsumerClosed.compareAndSet(false, true)) {
-      closePartitionGroupConsumer();
-      closePartitionMetadataProvider();
-      _transformPipeline.reportStats();
+    PartitionGroupConsumer consumer;
+    synchronized (_streamConsumerLock) {
+      if (!_streamConsumerClosed.compareAndSet(false, true)) {
+        return;
+      }
+      // Keep the reference for a retry of COMMIT, which may still checkpoint after closing for a previous build.
+      consumer = _partitionGroupConsumer;
     }
+    closePartitionGroupConsumer(consumer);
+    closePartitionMetadataProvider();
+    _transformPipeline.reportStats();
   }
 
   /// Closes the stream consumer and releases the consumer semaphore so that the next consuming segment of the
@@ -1796,9 +1820,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _hasReleasedConsumerSemaphore;
   }
 
-  private void closePartitionGroupConsumer() {
+  private void closePartitionGroupConsumer(@Nullable PartitionGroupConsumer consumer) {
+    if (consumer == null) {
+      return;
+    }
     try {
-      _partitionGroupConsumer.close();
+      consumer.close();
     } catch (Exception e) {
       _segmentLogger.warn("Could not close stream consumer", e);
     }
@@ -2048,16 +2075,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             }
           } else {
             boolean success = false;
-            // Since online helix transition for a segment can arrive before segment's consumer acquires the
-            // semaphore, check _consumerSemaphoreAcquired before catching up.
-            // This is to avoid consuming in parallel to another segment's consumer.
-            if (_consumerSemaphoreAcquired.get()) {
+            // A successful stream start alone does not make it safe to catch up. The consumer must still own the
+            // permit and have completed snapshot/TTL initialization.
+            if (_consumerSemaphoreAcquired.get() && _consumptionInitialized && !_streamConsumerClosed.get()
+                && _partitionGroupConsumer != null) {
               _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
               success = catchupToFinalOffset(endOffset,
                   TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
             } else {
-              _segmentLogger.warn("Consumer semaphore was not acquired, Skipping catch up from offset {} to {} ",
-                  _currentOffset, endOffset);
+              _segmentLogger.warn("Consumer is not ready to catch up from offset {} to {}", _currentOffset, endOffset);
             }
 
             if (success) {
@@ -2402,7 +2428,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Initialize stopOnDecodeError configuration with proper validation
       _stopOnDecodeError = parseStopOnDecodeErrorConfig(_streamConfig);
 
-      makeStreamConsumer("Starting");
+      // Retry initial stream consumer creation on the consumer thread without blocking this Helix transition.
       createPartitionMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
@@ -2576,21 +2602,35 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /// Creates a new stream consumer
-  private void makeStreamConsumer(String reason) {
-    if (_partitionGroupConsumer != null) {
-      closePartitionGroupConsumer();
+  /// Creates and starts a local consumer before publishing it to the segment. If start fails or offload wins the
+  /// publication race, this method still owns the consumer and closes it.
+  private boolean makeStreamConsumer(String reason) {
+    if (_streamConsumerClosed.get()) {
+      return false;
     }
-    _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
+    _segmentLogger.info("Creating new stream consumer for topic partition {}, reason: {}", _clientId, reason);
+    PartitionGroupConsumer consumer = null;
+    boolean published = false;
     try {
-      _partitionGroupConsumer =
-          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-      _partitionGroupConsumer.start(_currentOffset);
+      consumer = _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
+          CONSUMER_RECREATE_RETRY_POLICY);
+      consumer.start(_currentOffset);
+      synchronized (_streamConsumerLock) {
+        if (!_streamConsumerClosed.get()) {
+          _partitionGroupConsumer = consumer;
+          published = true;
+        }
+      }
+      return published;
     } catch (Exception e) {
       _segmentLogger.error("Faced exception while trying to create stream consumer for topic partition {} reason {}",
           _clientId, reason, e);
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
       throw e;
+    } finally {
+      if (!published) {
+        closePartitionGroupConsumer(consumer);
+      }
     }
   }
 
@@ -2598,19 +2638,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// Assumes there is a valid instance of [PartitionGroupConsumer]
   private void recreateStreamConsumer(String reason) {
     _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
-    _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
-    closePartitionGroupConsumer();
-    try {
-      _partitionGroupConsumer =
-          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus,
-              CONSUMER_RECREATE_RETRY_POLICY);
-      _partitionGroupConsumer.start(_currentOffset);
-    } catch (Exception e) {
-      _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId,
-          e);
-      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
-      throw e;
+    PartitionGroupConsumer previous = _partitionGroupConsumer;
+    _currentOffset = previous.checkpoint(_currentOffset);
+    synchronized (_streamConsumerLock) {
+      if (_streamConsumerClosed.get()) {
+        return;
+      }
+      _partitionGroupConsumer = null;
     }
+    closePartitionGroupConsumer(previous);
+    makeStreamConsumer(reason);
   }
 
   /// Creates a new stream metadata provider
@@ -2708,6 +2745,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } finally {
       _decodeRetryBackoffLock.unlock();
     }
+  }
+
+  @VisibleForTesting
+  @Nullable
+  PartitionGroupConsumer getPartitionGroupConsumer() {
+    return _partitionGroupConsumer;
   }
 
   @VisibleForTesting
