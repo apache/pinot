@@ -25,22 +25,48 @@ import java.nio.file.Files;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.SearcherManager;
 
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/// Extracts the shared Lucene 10 rollback fixtures into a caller-owned directory, without shared state.
+/// Helpers for Lucene index tests, including extraction of shared compatibility fixtures.
 public final class LuceneIndexTestUtils {
   private LuceneIndexTestUtils() {
   }
 
+  public static boolean isSearcherCurrent(SearcherManager searcherManager)
+      throws IOException {
+    IndexSearcher searcher = searcherManager.acquire();
+    try {
+      return ((DirectoryReader) searcher.getIndexReader()).isCurrent();
+    } finally {
+      searcherManager.release(searcher);
+    }
+  }
+
   public static File extractLucene10Fixtures(File directory)
       throws IOException {
-    FileUtils.forceMkdir(directory);
     // Generated with Lucene 10.0.0 (text/multi) and Pinot f9cd6821's HnswCodec (hnsw).
     // created9 variants set the creation major to 9, with Lucene912 and Lucene100 codecs respectively.
-    try (InputStream input = LuceneIndexTestUtils.class.getResourceAsStream("/data/lucene10-rollback.zip")) {
+    return extractFixtures(directory, "/data/lucene10-rollback.zip");
+  }
+
+  public static File extractLucene912Fixtures(File directory)
+      throws IOException {
+    // Both indexes were written with Lucene 9.12.0. The HNSW fixture is the BEST_SPEED, non-compound
+    // index from Pinot commit 26686e3f5c (three 2048-dimensional unit vectors in the first three dimensions).
+    // Multi-column text uses StandardAnalyzer and two text fields plus a stored Pinot DocID (1, then 0).
+    return extractFixtures(directory, "/data/lucene912-upgrade.zip");
+  }
+
+  private static File extractFixtures(File directory, String resource)
+      throws IOException {
+    FileUtils.forceMkdir(directory);
+    try (InputStream input = LuceneIndexTestUtils.class.getResourceAsStream(resource)) {
       assertNotNull(input);
       try (ZipInputStream zip = new ZipInputStream(input)) {
         ZipEntry entry;

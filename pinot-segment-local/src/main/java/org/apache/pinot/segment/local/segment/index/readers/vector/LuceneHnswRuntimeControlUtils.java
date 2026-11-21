@@ -18,13 +18,21 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.vector;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
+import org.apache.lucene.codecs.hnsw.HnswGraphProvider;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
+import org.apache.lucene.index.CodecReader;
+import org.apache.lucene.index.FloatVectorValues;
+import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.AbstractKnnCollector;
+import org.apache.lucene.search.AcceptDocs;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnCollector;
 import org.apache.lucene.search.KnnFloatVectorQuery;
@@ -33,9 +41,13 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopKnnCollector;
 import org.apache.lucene.search.TotalHits;
+import org.apache.lucene.search.VectorScorer;
 import org.apache.lucene.search.knn.KnnCollectorManager;
+import org.apache.lucene.search.knn.KnnSearchStrategy;
 import org.apache.lucene.search.knn.MultiLeafKnnCollector;
+import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.hnsw.BlockingFloatHeap;
+import org.apache.lucene.util.hnsw.HnswGraphSearcher;
 
 
 /// Shared Lucene HNSW query helpers for Pinot's immutable and mutable HNSW readers.
@@ -88,21 +100,74 @@ public final class LuceneHnswRuntimeControlUtils {
 
     @Override
     protected KnnCollectorManager getKnnCollectorManager(int k, IndexSearcher searcher) {
-      return new RuntimeControlledKnnCollectorManager(k, searcher, _efSearch, _useRelativeDistance,
+      return new RuntimeControlledKnnCollectorManager(k, searcher, filter != null, _efSearch, _useRelativeDistance,
           _useBoundedQueue);
+    }
+
+    @Override
+    protected TopDocs approximateSearch(LeafReaderContext context, AcceptDocs acceptDocs, int visitedLimit,
+        KnnCollectorManager collectorManager)
+        throws IOException {
+      if (_efSearch <= 0) {
+        return super.approximateSearch(context, acceptDocs, visitedLimit, collectorManager);
+      }
+      LeafReader reader = context.reader();
+      FloatVectorValues values = reader.getFloatVectorValues(field);
+      if (values == null) {
+        return super.approximateSearch(context, acceptDocs, visitedLimit, collectorManager);
+      }
+      KnnCollector collector = collectorManager.newCollector(visitedLimit, getSearchStrategy(), context);
+      if (values.size() <= collector.visitLimit()
+          || canUseGraph(reader, values.size(), acceptDocs.cost(), collector.k())) {
+        reader.searchNearestVectors(field, target, collector, acceptDocs);
+        return collector.topDocs();
+      }
+      // Lucene 10.6 can exhaustively score a batch before checking the visit limit. On leaves where
+      // the search can take that path, check the budget between individual vector scores instead.
+      VectorScorer scorer = values.scorer(target);
+      if (scorer != null) {
+        Bits accepted = acceptDocs.bits();
+        DocIdSetIterator vectors = scorer.iterator();
+        while (!collector.earlyTerminated()) {
+          int doc = vectors.nextDoc();
+          if (doc == DocIdSetIterator.NO_MORE_DOCS) {
+            break;
+          }
+          if (accepted == null || accepted.get(doc)) {
+            collector.incVisitedCount(1);
+            collector.collect(doc, scorer.score());
+          }
+        }
+      }
+      return collector.topDocs();
+    }
+
+    /// Mirrors Lucene99HnswVectorsReader's choice between graph search and flat scoring.
+    private boolean canUseGraph(LeafReader reader, int numVectors, int acceptedDocCount, int leafK)
+        throws IOException {
+      return leafK < numVectors
+          && HnswGraphSearcher.expectedVisitedNodes(leafK, numVectors) < Math.min(numVectors, acceptedDocCount)
+          && reader instanceof CodecReader codecReader
+          && codecReader.getVectorReader() instanceof PerFieldKnnVectorsFormat.FieldsReader perFieldReader
+          && perFieldReader.getFieldReader(field) instanceof HnswGraphProvider graphProvider
+          && graphProvider.getGraph(field).size() > 0;
     }
   }
 
   private static final class RuntimeControlledKnnCollectorManager implements KnnCollectorManager {
+    private static final int LUCENE_LEAF_QUOTA_SCALE = 16;
+
     private final int _k;
     private final BlockingFloatHeap _globalScoreQueue;
+    private final boolean _hasFilter;
     private final int _efSearch;
     private final boolean _useRelativeDistance;
     private final boolean _useBoundedQueue;
 
-    RuntimeControlledKnnCollectorManager(int k, IndexSearcher searcher, int efSearch,
+    RuntimeControlledKnnCollectorManager(int k, IndexSearcher searcher, boolean hasFilter, int efSearch,
         boolean useRelativeDistance, boolean useBoundedQueue) {
       _k = k;
+      _hasFilter = hasFilter;
       _efSearch = efSearch;
       _useRelativeDistance = useRelativeDistance;
       _useBoundedQueue = useBoundedQueue;
@@ -111,64 +176,63 @@ public final class LuceneHnswRuntimeControlUtils {
     }
 
     @Override
-    public KnnCollector newCollector(int visitLimit, LeafReaderContext context) {
+    public KnnCollector newCollector(int visitLimit, KnnSearchStrategy searchStrategy, LeafReaderContext context) {
+      int leafK = _k;
+      // Lucene requests an unlimited visit count when the rewritten filter matches all documents.
+      if (_hasFilter && _efSearch > 0 && visitLimit != Integer.MAX_VALUE) {
+        leafK = budgetedLeafK(context);
+      } else if (searchStrategy instanceof KnnSearchStrategy.Seeded seeded) {
+        // A reentrant pass is seeded with the first pass's candidates. Retain that quota when it exceeds k.
+        leafK = Math.max(_k, seeded.numberOfEntryPoints());
+      }
+      return newCollector(visitLimit, searchStrategy, leafK);
+    }
+
+    @Override
+    public KnnCollector newOptimisticCollector(int visitLimit, KnnSearchStrategy searchStrategy,
+        LeafReaderContext context, int leafK) {
+      return newCollector(visitLimit, searchStrategy, leafK);
+    }
+
+    @Override
+    public boolean isOptimistic() {
+      // Lucene checks its leaf quota before accepting filtered ANN results. A seeded second pass can
+      // score all entry points before checking its visit limit, so keep it disabled for explicit budgets.
+      return _hasFilter && _efSearch <= 0;
+    }
+
+    /// Mirrors Lucene 10.6's private AbstractKnnVectorQuery.perLeafTopKCalculation for budgeted searches.
+    /// Keep at least the query k because Lucene won't run a second pass to recover candidates.
+    private int budgetedLeafK(LeafReaderContext context) {
+      if (context.parent == null) {
+        return _k;
+      }
+      float leafProportion = context.reader().maxDoc() / (float) context.parent.reader().maxDoc();
+      return Math.max(_k, (int) (_k * leafProportion
+          + LUCENE_LEAF_QUOTA_SCALE * Math.sqrt(_k * leafProportion * (1 - leafProportion))));
+    }
+
+    private KnnCollector newCollector(int visitLimit, KnnSearchStrategy searchStrategy, int leafK) {
       int effectiveVisitLimit = _efSearch > 0 ? Math.min(visitLimit, _efSearch) : visitLimit;
       if (_useBoundedQueue) {
-        AbstractKnnCollector leafCollector = new TopKnnCollector(_k, effectiveVisitLimit);
+        AbstractKnnCollector leafCollector = new TopKnnCollector(leafK, effectiveVisitLimit, searchStrategy);
         KnnCollector collector = _globalScoreQueue != null
-            ? new MultiLeafKnnCollector(_k, _globalScoreQueue, leafCollector)
+            ? new MultiLeafKnnCollector(leafK, _globalScoreQueue, leafCollector)
             : leafCollector;
         return _useRelativeDistance ? collector : new RelativeDistanceDisabledKnnCollector(collector);
       }
-      return new UnboundedKnnCollector(_k, effectiveVisitLimit, _useRelativeDistance);
+      return new UnboundedKnnCollector(leafK, effectiveVisitLimit, searchStrategy, _useRelativeDistance);
     }
   }
 
-  private static final class RelativeDistanceDisabledKnnCollector implements KnnCollector {
-    private final KnnCollector _delegate;
-
+  private static final class RelativeDistanceDisabledKnnCollector extends KnnCollector.Decorator {
     RelativeDistanceDisabledKnnCollector(KnnCollector delegate) {
-      _delegate = delegate;
-    }
-
-    @Override
-    public boolean earlyTerminated() {
-      return _delegate.earlyTerminated();
-    }
-
-    @Override
-    public void incVisitedCount(int count) {
-      _delegate.incVisitedCount(count);
-    }
-
-    @Override
-    public long visitedCount() {
-      return _delegate.visitedCount();
-    }
-
-    @Override
-    public long visitLimit() {
-      return _delegate.visitLimit();
-    }
-
-    @Override
-    public int k() {
-      return _delegate.k();
-    }
-
-    @Override
-    public boolean collect(int docId, float similarity) {
-      return _delegate.collect(docId, similarity);
+      super(delegate);
     }
 
     @Override
     public float minCompetitiveSimilarity() {
       return Float.NEGATIVE_INFINITY;
-    }
-
-    @Override
-    public TopDocs topDocs() {
-      return _delegate.topDocs();
     }
   }
 
@@ -178,8 +242,8 @@ public final class LuceneHnswRuntimeControlUtils {
     private final PriorityQueue<Float> _topKFloor;
     private float _minCompetitiveSimilarity = Float.NEGATIVE_INFINITY;
 
-    UnboundedKnnCollector(int k, int visitLimit, boolean useRelativeDistance) {
-      super(k, visitLimit);
+    UnboundedKnnCollector(int k, int visitLimit, KnnSearchStrategy searchStrategy, boolean useRelativeDistance) {
+      super(k, visitLimit, searchStrategy);
       _useRelativeDistance = useRelativeDistance;
       _topKFloor = new PriorityQueue<>(Math.max(1, k));
     }

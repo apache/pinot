@@ -29,8 +29,9 @@ import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.codecs.lucene912.Lucene912Codec;
+import org.apache.lucene.codecs.lucene104.Lucene104Codec;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
+import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneCombinedTextIndexConstants;
@@ -331,6 +332,10 @@ public class VectorIndexUtils {
   public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig,
       @Nullable Path mmapMergeDirectory) {
     IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
+    // Lucene 10 disables this by default; retain the previous merge I/O throttling behavior.
+    ConcurrentMergeScheduler mergeScheduler = new ConcurrentMergeScheduler();
+    mergeScheduler.enableAutoIOThrottle();
+    indexWriterConfig.setMergeScheduler(mergeScheduler);
 
     double maxBufferSizeMB = Double.parseDouble(vectorIndexConfig.getProperties()
         .getOrDefault("maxBufferSizeMB", String.valueOf(IndexWriterConfig.DEFAULT_RAM_BUFFER_SIZE_MB)));
@@ -351,8 +356,8 @@ public class VectorIndexUtils {
 
     HnswVectorsFormat knnVectorsFormat = new HnswVectorsFormat(maxCon, beamWidth, maxDimensions, mmapMergeDirectory);
 
-    Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(vectorIndexConfig.getProperties()
-        .getOrDefault("mode", Lucene912Codec.Mode.BEST_SPEED.name()));
+    Lucene104Codec.Mode mode = Lucene104Codec.Mode.valueOf(vectorIndexConfig.getProperties()
+        .getOrDefault("mode", Lucene104Codec.Mode.BEST_SPEED.name()));
     indexWriterConfig.setCodec(new HnswCodec(mode, knnVectorsFormat));
     return indexWriterConfig;
   }

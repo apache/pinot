@@ -56,7 +56,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -65,13 +64,36 @@ public class LuceneTextIndexCompatibleTest {
   private static final String COLUMN = "Text";
   private static final int[] PINOT_IDS = {2, 0, 3, 1};
 
-  @Test
-  public void testLucene80IndexReader()
+  @DataProvider
+  public Object[][] legacyIndexLayouts() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "legacyIndexLayouts")
+  public void testLucene80IndexReader(boolean packed)
       throws IOException {
-    File indexPath =
+    File fixturePath =
         new File(LuceneTextIndexCompatibleTest.class.getClassLoader().getResource("data/lucene_80_index").getPath());
-    try (LuceneTextIndexReader lucene80Index = new LuceneTextIndexReader("Text", indexPath, 1000, Map.of())) {
-      assertNotNull(lucene80Index);
+    File indexPath = Files.createTempDirectory("lucene80-compatibility").toFile();
+    try {
+      FileUtils.copyDirectory(fixturePath, indexPath);
+      if (packed) {
+        File luceneDir = new File(indexPath, COLUMN + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+        File combinedFile = new File(indexPath, COLUMN + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+        LuceneTextIndexCombined.combineLuceneIndexFiles(luceneDir, combinedFile.getAbsolutePath());
+        TextIndexConfig config = new TextIndexConfigBuilder().setStoreInSegmentFile(true).build();
+        try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(combinedFile, true, 0, combinedFile.length(),
+            ByteOrder.LITTLE_ENDIAN, "Lucene 8 packed text index");
+            LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, buffer, 1000, config)) {
+          assertEquals(reader.getDocIds("1", null).getCardinality(), 35);
+        }
+      } else {
+        try (LuceneTextIndexReader reader = new LuceneTextIndexReader(COLUMN, indexPath, 1000, Map.of())) {
+          assertEquals(reader.getDocIds("1", null).getCardinality(), 35);
+        }
+      }
+    } finally {
+      FileUtils.deleteDirectory(indexPath);
     }
   }
 

@@ -24,10 +24,10 @@ import java.util.List;
 import java.util.function.IntConsumer;
 import org.apache.lucene.util.automaton.Automaton;
 import org.apache.lucene.util.automaton.CharacterRunAutomaton;
-import org.apache.lucene.util.automaton.RegExp;
 import org.apache.lucene.util.automaton.Transition;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.Util;
+import org.apache.pinot.segment.local.utils.LuceneRegexpAutomaton;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
@@ -45,7 +45,7 @@ public class RegexpMatcher {
 
   public RegexpMatcher(String regexQuery, FST<Long> fst) {
     _fst = fst;
-    _automaton = (new RegExp(regexQuery)).toAutomaton();
+    _automaton = LuceneRegexpAutomaton.compile(regexQuery);
   }
 
   /// Runs matching of the given regexp query on the FST, emitting the value (dict id) of each matched entry to the

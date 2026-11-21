@@ -21,6 +21,9 @@ package org.apache.pinot.segment.local.utils.fst;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
@@ -66,6 +69,33 @@ public class FSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
     assertTrue(regexpMatcher.match("helloworld"));
     assertTrue(regexpMatcher.match("helloasdfworld"));
     Assert.assertFalse(regexpMatcher.match("ahelloasdfworld"));
+  }
+
+  @Test
+  public void testOverlappingRegexAndComplement()
+      throws IOException {
+    FST<Long> fst = FSTBuilder.buildFST(new TreeMap<>(Map.of("a", 1, "aa", 2, "b", 3)));
+    List<Integer> matches = new ArrayList<>();
+    RegexpMatcher.regexMatch("(a|aa)*", fst, matches::add);
+    assertEquals(matches.stream().sorted().toList(), List.of(1, 2));
+    assertTrue(new RegexpMatcher("(a|aa)*", fst).match("aaa"));
+    matches.clear();
+    RegexpMatcher.regexMatch("~(a)", fst, matches::add);
+    assertEquals(matches.stream().sorted().toList(), List.of(2, 3));
+  }
+
+  @Test
+  public void testOversizedRegexRepetitions() {
+    assertThrows(IllegalArgumentException.class, () -> new RegexpMatcher("a{10001}", null));
+    assertThrows(IllegalArgumentException.class, () -> new RegexpMatcher("(a{99,101}){100,}", null));
+    assertTrue(new RegexpMatcher("(a{1,2}){2}", null).match("aaa"));
+    assertTrue(new RegexpMatcher("(a?){0,100}", null).match("a".repeat(100)));
+  }
+
+  @Test
+  public void testRepeatedComplementBudget() {
+    assertThrows(IllegalArgumentException.class, () -> new RegexpMatcher("(~(~(ab|cd))){1500}", null));
+    assertTrue(new RegexpMatcher("(~(~(ab|cd))){2}", null).match("abcd"));
   }
 
   @Test

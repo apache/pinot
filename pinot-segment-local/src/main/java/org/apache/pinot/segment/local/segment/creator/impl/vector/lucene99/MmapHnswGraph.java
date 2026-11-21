@@ -131,6 +131,11 @@ final class MmapHnswGraph extends HnswGraph implements Closeable {
   }
 
   @Override
+  public int neighborCount() {
+    return _current.size();
+  }
+
+  @Override
   public int size() {
     return _levelCounts[0];
   }
@@ -146,6 +151,11 @@ final class MmapHnswGraph extends HnswGraph implements Closeable {
   }
 
   @Override
+  public int maxConn() {
+    return _maxConn;
+  }
+
+  @Override
   public int entryNode() {
     return _entryNode;
   }
@@ -154,7 +164,7 @@ final class MmapHnswGraph extends HnswGraph implements Closeable {
   public NodesIterator getNodesOnLevel(int level) {
     assert size() == _nodes.length : "graph build is incomplete";
     if (level == 0) {
-      return new ArrayNodesIterator(_nodes.length);
+      return new DenseNodesIterator(_nodes.length);
     }
     if (_upperLevelNodes == null) {
       _upperLevelNodes = new int[_numLevels][];
@@ -168,7 +178,7 @@ final class MmapHnswGraph extends HnswGraph implements Closeable {
         }
       }
     }
-    return new ArrayNodesIterator(_upperLevelNodes[level], _levelCounts[level]);
+    return new ArrayNodesIterator(_upperLevelNodes[level]);
   }
 
   private MmapHnswNeighborList allocate(int capacity)
