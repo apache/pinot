@@ -458,7 +458,7 @@ public class PinotClientRequest {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (QueryException e) {
-      asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(e));
+      asyncResponse.resume(timeSeriesErrorResponse(e, TimeSeriesResponseMapper.toBrokerResponse(e)));
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST timeseries request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
@@ -490,7 +490,7 @@ public class PinotClientRequest {
         asyncResponse.resume(response);
       }
     } catch (QueryException e) {
-      asyncResponse.resume(PinotBrokerTimeSeriesResponse.fromException(e));
+      asyncResponse.resume(timeSeriesErrorResponse(e, PinotBrokerTimeSeriesResponse.fromException(e)));
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
@@ -1027,6 +1027,13 @@ public class PinotClientRequest {
     }
 
     return fingerprint;
+  }
+
+  private static Response timeSeriesErrorResponse(QueryException e, Object entity) {
+    Response.Status status = e.getErrorCode() == QueryErrorCode.ACCESS_DENIED
+        ? Response.Status.FORBIDDEN
+        : Response.Status.OK;
+    return Response.status(status).entity(entity).build();
   }
 
   private TimeSeriesBlock executeTimeSeriesQuery(String language, String queryString,

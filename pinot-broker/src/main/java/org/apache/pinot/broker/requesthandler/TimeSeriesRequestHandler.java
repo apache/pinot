@@ -34,9 +34,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -304,8 +302,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
     if (!authorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
-        Response.Status.FORBIDDEN);
+      throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied. " + authorizationResult.getFailureMessage());
     }
   }
 
@@ -396,8 +393,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
           Actions.Table.QUERY);
       if (!authorizationResult.hasAccess()) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-        throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
-          Response.Status.FORBIDDEN);
+        throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied. " + authorizationResult.getFailureMessage());
       }
     }
   }
