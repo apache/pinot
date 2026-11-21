@@ -85,6 +85,25 @@ public interface ColumnMetadata extends ColumnShape {
     return null;
   }
 
+  /// Returns the transform function expression used to generate the column, if persisted in the segment metadata.
+  @Nullable
+  default String getTransformFunction() {
+    return null;
+  }
+
+  /// Returns the transform provenance format version, or [#UNAVAILABLE] for a legacy column whose generating
+  /// expression is unknown. A known version with a null [#getTransformFunction] represents a known no-transform
+  /// state.
+  default int getTransformFunctionProvenanceVersion() {
+    return UNAVAILABLE;
+  }
+
+  /// Returns the dependency-aware fingerprint for the generating transform graph, or `null` when unavailable.
+  @Nullable
+  default String getTransformFunctionFingerprint() {
+    return null;
+  }
+
   /// Returns the total number of indexes for the column.
   @JsonIgnore
   int getNumIndexes();
