@@ -83,34 +83,37 @@ public class GrpcMaterializedViewQueryExecutor implements MaterializedViewQueryE
     Pair<String, Integer> broker = selectBroker();
     LOGGER.info("Selected broker gRPC endpoint: {}:{}", broker.getLeft(), broker.getRight());
 
-    BrokerGrpcQueryClient client = getOrCreateClient(broker.getLeft(), broker.getRight());
+    try {
+      Broker.BrokerRequest brokerRequest = buildMaterializationRequest(sql, authHeaders);
+      BrokerGrpcQueryClient client = getOrCreateClient(broker.getLeft(), broker.getRight());
+      Iterator<Broker.BrokerResponse> responseIterator = client.submit(brokerRequest);
 
-    Broker.BrokerRequest brokerRequest = buildMaterializationRequest(sql, authHeaders);
-    Iterator<Broker.BrokerResponse> responseIterator = client.submit(brokerRequest);
+      Preconditions.checkState(responseIterator.hasNext(),
+          "gRPC broker %s:%d returned no response. Check broker health and gRPC connectivity.",
+          broker.getLeft(), broker.getRight());
+      Broker.BrokerResponse metadataResponse = responseIterator.next();
+      JsonNode metadataJson = JsonUtils.bytesToJsonNode(metadataResponse.getPayload().toByteArray());
+      if (metadataJson.has("exceptions") && !metadataJson.get("exceptions").isEmpty()) {
+        throw new IOException("Broker returned one or more query execution exceptions");
+      }
 
-    Preconditions.checkState(responseIterator.hasNext(),
-        "gRPC broker %s:%d returned no response for query: %s. Check broker health and gRPC connectivity.",
-        broker.getLeft(), broker.getRight(), sql);
-    Broker.BrokerResponse metadataResponse = responseIterator.next();
-    JsonNode metadataJson = JsonUtils.bytesToJsonNode(metadataResponse.getPayload().toByteArray());
-    if (metadataJson.has("exceptions") && !metadataJson.get("exceptions").isEmpty()) {
-      throw new IOException("Query execution failed with exceptions: " + metadataJson.get("exceptions"));
+      // The broker gRPC protocol always sends the schema frame after metadata, even for queries
+      // that match zero rows.  A missing schema therefore indicates a real protocol error
+      // (broker version mismatch, truncated stream, etc.) — fail loud with actionable diagnostics
+      // so the operator can identify and fix the underlying issue rather than silently advancing
+      // the watermark with no data.
+      Preconditions.checkState(responseIterator.hasNext(),
+          "gRPC broker %s:%d sent metadata but no schema frame. "
+              + "Indicates a broker protocol error (version mismatch or truncated stream). "
+              + "Empty result sets still include a schema frame.",
+          broker.getLeft(), broker.getRight());
+      Broker.BrokerResponse schemaResponse = responseIterator.next();
+      DataSchema dataSchema = DataSchema.fromBytes(schemaResponse.getPayload().asReadOnlyByteBuffer());
+
+      return new GrpcQueryHandle(broker, dataSchema, responseIterator);
+    } catch (Exception e) {
+      throw safeQueryExecutionFailure(e);
     }
-
-    // The broker gRPC protocol always sends the schema frame after metadata, even for queries
-    // that match zero rows.  A missing schema therefore indicates a real protocol error
-    // (broker version mismatch, truncated stream, etc.) — fail loud with actionable diagnostics
-    // so the operator can identify and fix the underlying issue rather than silently advancing
-    // the watermark with no data.
-    Preconditions.checkState(responseIterator.hasNext(),
-        "gRPC broker %s:%d sent metadata but no schema frame for query: %s. "
-            + "Indicates a broker protocol error (version mismatch or truncated stream). "
-            + "Empty result sets still include a schema frame.",
-        broker.getLeft(), broker.getRight(), sql);
-    Broker.BrokerResponse schemaResponse = responseIterator.next();
-    DataSchema dataSchema = DataSchema.fromBytes(schemaResponse.getPayload().asReadOnlyByteBuffer());
-
-    return new GrpcQueryHandle(broker, dataSchema, responseIterator);
   }
 
   /// Streaming handle that decodes one gRPC data frame at a time. Heap residency is bounded by
@@ -144,8 +147,12 @@ public class GrpcMaterializedViewQueryExecutor implements MaterializedViewQueryE
       // Drain any remaining gRPC frames so the underlying call's server-streaming RPC is
       // properly terminated. The Helix-managed channel is shared and cached; not draining
       // here would leak the stream until the channel closes.
-      while (_responseIterator.hasNext()) {
-        _responseIterator.next();
+      try {
+        while (_responseIterator.hasNext()) {
+          _responseIterator.next();
+        }
+      } catch (Exception e) {
+        throw safeQueryStreamFailure(e);
       }
     }
 
@@ -159,13 +166,17 @@ public class GrpcMaterializedViewQueryExecutor implements MaterializedViewQueryE
 
       @Override
       public boolean hasNext() {
-        while (_currentFrameRows == null || _cursor >= _currentFrameRows.size()) {
-          if (!_responseIterator.hasNext()) {
-            return false;
+        try {
+          while (_currentFrameRows == null || _cursor >= _currentFrameRows.size()) {
+            if (!_responseIterator.hasNext()) {
+              return false;
+            }
+            decodeNextFrame();
           }
-          decodeNextFrame();
+          return true;
+        } catch (Exception e) {
+          throw safeQueryStreamFailure(e);
         }
-        return true;
       }
 
       @Override
@@ -177,7 +188,8 @@ public class GrpcMaterializedViewQueryExecutor implements MaterializedViewQueryE
         return _currentFrameRows.get(_cursor++);
       }
 
-      private void decodeNextFrame() {
+      private void decodeNextFrame()
+          throws Exception {
         Broker.BrokerResponse dataResponse = _responseIterator.next();
         Map<String, String> responseMetadata = dataResponse.getMetadataMap();
         String compressionAlgorithm = responseMetadata.getOrDefault(
@@ -192,18 +204,8 @@ public class GrpcMaterializedViewQueryExecutor implements MaterializedViewQueryE
         Preconditions.checkNotNull(rowSizeStr,
             "gRPC response metadata missing required 'rowSize' field");
         int rowSize = Integer.parseInt(rowSizeStr);
-        byte[] uncompressedPayload;
-        try {
-          uncompressedPayload = compressor.decompress(respBytes);
-        } catch (Exception e) {
-          throw new RuntimeException("Failed to decompress gRPC response payload", e);
-        }
-        ResultTable resultTable;
-        try {
-          resultTable = responseEncoder.decodeResultTable(uncompressedPayload, rowSize, _dataSchema);
-        } catch (IOException e) {
-          throw new RuntimeException("Failed to decode gRPC response frame", e);
-        }
+        byte[] uncompressedPayload = compressor.decompress(respBytes);
+        ResultTable resultTable = responseEncoder.decodeResultTable(uncompressedPayload, rowSize, _dataSchema);
         _currentFrameRows = resultTable.getRows();
         _cursor = 0;
         _framesDecoded++;
@@ -213,6 +215,19 @@ public class GrpcMaterializedViewQueryExecutor implements MaterializedViewQueryE
         }
       }
     }
+  }
+
+  @VisibleForTesting
+  static IOException safeQueryExecutionFailure(Throwable throwable) {
+    // Broker and transport messages can echo the submitted SQL. Do not retain the message or cause because minion
+    // task result and progress diagnostics serialize the complete throwable chain.
+    return new IOException("gRPC query execution failed (exception type: " + throwable.getClass().getName() + ")");
+  }
+
+  @VisibleForTesting
+  static RuntimeException safeQueryStreamFailure(Throwable throwable) {
+    // Streaming failures have the same downstream throwable serialization path as initial execution failures.
+    return new RuntimeException("gRPC query stream failed (exception type: " + throwable.getClass().getName() + ")");
   }
 
   /// Builds the gRPC [Broker.BrokerRequest] for a materialization query, forcing materialized-view
@@ -313,7 +328,7 @@ public class GrpcMaterializedViewQueryExecutor implements MaterializedViewQueryE
       try {
         client.close();
       } catch (Exception e) {
-        LOGGER.warn("Error closing gRPC client", e);
+        LOGGER.warn("Error closing gRPC client (exception type: {})", e.getClass().getName());
       }
     }
     _clientCache.clear();
