@@ -42,16 +42,19 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -66,12 +69,13 @@ public class IngestionDelayTrackerTest {
   private final ServerMetrics _serverMetrics = mock(ServerMetrics.class);
   private static final RealtimeTableDataManager REALTIME_TABLE_DATA_MANAGER = mock(RealtimeTableDataManager.class);
 
-  static {
+  @BeforeMethod
+  public void setUp() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName("ts")
-        .setNullHandlingEnabled(true)
-        .setStreamConfigs(getStreamConfigs())
-        .build();
+            .setTimeColumnName("ts")
+            .setNullHandlingEnabled(true)
+            .setStreamConfigs(getStreamConfigs())
+            .build();
     when(REALTIME_TABLE_DATA_MANAGER.getCachedTableConfigAndSchema()).thenReturn(Pair.of(tableConfig, null));
   }
 
@@ -91,16 +95,17 @@ public class IngestionDelayTrackerTest {
     private ScheduledExecutorService _scheduledExecutorService;
 
     public MockIngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-        RealtimeTableDataManager realtimeTableDataManager)
+        RealtimeTableDataManager realtimeTableDataManager, boolean periodicOffsetLagTrackingEnabled)
         throws RuntimeException {
-      this(serverMetrics, tableNameWithType, realtimeTableDataManager, 5, 5, () -> true);
+      this(serverMetrics, tableNameWithType, realtimeTableDataManager, 5, 5, () -> true,
+              periodicOffsetLagTrackingEnabled);
     }
 
     public MockIngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
         RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, int metricTrackingIntervalMs,
-        BooleanSupplier isServerReadyToServeQueries) {
+        BooleanSupplier isServerReadyToServeQueries, boolean periodicOffsetLagTrackingEnabled) {
       super(serverMetrics, tableNameWithType, realtimeTableDataManager, timerThreadTickIntervalMs,
-          metricTrackingIntervalMs, isServerReadyToServeQueries);
+          metricTrackingIntervalMs, isServerReadyToServeQueries, periodicOffsetLagTrackingEnabled);
     }
 
     @Override
@@ -113,7 +118,8 @@ public class IngestionDelayTrackerTest {
       }
       Map<String, List<Long>> metricToValues = new HashMap<>();
       _partitionToMetricToValues.put(partitionId, metricToValues);
-      if (_streamConfigIndexToStreamMetadataProvider.get(0).supportsOffsetLag()) {
+      if (_streamConfigIndexToStreamMetadataProvider.get(0).supportsOffsetLag()
+              && _periodicOffsetLagTrackingEnabled) {
         metricToValues.put(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName(), new ArrayList<>());
         metricToValues.put(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName(), new ArrayList<>());
         metricToValues.put(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName(), new ArrayList<>());
@@ -123,7 +129,8 @@ public class IngestionDelayTrackerTest {
 
       _scheduledExecutorService.scheduleWithFixedDelay(() -> _partitionToMetricToValues.compute(partitionId, (k, v) -> {
         Map<String, List<Long>> metricToValuesForPartition = _partitionToMetricToValues.get(partitionId);
-        if (_streamConfigIndexToStreamMetadataProvider.get(0).supportsOffsetLag()) {
+        if (_streamConfigIndexToStreamMetadataProvider.get(0).supportsOffsetLag()
+                && _periodicOffsetLagTrackingEnabled) {
           metricToValuesForPartition.get(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName())
               .add(getPartitionIngestionOffsetLag(partitionId));
           metricToValuesForPartition.get(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName())
@@ -154,14 +161,14 @@ public class IngestionDelayTrackerTest {
   }
 
   private IngestionDelayTracker createTracker() {
-    return new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER);
+    return new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, true);
   }
 
   @Test
   public void testTrackerConstructors() {
     // Test regular constructor
     IngestionDelayTracker ingestionDelayTracker =
-        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER);
+        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, true);
 
     Clock clock = Clock.systemUTC();
     ingestionDelayTracker.setClock(clock);
@@ -175,7 +182,7 @@ public class IngestionDelayTrackerTest {
     // Test constructor with timer arguments
     ingestionDelayTracker =
         new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER,
-            METRICS_CLEANUP_TICK_INTERVAL_MS, METRICS_TRACKING_TICK_INTERVAL_MS, () -> true);
+            METRICS_CLEANUP_TICK_INTERVAL_MS, METRICS_TRACKING_TICK_INTERVAL_MS, () -> true, true);
     // Untracked partitions should return null (metric not emitted)
     assertNull(ingestionDelayTracker.getPartitionIngestionDelayMs(0));
     assertNull(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0));
@@ -489,7 +496,7 @@ public class IngestionDelayTrackerTest {
     RealtimeTableDataManager realtimeTableDataManager = mock(RealtimeTableDataManager.class);
     when(realtimeTableDataManager.getCachedTableConfigAndSchema()).thenReturn(Pair.of(tableConfig, null));
     ingestionDelayTracker =
-        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, realtimeTableDataManager);
+        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, realtimeTableDataManager, true);
     try {
       partitionsHosted.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(0, 1));
       ingestionDelayTracker.updateLatestStreamOffset(partitionsHosted);
@@ -509,7 +516,7 @@ public class IngestionDelayTrackerTest {
   public void testIngestionDelay() {
     MockIngestionDelayTracker ingestionDelayTracker =
         new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER,
-            METRICS_CLEANUP_TICK_INTERVAL_MS, METRICS_TRACKING_TICK_INTERVAL_MS, () -> true);
+            METRICS_CLEANUP_TICK_INTERVAL_MS, METRICS_TRACKING_TICK_INTERVAL_MS, () -> true, true);
 
     final int partition0 = 0;
     final String segment0 = new LLCSegmentName(RAW_TABLE_NAME, partition0, 0, 123).getSegmentName();
@@ -543,6 +550,78 @@ public class IngestionDelayTrackerTest {
     }, 10, 2000, "Failed to verify the ingestion delay metrics.");
     scheduledExecutorService.shutdown();
     ingestionDelayTracker.shutdown();
+  }
+
+  @Test
+  public void testIngestionDelayWithOffsetLagTrackingDisabled() {
+    MockIngestionDelayTracker ingestionDelayTracker =
+        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER,
+            METRICS_CLEANUP_TICK_INTERVAL_MS, METRICS_TRACKING_TICK_INTERVAL_MS, () -> true, false);
+
+    final int partition0 = 0;
+    final String segment0 = new LLCSegmentName(RAW_TABLE_NAME, partition0, 0, 123).getSegmentName();
+    final int partition1 = 1;
+
+    ingestionDelayTracker._partitionsHostedByThisServer.put(partition0, true);
+    ingestionDelayTracker._partitionsHostedByThisServer.put(partition1, true);
+    ingestionDelayTracker.updateMetrics(segment0, partition0, System.currentTimeMillis(), System.currentTimeMillis(),
+        new LongMsgOffset(50));
+
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        verifyMetricsWithOffsetLagDisabled(ingestionDelayTracker._partitionToMetricToValues);
+      } catch (Throwable t) {
+        return false;
+      }
+      return true;
+    }, 10, 2000, "Failed to verify the ingestion delay metrics with offset lag tracking disabled.");
+
+    ingestionDelayTracker.shutdown();
+  }
+
+  @Test
+  public void testIngestionDelayWithOffsetLagTrackingEnabledWithUnsupportedStream() {
+    MockIngestionDelayTracker ingestionDelayTracker =
+            new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER,
+                    METRICS_CLEANUP_TICK_INTERVAL_MS, METRICS_TRACKING_TICK_INTERVAL_MS, () -> true, true);
+    StreamMetadataProvider mockStreamMetadataProvider = mock(StreamMetadataProvider.class);
+    when(mockStreamMetadataProvider.supportsOffsetLag()).thenReturn(false);
+    ingestionDelayTracker._streamConfigIndexToStreamMetadataProvider.put(0, mockStreamMetadataProvider);
+    final int partition0 = 0;
+    final String segment0 = new LLCSegmentName(RAW_TABLE_NAME, partition0, 0, 123).getSegmentName();
+    final int partition1 = 1;
+
+    ingestionDelayTracker._partitionsHostedByThisServer.put(partition0, true);
+    ingestionDelayTracker._partitionsHostedByThisServer.put(partition1, true);
+    ingestionDelayTracker.updateMetrics(segment0, partition0, System.currentTimeMillis(), System.currentTimeMillis(),
+            new LongMsgOffset(50));
+
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        verifyMetricsWithOffsetLagDisabled(ingestionDelayTracker._partitionToMetricToValues);
+      } catch (Throwable t) {
+        return false;
+      }
+      return true;
+    }, 10, 2000, "Failed to verify the ingestion delay metrics with offset lag tracking disabled.");
+
+    ingestionDelayTracker.shutdown();
+  }
+
+  private void verifyMetricsWithOffsetLagDisabled(Map<Integer, Map<String, List<Long>>> partitionToMetricToValues) {
+    assertEquals(partitionToMetricToValues.size(), 2);
+    for (Map<String, List<Long>> metrics : partitionToMetricToValues.values()) {
+      assertFalse(metrics.containsKey(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName()),
+          "Offset lag metric should not be tracked when offset lag tracking is disabled");
+      assertFalse(metrics.containsKey(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName()),
+          "Consuming offset metric should not be tracked when offset lag tracking is disabled");
+      assertFalse(metrics.containsKey(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName()),
+          "Upstream offset metric should not be tracked when offset lag tracking is disabled");
+      assertTrue(metrics.containsKey(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName()),
+          "Delay ms metric should still be tracked when offset lag tracking is disabled");
+      assertFalse(metrics.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName()).isEmpty(),
+          "Delay ms metric should have values");
+    }
   }
 
   private void verifyMetrics(Map<Integer, Map<String, List<Long>>> partitionToMetricToValues) {
