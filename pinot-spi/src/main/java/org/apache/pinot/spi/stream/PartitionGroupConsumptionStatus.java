@@ -39,6 +39,7 @@ public class PartitionGroupConsumptionStatus {
   private StreamPartitionMsgOffset _startOffset;
   private StreamPartitionMsgOffset _endOffset;
   private String _status;
+  private boolean _endOfPartitionGroup;
 
   public PartitionGroupConsumptionStatus(int partitionGroupId, int streamPartitionId, int sequenceNumber,
       StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
@@ -85,6 +86,15 @@ public class PartitionGroupConsumptionStatus {
 
   public void setEndOffset(StreamPartitionMsgOffset endOffset) {
     _endOffset = endOffset;
+  }
+
+  /// Whether the server reported an exhausted partition group at the committed end offset.
+  public boolean isEndOfPartitionGroup() {
+    return _endOfPartitionGroup;
+  }
+
+  public void setEndOfPartitionGroup(boolean endOfPartitionGroup) {
+    _endOfPartitionGroup = endOfPartitionGroup;
   }
 
   public String getStatus() {

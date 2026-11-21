@@ -301,12 +301,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         int partitionGroupId = entry.getKey();
         LLCSegmentName llcSegmentName = entry.getValue();
         SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, llcSegmentName.getSegmentName());
-        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
-            new PartitionGroupConsumptionStatus(partitionGroupId, llcSegmentName.getSequenceNumber(),
-                offsetFactory.create(segmentZKMetadata.getStartOffset()),
-                segmentZKMetadata.getEndOffset() != null ? offsetFactory.create(segmentZKMetadata.getEndOffset())
-                    : null, segmentZKMetadata.getStatus().toString());
-        partitionGroupConsumptionStatusList.add(partitionGroupConsumptionStatus);
+        partitionGroupConsumptionStatusList.add(toPartitionGroupConsumptionStatus(partitionGroupId, partitionGroupId,
+            llcSegmentName.getSequenceNumber(), segmentZKMetadata, offsetFactory));
       }
     } else {
       // Multiple streams
@@ -322,12 +318,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
           offsetFactory = StreamConsumerFactoryProvider.create(streamConfigs.get(index)).createStreamMsgOffsetFactory();
           offsetFactories[index] = offsetFactory;
         }
-        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
-            new PartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId, llcSegmentName.getSequenceNumber(),
-                offsetFactory.create(segmentZKMetadata.getStartOffset()),
-                segmentZKMetadata.getEndOffset() != null ? offsetFactory.create(segmentZKMetadata.getEndOffset())
-                    : null, segmentZKMetadata.getStatus().toString());
-        partitionGroupConsumptionStatusList.add(partitionGroupConsumptionStatus);
+        partitionGroupConsumptionStatusList.add(toPartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId,
+            llcSegmentName.getSequenceNumber(), segmentZKMetadata, offsetFactory));
       }
     }
 
@@ -856,6 +848,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         : segmentLocation;
     SegmentZKMetadataUtils.updateCommittingSegmentZKMetadata(realtimeTableName, segmentZKMetadata, segmentMetadata,
         downloadUrl, committingSegmentDescriptor.getSegmentSizeBytes(), committingSegmentDescriptor.getNextOffset());
+    recordEndOfPartitionGroup(segmentZKMetadata, committingSegmentDescriptor);
     persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, stat.getVersion());
 
     // Refresh the Broker routing
@@ -875,9 +868,16 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
 
     segmentZKMetadata.setStatus(Status.COMMITTING);
     segmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
+    recordEndOfPartitionGroup(segmentZKMetadata, committingSegmentDescriptor);
     persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, stat.getVersion());
 
     return segmentZKMetadata;
+  }
+
+  private static void recordEndOfPartitionGroup(SegmentZKMetadata metadata, CommittingSegmentDescriptor descriptor) {
+    if (SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP.equals(descriptor.getStopReason())) {
+      metadata.markEndOfPartitionGroup();
+    }
   }
 
   /// Returns `true` if a pauseless commit start can resume an earlier attempt that moved the segment to COMMITTING
@@ -2309,10 +2309,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         int partitionGroupId = entry.getKey();
         SegmentZKMetadata zkMetadata = entry.getValue();
         LLCSegmentName llcSegmentName = new LLCSegmentName(zkMetadata.getSegmentName());
-        result.add(new PartitionGroupConsumptionStatus(partitionGroupId, llcSegmentName.getSequenceNumber(),
-            offsetFactory.create(zkMetadata.getStartOffset()),
-            zkMetadata.getEndOffset() != null ? offsetFactory.create(zkMetadata.getEndOffset()) : null,
-            zkMetadata.getStatus().toString()));
+        result.add(toPartitionGroupConsumptionStatus(partitionGroupId, partitionGroupId,
+            llcSegmentName.getSequenceNumber(), zkMetadata, offsetFactory));
       }
     } else {
       StreamPartitionMsgOffsetFactory[] offsetFactories = new StreamPartitionMsgOffsetFactory[numStreams];
@@ -2328,14 +2326,22 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
               StreamConsumerFactoryProvider.create(streamConfigs.get(index)).createStreamMsgOffsetFactory();
           offsetFactories[index] = offsetFactory;
         }
-        result.add(new PartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId,
-            llcSegmentName.getSequenceNumber(),
-            offsetFactory.create(zkMetadata.getStartOffset()),
-            zkMetadata.getEndOffset() != null ? offsetFactory.create(zkMetadata.getEndOffset()) : null,
-            zkMetadata.getStatus().toString()));
+        result.add(toPartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId,
+            llcSegmentName.getSequenceNumber(), zkMetadata, offsetFactory));
       }
     }
     return result;
+  }
+
+  private static PartitionGroupConsumptionStatus toPartitionGroupConsumptionStatus(int partitionGroupId,
+      int streamPartitionId, int sequenceNumber, SegmentZKMetadata metadata,
+      StreamPartitionMsgOffsetFactory offsetFactory) {
+    String endOffset = metadata.getEndOffset();
+    PartitionGroupConsumptionStatus status = new PartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId,
+        sequenceNumber, offsetFactory.create(metadata.getStartOffset()),
+        endOffset != null ? offsetFactory.create(endOffset) : null, metadata.getStatus().toString());
+    status.setEndOfPartitionGroup(endOffset != null && metadata.isEndOfPartitionGroup());
+    return status;
   }
 
   private StreamPartitionMsgOffset selectStartOffset(OffsetCriteria offsetCriteria, int partitionGroupId,

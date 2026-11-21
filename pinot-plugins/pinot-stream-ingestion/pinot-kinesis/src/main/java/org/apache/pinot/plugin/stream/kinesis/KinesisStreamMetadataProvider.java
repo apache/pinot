@@ -19,14 +19,17 @@
 package org.apache.pinot.plugin.stream.kinesis;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -49,6 +52,7 @@ import software.amazon.awssdk.services.kinesis.model.Shard;
 /// A [StreamMetadataProvider] implementation for the Kinesis stream
 public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   public static final String SHARD_ID_PREFIX = "shardId-";
+  private static final int MAX_END_OF_SHARD_PROBES = 5;
   private final KinesisConnectionHandler _kinesisConnectionHandler;
   private final StreamConsumerFactory _kinesisStreamConsumerFactory;
   private final String _clientId;
@@ -153,7 +157,8 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       if (currentEndOffset != null) { // Segment DONE (committing/committed)
         String endingSequenceNumber = shard.sequenceNumberRange().endingSequenceNumber();
         if (endingSequenceNumber != null) { // Shard has ended, check if we're also done consuming it
-          if (consumedEndOfShard(currentEndOffset, currentPartitionGroupConsumptionStatus)) {
+          if (consumedEndOfShard(shardId, currentEndOffset, currentPartitionGroupConsumptionStatus,
+              endingSequenceNumber, timeoutMillis)) {
             shardsEnded.add(shardId);
             continue; // Shard ended and we're done consuming it. Skip
           }
@@ -174,14 +179,8 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         continue;
       }
       Shard newShard = entry.getValue();
-      String parentShardId = newShard.parentShardId();
-
-      // Add the new shard in the following 3 cases:
-      // 1. Root shards - Parent shardId will be null. Will find this case when creating new table.
-      // 2. Parent expired - Parent shardId will not be part of shardIdToShard map
-      // 3. Parent reached EOL and completely consumed.
-      if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded.contains(
-          parentShardId)) {
+      if (isParentFinished(newShard.parentShardId(), shardIdToShardMap, shardsEnded)
+          && isParentFinished(newShard.adjacentParentShardId(), shardIdToShardMap, shardsEnded)) {
         // TODO: Revisit this. Kinesis starts consuming AFTER the start sequence number, and we might miss the first
         //       message.
         StreamPartitionMsgOffset newStartOffset =
@@ -217,35 +216,61 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     return shardIdNum.isEmpty() ? 0 : Integer.parseInt(shardIdNum);
   }
 
-  private boolean consumedEndOfShard(StreamPartitionMsgOffset startCheckpoint,
-      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus)
+  private static boolean isParentFinished(@Nullable String parentId, Map<String, Shard> shards,
+      Set<String> endedShards) {
+    return parentId == null || !shards.containsKey(parentId) || endedShards.contains(parentId);
+  }
+
+  /// A closed shard can be retired from a committed terminal signal, a matching durable sequence, or an explicitly
+  /// terminal empty fetch. An empty response can have a live iterator with readable records ahead of it.
+  private boolean consumedEndOfShard(String shardId, StreamPartitionMsgOffset checkpoint,
+      PartitionGroupConsumptionStatus consumptionStatus, String endingSequenceNumber, int timeoutMillis)
       throws IOException, TimeoutException {
-    try (PartitionGroupConsumer partitionGroupConsumer = _kinesisStreamConsumerFactory.createPartitionGroupConsumer(
-        _clientId, partitionGroupConsumptionStatus)) {
-      int attempts = 0;
-      while (true) {
-        MessageBatch<?> messageBatch = partitionGroupConsumer.fetchMessages(startCheckpoint, _fetchTimeoutMs);
-        if (messageBatch.getMessageCount() > 0) {
-          // There are messages left to be consumed so we haven't consumed the shard fully
+    if (!(checkpoint instanceof KinesisPartitionGroupOffset kinesisOffset)
+        || !shardId.equals(kinesisOffset.getShardId())) {
+      throw new IOException("Invalid Kinesis checkpoint for shard " + shardId + ": " + checkpoint);
+    }
+    if (consumptionStatus.isEndOfPartitionGroup()) {
+      return true;
+    }
+    String sequenceNumber = kinesisOffset.getSequenceNumber();
+    if (!isSequenceNumber(sequenceNumber)) {
+      return false;
+    }
+    if (isSequenceNumber(endingSequenceNumber)
+        && new BigInteger(sequenceNumber).compareTo(new BigInteger(endingSequenceNumber)) >= 0) {
+      // The iterator resumes AFTER the last committed record.
+      return true;
+    }
+
+    long startMs = currentTimeMillis();
+    try (PartitionGroupConsumer consumer =
+        _kinesisStreamConsumerFactory.createPartitionGroupConsumer(_clientId, consumptionStatus)) {
+      for (int attempt = 0; attempt < MAX_END_OF_SHARD_PROBES; attempt++) {
+        long remainingMs = timeoutMillis - (currentTimeMillis() - startMs);
+        if (remainingMs <= 0) {
+          break;
+        }
+        int fetchTimeoutMs = (int) Math.min(Math.max(1, _fetchTimeoutMs), remainingMs);
+        MessageBatch<?> batch = consumer.fetchMessages(checkpoint, fetchTimeoutMs);
+        if (batch.getMessageCount() > 0) {
           return false;
         }
-        if (messageBatch.isEndOfPartitionGroup()) {
-          // Shard can't be iterated further. We have consumed all the messages because message count = 0
+        if (batch.isEndOfPartitionGroup()) {
           return true;
         }
-        // Even though message count = 0, shard can be iterated further.
-        // Based on kinesis documentation, there might be more records to be consumed.
-        // So we need to fetch messages again to check if we have reached end of shard.
-        // To prevent an infinite loop (known cases listed in fetchMessages()), we will limit the number of attempts
-        attempts++;
-        if (attempts >= 5) {
-          LOGGER.warn("Reached max attempts to check if end of shard reached from checkpoint {}. "
-                  + " Assuming we have not consumed till end of shard.", startCheckpoint);
-          return false;
-        }
-        // continue to fetch messages. reusing the partitionGroupConsumer ensures we use new shard iterator
       }
     }
+    return false;
+  }
+
+  private static boolean isSequenceNumber(@Nullable String sequenceNumber) {
+    return StringUtils.isNotEmpty(sequenceNumber)
+        && sequenceNumber.chars().allMatch(character -> character >= '0' && character <= '9');
+  }
+
+  long currentTimeMillis() {
+    return TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
   }
 
   @Override

@@ -362,6 +362,16 @@ public class SegmentZKMetadata implements ZKMetadata {
     setValue(Segment.Realtime.END_OFFSET, endOffset);
   }
 
+  /// Whether the current end offset matches a server-confirmed end of the partition group.
+  public boolean isEndOfPartitionGroup() {
+    String endOffset = getEndOffset();
+    return endOffset != null && endOffset.equals(_simpleFields.get(Segment.Realtime.END_OF_PARTITION_GROUP_OFFSET));
+  }
+
+  public void markEndOfPartitionGroup() {
+    setValue(Segment.Realtime.END_OF_PARTITION_GROUP_OFFSET, getEndOffset());
+  }
+
   public int getNumReplicas() {
     return _znRecord.getIntField(Segment.Realtime.NUM_REPLICAS, -1);
   }

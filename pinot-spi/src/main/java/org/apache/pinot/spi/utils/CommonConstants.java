@@ -2631,6 +2631,7 @@ public class CommonConstants {
       public static final String STATUS = "segment.realtime.status";
       public static final String START_OFFSET = "segment.realtime.startOffset";
       public static final String END_OFFSET = "segment.realtime.endOffset";
+      public static final String END_OF_PARTITION_GROUP_OFFSET = "segment.realtime.endOfPartitionGroupOffset";
       public static final String NUM_REPLICAS = "segment.realtime.numReplicas";
       public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
       @Deprecated

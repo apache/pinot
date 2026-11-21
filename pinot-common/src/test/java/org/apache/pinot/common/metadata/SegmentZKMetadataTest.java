@@ -34,6 +34,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentZKMetadataTest {
@@ -73,6 +75,19 @@ public class SegmentZKMetadataTest {
     assertEquals(SegmentZKMetadata.fromJsonString(doneSegmentMetadata.toJsonString()), doneSegmentMetadata);
     Assert.assertFalse(inProgressSegmentMetadata.toJsonString().contains("\"customMap\""));
     Assert.assertFalse(doneSegmentMetadata.toJsonString().contains("\"customMap\""));
+  }
+
+  @Test
+  public void testEndOfPartitionGroupEvidenceIsBoundToEndOffset() {
+    SegmentZKMetadata metadata = getTestDoneRealtimeSegmentZKMetadata();
+    metadata.setEndOffset("closed-offset");
+    assertFalse(metadata.isEndOfPartitionGroup());
+    metadata.markEndOfPartitionGroup();
+    SegmentZKMetadata recovered = new SegmentZKMetadata(metadata.toZNRecord());
+    assertTrue(recovered.isEndOfPartitionGroup());
+
+    recovered.setEndOffset("replacement-offset");
+    assertFalse(recovered.isEndOfPartitionGroup());
   }
 
   @Test
