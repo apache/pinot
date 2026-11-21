@@ -50,10 +50,25 @@ public class SanitizationTransformerUtils {
   @Nullable
   public static SanitizedColumnInfo getSanitizedColumnInfo(FieldSpec fieldSpec) {
     FieldSpec.DataType dataType = fieldSpec.getDataType();
+    MaxLengthExceedStrategy strategy = fieldSpec.getEffectiveMaxLengthExceedStrategy();
+
+    if (dataType == FieldSpec.DataType.VARIANT) {
+      if (strategy == MaxLengthExceedStrategy.TRIM_LENGTH
+          || strategy == MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE) {
+        throw new IllegalStateException(
+            "VARIANT envelope cannot use max length exceed strategy: " + strategy);
+      }
+      // ERROR can enforce a configured envelope-size bound without modifying the envelope. NO_ACTION deliberately
+      // bypasses generic byte sanitization because Variant payload validation belongs to VariantEnvelope/the producer.
+      if (strategy == MaxLengthExceedStrategy.ERROR) {
+        return new SanitizedColumnInfo(fieldSpec.getName(), fieldSpec.getEffectiveMaxLength(), strategy,
+            fieldSpec.getDefaultNullValue());
+      }
+      return null;
+    }
 
     if (dataType == FieldSpec.DataType.STRING || dataType == FieldSpec.DataType.JSON
         || dataType == FieldSpec.DataType.BYTES) {
-      MaxLengthExceedStrategy strategy = fieldSpec.getEffectiveMaxLengthExceedStrategy();
       // For STRING, always apply (to handle null characters even with NO_ACTION)
       // For JSON/BYTES, only apply if strategy is not NO_ACTION
       if (dataType == FieldSpec.DataType.STRING || strategy != MaxLengthExceedStrategy.NO_ACTION) {

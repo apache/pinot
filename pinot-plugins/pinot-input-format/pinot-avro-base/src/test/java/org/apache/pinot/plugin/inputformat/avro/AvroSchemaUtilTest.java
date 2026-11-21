@@ -34,7 +34,7 @@ public class AvroSchemaUtilTest {
   /// Every Pinot data type that has an Avro representation.
   private static final DataType[] SUPPORTED_DATA_TYPES =
       {DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.BOOLEAN, DataType.TIMESTAMP,
-          DataType.BIG_DECIMAL, DataType.STRING, DataType.JSON, DataType.BYTES, DataType.UUID};
+          DataType.BIG_DECIMAL, DataType.STRING, DataType.JSON, DataType.BYTES, DataType.UUID, DataType.VARIANT};
 
   /// The mapping must be driven by the original (logical) data type, not the stored type. Otherwise BOOLEAN collapses
   /// to "int" and TIMESTAMP to a plain "long", misrepresenting the column in the generated Avro schema.
@@ -57,6 +57,12 @@ public class AvroSchemaUtilTest {
   @Test
   public void testToAvroSchemaJsonObjectForUuid() {
     assertLogicalType(DataType.UUID, "string", "uuid");
+  }
+
+  /// VARIANT passes through as opaque bytes: the PVAR envelope must round-trip unchanged through Avro.
+  @Test
+  public void testToAvroSchemaForVariant() {
+    assertPrimitiveType(DataType.VARIANT, "bytes");
   }
 
   /// The Avro-schema and JSON forms are two views of one mapping, so they must agree for every supported type.
