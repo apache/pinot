@@ -1052,6 +1052,9 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+        /// Name of the cost-based logical optimizer to use for this query, as registered by a
+        /// `QueryOptimizerProvider` plugin. Unset means the built-in HEP planner.
+        public static final String QUERY_OPTIMIZER = "queryOptimizer";
         // When true, the multi-stage planner prunes input (passthrough) columns - notably the unnested source array -
         // from the UNNEST output when they are not referenced downstream, avoiding copying them into every exploded
         // row. Defaults to false: enabling it makes the broker emit a smaller UNNEST output schema, which an
