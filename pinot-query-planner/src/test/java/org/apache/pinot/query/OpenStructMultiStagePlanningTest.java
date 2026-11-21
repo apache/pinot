@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,12 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.type.OpenStructSqlType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -152,6 +158,47 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
         "SELECT x['n'] FROM (SELECT " + computed + " AS x FROM d)")) {
       Exception e = expectThrows(Exception.class, () -> planQuery(sql));
       assertTrue(e.getMessage().contains("OPEN_STRUCT key lookup requires a column reference"), e.getMessage());
+    }
+  }
+
+  /// The leaf receives the planned key type, so it can convert a segment value stored as another type (for example an
+  /// undeclared INT key that the plan types VARCHAR) before a pushed-down comparison or sort. The type is the same
+  /// for a declared key, whose matching segments keep their index.
+  @Test
+  public void testPushedKeyReadCarriesThePlannedType() {
+    assertEquals(plannedKeyTypes("SELECT col1 FROM d WHERE v['k'] > '2'"), List.of("STRING"));
+    assertEquals(plannedKeyTypes("SELECT v['k'] FROM d ORDER BY v['k'] LIMIT 1"), List.of("STRING"));
+    assertEquals(plannedKeyTypes("SELECT col1 FROM d WHERE v['n'] > 2"), List.of("LONG"));
+  }
+
+  private List<String> plannedKeyTypes(String sql) {
+    List<RexExpression> expressions = new ArrayList<>();
+    for (DispatchablePlanFragment fragment : planQuery(sql).getQueryStageMap().values()) {
+      collectExpressions(fragment.getPlanFragment().getFragmentRoot(), expressions);
+    }
+    List<String> types = new ArrayList<>();
+    expressions.forEach(expression -> collectItemTypes(expression, types));
+    return types.stream().distinct().toList();
+  }
+
+  private static void collectExpressions(PlanNode node, List<RexExpression> expressions) {
+    if (node instanceof FilterNode filter) {
+      expressions.add(filter.getCondition());
+    } else if (node instanceof ProjectNode project) {
+      expressions.addAll(project.getProjects());
+    }
+    for (PlanNode input : node.getInputs()) {
+      collectExpressions(input, expressions);
+    }
+  }
+
+  private static void collectItemTypes(RexExpression expression, List<String> types) {
+    if (expression instanceof RexExpression.FunctionCall call) {
+      List<RexExpression> operands = call.getFunctionOperands();
+      if (call.getFunctionName().equals("ITEM") && operands.size() == 3) {
+        types.add(String.valueOf(((RexExpression.Literal) operands.get(2)).getValue()));
+      }
+      operands.forEach(operand -> collectItemTypes(operand, types));
     }
   }
 
