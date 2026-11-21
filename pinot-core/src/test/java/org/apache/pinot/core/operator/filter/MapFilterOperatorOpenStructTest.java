@@ -233,6 +233,13 @@ public class MapFilterOperatorOpenStructTest {
 
     MapFilterOperator op = new MapFilterOperator(segment, predicate, qc, NUM_DOCS);
     assertTrue(op.toExplainString().contains("delegateTo:per_key_index"));
+
+    // MSE carries the planned type. A matching key can use the same inverted index.
+    ExpressionContext typedItem = ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM,
+        ItemTransformFunction.FUNCTION_NAME, List.of(ExpressionContext.forIdentifier(COLUMN),
+        ExpressionContext.forLiteral(DataType.STRING, KEY), ExpressionContext.forLiteral(DataType.STRING, "STRING"))));
+    MapFilterOperator typed = new MapFilterOperator(segment, new EqPredicate(typedItem, "active"), qc, NUM_DOCS);
+    assertTrue(typed.toExplainString().contains("delegateTo:per_key_index"));
   }
 
   /// Absent key on a fully materialized segment with EQ → no doc matches (getTrues returns EOF).
