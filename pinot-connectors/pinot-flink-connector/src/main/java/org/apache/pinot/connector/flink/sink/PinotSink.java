@@ -31,11 +31,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.connector.flink.common.PinotGenericRowConverter;
 import org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -43,6 +46,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +74,7 @@ public class PinotSink<T> implements Sink<T> {
   private final Schema _schema;
   @Nullable private final String _segmentNamePrefix;
   @Nullable private final Long _segmentUploadTimeMs;
+  @Nullable private final String _authToken;
 
   public PinotSink(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema) {
     this(recordConverter, tableConfig, schema, DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
@@ -83,6 +88,16 @@ public class PinotSink<T> implements Sink<T> {
         DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
   }
 
+  /// Same as [#PinotSink(PinotGenericRowConverter, TableConfig, Schema, String)], and also uses `authToken` to
+  /// authenticate segment uploads with the controller.
+  ///
+  /// The given `tableConfig` is not modified: the sink applies the upload settings to a deep copy.
+  public PinotSink(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
+      String controllerBaseUrl, @Nullable String authToken) {
+    this(recordConverter, prepareTableConfigForSink(copyTableConfig(tableConfig), controllerBaseUrl), schema,
+        DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE, null, null, authToken);
+  }
+
   public PinotSink(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize) {
     this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize, null, null);
@@ -91,6 +106,15 @@ public class PinotSink<T> implements Sink<T> {
   public PinotSink(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize, @Nullable String segmentNamePrefix,
       @Nullable Long segmentUploadTimeMs) {
+    this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize, segmentNamePrefix,
+        segmentUploadTimeMs, null);
+  }
+
+  /// Full constructor. A non-blank `authToken` is used to authenticate segment uploads with the controller and takes
+  /// precedence over any `authToken` in the table's batch config.
+  public PinotSink(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
+      long segmentFlushMaxNumRecords, int executorPoolSize, @Nullable String segmentNamePrefix,
+      @Nullable Long segmentUploadTimeMs, @Nullable String authToken) {
     _recordConverter = recordConverter;
     _tableConfig = tableConfig;
     _schema = schema;
@@ -98,6 +122,17 @@ public class PinotSink<T> implements Sink<T> {
     _executorPoolSize = executorPoolSize;
     _segmentNamePrefix = segmentNamePrefix;
     _segmentUploadTimeMs = segmentUploadTimeMs;
+    _authToken = authToken;
+  }
+
+  /// Deep-copies the table config through JSON. `new TableConfig(tableConfig)` is not enough because it shares the
+  /// nested ingestion config.
+  private static TableConfig copyTableConfig(TableConfig tableConfig) {
+    try {
+      return JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to copy table config for table: " + tableConfig.getTableName(), e);
+    }
   }
 
   /// Applies the connector-specific batch-ingestion defaults needed for segment generation and upload.
@@ -137,6 +172,29 @@ public class PinotSink<T> implements Sink<T> {
     return tableConfig;
   }
 
+  /// Builds the [AuthProvider] for segment uploads from `authToken`, falling back to the `authToken` in the table's
+  /// batch config when `authToken` is blank. Returns a provider with no headers when neither is set.
+  ///
+  /// Prefer passing the token to the sink constructor. Never store it in the table config saved on the controller: that
+  /// config is kept in ZooKeeper and returned by the table APIs.
+  static AuthProvider createAuthProvider(TableConfig tableConfig, @Nullable String authToken) {
+    return AuthProviderUtils.makeAuthProvider(
+        StringUtils.isNotBlank(authToken) ? authToken : getBatchConfigAuthToken(tableConfig));
+  }
+
+  @Nullable
+  private static String getBatchConfigAuthToken(TableConfig tableConfig) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null || ingestionConfig.getBatchIngestionConfig() == null) {
+      return null;
+    }
+    List<Map<String, String>> batchConfigMaps = ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps();
+    if (batchConfigMaps == null || batchConfigMaps.isEmpty()) {
+      return null;
+    }
+    return batchConfigMaps.get(0).get(BatchConfigProperties.AUTH_TOKEN);
+  }
+
   @Override
   public SinkWriter<T> createWriter(WriterInitContext context)
       throws IOException {
@@ -150,6 +208,7 @@ public class PinotSink<T> implements Sink<T> {
   private final class PinotSinkWriter implements SinkWriter<T> {
     private final SegmentWriter _segmentWriter;
     private final SegmentUploader _segmentUploader;
+    private final AuthProvider _authProvider;
     private final ExecutorService _executor;
     private final List<Future<?>> _pendingUploads = new ArrayList<>();
     private long _segmentNumRecord;
@@ -169,7 +228,8 @@ public class PinotSink<T> implements Sink<T> {
         segmentUploader.init(_tableConfig);
         _segmentWriter = segmentWriter;
         _segmentUploader = segmentUploader;
-        LOG.info("Open Pinot sink with the table {}", _tableConfig.toJsonString());
+        _authProvider = createAuthProvider(_tableConfig, _authToken);
+        LOG.info("Open Pinot sink with the table {}", _tableConfig.getTableName());
       } catch (Exception e) {
         shutdownExecutorNow();
         closeQuietly(segmentWriter);
@@ -252,7 +312,7 @@ public class PinotSink<T> implements Sink<T> {
       LOG.info("Pinot segment writer flushed with {} records to {}", recordsInSegment, segmentURI);
       _pendingUploads.add(_executor.submit(() -> {
         try {
-          _segmentUploader.uploadSegment(segmentURI, null);
+          _segmentUploader.uploadSegment(segmentURI, _authProvider);
         } catch (Exception e) {
           throw new RuntimeException("Failed to upload Pinot segment", e);
         }

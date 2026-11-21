@@ -49,7 +49,7 @@ try (PinotAdminClient client = new PinotAdminClient(controllerAddress, propertie
   TableConfig tableConfig =
       client.getTableClient().getTableConfigObjectForType("starbucksStores", TableType.OFFLINE);
   // create Flink Pinot Sink
-  srcDs.sinkTo(new PinotSink<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema,
+  srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema,
       controllerUrl));
 }
 execEnv.execute();
@@ -83,7 +83,7 @@ try (PinotAdminClient client = new PinotAdminClient(controllerAddress, propertie
 
   // create Flink Pinot Sink (partition it same as the realtime stream(e.g. kafka) in case of upsert tables)
   srcDs.partitionCustom((Partitioner<Integer>) (key, partitions) -> key % partitions, r -> (Integer) r.getField("primaryKey"))
-      .sinkTo(new PinotSink<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema,
+      .sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema,
           controllerUrl));
 }
 execEnv.execute();
@@ -91,6 +91,29 @@ execEnv.execute();
 ```
 
 For more examples, please see `src/main/java/org/apache/pinot/connector/flink/FlinkQuickStart.java`
+
+## Authentication
+If the controller has authentication enabled, pass the auth headers to the `PinotAdminClient` and the token to
+`PinotSink`. The sink sends the token as the `Authorization` header when uploading segments.
+```java
+String authToken = "Basic <base64(user:password)>";
+try (PinotAdminClient client =
+    new PinotAdminClient(controllerAddress, properties, Map.of("Authorization", authToken))) {
+  Schema schema = client.getSchemaClient().getSchemaObject("starbucksStores");
+  TableConfig tableConfig =
+      client.getTableClient().getTableConfigObjectForType("starbucksStores", TableType.OFFLINE);
+  srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(TEST_TYPE_INFO), tableConfig, schema,
+      controllerUrl, authToken));
+}
+```
+ - The token can be `Basic <base64(user:password)>` or `Bearer <token>`.
+ - The sink keeps the token separate from the table config, and the `tableConfig` you pass in is not modified. Do not
+   save the token in the table config stored in the controller: that config is kept in ZooKeeper and returned by the
+   table APIs.
+ - The full constructor also takes an `authToken`, so authentication can be combined with custom flush, executor and
+   segment naming settings.
+ - Like any credential passed to a Flink job, the token is part of the serialized job graph sent to the task managers.
+ - Only static tokens are supported for segment upload.
 
 ## Notes for backfilling upsert table
  - To correctly partition the output segments by the primary key, the Flink job *must* also include the partitionCustom operator with the same stream partition logic before the Sink operator
