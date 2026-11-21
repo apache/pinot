@@ -32,6 +32,7 @@ repo. It is intentionally short and focused on day-to-day work.
 ## Repository layout (high level)
 - pinot-broker: broker query planning and scatter-gather.
 - pinot-controller: controller APIs, table/segment metadata, Helix management.
+- pinot-coordination-ratis: experimental controller-side Ratis metadata and recovery foundation.
 - pinot-server: server query execution, segment loading, indexing.
 - pinot-minion: background tasks (segment conversion, purge, etc).
 - pinot-common / pinot-spi: shared utils, config, and SPI interfaces.
