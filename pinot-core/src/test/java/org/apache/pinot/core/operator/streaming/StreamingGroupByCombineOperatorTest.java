@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -30,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
@@ -140,14 +142,15 @@ public class StreamingGroupByCombineOperatorTest {
         new StreamingGroupByCombineOperator(operators, queryContext, EXECUTOR, flushThreshold);
 
     // Collect all blocks
-    List<GroupByResultsBlock> dataBlocks = new ArrayList<>();
+    List<Iterator<Record>> dataBlockIterators = new ArrayList<>();
     combineOperator.start();
     try {
       BaseResultsBlock block = combineOperator.nextBlock();
       while (!(block instanceof MetadataResultsBlock)) {
         assertNull(block.getErrorMessages(), "Expected no errors but got: " + block.getErrorMessages());
         assertTrue(block instanceof GroupByResultsBlock, "Expected GroupByResultsBlock but got: " + block.getClass());
-        dataBlocks.add((GroupByResultsBlock) block);
+        // Retain each table's cursor until all subsequent flushes finish and the producer stops.
+        dataBlockIterators.add(((GroupByResultsBlock) block).getTable().iterator());
         block = combineOperator.nextBlock();
       }
     } finally {
@@ -155,15 +158,15 @@ public class StreamingGroupByCombineOperatorTest {
     }
 
     // With 50 distinct groups and a flush threshold of 10, we should get multiple data blocks
-    assertTrue(dataBlocks.size() > 1,
-        "Expected multiple data blocks but got " + dataBlocks.size());
+    assertTrue(dataBlockIterators.size() > 1,
+        "Expected multiple data blocks but got " + dataBlockIterators.size());
 
     // Merge all partial results to verify correctness
     // Each group key g should have SUM(intColumn) = NUM_SEGMENTS * 2 * (g + 1)
     Map<Integer, Double> groupSums = new HashMap<>();
-    for (GroupByResultsBlock dataBlock : dataBlocks) {
-      List<Object[]> rows = dataBlock.getRows();
-      for (Object[] row : rows) {
+    for (Iterator<Record> iterator : dataBlockIterators) {
+      while (iterator.hasNext()) {
+        Object[] row = iterator.next().getValues();
         int groupKey = (int) row[0];
         double sum = ((Number) row[1]).doubleValue();
         groupSums.merge(groupKey, sum, Double::sum);
