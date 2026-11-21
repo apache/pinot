@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
+import it.unimi.dsi.fastutil.booleans.BooleanArrayList;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -37,6 +41,8 @@ import org.apache.lucene.search.ReferenceManager.RefreshListener;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -49,6 +55,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -281,6 +288,119 @@ public class LuceneMutableTextIndexTest {
       _realtimeLuceneTextIndex.close();
       _realtimeLuceneTextIndex = null;
     }
+  }
+
+  @Test
+  public void testGetDocScores()
+      throws IOException {
+    TextIndexConfig config = new TextIndexConfigBuilder().withUseANDForMultiTermQueries(false).build();
+    RealtimeLuceneTextIndex index = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR,
+        "table__0__" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement() + "__20240601T1818Z", config);
+    try {
+      index.add("usb charger");
+      index.add("usb charger braided cable wall adapter travel kit pouch");
+      index.add("usb usb usb hub");
+      index.add("usb power bank hub");
+      index.add("hdmi monitor cable");
+      index.getSearcherManager().maybeRefreshBlocking();
+
+      Int2FloatMap scores = index.getDocScores("usb", null);
+      assertEquals(scores.keySet(), Set.of(0, 1, 2, 3));
+      for (float score : scores.values()) {
+        assertTrue(score > 0);
+      }
+      // Same length, more occurrences
+      assertTrue(scores.get(2) > scores.get(3));
+      // Same occurrences, shorter document
+      assertTrue(scores.get(0) > scores.get(1));
+      // Non-matching documents are absent and read as 0
+      assertEquals(scores.get(4), 0f);
+    } finally {
+      index.close();
+    }
+  }
+
+  /// A consuming segment with a multi-column text index scores and collects statistics per column, like the
+  /// single-column index.
+  @Test
+  public void testMultiColumnGetDocScoresAndStats()
+      throws IOException {
+    MultiColumnRealtimeLuceneTextIndex index = new MultiColumnRealtimeLuceneTextIndex(List.of("title", "body"),
+        new BooleanArrayList(new boolean[]{true, true}), INDEX_DIR,
+        "table__0__" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement() + "__20240601T1818Z",
+        new MultiColumnTextIndexConfig(List.of("title", "body")));
+    try {
+      index.add(List.of("usb charger", "wall adapter"));
+      index.add(List.of("usb charger braided cable wall adapter travel kit pouch", "cable"));
+      index.add(List.of("usb usb usb hub", "hub"));
+      index.add(List.of("usb power bank hub", "battery"));
+      index.add(List.of("hdmi monitor cable", "usb port"));
+      index.getSearcherManager().maybeRefreshBlocking();
+
+      Int2FloatMap scores = index.getDocScores("title", "usb", (String) null);
+      // Doc 4 mentions usb only in the body, so the title query does not match it
+      assertEquals(scores.keySet(), Set.of(0, 1, 2, 3));
+      assertTrue(scores.get(2) > scores.get(3));
+      assertTrue(scores.get(0) > scores.get(1));
+      assertEquals(index.getDocScores("body", "usb", (String) null).keySet(), Set.of(4));
+
+      TextScoreStats stats = index.getTextScoreStats("title", "usb", null);
+      assertEquals(index.getDocScores("title", "usb", null, stats), scores,
+          "A segment's own statistics must reproduce its per-segment scores");
+    } finally {
+      index.close();
+    }
+  }
+
+  @Test
+  public void testGlobalStatsScoring()
+      throws IOException {
+    // Same first document in both consuming segments; `usb` is common in A and rare in B
+    String[] docsA = {"usb charger", "usb hub", "usb cable"};
+    String[] docsB = {"usb charger", "hdmi monitor cable", "wireless mouse pad"};
+    RealtimeLuceneTextIndex indexA = newScoringIndex(docsA);
+    RealtimeLuceneTextIndex indexB = newScoringIndex(docsB);
+    String[] unionDocs = {docsA[0], docsA[1], docsA[2], docsB[0], docsB[1], docsB[2]};
+    RealtimeLuceneTextIndex unionIndex = newScoringIndex(unionDocs);
+    try {
+      String query = "usb charger";
+      assertNotEquals(indexA.getDocScores(query, null).get(0), indexB.getDocScores(query, null).get(0));
+
+      TextScoreStats stats = indexA.getTextScoreStats(query, null).merge(indexB.getTextScoreStats(query, null));
+      assertEquals(stats, unionIndex.getTextScoreStats(query, null));
+      assertEquals(stats.getField(TEXT_COLUMN_NAME).getDocCount(), 6);
+      assertEquals(stats.getField(TEXT_COLUMN_NAME).getTermStats("usb"), new long[]{4, 4});
+
+      Int2FloatMap globalA = indexA.getDocScores(query, null, stats);
+      Int2FloatMap globalB = indexB.getDocScores(query, null, stats);
+      Int2FloatMap union = unionIndex.getDocScores(query, null);
+      assertEquals(globalA.get(0), globalB.get(0));
+      for (int docId = 0; docId < docsA.length; docId++) {
+        assertEquals(globalA.get(docId), union.get(docId), 1e-6f);
+        assertEquals(globalB.get(docId), union.get(docsA.length + docId), 1e-6f);
+      }
+      // No global statistics: identical to the plain call
+      assertEquals(indexA.getDocScores(query, null, null), indexA.getDocScores(query, null));
+    } finally {
+      indexA.close();
+      indexB.close();
+      unionIndex.close();
+    }
+  }
+
+  private static RealtimeLuceneTextIndex newScoringIndex(String[] docs) {
+    TextIndexConfig config = new TextIndexConfigBuilder().withUseANDForMultiTermQueries(false).build();
+    RealtimeLuceneTextIndex index = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR,
+        "table__0__" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement() + "__20240601T1818Z", config);
+    for (String doc : docs) {
+      index.add(doc);
+    }
+    try {
+      index.getSearcherManager().maybeRefreshBlocking();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return index;
   }
 
   @Test

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -52,6 +54,7 @@ import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.CsvParser;
@@ -373,51 +376,101 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
-      Constructor<QueryParserBase> queryParserClassConstructor = _queryParserClassConstructor;
-      String queryParserClass = _queryParserClass;
-      boolean enablePrefixSuffixMatchingInPhraseQueries = _enablePrefixSuffixMatchingInPhraseQueries;
-      boolean useANDForMultiTermQueries = _useANDForMultiTermQueries;
-
-      ColumnConfig columnConfig = _perColumnConfigs.get(column);
-      if (columnConfig != null) {
-        if (columnConfig._queryParserClassConstructor != null) {
-          queryParserClassConstructor = columnConfig._queryParserClassConstructor;
-        }
-        if (columnConfig._queryParserClass != null) {
-          queryParserClass = columnConfig._queryParserClass;
-        }
-        if (columnConfig._enablePrefixSuffixMatchingInPhraseQueries != null) {
-          enablePrefixSuffixMatchingInPhraseQueries = columnConfig._enablePrefixSuffixMatchingInPhraseQueries;
-        }
-        if (columnConfig._useANDForMultiTermQueries != null) {
-          useANDForMultiTermQueries = columnConfig._useANDForMultiTermQueries;
-        }
-      }
-
-      // Lucene query parsers are generally stateful and a new instance must be created per query.
-      QueryParserBase parser = queryParserClassConstructor.newInstance(column, _analyzer);
-      // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
-      // the query parser. To support the feature, we need to explicitly set the config to be true.
-
-      if (queryParserClass.equals(CLASSIC_QUERY_PARSER)
-          && enablePrefixSuffixMatchingInPhraseQueries) {
-        parser.setAllowLeadingWildcard(true);
-      }
-      if (queryParserClass.equals(CLASSIC_QUERY_PARSER) && useANDForMultiTermQueries) {
-        parser.setDefaultOperator(QueryParser.Operator.AND);
-      }
-      Query query = parser.parse(searchQuery);
-      if (queryParserClass.equals(CLASSIC_QUERY_PARSER)
-          && enablePrefixSuffixMatchingInPhraseQueries) {
-        query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
-      }
-      _indexSearcher.search(query, docIDCollector);
+      _indexSearcher.search(parseQueryWithoutOptions(column, searchQuery), docIDCollector);
       return docIds;
     } catch (Exception e) {
       String msg =
           "Caught exception while searching the text index for columns: " + _columns + " search query:" + searchQuery;
       throw new RuntimeException(msg, e);
     }
+  }
+
+  @Override
+  public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString) {
+    return getDocScores(column, searchQuery, optionsString, null);
+  }
+
+  @Override
+  public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    Int2FloatOpenHashMap scores = new Int2FloatOpenHashMap();
+    try {
+      IndexSearcher searcher = globalStats != null
+          ? LuceneTextScoreStatsUtils.newGlobalStatsSearcher(_indexReader, globalStats) : _indexSearcher;
+      searcher.search(parseQuery(column, searchQuery, optionsString),
+          new LuceneDocScoreCollector(scores, _docIdTranslator::getPinotDocId));
+      return scores;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while scoring the text index for column: " + column + " search query:" + searchQuery, e);
+    }
+  }
+
+  @Override
+  public TextScoreStats getTextScoreStats(String column, String searchQuery, @Nullable String optionsString) {
+    try {
+      return LuceneTextScoreStatsUtils.collect(_indexSearcher, parseQuery(column, searchQuery, optionsString));
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while collecting text score statistics for column: " + column + " search query:"
+              + searchQuery, e);
+    }
+  }
+
+  /// Parses a search string for `column`, honouring the options string when it carries options.
+  private Query parseQuery(String column, String searchQuery, @Nullable String optionsString)
+      throws Exception {
+    if (optionsString != null && !optionsString.trim().isEmpty()) {
+      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+      if (!options.getOptions().isEmpty()) {
+        return LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, column, _analyzer);
+      }
+    }
+    return parseQueryWithoutOptions(column, searchQuery);
+  }
+
+  /// Parses a search string for `column` with the column's (or the index-wide) parser configuration.
+  private Query parseQueryWithoutOptions(String column, String searchQuery)
+      throws Exception {
+    Constructor<QueryParserBase> queryParserClassConstructor = _queryParserClassConstructor;
+    String queryParserClass = _queryParserClass;
+    boolean enablePrefixSuffixMatchingInPhraseQueries = _enablePrefixSuffixMatchingInPhraseQueries;
+    boolean useANDForMultiTermQueries = _useANDForMultiTermQueries;
+
+    ColumnConfig columnConfig = _perColumnConfigs.get(column);
+    if (columnConfig != null) {
+      if (columnConfig._queryParserClassConstructor != null) {
+        queryParserClassConstructor = columnConfig._queryParserClassConstructor;
+      }
+      if (columnConfig._queryParserClass != null) {
+        queryParserClass = columnConfig._queryParserClass;
+      }
+      if (columnConfig._enablePrefixSuffixMatchingInPhraseQueries != null) {
+        enablePrefixSuffixMatchingInPhraseQueries = columnConfig._enablePrefixSuffixMatchingInPhraseQueries;
+      }
+      if (columnConfig._useANDForMultiTermQueries != null) {
+        useANDForMultiTermQueries = columnConfig._useANDForMultiTermQueries;
+      }
+    }
+
+    // Lucene query parsers are generally stateful and a new instance must be created per query.
+    QueryParserBase parser = queryParserClassConstructor.newInstance(column, _analyzer);
+    // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
+    // the query parser. To support the feature, we need to explicitly set the config to be true.
+
+    if (queryParserClass.equals(CLASSIC_QUERY_PARSER)
+        && enablePrefixSuffixMatchingInPhraseQueries) {
+      parser.setAllowLeadingWildcard(true);
+    }
+    if (queryParserClass.equals(CLASSIC_QUERY_PARSER) && useANDForMultiTermQueries) {
+      parser.setDefaultOperator(QueryParser.Operator.AND);
+    }
+    Query query = parser.parse(searchQuery);
+    if (queryParserClass.equals(CLASSIC_QUERY_PARSER)
+        && enablePrefixSuffixMatchingInPhraseQueries) {
+      query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
+    }
+    return query;
   }
 
   /// When we destroy the loaded ImmutableSegment, all the indexes
