@@ -121,10 +121,12 @@ SqlPinotShow :=                                                ── unified en
 
 SqlPinotCreateTable :=
     CREATE TABLE [IF NOT EXISTS] CompoundIdentifier
-    PinotColumnList
-    [PinotPrimaryKeyList]
-    TABLE_TYPE = (OFFLINE | REALTIME)
-    [PROPERTIES (PinotPropertyList)]
+    (
+        PinotColumnList [PinotPrimaryKeyList]
+        TABLE_TYPE = (OFFLINE | REALTIME) [PROPERTIES (PinotPropertyList)]
+      | WITH (PinotWithOptionList)
+      | LIKE CompoundIdentifier [TYPE (OFFLINE | REALTIME)]
+    )
 
 SqlPinotDrop :=                                                ── unified entry under one DROP token
     DROP (
@@ -673,6 +675,73 @@ accept a name that resolves to a different kind of object. Returning 200 in that
 leave a real OFFLINE table named `foo` standing while the script thinks it cleaned up an
 MV — an actively dangerous failure mode. 400 forces the operator to inspect cluster state
 before acting.
+
+### 6.8a Table DDL: CREATE TABLE LIKE
+
+```sql
+CREATE TABLE [IF NOT EXISTS] [db.]target
+LIKE [db.]source [TYPE OFFLINE | REALTIME];
+```
+
+The parser's existing `CREATE TABLE` production emits a dedicated
+`SqlPinotCreateTableLike` node for this form. `DdlCompiler` produces a
+`CompiledCreateTableLike` with independent source and destination identifiers,
+the optional source type, and the existence flag. Compilation does not read the
+catalog. Execution uses the additive `CREATE_TABLE_LIKE` operation.
+
+Omitting `TYPE` copies every existing physical variant of the source: OFFLINE,
+REALTIME, or both for a hybrid. An explicit type selects only that variant and
+returns 404 if it is absent. A hybrid is represented by the existing `TableConfigs`
+bundle (one Schema plus optional OFFLINE and REALTIME configs); there is no new
+SPI table type. Materialized views and Pinot `LogicalTableConfig` sources are
+rejected.
+
+The target follows the existing explicit-database/header conflict rule. An explicit
+source database is resolved independently; an unqualified source uses the database
+header and then the default database. A target database qualifier does not become
+the default source database. Authorization uses fully qualified typed resources:
+READ / GET_TABLE_CONFIG for source candidates before discovery, and CREATE /
+CREATE_TABLE for both destination candidates before existence checks. Both target
+permissions are required because any existing target variant blocks the operation,
+including when `TYPE` selects just one source variant. With no `TYPE`,
+both source candidates require READ permission, consistent with other untyped DDLs.
+
+Source configs are fetched without environment-variable substitution or config
+decorators. The source reader propagates malformed-definition errors instead of
+converting them to a missing config. A selected source variant that cannot be read
+or deserialized produces 500 before any target writes; only absent records are
+omitted. Explicit `TYPE` reads only that variant. JSON deep copies preserve the stored
+definition, including schema metadata, distinct per-variant settings, and symbolic
+`${VAR}` references. `TableConfigs.setTableName` changes structural table/schema
+names. Arbitrary config values such as stream topics, tenants, task settings, and
+explicit instance-partition references retain their values. Target tuning and the
+normal validation pipeline run before persistence, including validation of the
+two copied configs as a hybrid pair.
+
+Source segments, consuming offsets/sequence numbers, runtime assignments, task
+execution records, pause/disabled state, and explicit hybrid time-boundary runtime
+overrides are not copied. Normal REALTIME creation initializes fresh consuming
+segments and starts ingestion using the inherited configuration.
+
+Any existing target variant means 409, or 200 no-op with `IF NOT EXISTS`; the
+operation never extends an existing table into a hybrid. Incompatible object kinds
+are rejected even with `IF NOT EXISTS`. An existing standalone schema can be
+reused only when its complete definition equals the copied schema after renaming.
+Dry-run performs preparation and validation without writes.
+
+Writes proceed Schema → OFFLINE → REALTIME, with both configs validated before
+the first write. This is a sequential creation, not a multi-resource transaction.
+The LIKE executor does not delete already-created resources on failure. Existing
+per-table creation still performs its own setup/cleanup. The failure response
+reports successful `addTable` calls in `createdTables`; callers must inspect partial
+state before cleanup or retry. `IF NOT EXISTS` does not repair partial creation.
+In particular, the unconditional bulk rollback in `POST /tableConfigs` is not
+reused, because it can delete resources created by a concurrent request.
+
+Successful creation returns 201; dry-run and no-op return 200. LIKE responses use
+`sourceTableName`, raw `tableName`, `tableConfigs` (the existing bundle JSON), and
+`createdTables`. The copied bundle is omitted on no-op. Existing operations retain
+their response shape.
 
 ### 6.9 Authorization contract
 

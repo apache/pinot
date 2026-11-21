@@ -24,11 +24,19 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.AccessOption;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidator;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.ConfigValidationException;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -164,6 +172,91 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
     postDdl(sql, false); // first time — succeeds
     int status = postDdlExpectFailure(sql);
     assertEquals(status, 409, "Expected 409 Conflict on duplicate create");
+  }
+
+  @Test
+  public void createTableLikePersistsIndependentOfflineDefinition()
+      throws IOException {
+    String source = "ddlLikeOfflineSource";
+    String target = "ddlLikeOfflineTarget";
+    postDdl("CREATE TABLE " + source + " (id INT NOT NULL, city STRING) PRIMARY KEY (id) "
+        + "TABLE_TYPE = OFFLINE PROPERTIES ('replication' = '1', 'retentionTimeUnit' = 'DAYS', "
+        + "'retentionTimeValue' = '7', 'likeTemplate' = '${PINOT_LIKE_TEST_PROPERTY:template-value}')", false);
+    Schema sourceSchema = DEFAULT_INSTANCE.getHelixResourceManager().getSchema(source);
+    JsonNode sourceConfig = JsonUtils.objectToJsonNode(
+        DEFAULT_INSTANCE.getHelixResourceManager().getOfflineTableConfig(source, false, false));
+
+    JsonNode response = postDdl("CREATE TABLE " + target + " LIKE " + source, false);
+    assertEquals(response.get("operation").asText(), "CREATE_TABLE_LIKE");
+    assertEquals(response.get("sourceTableName").asText(), source);
+    assertEquals(response.get("createdTables").get(0).asText(), target + "_OFFLINE");
+    assertEquals(DEFAULT_INSTANCE.getHelixResourceManager().getSchema(target),
+        Schema.cloneSchemaWithName(sourceSchema, target));
+    assertEquals(DEFAULT_INSTANCE.getHelixResourceManager().getOfflineTableConfig(target, false, false)
+        .getValidationConfig().getRetentionTimeValue(), "7");
+    assertEquals(DEFAULT_INSTANCE.getHelixResourceManager().getOfflineTableConfig(target, false, false)
+        .getCustomConfig().getCustomConfigs().get("likeTemplate"), "${PINOT_LIKE_TEST_PROPERTY:template-value}");
+    assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getRealtimeTableConfig(target, false, false));
+    assertEquals(JsonUtils.objectToJsonNode(
+        DEFAULT_INSTANCE.getHelixResourceManager().getOfflineTableConfig(source, false, false)), sourceConfig);
+    assertEquals(DEFAULT_INSTANCE.getHelixResourceManager().getSchema(source), sourceSchema);
+
+    JsonNode repeated = postDdl("CREATE TABLE IF NOT EXISTS " + target + " LIKE " + source, false);
+    assertNull(repeated.get("tableConfigs"), "A no-op must not advertise copied configuration as applied");
+  }
+
+  @Test
+  public void createTableLikeDryRunDoesNotPersistCopiedDefinition()
+      throws IOException {
+    String source = "ddlLikeDryRunSource";
+    String target = "ddlLikeDryRunTarget";
+    postDdl("CREATE TABLE " + source + " (id INT) TABLE_TYPE = OFFLINE "
+        + "PROPERTIES ('replication' = '1')", false);
+
+    JsonNode response = postDdl("CREATE TABLE " + target + " LIKE " + source, true);
+    assertTrue(response.get("dryRun").asBoolean());
+    assertEquals(response.get("tableConfigs").get("schema").get("schemaName").asText(), target);
+    assertNotNull(response.get("tableConfigs").get("offline"));
+    assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getSchema(target));
+    assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getOfflineTableConfig(target, false, false));
+    assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getRealtimeTableConfig(target, false, false));
+  }
+
+  @Test
+  public void createTableLikeRejectsUnreadableSourceVariantBeforePersisting()
+      throws IOException {
+    String source = "ddlLikeUnreadableSource";
+    String target = "ddlLikeUnreadableTarget";
+    postDdl("CREATE TABLE " + source + " (id INT) TABLE_TYPE = OFFLINE "
+        + "PROPERTIES ('replication' = '1')", false);
+    String realtimeName = source + "_REALTIME";
+    String realtimeConfigPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(realtimeName);
+    ZNRecord unreadableConfig = TableConfigSerDeUtils.toZNRecord(
+        new TableConfigBuilder(TableType.REALTIME).setTableName(source).build());
+    unreadableConfig.setSimpleField(TableConfig.TENANT_CONFIG_KEY, "{invalid-json");
+
+    try {
+      assertTrue(DEFAULT_INSTANCE.getHelixResourceManager().getPropertyStore()
+          .set(realtimeConfigPath, unreadableConfig, AccessOption.PERSISTENT));
+      String url = DEFAULT_INSTANCE.getControllerBaseApiUrl() + "/sql/ddl";
+      Pair<Integer, String> response = postRequestWithStatusCode(url,
+          JsonUtils.objectToString(Map.of("sql", "CREATE TABLE " + target + " LIKE " + source)));
+
+      assertEquals(response.getLeft().intValue(), 500, response.getRight());
+      assertTrue(response.getRight().contains(realtimeName), response.getRight());
+      assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getSchema(target));
+      assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getOfflineTableConfig(target, false, false));
+      assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getRealtimeTableConfig(target, false, false));
+
+      String selectedTarget = target + "Selected";
+      JsonNode selected = postDdl("CREATE TABLE " + selectedTarget + " LIKE " + source + " TYPE OFFLINE", false);
+      assertEquals(selected.get("createdTables").get(0).asText(), selectedTarget + "_OFFLINE");
+      assertNotNull(DEFAULT_INSTANCE.getHelixResourceManager().getOfflineTableConfig(selectedTarget, false, false));
+      assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getRealtimeTableConfig(selectedTarget, false, false));
+    } finally {
+      DEFAULT_INSTANCE.getHelixResourceManager().getPropertyStore()
+          .remove(realtimeConfigPath, AccessOption.PERSISTENT);
+    }
   }
 
   // -------------------------------------------------------------------------------------------
