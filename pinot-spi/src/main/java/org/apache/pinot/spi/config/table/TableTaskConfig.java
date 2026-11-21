@@ -58,7 +58,8 @@ public class TableTaskConfig extends BaseJsonConfig {
   /// - `true` — opt this table into the concurrent scheduling path, which drops the
   ///      controller-wide `synchronized` lock and relies on the distributed ZK lock for
   ///      same-table coordination. Allows task generation for other tables to proceed in
-  ///      parallel.
+  ///      parallel. Applies to cron scheduling and, when distributed locking is enabled, to
+  ///      ad-hoc task creation.
   /// - `false` — force legacy behavior for this table even when the cluster default is
   ///      concurrent. Useful as a per-table escape hatch.
   @JsonProperty
