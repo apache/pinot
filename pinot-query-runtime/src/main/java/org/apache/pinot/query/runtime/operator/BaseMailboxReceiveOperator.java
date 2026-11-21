@@ -19,8 +19,10 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
@@ -28,6 +30,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
@@ -77,7 +80,9 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());
       }
-      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, asyncStreams, senderStageId);
+      List<String> mailboxIds = _mailboxIds;
+      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, asyncStreams, senderStageId,
+          () -> describeSenders(mailboxInfos.getMailboxInfos(), mailboxIds));
     } else {
       // TODO: Revisit if we should throw exception here.
       _mailboxIds = List.of();
@@ -85,6 +90,20 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
       _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, List.of(), senderStageId);
     }
     _statMap.merge(StatKey.FAN_IN, _mailboxIds.size());
+  }
+
+  /// Describes the sender of each mailbox as its worker id and address, by mailbox id. `mailboxIds` must be in the
+  /// order [MailboxIdUtils#toMailboxIds] creates them from `senderMailboxInfos`.
+  private static Map<Object, String> describeSenders(List<MailboxInfo> senderMailboxInfos, List<String> mailboxIds) {
+    Map<Object, String> senderDescriptions = Maps.newHashMapWithExpectedSize(mailboxIds.size());
+    int index = 0;
+    for (MailboxInfo mailboxInfo : senderMailboxInfos) {
+      for (int senderWorkerId : mailboxInfo.getWorkerIds()) {
+        senderDescriptions.put(mailboxIds.get(index++),
+            "worker " + senderWorkerId + " on " + mailboxInfo.getHostname() + ":" + mailboxInfo.getPort());
+      }
+    }
+    return senderDescriptions;
   }
 
   @Override
