@@ -19,9 +19,14 @@
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.lucene.store.ByteBuffersDataInput;
+import org.apache.lucene.store.ByteBuffersIndexInput;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
@@ -109,7 +114,14 @@ public class PinotBufferLuceneDirectory extends Directory {
     if (fileInfo == null) {
       throw new IOException("File not found: " + name);
     }
-    return new PinotBufferIndexInput(name, _indexBuffer, fileInfo.getOffset(), fileInfo.getSize());
+    long size = fileInfo.getSize();
+    if (size <= Integer.MAX_VALUE) {
+      // A direct view of the buffer: Lucene reads vectors and postings with bulk, zero-copy accessors instead of
+      // refilling a small heap buffer for every read
+      ByteBuffer view = _indexBuffer.toDirectByteBuffer(fileInfo.getOffset(), (int) size, ByteOrder.LITTLE_ENDIAN);
+      return new ByteBuffersIndexInput(new ByteBuffersDataInput(List.of(view)), name);
+    }
+    return new PinotBufferIndexInput(name, _indexBuffer, fileInfo.getOffset(), size);
   }
 
   @Override
