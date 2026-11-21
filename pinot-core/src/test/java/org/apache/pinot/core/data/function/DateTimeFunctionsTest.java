@@ -553,6 +553,21 @@ public class DateTimeFunctionsTest {
 
     assertEquals(DateTimeFunctions.dateBin("10d10m", Timestamp.valueOf("2024-02-09 23:00:55.0"),
         Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-01-31 00:30:00.0"));
+
+    // Source before the origin: the bin boundary must still fall at or before the source. Integer division truncates
+    // toward zero, which would pick the boundary after the source, so floor division is required here.
+    assertEquals(DateTimeFunctions.dateBin("15m", Timestamp.valueOf("2023-12-31 23:45:30.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2023-12-31 23:45:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("10m", Timestamp.valueOf("2023-12-31 23:29:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2023-12-31 23:20:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("1d", Timestamp.valueOf("2023-12-30 05:00:00.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2023-12-30 00:00:00.0"));
+
+    // Source exactly on a bin boundary before the origin stays on that boundary.
+    assertEquals(DateTimeFunctions.dateBin("15m", Timestamp.valueOf("2023-12-31 23:45:00.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2023-12-31 23:45:00.0"));
   }
 
   @Test
