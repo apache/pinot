@@ -19,31 +19,27 @@
 package org.apache.pinot.core.util.trace;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.text.ParseException;
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
-import javax.management.MBeanServer;
-import javax.management.MalformedObjectNameException;
-import javax.management.ObjectName;
+import jdk.jfr.Configuration;
+import jdk.jfr.Recording;
+import jdk.jfr.RecordingState;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -52,28 +48,37 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/// Starts, stops and retunes a continuous JFR recording from the `pinot.jfr.*` cluster configs, without a restart.
+///
+/// The JVM owns the JFR options that are global to the process: the repository path, `preserve-repository`, the
+/// dump path and the chunk size. Set them with `-XX:FlightRecorderOptions`, for example
+/// `-XX:FlightRecorderOptions:repository=/var/pinot/jfr,preserve-repository=true`. This class owns only the options
+/// of one recording.
+///
+/// Each Pinot component registers its own instance with its instance ID. A component records when
+/// `pinot.jfr.enabled` is `true` and `pinot.jfr.instanceRegex` matches its full instance ID. Components that run in
+/// the same JVM (quickstarts and tests) share one recording for each recording name.
+///
+/// If the JVM starts with `-XX:StartFlightRecording`, this class does nothing, because the JVM flags own the
+/// recording.
 public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ContinuousJfrStarter.class);
-  private static final String JFR_CONFIGURE_COMMAND = "jfrConfigure";
-  private static final String JFR_START_COMMAND = "jfrStart";
-  private static final String JFR_STOP_COMMAND = "jfrStop";
-  private static final String JFR_DIAGNOSTIC_MBEAN = "com.sun.management:type=DiagnosticCommand";
-  private static final Duration REPOSITORY_CLEANUP_INTERVAL = Duration.ofDays(1);
-  private static final ScheduledExecutorService REPOSITORY_CLEANUP_EXECUTOR =
-      Executors.newSingleThreadScheduledExecutor(
-        runnable -> {
-          Thread thread = new Thread(runnable, "pinot-jfr-repository-cleaner");
-          thread.setDaemon(true);
-          return thread;
-        });
+  private static final String START_FLIGHT_RECORDING_ARGUMENT = "-XX:StartFlightRecording";
 
   /// Key that controls whether to enable continuous JFR recording.
   public static final String ENABLED = "enabled";
   /// Default value for the enabled key.
   public static final boolean DEFAULT_ENABLED = false;
 
-  /// Key that controls the JFR configuration to use. Valid values are 'default' or 'profile', but more can be added
-  /// by adding custom configurations/settings. See the JFR documentation for more information.
+  /// Key that selects the instances that record. The value is a regular expression that must match the full
+  /// instance ID, for example `Server_.*` or `(Broker|Controller)_.*`.
+  ///
+  /// If the key is not set, all instances record. If the value is not a valid regular expression, the instance
+  /// logs an error and keeps its current state.
+  public static final String INSTANCE_REGEX = "instanceRegex";
+
+  /// Key that controls the JFR configuration to use. Valid values are 'default' or 'profile', or the path of a
+  /// custom `.jfc` file. See the JFR documentation for more information.
   ///
   /// The default value is 'default', which is the default JFR configuration and the one that has a target of less
   /// than 1% overhead.
@@ -94,34 +99,7 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   ///
   /// If true, the recording will be dumped to a file when the JVM exits.
   /// We default to false so JFR does not force an on-exit dump file.
-  /// A side effect of setting this to true is that the repository may be deleted even if
-  /// [#PRESERVE_REPOSITORY] is true.
   public static final boolean DEFAULT_DUMP_ON_EXIT = false;
-  /// Key that controls the JFR repository directory path.
-  ///
-  /// The default value is the tmp directory of the system, as determined by the `java.io.tmpdir` system property.
-  ///
-  /// If set, this is applied via the JFR DiagnosticCommand MBean as `repositorypath`.
-  public static final String DIRECTORY = "directory";
-  /// Key that controls the JFR default dump directory path.
-  /// If set, this is applied via the JFR DiagnosticCommand MBean as `dumppath`.
-  public static final String DUMP_PATH = "dumpPath";
-  /// Key that controls whether the JFR repository directory is preserved after the JVM exits.
-  ///
-  /// By default, JFR deletes the repository directory on JVM exit. Setting this to true prevents that, which is
-  /// useful when the repository is shared or when post-mortem analysis of in-flight chunks is needed.
-  ///
-  /// If set, this is applied via the JFR DiagnosticCommand MBean as `preserve-repository`.
-  public static final String PRESERVE_REPOSITORY = "preserveRepository";
-  /// Default value for the preserveRepository key.
-  public static final boolean DEFAULT_PRESERVE_REPOSITORY = true;
-  /// Key that controls the maximum total size for all repositories under the configured repository directory.
-  ///
-  /// When the total size exceeds this threshold, the older repositories are removed first. The repository currently
-  /// used by JFR is always kept, even if it is larger than this threshold.
-  public static final String REPOSITORY_MAX_TOTAL_SIZE = "repositoryMaxTotalSize";
-  /// Default maximum total size for all repositories under the configured repository directory.
-  public static final String DEFAULT_REPOSITORY_MAX_TOTAL_SIZE = "20GB";
 
   /// Key that controls whether to buffer the recording to disk.
   /// If false, the recording will only be kept in memory.
@@ -153,490 +131,417 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   public static final String MAX_AGE = "maxAge";
   public static final String DEFAULT_MAX_AGE = "P7D";
 
-  /// A flag to track whether the JFR recording has been started.
-  /// This is specially useful for testing and quickstarts, where servers, brokers and other components are executed
-  /// in the same JVM.
-  public static final ContinuousJfrStarter INSTANCE = new ContinuousJfrStarter();
-  private static final Object GLOBAL_RECORDING_LOCK = new Object();
-  @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private static final Map<String, RecordingState> GLOBAL_RECORDINGS = new HashMap<>();
-  @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private boolean _running = false;
-  @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private Map<String, Object> _currentConfig;
-  @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private String _recordingName;
-  private final MBeanServer _mBeanServer;
-  @Nullable
-  private final ObjectName _diagnosticCommandObjectName;
+  /// Keys that older versions read. The JVM owns these options now, so this class ignores them and logs the
+  /// replacement for each one.
+  private static final Map<String, String> REMOVED_KEYS = Map.of(
+      "directory", "-XX:FlightRecorderOptions:repository=<path>",
+      "dumpPath", "-XX:FlightRecorderOptions:dumppath=<path>",
+      "maxDumps", "a cleanup of the repository directory outside the JVM",
+      "preserveRepository", "-XX:FlightRecorderOptions:preserve-repository=true",
+      "repositoryMaxTotalSize", "a cleanup of the repository directory outside the JVM");
 
-  @VisibleForTesting
-  protected ContinuousJfrStarter() {
-    this(ManagementFactory.getPlatformMBeanServer(), createDiagnosticCommandObjectName());
+  private static final Object GLOBAL_RECORDING_LOCK = new Object();
+  /// The recordings that this class runs, by recording name. Several instances in the same JVM share an entry.
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private static final Map<String, SharedRecording> GLOBAL_RECORDINGS = new HashMap<>();
+  /// The last stopped recording for each recording name.
+  ///
+  /// `Recording.stop()` keeps the recorded chunks in the repository, but `Recording.close()` deletes them. This class
+  /// keeps the last stopped recording open, so its data survives a disable or a restart of the recording. It closes
+  /// the recording before it, so the disk usage stays bounded.
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private static final Map<String, Recording> STOPPED_RECORDINGS = new HashMap<>();
+
+  private final String _instanceId;
+  private final boolean _recordingStartedByJvmArgument;
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  @Nullable
+  private Map<String, Object> _currentConfig;
+  /// The name of the recording this instance holds a reference to, or null if it does not record.
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  @Nullable
+  private String _recordingName;
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private boolean _jvmArgumentWarningLogged;
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private boolean _closed;
+
+  public ContinuousJfrStarter(String instanceId) {
+    this(instanceId, ManagementFactory.getRuntimeMXBean().getInputArguments());
   }
 
   @VisibleForTesting
-  protected ContinuousJfrStarter(MBeanServer mBeanServer, @Nullable ObjectName diagnosticCommandObjectName) {
-    _mBeanServer = mBeanServer;
-    _diagnosticCommandObjectName = diagnosticCommandObjectName;
+  ContinuousJfrStarter(String instanceId, List<String> jvmArguments) {
+    _instanceId = instanceId;
+    _recordingStartedByJvmArgument = jvmArguments.stream()
+        .anyMatch(argument -> argument.startsWith(START_FLIGHT_RECORDING_ARGUMENT));
   }
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     boolean jfrChanged = changedConfigs.stream()
         .anyMatch(changedConfig -> changedConfig.startsWith(CommonConstants.JFR));
-    if (!jfrChanged && _currentConfig != null) {
-      LOGGER.debug("ChangedConfigs: {} does not contain any JFR config. Skipping updates", changedConfigs);
-      return;
-    }
-    PinotConfiguration config = new PinotConfiguration(clusterConfigs);
-    PinotConfiguration subset = config.subset(CommonConstants.JFR);
+    PinotConfiguration subset = new PinotConfiguration(clusterConfigs).subset(CommonConstants.JFR);
 
     synchronized (GLOBAL_RECORDING_LOCK) {
+      if (_closed) {
+        return;
+      }
+      if (!jfrChanged && _currentConfig != null) {
+        LOGGER.debug("ChangedConfigs: {} does not contain any JFR config. Skipping updates", changedConfigs);
+        return;
+      }
       Map<String, Object> newSubsetMap = subset.toMap();
-
-      if (_currentConfig != null && _currentConfig.equals(newSubsetMap)) {
-        // No change
+      if (newSubsetMap.equals(_currentConfig)) {
         LOGGER.debug("JFR config change detected, but no actual change in config");
         return;
       }
-
-      if (!applyConfig(subset, newSubsetMap)) {
-        LOGGER.warn("Failed to apply continuous JFR config update");
+      if (applyConfig(subset)) {
+        _currentConfig = newSubsetMap;
+      } else {
+        LOGGER.warn("Failed to apply continuous JFR config update on instance {}", _instanceId);
       }
     }
   }
 
+  /// Returns whether this instance holds a reference to a recording that is running.
   public boolean isRunning() {
     synchronized (GLOBAL_RECORDING_LOCK) {
-      return _running;
+      return _recordingName != null
+          && GLOBAL_RECORDINGS.get(_recordingName)._recording.getState() == RecordingState.RUNNING;
     }
   }
 
-  @VisibleForTesting
-  protected static void resetGlobalStateForTesting() {
+  /// Gives back the reference of this instance to its recording, and ignores later config changes. The component that
+  /// registered this instance calls this method when it stops. Without it, a component that restarts in the same JVM
+  /// (for example in tests) keeps a reference to the recording, and `enabled=false` no longer stops it.
+  public void close() {
     synchronized (GLOBAL_RECORDING_LOCK) {
+      if (_closed) {
+        return;
+      }
+      _closed = true;
+      releaseRecordingReference();
+      _currentConfig = null;
+    }
+  }
+
+  /// Closes all the recordings that this class started, in all instances, and forgets them.
+  @VisibleForTesting
+  static void resetGlobalStateForTesting() {
+    synchronized (GLOBAL_RECORDING_LOCK) {
+      GLOBAL_RECORDINGS.values().forEach(sharedRecording -> sharedRecording._recording.close());
       GLOBAL_RECORDINGS.clear();
+      STOPPED_RECORDINGS.values().forEach(Recording::close);
+      STOPPED_RECORDINGS.clear();
     }
   }
 
+  /// Returns the recording that this instance holds a reference to, or null if it does not record.
+  @VisibleForTesting
+  @Nullable
+  Recording getRecording() {
+    synchronized (GLOBAL_RECORDING_LOCK) {
+      return _recordingName != null ? GLOBAL_RECORDINGS.get(_recordingName)._recording : null;
+    }
+  }
+
+  /// Returns the last stopped recording with the given name, or null if there is none.
+  @VisibleForTesting
+  @Nullable
+  static Recording getStoppedRecording(String recordingName) {
+    synchronized (GLOBAL_RECORDING_LOCK) {
+      return STOPPED_RECORDINGS.get(recordingName);
+    }
+  }
+
+  /// Applies the config to this instance. Returns false and keeps the current state if the config is not valid.
   @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private boolean applyConfig(PinotConfiguration subset, Map<String, Object> newSubsetMap) {
-    boolean enabled = subset.getProperty(ENABLED, DEFAULT_ENABLED);
-    if (!enabled) {
-      if (!releaseRecordingReference()) {
-        return false;
+  private boolean applyConfig(PinotConfiguration subset) {
+    for (Map.Entry<String, String> removedKey : REMOVED_KEYS.entrySet()) {
+      if (subset.containsKey(removedKey.getKey())) {
+        LOGGER.warn("Ignoring continuous JFR config '{}.{}'. Use {} instead", CommonConstants.JFR,
+            removedKey.getKey(), removedKey.getValue());
       }
-      _currentConfig = newSubsetMap;
+    }
+    Boolean shouldRecord = shouldRecord(subset);
+    if (shouldRecord == null) {
+      return false;
+    }
+    if (!shouldRecord) {
+      releaseRecordingReference();
       return true;
     }
-    String targetRecordingName = subset.getProperty(NAME, DEFAULT_NAME);
-    boolean alreadyAttachedToTarget = _running && targetRecordingName.equals(_recordingName);
-    if (!alreadyAttachedToTarget && !releaseRecordingReference()) {
+    RecordingSpec spec;
+    try {
+      spec = RecordingSpec.from(subset);
+    } catch (IllegalArgumentException e) {
+      LOGGER.error("Invalid continuous JFR config on instance {}", _instanceId, e);
       return false;
     }
-    if (!acquireRecordingReference(subset, newSubsetMap, targetRecordingName, alreadyAttachedToTarget)) {
-      return false;
+    if (_recordingName != null && !_recordingName.equals(spec._name)) {
+      releaseRecordingReference();
     }
-    _currentConfig = newSubsetMap;
-    return true;
+    return acquireRecordingReference(spec);
   }
 
+  /// Returns whether this instance must record, or null if the instance regex is not valid.
   @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private boolean acquireRecordingReference(PinotConfiguration subset, Map<String, Object> configMap,
-      String recordingName, boolean alreadyAttachedToTarget) {
-    RecordingState recordingState = GLOBAL_RECORDINGS.get(recordingName);
-    if (recordingState == null) {
-      if (!startRecording(subset, recordingName)) {
-        return false;
-      }
-      recordingState = new RecordingState(new HashMap<>(configMap), 1);
-      updateRepositoryCleanupTask(subset, recordingName, recordingState);
-      GLOBAL_RECORDINGS.put(recordingName, recordingState);
-      _recordingName = recordingName;
-      _running = true;
-      return true;
-    }
-    if (!recordingState._config.equals(configMap)) {
-      if (!restartRecording(subset, recordingName)) {
-        LOGGER.warn("Failed to restart continuous JFR recording '{}' for config update", recordingName);
-        return false;
-      }
-      recordingState._config = new HashMap<>(configMap);
-      updateRepositoryCleanupTask(subset, recordingName, recordingState);
-    }
-    if (!alreadyAttachedToTarget) {
-      recordingState._referenceCount++;
-    }
-    _recordingName = recordingName;
-    _running = true;
-    return true;
-  }
-
-  @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private boolean restartRecording(PinotConfiguration subset, String recordingName) {
-    if (!stopRecording(recordingName)) {
-      LOGGER.warn("Failed to stop continuous JFR recording '{}' before restart", recordingName);
-      return false;
-    }
-    return startRecording(subset, recordingName);
-  }
-
-  @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private boolean releaseRecordingReference() {
-    if (!_running) {
-      return true;
-    }
-    assert _recordingName != null;
-    RecordingState recordingState = GLOBAL_RECORDINGS.get(_recordingName);
-    if (recordingState == null) {
-      LOGGER.warn("No global state found for running continuous JFR recording '{}'", _recordingName);
-      _running = false;
-      _recordingName = null;
-      return true;
-    }
-    if (recordingState._referenceCount > 1) {
-      recordingState._referenceCount--;
-      _running = false;
-      _recordingName = null;
-      return true;
-    }
-    if (!stopRecording(_recordingName)) {
-      return false;
-    }
-    cancelRepositoryCleanupTask(recordingState);
-    GLOBAL_RECORDINGS.remove(_recordingName);
-    _running = false;
-    _recordingName = null;
-    return true;
-  }
-
-  @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private boolean stopRecording(String recordingName) {
-    if (!isDiagnosticCommandAvailable()) {
-      LOGGER.warn("JFR DiagnosticCommand MBean is unavailable. Cannot stop continuous JFR recording '{}'",
-          recordingName);
-      return false;
-    }
-    if (!executeDiagnosticCommand(JFR_STOP_COMMAND, "name=" + recordingName)) {
-      LOGGER.warn("Failed to stop continuous JFR recording '{}'", recordingName);
-      return false;
-    }
-    LOGGER.info("Stopped continuous JFR recording {}", recordingName);
-    return true;
-  }
-
-  @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private boolean startRecording(PinotConfiguration subset, String recordingName) {
+  @Nullable
+  private Boolean shouldRecord(PinotConfiguration subset) {
     if (!subset.getProperty(ENABLED, DEFAULT_ENABLED)) {
-      LOGGER.info("Continuous JFR recording is disabled");
+      return false;
+    }
+    if (_recordingStartedByJvmArgument) {
+      if (!_jvmArgumentWarningLogged) {
+        LOGGER.warn("Ignoring continuous JFR cluster configs on instance {}, because the JVM starts a recording with "
+            + "{}", _instanceId, START_FLIGHT_RECORDING_ARGUMENT);
+        _jvmArgumentWarningLogged = true;
+      }
+      return false;
+    }
+    String instanceRegex = subset.getProperty(INSTANCE_REGEX);
+    if (instanceRegex == null || instanceRegex.isEmpty()) {
       return true;
     }
-    if (!isDiagnosticCommandAvailable()) {
-      LOGGER.warn("JFR DiagnosticCommand MBean is unavailable. Cannot start continuous JFR recording");
-      return false;
-    }
-    if (!applyRuntimeOptions(subset)) {
-      LOGGER.warn("Failed to apply JFR runtime options for recording '{}'", recordingName);
-      return false;
-    }
-
-    String maxAge = subset.getProperty(MAX_AGE, DEFAULT_MAX_AGE);
     try {
-      List<String> startArguments = new ArrayList<>();
-      startArguments.add("name=" + recordingName);
-      startArguments.add("settings=" + subset.getProperty(CONFIGURATION, DEFAULT_CONFIGURATION));
-      startArguments.add("dumponexit=" + subset.getProperty(DUMP_ON_EXIT, DEFAULT_DUMP_ON_EXIT));
-      boolean toDisk = subset.getProperty(TO_DISK, DEFAULT_TO_DISK);
-      startArguments.add("disk=" + toDisk);
-      if (toDisk) {
-        try {
-          long maxSize = DataSizeUtils.toBytes(subset.getProperty(MAX_SIZE, DEFAULT_MAX_SIZE));
-          startArguments.add("maxsize=" + maxSize);
-          startArguments.add("maxage=" + toJfrTimeArgument(maxAge));
-        } catch (IllegalArgumentException | ClassCastException e) {
-          throw new RuntimeException("Failed to parse maxSize configuration for continuous JFR recording '"
-              + recordingName + "'", e);
-        }
-      }
-      if (!executeDiagnosticCommand(JFR_START_COMMAND, startArguments.toArray(new String[0]))) {
-        LOGGER.warn("Failed to start continuous JFR recording '{}'", recordingName);
+      return Pattern.compile(instanceRegex).matcher(_instanceId).matches();
+    } catch (PatternSyntaxException e) {
+      LOGGER.error("Invalid continuous JFR config '{}.{}': '{}'. Keeping the current recording state on instance {}",
+          CommonConstants.JFR, INSTANCE_REGEX, instanceRegex, _instanceId, e);
+      return null;
+    }
+  }
+
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private boolean acquireRecordingReference(RecordingSpec spec) {
+    SharedRecording sharedRecording = GLOBAL_RECORDINGS.get(spec._name);
+    if (sharedRecording == null) {
+      Recording recording = startRecording(spec);
+      if (recording == null) {
         return false;
       }
-    } catch (DateTimeParseException e) {
-      throw new RuntimeException("Failed to parse duration '" + maxAge + "'", e);
-    }
-
-    LOGGER.info("Started continuous JFR recording {} with configuration: {}", recordingName, subset);
-    return true;
-  }
-
-  @VisibleForTesting
-  protected boolean executeDiagnosticCommand(String operationName, String... arguments) {
-    try {
-      _mBeanServer.invoke(_diagnosticCommandObjectName, operationName, new Object[]{arguments},
-          new String[]{String[].class.getName()});
+      GLOBAL_RECORDINGS.put(spec._name, new SharedRecording(recording, spec));
+      _recordingName = spec._name;
       return true;
-    } catch (Exception e) {
-      LOGGER.warn("Failed to execute JFR command '{}' with arguments {}", operationName, Arrays.toString(arguments), e);
+    }
+    if (isStopped(sharedRecording._recording)) {
+      if (!restartRecording(sharedRecording, spec)) {
+        return false;
+      }
+    } else if (!sharedRecording._spec.equals(spec) && !updateRecording(sharedRecording, spec)) {
       return false;
     }
-  }
-
-  private boolean applyRuntimeOptions(PinotConfiguration subset) {
-    List<String> configureArguments = new ArrayList<>();
-    String repositoryPath = subset.getProperty(DIRECTORY, (String) null);
-    if (repositoryPath != null && !repositoryPath.isEmpty()) {
-      configureArguments.add("repositorypath=" + repositoryPath);
+    if (!spec._name.equals(_recordingName)) {
+      sharedRecording._referenceCount++;
+      _recordingName = spec._name;
     }
-    String dumpPath = subset.getProperty(DUMP_PATH, (String) null);
-    if (dumpPath != null && !dumpPath.isEmpty()) {
-      configureArguments.add("dumppath=" + dumpPath);
-    }
-    if (configureArguments.isEmpty()) {
-      return true;
-    }
-    boolean preserveRepository = subset.getProperty(PRESERVE_REPOSITORY, DEFAULT_PRESERVE_REPOSITORY);
-    if (preserveRepository) {
-      List<String> configureArgumentsWithPreserve = new ArrayList<>(configureArguments);
-      configureArgumentsWithPreserve.add("preserve-repository=true");
-      if (executeDiagnosticCommand(JFR_CONFIGURE_COMMAND, configureArgumentsWithPreserve.toArray(new String[0]))) {
-        return true;
-      }
-      LOGGER.warn("Failed to apply preserveRepository option for continuous JFR recording. Retrying without it");
-    }
-    return executeDiagnosticCommand(JFR_CONFIGURE_COMMAND, configureArguments.toArray(new String[0]));
-  }
-
-  @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private void updateRepositoryCleanupTask(
-      PinotConfiguration subset, String recordingName, RecordingState recordingState) {
-    if (!isRepositoryCleanupEnabled()) {
-      return;
-    }
-    String repositoryRoot = subset.getProperty(DIRECTORY, (String) null);
-    if (repositoryRoot == null || repositoryRoot.isEmpty()) {
-      cancelRepositoryCleanupTask(recordingState);
-      return;
-    }
-    long maxTotalSizeBytes;
-    try {
-      maxTotalSizeBytes = DataSizeUtils.toBytes(subset.getProperty(REPOSITORY_MAX_TOTAL_SIZE,
-          DEFAULT_REPOSITORY_MAX_TOTAL_SIZE));
-    } catch (IllegalArgumentException | ClassCastException e) {
-      throw new RuntimeException("Failed to parse continuous JFR repository max total size from key '"
-          + REPOSITORY_MAX_TOTAL_SIZE + "'", e);
-    }
-    if (recordingState._cleanupTask != null && !recordingState._cleanupTask.isCancelled()
-        && Objects.equals(recordingState._repositoryRoot, repositoryRoot)
-        && recordingState._repositoryMaxTotalSizeBytes == maxTotalSizeBytes) {
-      return;
-    }
-    cancelRepositoryCleanupTask(recordingState);
-    recordingState._repositoryRoot = repositoryRoot;
-    recordingState._repositoryMaxTotalSizeBytes = maxTotalSizeBytes;
-    recordingState._cleanupTask = REPOSITORY_CLEANUP_EXECUTOR.scheduleWithFixedDelay(
-        () -> cleanupRepositoriesIfNeeded(recordingName, repositoryRoot, maxTotalSizeBytes), 0,
-        REPOSITORY_CLEANUP_INTERVAL.toMillis(), TimeUnit.MILLISECONDS);
-  }
-
-  @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private void cancelRepositoryCleanupTask(RecordingState recordingState) {
-    if (recordingState._cleanupTask != null) {
-      recordingState._cleanupTask.cancel(false);
-      recordingState._cleanupTask = null;
-    }
-  }
-
-  @VisibleForTesting
-  protected boolean isRepositoryCleanupEnabled() {
     return true;
   }
 
-  private void cleanupRepositoriesIfNeeded(String recordingName, String repositoryRoot, long maxTotalSizeBytes) {
-    try {
-      Path repositoryRootPath = Path.of(repositoryRoot).toAbsolutePath().normalize();
-      Path activeRepositoryPath = resolveCurrentRepositoryPath();
-      cleanupOldRepositoriesInternal(repositoryRootPath, maxTotalSizeBytes, activeRepositoryPath);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to clean up old JFR repositories for recording '{}' under '{}'", recordingName,
-          repositoryRoot, e);
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private void releaseRecordingReference() {
+    if (_recordingName == null) {
+      return;
     }
+    SharedRecording sharedRecording = GLOBAL_RECORDINGS.get(_recordingName);
+    if (sharedRecording._referenceCount > 1) {
+      sharedRecording._referenceCount--;
+    } else {
+      stopRecording(_recordingName, sharedRecording._recording);
+      GLOBAL_RECORDINGS.remove(_recordingName);
+    }
+    _recordingName = null;
+  }
+
+  /// Applies a new spec to a running recording. JFR can change all the options of a running recording, except the
+  /// `toDisk` option. For that option, this method starts a new recording and stops the old one.
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private boolean updateRecording(SharedRecording sharedRecording, RecordingSpec spec) {
+    if (sharedRecording._spec._toDisk != spec._toDisk) {
+      Recording recording = startRecording(spec);
+      if (recording == null) {
+        return false;
+      }
+      stopRecording(spec._name, sharedRecording._recording);
+      sharedRecording._recording = recording;
+    } else {
+      try {
+        applyOptions(sharedRecording._recording, spec);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to update continuous JFR recording '{}'", spec._name, e);
+        return false;
+      }
+      LOGGER.info("Updated continuous JFR recording '{}' to {}", spec._name, spec);
+    }
+    sharedRecording._spec = spec;
+    return true;
+  }
+
+  /// Returns whether the recording stopped without this class, for example with `jcmd <pid> JFR.stop`.
+  private static boolean isStopped(Recording recording) {
+    RecordingState state = recording.getState();
+    return state == RecordingState.STOPPED || state == RecordingState.CLOSED;
+  }
+
+  /// Replaces a recording that stopped without this class with a new one. JFR cannot start a stopped or closed
+  /// recording again, and rejects any change to a closed one.
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private boolean restartRecording(SharedRecording sharedRecording, RecordingSpec spec) {
+    LOGGER.warn("Continuous JFR recording '{}' is {}, but Pinot did not stop it. Starting a new recording", spec._name,
+        sharedRecording._recording.getState());
+    Recording recording = startRecording(spec);
+    if (recording == null) {
+      return false;
+    }
+    stopRecording(spec._name, sharedRecording._recording);
+    sharedRecording._recording = recording;
+    sharedRecording._spec = spec;
+    return true;
   }
 
   @Nullable
-  private Path resolveCurrentRepositoryPath() {
-    if (!isDiagnosticCommandAvailable()) {
+  private static Recording startRecording(RecordingSpec spec) {
+    Recording recording = null;
+    try {
+      recording = new Recording();
+      recording.setName(spec._name);
+      recording.setToDisk(spec._toDisk);
+      applyOptions(recording, spec);
+      recording.start();
+    } catch (RuntimeException e) {
+      LOGGER.warn("Failed to start continuous JFR recording '{}'", spec._name, e);
+      if (recording != null) {
+        recording.close();
+      }
       return null;
     }
+    LOGGER.info("Started continuous JFR recording '{}' with {}", spec._name, spec);
+    return recording;
+  }
+
+  private static void applyOptions(Recording recording, RecordingSpec spec) {
+    recording.setSettings(spec._settings);
+    recording.setDumpOnExit(spec._dumpOnExit);
+    if (spec._toDisk) {
+      recording.setMaxSize(spec._maxSizeBytes);
+      recording.setMaxAge(spec._maxAge);
+    }
+  }
+
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private static void stopRecording(String recordingName, Recording recording) {
     try {
-      Object result = _mBeanServer.invoke(
-          _diagnosticCommandObjectName,
-          JFR_CONFIGURE_COMMAND,
-          new Object[]{new String[0]},
-          new String[]{String[].class.getName()});
-      if (result == null) {
+      recording.stop();
+    } catch (IllegalStateException e) {
+      // Another tool, for example jcmd, stopped or closed the recording before.
+      LOGGER.debug("Continuous JFR recording '{}' was not running", recordingName, e);
+    }
+    Recording previous = STOPPED_RECORDINGS.put(recordingName, recording);
+    if (previous != null) {
+      previous.close();
+    }
+    LOGGER.info("Stopped continuous JFR recording '{}'", recordingName);
+  }
+
+  private static class SharedRecording {
+    private Recording _recording;
+    private RecordingSpec _spec;
+    private int _referenceCount = 1;
+
+    private SharedRecording(Recording recording, RecordingSpec spec) {
+      _recording = recording;
+      _spec = spec;
+    }
+  }
+
+  /// The options of one recording, read from the `pinot.jfr.*` cluster configs.
+  private static final class RecordingSpec {
+    private final String _name;
+    private final String _configuration;
+    private final Map<String, String> _settings;
+    private final boolean _dumpOnExit;
+    private final boolean _toDisk;
+    private final long _maxSizeBytes;
+    private final Duration _maxAge;
+
+    private RecordingSpec(String name, String configuration, Map<String, String> settings, boolean dumpOnExit,
+        boolean toDisk, long maxSizeBytes, Duration maxAge) {
+      _name = name;
+      _configuration = configuration;
+      _settings = settings;
+      _dumpOnExit = dumpOnExit;
+      _toDisk = toDisk;
+      _maxSizeBytes = maxSizeBytes;
+      _maxAge = maxAge;
+    }
+
+    /// Reads the spec from the config subset. Throws `IllegalArgumentException` if a value is not valid.
+    private static RecordingSpec from(PinotConfiguration subset) {
+      String name = subset.getProperty(NAME, DEFAULT_NAME);
+      String configuration = subset.getProperty(CONFIGURATION, DEFAULT_CONFIGURATION);
+      String maxSize = subset.getProperty(MAX_SIZE, DEFAULT_MAX_SIZE);
+      long maxSizeBytes;
+      try {
+        maxSizeBytes = DataSizeUtils.toBytes(maxSize);
+      } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException("Invalid value for '" + MAX_SIZE + "': '" + maxSize + "'", e);
+      }
+      String maxAge = subset.getProperty(MAX_AGE, DEFAULT_MAX_AGE);
+      Duration maxAgeDuration;
+      try {
+        maxAgeDuration = Duration.parse(maxAge.toUpperCase(Locale.ENGLISH));
+      } catch (DateTimeParseException e) {
+        throw new IllegalArgumentException("Invalid value for '" + MAX_AGE + "': '" + maxAge + "'", e);
+      }
+      return new RecordingSpec(name, configuration, loadSettings(configuration),
+          subset.getProperty(DUMP_ON_EXIT, DEFAULT_DUMP_ON_EXIT), subset.getProperty(TO_DISK, DEFAULT_TO_DISK),
+          maxSizeBytes, maxAgeDuration);
+    }
+
+    /// Loads the settings of a predefined JFR configuration, or of a `.jfc` file if the value is a file path.
+    private static Map<String, String> loadSettings(String configuration) {
+      try {
+        Path path = toFilePath(configuration);
+        return path != null ? Configuration.create(path).getSettings()
+            : Configuration.getConfiguration(configuration).getSettings();
+      } catch (IOException | ParseException e) {
+        throw new IllegalArgumentException("Invalid value for '" + CONFIGURATION + "': '" + configuration + "'", e);
+      }
+    }
+
+    @Nullable
+    private static Path toFilePath(String configuration) {
+      try {
+        Path path = Path.of(configuration);
+        return Files.isRegularFile(path) ? path : null;
+      } catch (InvalidPathException e) {
         return null;
       }
-      String output = result.toString();
-      for (String line : output.split("\\R")) {
-        String trimmedLine = line.trim();
-        if (trimmedLine.startsWith("Repository path:")) {
-          String repositoryPath = trimmedLine.substring("Repository path:".length()).trim();
-          if (!repositoryPath.isEmpty()) {
-            return Path.of(repositoryPath).toAbsolutePath().normalize();
-          }
-        }
-      }
-      return null;
-    } catch (Exception e) {
-      LOGGER.warn("Failed to resolve current JFR repository path from {}", JFR_CONFIGURE_COMMAND, e);
-      return null;
-    }
-  }
-
-  @VisibleForTesting
-  static void cleanupOldRepositoriesInternal(Path repositoryRootPath, long maxTotalSizeBytes,
-      @Nullable Path activeRepositoryPath) {
-    if (!Files.isDirectory(repositoryRootPath) || maxTotalSizeBytes < 0) {
-      return;
-    }
-    if (activeRepositoryPath != null && repositoryRootPath.equals(activeRepositoryPath)) {
-      return;
-    }
-    try {
-      List<PathWithMetadata> repositories = new ArrayList<>();
-      try (java.util.stream.Stream<Path> children = Files.list(repositoryRootPath)) {
-        children.filter(path -> activeRepositoryPath == null || !activeRepositoryPath.startsWith(path))
-            .forEach(path -> repositories.add(
-                new PathWithMetadata(path, computePathSize(path), readLastModifiedMillis(path))));
-      }
-      long totalSizeBytes = repositories.stream().mapToLong(pathWithMetadata -> pathWithMetadata._sizeBytes).sum();
-      if (activeRepositoryPath != null) {
-        totalSizeBytes += computePathSize(activeRepositoryPath);
-      }
-      if (totalSizeBytes <= maxTotalSizeBytes) {
-        return;
-      }
-      repositories.sort((left, right) -> Long.compare(left._lastModifiedMillis, right._lastModifiedMillis));
-      for (PathWithMetadata repository : repositories) {
-        if (totalSizeBytes <= maxTotalSizeBytes) {
-          break;
-        }
-        deletePathRecursively(repository._path);
-        totalSizeBytes -= repository._sizeBytes;
-      }
-    } catch (Exception e) {
-      LOGGER.warn("Failed to clean old JFR repositories under '{}'", repositoryRootPath, e);
-    }
-  }
-
-  private static long computePathSize(Path path) {
-    if (!Files.exists(path)) {
-      return 0;
-    }
-    SizeCollector sizeCollector = new SizeCollector();
-    try {
-      Files.walkFileTree(path, sizeCollector);
-      return sizeCollector._sizeBytes;
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to compute size for path '" + path + "'", e);
-    }
-  }
-
-  private static long readLastModifiedMillis(Path path) {
-    try {
-      return Files.getLastModifiedTime(path).toMillis();
-    } catch (Exception e) {
-      return Long.MAX_VALUE;
-    }
-  }
-
-  private static void deletePathRecursively(Path path) {
-    if (!Files.exists(path)) {
-      return;
-    }
-    try {
-      Files.walkFileTree(path, new RecursiveDeleteVisitor());
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to delete path '" + path + "'", e);
-    }
-  }
-
-  @VisibleForTesting
-  protected boolean isDiagnosticCommandAvailable() {
-    return _mBeanServer != null && _diagnosticCommandObjectName != null
-        && _mBeanServer.isRegistered(_diagnosticCommandObjectName);
-  }
-
-  private static ObjectName createDiagnosticCommandObjectName() {
-    try {
-      return new ObjectName(JFR_DIAGNOSTIC_MBEAN);
-    } catch (MalformedObjectNameException e) {
-      LOGGER.warn("Invalid JFR DiagnosticCommand MBean name '{}'. Continuous JFR control will be disabled",
-          JFR_DIAGNOSTIC_MBEAN, e);
-      return null;
-    }
-  }
-
-  private static String toJfrTimeArgument(String durationText) {
-    Duration duration = Duration.parse(durationText.toUpperCase(Locale.ENGLISH));
-    if (duration.isZero()) {
-      return "0s";
-    }
-    return duration.toMillis() + "ms";
-  }
-
-  private static class RecordingState {
-    private Map<String, Object> _config;
-    private int _referenceCount;
-    @Nullable
-    private ScheduledFuture<?> _cleanupTask;
-    @Nullable
-    private String _repositoryRoot;
-    private long _repositoryMaxTotalSizeBytes;
-
-    private RecordingState(Map<String, Object> config, int referenceCount) {
-      _config = config;
-      _referenceCount = referenceCount;
-    }
-  }
-
-  private static final class PathWithMetadata {
-    private final Path _path;
-    private final long _sizeBytes;
-    private final long _lastModifiedMillis;
-
-    private PathWithMetadata(Path path, long sizeBytes, long lastModifiedMillis) {
-      _path = path;
-      _sizeBytes = sizeBytes;
-      _lastModifiedMillis = lastModifiedMillis;
-    }
-  }
-
-  private static final class SizeCollector extends SimpleFileVisitor<Path> {
-    private long _sizeBytes;
-
-    @Override
-    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-      _sizeBytes += attrs.size();
-      return FileVisitResult.CONTINUE;
-    }
-  }
-
-  private static final class RecursiveDeleteVisitor extends SimpleFileVisitor<Path> {
-    @Override
-    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-        throws java.io.IOException {
-      Files.deleteIfExists(file);
-      return FileVisitResult.CONTINUE;
     }
 
     @Override
-    public FileVisitResult postVisitDirectory(Path dir, @Nullable java.io.IOException exc)
-        throws java.io.IOException {
-      Files.deleteIfExists(dir);
-      return FileVisitResult.CONTINUE;
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof RecordingSpec)) {
+        return false;
+      }
+      RecordingSpec that = (RecordingSpec) o;
+      return _dumpOnExit == that._dumpOnExit && _toDisk == that._toDisk && _maxSizeBytes == that._maxSizeBytes
+          && _name.equals(that._name) && _settings.equals(that._settings) && _maxAge.equals(that._maxAge);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_name, _settings, _dumpOnExit, _toDisk, _maxSizeBytes, _maxAge);
+    }
+
+    @Override
+    public String toString() {
+      return "{configuration=" + _configuration + ", dumpOnExit=" + _dumpOnExit + ", toDisk=" + _toDisk
+          + ", maxSize=" + _maxSizeBytes + ", maxAge=" + _maxAge + "}";
     }
   }
 }

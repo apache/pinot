@@ -187,6 +187,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected ThreadAccountant _threadAccountant;
   protected QueryKillingManager _queryKillingManager;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
+  @Nullable
+  private ContinuousJfrStarter _continuousJfrStarter;
   protected volatile boolean _isServerReadyToServeQueries = false;
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
@@ -301,7 +303,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager = HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId,
         org.apache.helix.InstanceType.PARTICIPANT, _zkAddress);
 
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _continuousJfrStarter = new ContinuousJfrStarter(_instanceId);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_continuousJfrStarter);
     initTransitionThreadPoolManager();
 
     NettyInspector.logAllChecks();
@@ -1072,6 +1075,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
   public void stop() {
     LOGGER.info("Shutting down Pinot server");
     long startTimeMs = System.currentTimeMillis();
+    if (_continuousJfrStarter != null) {
+      _continuousJfrStarter.close();
+    }
 
     _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
