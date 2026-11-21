@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -45,6 +46,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -58,10 +60,14 @@ import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -76,6 +82,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -85,6 +92,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -102,6 +110,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -577,6 +586,61 @@ public class BaseTableDataManagerTest {
     segmentMetadata = new SegmentMetadataImpl(indexDir);
     assertEquals(segmentMetadata.getCrc(), zkMetadata.getCrc());
     assertEquals(segmentMetadata.getTotalDocs(), 5);
+  }
+
+  @DataProvider
+  public Object[][] crcChanged() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "crcChanged")
+  public void testReloadUninitializedUpsertSegmentIgnoresValidDocIdsSnapshot(boolean crcChanged)
+      throws Exception {
+    SegmentZKMetadata zkMetadata;
+    File indexDir;
+    if (crcChanged) {
+      zkMetadata = createRawSegment(SegmentVersion.v3, 4);
+      zkMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
+      indexDir = createSegment(SegmentVersion.v3, 5);
+    } else {
+      indexDir = createSegment(SegmentVersion.v3, 5);
+      zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+      zkMetadata.setCrc(getCRC(indexDir));
+    }
+    zkMetadata.setPartitionMetadata(new SegmentPartitionMetadata(
+        Map.of(STRING_COLUMN, new ColumnPartitionMetadata("Modulo", 1, Set.of(0), null))));
+
+    // An upsert table with metadata TTL and snapshots
+    BaseTableDataManager tableDataManager = createTableManager();
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    when(upsertContext.getMetadataTTL()).thenReturn(100.0);
+    when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.NONE);
+    TableUpsertMetadataManager tableUpsertMetadataManager = mock(TableUpsertMetadataManager.class);
+    when(tableUpsertMetadataManager.getContext()).thenReturn(upsertContext);
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager = mock(PartitionUpsertMetadataManager.class);
+    when(tableUpsertMetadataManager.getOrCreatePartitionManager(0)).thenReturn(partitionUpsertMetadataManager);
+    tableDataManager._tableUpsertMetadataManager = tableUpsertMetadataManager;
+    // The add of the segment failed, so its upsert metadata is not initialized, and an earlier load left a snapshot
+    ImmutableSegmentImpl segment = (ImmutableSegmentImpl) ImmutableSegmentLoader.load(indexDir,
+        new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA));
+    FileUtils.writeByteArrayToFile(new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir),
+        V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME), new byte[]{1});
+    tableDataManager.registerSegment(SEGMENT_NAME, new ImmutableSegmentDataManager(segment));
+    doAnswer(invocation -> {
+      ImmutableSegmentImpl reloadedSegment = invocation.getArgument(0);
+      assertFalse(reloadedSegment.hasSnapshotFile(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+      return null;
+    }).when(partitionUpsertMetadataManager).replaceSegment(any(), eq(segment));
+
+    tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, segment.getSegmentMetadata(),
+        false);
+
+    verify(partitionUpsertMetadataManager).replaceSegment(any(), eq(segment));
+    ImmutableSegmentDataManager segmentDataManager =
+        (ImmutableSegmentDataManager) tableDataManager.getSegmentDataManager(SEGMENT_NAME);
+    assertTrue(segmentDataManager.isPartitionMetadataInitialized());
+    assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getCrc(), zkMetadata.getCrc());
   }
 
   @Test

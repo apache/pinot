@@ -540,6 +540,28 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Replaced segment: {} with new CRC: {}", segmentName, zkMetadata.getCrc());
   }
 
+  /// Returns whether the registered segment is an upsert segment whose upsert metadata is not initialized. A new upsert
+  /// segment is registered before its metadata is initialized, so a failed add leaves it registered with partial valid
+  /// docs while its CRC still matches ZK.
+  protected boolean hasUninitializedUpsertMetadata(SegmentDataManager segmentDataManager) {
+    return isUpsertEnabled()
+        && segmentDataManager instanceof ImmutableSegmentDataManager immutableSegmentDataManager
+        && !immutableSegmentDataManager.isPartitionMetadataInitialized();
+  }
+
+  /// Rebuilds the upsert metadata of a registered segment by reloading the segment, from the local index directory when
+  /// its CRC matches ZK, or from a download when a completed segment has a new CRC. The reload ignores the leftover
+  /// validDocIds snapshot of the segment. The reloaded segment replaces the registered one with its upsert metadata
+  /// initialized.
+  protected void reloadUninitializedUpsertSegment(SegmentDataManager segmentDataManager, SegmentZKMetadata zkMetadata,
+      IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    String segmentName = segmentDataManager.getSegmentName();
+    _logger.info("Reloading segment: {} because its upsert metadata is not initialized", segmentName);
+    SegmentMetadata localMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+    reloadSegment(segmentName, indexLoadingConfig, zkMetadata, localMetadata, false);
+  }
+
   @Override
   public void downloadAndLoadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
@@ -1048,13 +1070,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // When adding a new segment, register it *before* partitionUpsertMetadataManager.addSegment() fully initializes
       // the validDocIds bitmap. This lets queries access the new segment immediately while the bitmap is being built.
       // Without early registration, docs in existing segments that get invalidated by this new segment would become
-      // invisible to queries until addSegment() completes.
+      // invisible to queries until addSegment() completes. If addSegment() fails, the segment stays registered with
+      // partial metadata until the retried ONLINE transition rebuilds it (see hasUninitializedUpsertMetadata()).
       registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
       partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
       partitionUpsertMetadataManager.addSegment(immutableSegment);
       newSegmentManager.markPartitionMetadataInitialized();
       _logger.info("Added new immutable segment: {} with upsert enabled", segmentName);
     } else {
+      if (hasUninitializedUpsertMetadata(oldSegmentManager)) {
+        // Brokers do not route a segment whose add failed. Track it as newly added again so that queries include it
+        // while the replacement moves keys from other segments to it.
+        partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
+      }
       replaceUpsertSegment(segmentName, oldSegmentManager, newSegmentManager, partitionUpsertMetadataManager);
     }
   }
@@ -1064,17 +1092,39 @@ public abstract class BaseTableDataManager implements TableDataManager {
     IndexSegment oldSegment = oldSegmentManager.getSegment();
     ImmutableSegment immutableSegment = newSegmentManager.getSegment();
     UpsertConfig.ConsistencyMode consistencyMode = _tableUpsertMetadataManager.getContext().getConsistencyMode();
+    SegmentDataManager duoSegmentDataManager = null;
     if (consistencyMode != UpsertConfig.ConsistencyMode.NONE) {
       // For consistency modes, keep both old and new segments visible to queries during replacement so that queries
       // can see the new updates in the new segment while the old segment's validDocIds are still being updated.
       // Register the new segment to the upsert metadata manager before making it visible to queries so the upsert
       // view is updated before any query can access it.
-      SegmentDataManager duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
+      duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
       registerSegment(segmentName, duoSegmentDataManager, partitionUpsertMetadataManager);
     }
     // Publish the replacement on its own only after its validDocIds and partition metadata are initialized, preserving
     // access to the old segment's valid docs during replacement. Mark completion before offload releases the permit.
-    partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+    try {
+      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+    } catch (Throwable t) {
+      // TODO: Revert the upsert metadata changes of a failed replacement, so that the new segment can be released and
+      //   the old segment put back after any failed replacement. Until then, each failed rebuild keeps its new segment
+      //   loaded until a restart.
+      if (hasUninitializedUpsertMetadata(oldSegmentManager)) {
+        // A failed rebuild leaves the old segment registered on its own with its upsert metadata still uninitialized,
+        // so that the next ONLINE retry rebuilds it again. The new segment stays loaded because the upsert metadata
+        // can still point at it.
+        _logger.warn("Failed to rebuild upsert metadata of segment: {}, keeping the old segment registered and the new "
+            + "segment loaded until a restart", segmentName);
+        if (duoSegmentDataManager != null) {
+          // The old segment has been serving all along, so put it back without firing the post-registration hook again
+          partitionUpsertMetadataManager.untrackSegmentForUpsertView(immutableSegment);
+          synchronized (_segmentDataManagerMap) {
+            _segmentDataManagerMap.replace(segmentName, duoSegmentDataManager, oldSegmentManager);
+          }
+        }
+      }
+      throw t;
+    }
     newSegmentManager.markPartitionMetadataInitialized();
     registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
     _logger.info("Replaced {} segment: {} with upsert enabled and consistency mode: {}",
@@ -1292,9 +1342,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // Re-validate under the segment lock: the caller's map read in reloadSegment(String, boolean, String) is
         // unlocked, so a concurrent offloadSegment can remove the entry between that read and this lock acquisition.
         // Without this guard, reload would resurrect a segment the cluster has already dropped.
-        if (_segmentDataManagerMap.get(segmentName) == null) {
+        SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+        if (segmentDataManager == null) {
           _logger.warn("Skipping reload for segment: {} — concurrently offloaded after dispatch", segmentName);
           return;
+        }
+        // A segment whose upsert metadata is not initialized was never tracked for snapshots, so its validDocIds
+        // snapshot comes from an earlier load and does not match the metadata. Delete it so that the reload rebuilds
+        // the metadata from all the docs, as the initial add did.
+        boolean upsertMetadataUninitialized = hasUninitializedUpsertMetadata(segmentDataManager);
+        if (upsertMetadataUninitialized
+            && segmentDataManager.getSegment() instanceof ImmutableSegmentImpl immutableSegment) {
+          immutableSegment.deleteSnapshotFile(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
+          Preconditions.checkState(
+              !immutableSegment.hasSnapshotFile(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME),
+              "Failed to delete stale validDocIds snapshot of segment: %s in table: %s", segmentName,
+              _tableNameWithType);
         }
         /*
         Determines if a segment should be downloaded from deep storage based on:
@@ -1321,7 +1384,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // CRC-mismatched normal reload keeps the local segment (shouldDownload is false), so the local snapshot still
         // maps and the reload proceeds.
         UpsertContext upsertContext = isUpsertEnabled() ? _tableUpsertMetadataManager.getContext() : null;
-        boolean restoreValidDocIdsOnDiskBitmap = upsertContext != null && upsertContext.isSnapshotEnabled()
+        boolean restoreValidDocIdsOnDiskBitmap = upsertContext != null
+            && !upsertMetadataUninitialized
+            && upsertContext.isSnapshotEnabled()
             && (upsertContext.getMetadataTTL() > 0 || upsertContext.getDeletedKeysTTL() > 0);
         if (restoreValidDocIdsOnDiskBitmap && !crcMatch && shouldDownload) {
           throw new IllegalStateException(String.format(

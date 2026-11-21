@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -934,8 +935,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /// @param hashFunction       hash function configured for Upsert's primary keys
   /// @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
   ///         return the latest record.
-  @SuppressWarnings({"rawtypes", "unchecked"})
   protected static Iterator<RecordInfo> resolveComparisonTies(Iterator<RecordInfo> recordInfoIterator,
+      HashFunction hashFunction) {
+    return getDeduplicatedRecordInfos(recordInfoIterator, hashFunction).iterator();
+  }
+
+  /// Returns the records that [#resolveComparisonTies] iterates over. The collection is not modified afterward, so
+  /// iterating it again returns the records in the same order.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  protected static Collection<RecordInfo> getDeduplicatedRecordInfos(Iterator<RecordInfo> recordInfoIterator,
       HashFunction hashFunction) {
     Map<Object, RecordInfo> deDuplicatedRecordInfo = new HashMap<>();
     while (recordInfoIterator.hasNext()) {
@@ -953,7 +961,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             return maxComparisonValueRecordInfo;
           });
     }
-    return deDuplicatedRecordInfo.values().iterator();
+    return deDuplicatedRecordInfo.values();
   }
 
   @Override
