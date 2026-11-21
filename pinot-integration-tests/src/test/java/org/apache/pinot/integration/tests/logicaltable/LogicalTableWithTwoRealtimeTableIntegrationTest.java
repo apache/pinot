@@ -147,6 +147,8 @@ public class LogicalTableWithTwoRealtimeTableIntegrationTest extends BaseLogical
       throws Exception {
     Properties producerProperties = new Properties();
     producerProperties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + getKafkaPort());
+    // Each send waits for its acknowledgement, so no other record can join the batch.
+    producerProperties.put(ProducerConfig.LINGER_MS_CONFIG, 0);
     producerProperties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
         "org.apache.kafka.common.serialization.ByteArraySerializer");
     producerProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
