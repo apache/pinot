@@ -42,6 +42,7 @@ import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.segment.index.datasource.NullDataSource;
 import org.apache.pinot.segment.local.segment.index.openstruct.FakeStringForwardIndex;
+import org.apache.pinot.segment.local.segment.index.openstruct.ImmutableOpenStructDataSource;
 import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructSparseBlobReader;
 import org.apache.pinot.segment.local.segment.index.openstruct.SparseKeyDataSource;
 import org.apache.pinot.segment.spi.Constants;
@@ -65,6 +66,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -604,6 +606,8 @@ public class MapFilterOperatorOpenStructTest {
   private static OpenStructDataSource withSparseJsonIndex(OpenStructDataSource osDs,
       JsonIndexReader jsonIndex) {
     when(osDs.getSparseJsonIndex()).thenReturn(jsonIndex);
+    when(osDs.getSparseJsonIndex(anyString())).thenCallRealMethod();
+    when(osDs.hasUnambiguousSparseJsonPath(anyString())).thenCallRealMethod();
     return osDs;
   }
 
@@ -623,6 +627,47 @@ public class MapFilterOperatorOpenStructTest {
 
     assertTrue(op.toExplainString().contains("delegateTo:json_match"));
     assertEquals(countMatches(op), 2);
+  }
+
+  @Test
+  public void testSparseJsonIndexScansAmbiguousKeys() {
+    String[] blobs = new String[NUM_DOCS];
+    blobs[0] = "{\"a.b\":{\"c\":\"first\"},\"a\":{\"b.c\":\"second\"},"
+        + "\"x[0]\":\"first\",\"$x\":\"first\",\"x[\":\"first\"}";
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    when(jsonIndex.isPathIndexed(anyString())).thenReturn(true);
+    // The JSON index retains the second value where the OPEN_STRUCT reader resolves the first.
+    when(jsonIndex.getMatchingDocIds(any(FilterContext.class))).thenReturn(new MutableRoaringBitmap());
+    OpenStructDataSource osDs = withSparseJsonIndex(mockSparseSegmentSource(null, Map.of(), blobs), jsonIndex);
+
+    for (String key : List.of("a.b.c", "x[0]", "$x", "x[")) {
+      MapFilterOperator op = new MapFilterOperator(mockSegment(osDs),
+          makeEqPredicate(COLUMN, key, "first"), mockQueryContext(), NUM_DOCS);
+      assertEquals(collect(op.getTrues()), List.of(0), key);
+    }
+    verify(jsonIndex, never()).getMatchingDocIds(any(FilterContext.class));
+  }
+
+  @Test
+  public void testSparseJsonIndexUsesNativeDottedString() {
+    String[] blobs = {"{\"device\":\"{}\",\"device.os\":\"linux\",\"tags\":[\"a\",\"b\"],\"tags.$index\":\"custom\"}"};
+    JsonIndexReader jsonIndex = mock(JsonIndexReader.class);
+    when(jsonIndex.isPathIndexed("$.device.os")).thenReturn(true);
+    when(jsonIndex.getMatchingDocIds(any(FilterContext.class))).thenReturn(MutableRoaringBitmap.bitmapOf(0));
+    DataSource sparse = mock(DataSource.class);
+    doReturn(new FakeStringForwardIndex(blobs)).when(sparse).getForwardIndex();
+    when(sparse.getJsonIndex()).thenReturn(jsonIndex);
+    Map<String, DataType> types = Map.of("device", DataType.STRING, "device.os", DataType.STRING,
+        "tags", DataType.STRING, "tags.$index", DataType.STRING);
+    OpenStructDataSource osDs = new ImmutableOpenStructDataSource(
+        new ComplexFieldSpec(COLUMN, DataType.OPEN_STRUCT, true, Map.of()), Map.of(), sparse, blobs.length,
+        List.copyOf(types.keySet()), Map.of("tags", 2), types);
+
+    MapFilterOperator op = new MapFilterOperator(mockSegment(osDs),
+        makeEqPredicate(COLUMN, "device.os", "linux"), mockQueryContext(), blobs.length);
+    assertTrue(op.toExplainString().contains("delegateTo:json_match"));
+    assertEquals(collect(op.getTrues()), List.of(0));
+    assertNull(osDs.getSparseJsonIndex("tags.$index"), "the array index and the literal key share a posting key");
   }
 
   @Test
