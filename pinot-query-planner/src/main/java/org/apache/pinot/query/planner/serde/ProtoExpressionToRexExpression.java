@@ -41,6 +41,8 @@ public class ProtoExpressionToRexExpression {
         return convertLiteral(expression.getLiteral());
       case FUNCTIONCALL:
         return convertFunctionCall(expression.getFunctionCall());
+      case PATTERNFIELDREF:
+        return convertPatternFieldRef(expression.getPatternFieldRef());
       default:
         throw new IllegalStateException("Unsupported proto Expression type: " + expression.getExpressionCase());
     }
@@ -48,6 +50,18 @@ public class ProtoExpressionToRexExpression {
 
   public static RexExpression.InputRef convertInputRef(Expressions.InputRef inputRef) {
     return new RexExpression.InputRef(inputRef.getIndex());
+  }
+
+  public static RexExpression.PatternFieldRef convertPatternFieldRef(Expressions.PatternFieldRef patternFieldRef) {
+    int symbolOrdinal = patternFieldRef.getSymbolOrdinal();
+    if (symbolOrdinal == RexExpression.PatternFieldRef.UNRESOLVED_SYMBOL_ORDINAL
+        || symbolOrdinal < RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL) {
+      throw new IllegalStateException(
+          "Invalid MATCH_RECOGNIZE pattern variable ordinal on the wire: " + symbolOrdinal
+              + ". Expected a non-negative symbol-table index or the universal ordinal "
+              + RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL + ".");
+    }
+    return new RexExpression.PatternFieldRef(patternFieldRef.getIndex(), symbolOrdinal, patternFieldRef.getAlpha());
   }
 
   public static RexExpression.FunctionCall convertFunctionCall(Expressions.FunctionCall functionCall) {

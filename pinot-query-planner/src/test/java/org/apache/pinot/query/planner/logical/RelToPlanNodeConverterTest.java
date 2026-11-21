@@ -49,6 +49,8 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -248,6 +250,30 @@ public class RelToPlanNodeConverterTest {
     RexExpression.InputRef rewrittenOrdinal =
         (RexExpression.InputRef) conditionExpr.getFunctionOperands().get(0);
     Assert.assertEquals(rewrittenOrdinal.getIndex(), child.getOrdinalityIndex());
+  }
+
+  /// CROSS JOIN UNNEST is the only correlate shape the converter implements. A correlate whose right side has no
+  /// [Uncollect] must fail planning: it used to become an UNNEST of the first left column, with the right side dropped.
+  @Test
+  public void testConvertLogicalCorrelateWithoutUncollectIsRejected() {
+    TypeFactory typeFactory = TypeFactory.INSTANCE;
+    RelOptCluster cluster = createCluster(typeFactory);
+    RelDataType leftRowType = typeFactory.builder()
+        .add("id", SqlTypeName.INTEGER)
+        .add("val", SqlTypeName.INTEGER)
+        .build();
+    LogicalValues left = LogicalValues.create(cluster, leftRowType, ImmutableList.of());
+
+    CorrelationId correlationId = new CorrelationId(0);
+    LogicalProject right = buildCorrelatedProject(cluster, leftRowType, correlationId, "val");
+    LogicalCorrelate correlate =
+        LogicalCorrelate.create(left, right, correlationId, ImmutableBitSet.of(1), JoinRelType.INNER);
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null,
+        CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
+    QueryException e = Assert.expectThrows(QueryException.class, () -> converter.toPlanNode(correlate));
+    Assert.assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_PLANNING);
+    Assert.assertTrue(e.getMessage().contains("CROSS JOIN UNNEST"), e.getMessage());
   }
 
   private static RelOptCluster createCluster(TypeFactory typeFactory) {

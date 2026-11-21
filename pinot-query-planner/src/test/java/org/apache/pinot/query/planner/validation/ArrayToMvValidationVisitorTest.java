@@ -20,13 +20,17 @@ package org.apache.pinot.query.planner.validation;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.MvAggregateNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
@@ -208,5 +212,36 @@ public class ArrayToMvValidationVisitorTest {
     validate(node, false);
     QueryException e = expectThrows(QueryException.class, () -> validate(node, true));
     assertTrue(e.getMessage().startsWith("ARRAY_TO_MV found in PROJECT in the intermediate stage"), e.getMessage());
+  }
+
+  /// MATCH_RECOGNIZE evaluates its MEASURES and DEFINE expressions itself, in an intermediate stage, so `ARRAY_TO_MV`
+  /// in either is rejected like in the other intermediate-stage operators.
+  @Test
+  public void testArrayToMvInMatchRecognizeFails() {
+    RexExpression arrayToMv = new RexExpression.FunctionCall(ColumnDataType.STRING, "ARRAY_TO_MV",
+        List.of(new RexExpression.PatternFieldRef(0, RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL, "t")));
+    RexExpression defineWithArrayToMv = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, "EQUALS",
+        List.of(new RexExpression.FunctionCall(ColumnDataType.STRING, "ARRAY_TO_MV",
+            List.of(new RexExpression.PatternFieldRef(0, 0, "A"))),
+            new RexExpression.Literal(ColumnDataType.STRING, "x")));
+    RexExpression plainMeasure =
+        new RexExpression.PatternFieldRef(0, RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL, "t");
+
+    validate(match(plainMeasure, null), true);
+    for (MatchNode node : List.of(match(arrayToMv, null), match(plainMeasure, defineWithArrayToMv))) {
+      QueryException e = expectThrows(ArrayToMvValidationVisitor.ArrayToMvValidationException.class,
+          () -> validate(node, true));
+      assertTrue(e.getMessage().startsWith("ARRAY_TO_MV found in MATCH_RECOGNIZE MEASURES or DEFINE in the "
+          + "intermediate stage"), e.getMessage());
+    }
+  }
+
+  private static MatchNode match(RexExpression measure, RexExpression definition) {
+    DataSchema output = new DataSchema(new String[]{"m"}, new ColumnDataType[]{ColumnDataType.STRING});
+    List<PlanNode> inputs = new ArrayList<>(List.of(input(ColumnDataType.STRING_ARRAY)));
+    return new MatchNode(1, output, PlanNode.NodeHint.EMPTY, inputs, List.of(new PatternSymbol("A", definition)),
+        new RowPattern.Symbol(0), List.of(new MatchNode.Measure("m", measure)), List.of(),
+        List.of(new RelFieldCollation(0)), MatchNode.AfterMatchSkipMode.PAST_LAST_ROW,
+        MatchNode.NO_SKIP_TO_SYMBOL, MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
   }
 }
