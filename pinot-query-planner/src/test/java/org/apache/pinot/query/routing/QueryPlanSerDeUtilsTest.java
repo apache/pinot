@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.query.routing;
 
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -40,10 +42,14 @@ import static org.testng.Assert.assertTrue;
 /// the legacy JSON custom properties, including a server decoding what a pre-proto broker sends.
 public class QueryPlanSerDeUtilsTest {
   private static final Map<String, String> CUSTOM_PROPERTIES = Map.of("foo", "bar");
-  private static final Map<String, List<String>> TABLE_SEGMENTS_MAP =
-      Map.of("OFFLINE", List.of("seg_0", "seg_1"), "REALTIME", List.of("seg__0__0__20240101T0000Z"));
-  private static final Map<String, List<String>> LOGICAL_TABLE_SEGMENTS_MAP =
-      Map.of("t1_OFFLINE", List.of("t1_seg_0"), "t2_REALTIME", List.of("t2_seg_0", "t2_seg_1"));
+  private static final Map<String, SegmentsToQuery> TABLE_SEGMENTS_MAP = Map.of(
+      "OFFLINE", new SegmentsToQuery(List.of("seg_0", "seg_1")),
+      "REALTIME", new SegmentsToQuery(List.of("seg__0__0__20240101T0000Z"))
+  );
+  private static final Map<String, SegmentsToQuery> LOGICAL_TABLE_SEGMENTS_MAP = Map.of(
+      "t1_OFFLINE", new SegmentsToQuery(List.of("t1_seg_0")),
+      "t2_REALTIME", new SegmentsToQuery(List.of("t2_seg_0", "t2_seg_1"))
+  );
 
   @DataProvider
   public static Object[][] encodings() {
@@ -60,6 +66,7 @@ public class QueryPlanSerDeUtilsTest {
     assertFalse(proto.hasLogicalTableSegmentsMap());
     assertEquals(proto.getCustomPropertyMap().containsKey(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY), !protoSegmentList);
     assertFalse(proto.getCustomPropertyMap().containsKey(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY));
+    assertFalse(proto.getCustomPropertyMap().containsKey(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY));
     assertEquals(proto.getCustomPropertyMap().get("foo"), "bar");
 
     WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto);
@@ -94,10 +101,41 @@ public class QueryPlanSerDeUtilsTest {
   }
 
   @Test(dataProvider = "encodings")
+  public void testOptionalSegmentsRoundTrip(boolean protoSegmentList)
+      throws Exception {
+    Map<String, SegmentsToQuery> tableSegmentsMap = Map.of(
+        "OFFLINE", new SegmentsToQuery(List.of("seg_0", "seg_1")),
+        "REALTIME", new SegmentsToQuery(List.of("seg__0__0__20240101T0000Z"), List.of("seg__0__1__20240101T0100Z"))
+    );
+
+    Worker.WorkerMetadata proto = toProto(leafWorker(tableSegmentsMap, null), protoSegmentList);
+    assertEquals(proto.getCustomPropertyMap().containsKey(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY),
+        !protoSegmentList);
+
+    WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto);
+    assertEquals(decoded.getTableSegmentsMap(), tableSegmentsMap);
+    assertEquals(decoded.getCustomProperties(), CUSTOM_PROPERTIES);
+  }
+
+  @Test(dataProvider = "encodings")
+  public void testLogicalTableOptionalSegmentsRoundTrip(boolean protoSegmentList)
+      throws Exception {
+    Map<String, SegmentsToQuery> logicalTableSegmentsMap = Map.of(
+        "t1_OFFLINE", new SegmentsToQuery(List.of("t1_seg_0")),
+        "t2_REALTIME", new SegmentsToQuery(List.of("t2_seg_0", "t2_seg_1"), List.of("t2_seg_2"))
+    );
+
+    WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(
+        toProto(leafWorker(null, logicalTableSegmentsMap), protoSegmentList));
+    assertEquals(decoded.getLogicalTableSegmentsMap(), logicalTableSegmentsMap);
+    assertEquals(decoded.getCustomProperties(), CUSTOM_PROPERTIES);
+  }
+
+  @Test(dataProvider = "encodings")
   public void testEmptySegmentListStillMarksLeafWorker(boolean protoSegmentList)
       throws Exception {
     // A padded worker of a partitioned table scans no segment but must still run the leaf stage.
-    Map<String, List<String>> emptySegments = Map.of("OFFLINE", new ArrayList<>());
+    Map<String, SegmentsToQuery> emptySegments = Map.of("OFFLINE", new SegmentsToQuery(new ArrayList<>()));
     WorkerMetadata decoded =
         QueryPlanSerDeUtils.fromProtoWorkerMetadata(toProto(leafWorker(emptySegments, null), protoSegmentList));
     assertEquals(decoded.getTableSegmentsMap(), emptySegments);
@@ -175,9 +213,8 @@ public class QueryPlanSerDeUtilsTest {
   public void testLegacyJsonIsParsedOnce()
       throws Exception {
     Worker.WorkerMetadata proto = Worker.WorkerMetadata.newBuilder().setWorkedId(7)
-        .putCustomProperty(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY, JsonUtils.objectToString(TABLE_SEGMENTS_MAP))
-        .putCustomProperty(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY,
-            JsonUtils.objectToString(LOGICAL_TABLE_SEGMENTS_MAP))
+        .putCustomProperty(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY, toSegmentsJson(TABLE_SEGMENTS_MAP))
+        .putCustomProperty(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY, toSegmentsJson(LOGICAL_TABLE_SEGMENTS_MAP))
         .build();
 
     WorkerMetadata decoded = QueryPlanSerDeUtils.fromProtoWorkerMetadata(proto);
@@ -191,9 +228,8 @@ public class QueryPlanSerDeUtilsTest {
   public void testDecodesLegacyBrokerJsonCustomProperties()
       throws Exception {
     Worker.WorkerMetadata proto = Worker.WorkerMetadata.newBuilder().setWorkedId(7)
-        .putCustomProperty(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY, JsonUtils.objectToString(TABLE_SEGMENTS_MAP))
-        .putCustomProperty(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY,
-            JsonUtils.objectToString(LOGICAL_TABLE_SEGMENTS_MAP))
+        .putCustomProperty(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY, toSegmentsJson(TABLE_SEGMENTS_MAP))
+        .putCustomProperty(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY, toSegmentsJson(LOGICAL_TABLE_SEGMENTS_MAP))
         .putCustomProperty("foo", "bar")
         .build();
 
@@ -206,14 +242,18 @@ public class QueryPlanSerDeUtilsTest {
   }
 
   /// The legacy encoding must stay readable by a server that predates the proto fields, which parses the custom
-  /// property with Jackson: pin the exact JSON shape it expects.
+  /// property with Jackson: pin the exact JSON shape it expects. The optional segments are sent in a property of their
+  /// own, which such a server ignores.
   @Test
   public void testLegacyEncodingIsTheJacksonJsonOlderServersParse()
       throws Exception {
-    Map<String, List<String>> segmentsMap = Map.of("OFFLINE", List.of("seg_0", "seg-1.tar.gz", "s\u00ebg_2"));
+    Map<String, SegmentsToQuery> segmentsMap =
+        Map.of("OFFLINE", new SegmentsToQuery(List.of("seg_0", "seg-1.tar.gz", "s\u00ebg_2"), List.of("seg_3")));
     Worker.WorkerMetadata proto = toProto(leafWorker(segmentsMap, null), false);
     assertEquals(proto.getCustomPropertyMap().get(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY),
         "{\"OFFLINE\":[\"seg_0\",\"seg-1.tar.gz\",\"s\u00ebg_2\"]}");
+    assertEquals(proto.getCustomPropertyMap().get(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY),
+        "{\"OFFLINE\":[\"seg_3\"]}");
   }
 
   /// The mailbox information of a receiver carries the hash of its instance id, and that of a sender, or of a plan
@@ -240,8 +280,14 @@ public class QueryPlanSerDeUtilsTest {
     assertEquals(decoded.get(1).getInstanceIdHash(), 0L);
   }
 
-  private static WorkerMetadata leafWorker(@Nullable Map<String, List<String>> tableSegmentsMap,
-      @Nullable Map<String, List<String>> logicalTableSegmentsMap) {
+  /// Returns the JSON a broker using the legacy encoding sends for the segments of the given segments map.
+  private static String toSegmentsJson(Map<String, SegmentsToQuery> segmentsMap)
+      throws Exception {
+    return JsonUtils.objectToString(Maps.transformValues(segmentsMap, SegmentsToQuery::getSegments));
+  }
+
+  private static WorkerMetadata leafWorker(@Nullable Map<String, SegmentsToQuery> tableSegmentsMap,
+      @Nullable Map<String, SegmentsToQuery> logicalTableSegmentsMap) {
     MailboxInfos mailboxInfos = new MailboxInfos(new MailboxInfo("localhost", 1234, List.of(0, 1)));
     WorkerMetadata workerMetadata = new WorkerMetadata(3, Map.of(2, mailboxInfos), new HashMap<>(CUSTOM_PROPERTIES));
     if (tableSegmentsMap != null) {

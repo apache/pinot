@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -79,7 +80,7 @@ public class BenchmarkSegmentListEncoding {
     }
     WorkerMetadata workerMetadata = new WorkerMetadata(0,
         Map.of(1, new MailboxInfos(new MailboxInfo("localhost", 12345, List.of(0)))), new HashMap<>());
-    workerMetadata.setTableSegmentsMap(Map.of("OFFLINE", segments));
+    workerMetadata.setTableSegmentsMap(Map.of("OFFLINE", new SegmentsToQuery(segments)));
     _workerMetadataList = List.of(workerMetadata);
 
     _legacyBytes = QueryPlanSerDeUtils.toProtoWorkerMetadataList(_workerMetadataList, false).get(0).toByteArray();
@@ -113,14 +114,14 @@ public class BenchmarkSegmentListEncoding {
   /// Decode includes the first `getTableSegmentsMap()`, since the legacy JSON is only parsed then, on the worker's own
   /// thread; without it the legacy decode would measure nothing but the protobuf parse.
   @Benchmark
-  public Map<String, List<String>> decodeLegacy()
+  public Map<String, SegmentsToQuery> decodeLegacy()
       throws Exception {
     return QueryPlanSerDeUtils.fromProtoWorkerMetadata(Worker.WorkerMetadata.parseFrom(_legacyBytes))
         .getTableSegmentsMap();
   }
 
   @Benchmark
-  public Map<String, List<String>> decodeProto()
+  public Map<String, SegmentsToQuery> decodeProto()
       throws Exception {
     return QueryPlanSerDeUtils.fromProtoWorkerMetadata(Worker.WorkerMetadata.parseFrom(_protoBytes))
         .getTableSegmentsMap();

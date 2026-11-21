@@ -583,6 +583,40 @@ public class WorkerManagerTest {
     return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
   }
 
+  @DataProvider
+  public static Object[][] usePhysicalOptimizer() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "usePhysicalOptimizer")
+  public void testLeafWorkersCarryOptionalSegments(boolean usePhysicalOptimizer) {
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    ServerInstance server2 = getServerInstance("localhost", 2);
+    Map<String, ServerInstance> serverInstanceMap =
+        Map.of(server1.getInstanceId(), server1, server2.getInstanceId(), server2);
+    // A new segment the broker has not seen online yet is routed to server 1 as an optional segment
+    RoutingTable routingTable = new RoutingTable(Map.of(
+        server1, new SegmentsToQuery(List.of("segment1"), List.of("newSegment1")),
+        server2, new SegmentsToQuery(List.of("segment2"), List.of())
+    ), List.of(), 0);
+    CapturingRoutingManager routingManager =
+        new CapturingRoutingManager(serverInstanceMap, Map.of("testTable_OFFLINE", routingTable));
+    QueryEnvironment queryEnvironment = newQueryEnvironment(getSchemaBuilder("testTable").build(), routingManager);
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; SELECT col1 FROM testTable")) {
+      DispatchablePlanFragment leaf = leafFragment(compiledQuery.planQuery(0).getQueryPlan());
+      assertNotNull(leaf);
+      Map<String, Map<String, SegmentsToQuery>> serverToSegmentsMap = new HashMap<>();
+      workerIdToServer(leaf).forEach((workerId, server) -> serverToSegmentsMap.put(server,
+          leaf.getWorkerMetadataList().get(workerId).getTableSegmentsMap()));
+      assertEquals(serverToSegmentsMap, Map.of(
+          server1.getInstanceId(), Map.of("OFFLINE", new SegmentsToQuery(List.of("segment1"), List.of("newSegment1"))),
+          server2.getInstanceId(), Map.of("OFFLINE", new SegmentsToQuery(List.of("segment2")))
+      ));
+    }
+  }
+
   @Test
   public void testBrokerPruningPreservesQueryOptionsOnRoutingRequest() {
     Schema schema = getSchemaBuilder("testTable").build();
@@ -1259,16 +1293,100 @@ public class WorkerManagerTest {
             + "WHERE col1 = 'foo'")) {
       DispatchablePlanFragment leaf = leafFragment(compiledQuery.planQuery(0).getQueryPlan());
       assertNotNull(leaf);
-      List<String> segments = leaf.getWorkerIdToSegmentsMap().get(0).get(TableType.OFFLINE.name());
+      List<String> segments = leaf.getWorkerIdToSegmentsMap().get(0).get(TableType.OFFLINE.name()).getSegments();
       assertEquals(segments, List.of("seg0"));
       segments.add("mutated");
       // Planning the same query again must see the broker's original list, not the mutation above.
       DispatchablePlanFragment leafAgain = leafFragment(compiledQuery.planQuery(1).getQueryPlan());
       assertNotNull(leafAgain);
-      List<String> segmentsAgain = leafAgain.getWorkerIdToSegmentsMap().get(0).get(TableType.OFFLINE.name());
+      List<String> segmentsAgain =
+          leafAgain.getWorkerIdToSegmentsMap().get(0).get(TableType.OFFLINE.name()).getSegments();
       assertEquals(segmentsAgain, List.of("seg0"));
       assertNotSame(segmentsAgain, segments);
     }
+  }
+
+  @Test
+  public void testPartitionedLeafWorkersCarryOptionalSegments() {
+    QueryEnvironment queryEnvironment = newPartitionedQueryEnvironmentWithOptionalSegments();
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=false; SELECT col2 FROM testTable "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ "
+            + "WHERE col1 = 'foo'")) {
+      DispatchablePlanFragment leaf = leafFragment(compiledQuery.planQuery(0).getQueryPlan());
+      assertNotNull(leaf);
+      assertEquals(leaf.getWorkerIdToSegmentsMap(), Map.of(
+          0, offlineSegments(List.of("seg0"), List.of("newSeg0")),
+          1, offlineSegments("seg1"),
+          2, offlineSegments("seg2"),
+          3, offlineSegments(List.of("seg3"), List.of("newSeg3"))
+      ));
+    }
+  }
+
+  @Test
+  public void testPartitionedLeafWorkersCarryOptionalSegmentsWithMultiplePartitionsPerWorker() {
+    QueryEnvironment queryEnvironment = newPartitionedQueryEnvironmentWithOptionalSegments();
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=false; SELECT col2 FROM testTable "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='2') */ "
+            + "WHERE col1 = 'foo'")) {
+      DispatchablePlanFragment leaf = leafFragment(compiledQuery.planQuery(0).getQueryPlan());
+      assertNotNull(leaf);
+      // Worker 0 scans partitions 0 and 2, worker 1 partitions 1 and 3
+      assertEquals(leaf.getWorkerIdToSegmentsMap(), Map.of(
+          0, offlineSegments(List.of("seg0", "seg2"), List.of("newSeg0")),
+          1, offlineSegments(List.of("seg1", "seg3"), List.of("newSeg3"))
+      ));
+    }
+  }
+
+  @Test
+  public void testBrokerPruningPartitionedLeafKeepsPartitionWithUnprunedOptionalSegment() {
+    QueryEnvironment queryEnvironment = newPartitionedQueryEnvironmentWithOptionalSegments();
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SELECT col2 FROM testTable "
+            + "/*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ "
+            + "WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      // seg0, seg2 and seg3 are pruned. Only partition 2 is dropped for it: the optional segments of partitions 0 and
+      // 3 are not pruned, so their workers stay to query them.
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 1);
+      DispatchablePlanFragment leaf = leafFragment(dispatchableSubPlan);
+      assertNotNull(leaf);
+      assertEquals(leaf.getWorkerIdToSegmentsMap(), Map.of(
+          0, offlineSegments(List.of("seg0"), List.of("newSeg0")),
+          1, offlineSegments("seg1"),
+          2, offlineSegments(List.of("seg3"), List.of("newSeg3"))
+      ));
+    }
+  }
+
+  /// Builds a QueryEnvironment for an offline partitioned table "testTable" (function Hashcode on col1) with 4
+  /// partitions, where partitions 0 and 2 are fully replicated on server 1, and partitions 1 and 3 on server 2.
+  /// Partition `p` holds the segment `"seg{p}"`. Partitions 0 and 3 also hold a new segment `"newSeg{p}"` that is
+  /// still waiting for replicas, which the broker lists as an optional segment. The [RoutingManager] reports `seg1` as
+  /// the only segment that survives broker pruning.
+  private static QueryEnvironment newPartitionedQueryEnvironmentWithOptionalSegments() {
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    ServerInstance server2 = getServerInstance("localhost", 2);
+    Set<String> servers1 = Set.of(server1.getInstanceId());
+    Set<String> servers2 = Set.of(server2.getInstanceId());
+    TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap =
+        new TablePartitionReplicatedServersInfo.PartitionInfo[]{
+            new TablePartitionReplicatedServersInfo.PartitionInfo(servers1, List.of("seg0"), List.of("newSeg0")),
+            new TablePartitionReplicatedServersInfo.PartitionInfo(servers2, List.of("seg1")),
+            new TablePartitionReplicatedServersInfo.PartitionInfo(servers1, List.of("seg2")),
+            new TablePartitionReplicatedServersInfo.PartitionInfo(servers2, List.of("seg3"), List.of("newSeg3"))
+        };
+    TablePartitionReplicatedServersInfo tablePartitionInfo = new TablePartitionReplicatedServersInfo(
+        PARTITIONED_TABLE_OFFLINE, "col1", "Hashcode", 4, partitionInfoMap, List.of(), Set.of());
+    RoutingTable prunedRoutingTable =
+        new RoutingTable(Map.of(server2, new SegmentsToQuery(List.of("seg1"), List.of())), List.of(), 0);
+    return newPartitionedTableQueryEnvironment(new PartitionedRoutingManager(
+        Map.of(server1.getInstanceId(), server1, server2.getInstanceId(), server2),
+        Map.of(PARTITIONED_TABLE_OFFLINE, tablePartitionInfo), Map.of(PARTITIONED_TABLE_OFFLINE, prunedRoutingTable),
+        false));
   }
 
   @Test
@@ -1366,10 +1484,10 @@ public class WorkerManagerTest {
       assertEquals(assignedSegments(leafB, 3), List.of("b_seg3"));
       // A single table type key mapped to an empty (mutable) list, on a server that hosts table A rather than on
       // partition 3's server (localhost_4), which only hosts table B's partition 3.
-      Map<String, List<String>> emptyWorkerSegmentsMap = leafA.getWorkerIdToSegmentsMap().get(3);
+      Map<String, SegmentsToQuery> emptyWorkerSegmentsMap = leafA.getWorkerIdToSegmentsMap().get(3);
       assertEquals(emptyWorkerSegmentsMap.keySet(), Set.of(TableType.OFFLINE.name()));
-      assertEquals(emptyWorkerSegmentsMap.get(TableType.OFFLINE.name()), List.of());
-      emptyWorkerSegmentsMap.get(TableType.OFFLINE.name()).add("mutable");
+      assertEquals(emptyWorkerSegmentsMap.get(TableType.OFFLINE.name()).getSegments(), List.of());
+      emptyWorkerSegmentsMap.get(TableType.OFFLINE.name()).getSegments().add("mutable");
       String emptyWorkerServer = workerIdToServer(leafA).get(3);
       assertTrue(Set.of("_1", "_2", "_3").stream().anyMatch(emptyWorkerServer::endsWith), emptyWorkerServer);
       // The join stage takes its workers from a leaf, so it keeps all 4 workers as well.
@@ -1452,9 +1570,9 @@ public class WorkerManagerTest {
     try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(COLOCATED_JOIN_QUERY)) {
       DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
       DispatchablePlanFragment leafA = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_A);
-      Map<String, List<String>> emptyWorkerSegmentsMap = leafA.getWorkerIdToSegmentsMap().get(3);
+      Map<String, SegmentsToQuery> emptyWorkerSegmentsMap = leafA.getWorkerIdToSegmentsMap().get(3);
       assertEquals(emptyWorkerSegmentsMap.keySet(), Set.of(TableType.REALTIME.name()));
-      assertEquals(emptyWorkerSegmentsMap.get(TableType.REALTIME.name()), List.of());
+      assertEquals(emptyWorkerSegmentsMap.get(TableType.REALTIME.name()).getSegments(), List.of());
     }
   }
 
@@ -1495,10 +1613,10 @@ public class WorkerManagerTest {
       assertEquals(assignedSegments(leafA, 3), List.of());
       assertEquals(new HashSet<>(assignedSegments(leafB, 3)), Set.of("b_seg3", "b_seg7"));
       // Same shape as on the one-partition-per-worker path: one table type key, mapped to a mutable empty list.
-      Map<String, List<String>> emptyWorkerSegmentsMap = leafA.getWorkerIdToSegmentsMap().get(3);
+      Map<String, SegmentsToQuery> emptyWorkerSegmentsMap = leafA.getWorkerIdToSegmentsMap().get(3);
       assertEquals(emptyWorkerSegmentsMap.keySet(), Set.of(TableType.OFFLINE.name()));
-      assertEquals(emptyWorkerSegmentsMap.get(TableType.OFFLINE.name()), List.of());
-      emptyWorkerSegmentsMap.get(TableType.OFFLINE.name()).add("mutable");
+      assertEquals(emptyWorkerSegmentsMap.get(TableType.OFFLINE.name()).getSegments(), List.of());
+      emptyWorkerSegmentsMap.get(TableType.OFFLINE.name()).getSegments().add("mutable");
       // Every server hosts every partition here, so the empty worker lands with its peer.
       assertEquals(workerIdToServer(leafA), workerIdToServer(leafB));
     }
@@ -1811,6 +1929,41 @@ public class WorkerManagerTest {
   }
 
   @Test
+  public void testReplicatedLeafWorkersCarryOptionalSegments() {
+    // The dimension table holds a new segment that is not online on all the servers yet
+    QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(new ColocatedTableSpec(4, true),
+        new ColocatedTableSpec(4, true).optionalSegments(Map.of(1, List.of("b_newSeg"))));
+    try (QueryEnvironment.CompiledQuery compiledQuery =
+        queryEnvironment.compile(replicatedDimensionJoinQuery(4))) {
+      DispatchablePlanFragment leafB =
+          leafFragmentForTable(compiledQuery.planQuery(0).getQueryPlan(), COLOCATED_TABLE_B);
+      // Every worker scans the whole dimension table, and the new segment only if its server has loaded it
+      assertEquals(leafB.getWorkerIdToSegmentsMap().size(), 4);
+      for (Map<String, SegmentsToQuery> segmentsMap : leafB.getWorkerIdToSegmentsMap().values()) {
+        assertEquals(segmentsMap,
+            offlineSegments(List.of("b_seg0", "b_seg1", "b_seg2", "b_seg3"), List.of("b_newSeg")));
+      }
+    }
+  }
+
+  @Test
+  public void testReplicatedLeafWorkersCarryOnlyOptionalSegments() {
+    // The only segment of the dimension table is new and not online on all the servers yet
+    QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(new ColocatedTableSpec(4, true),
+        new ColocatedTableSpec(4, true).partitionsWithoutSegments(Set.of(0, 1, 2, 3))
+            .optionalSegments(Map.of(0, List.of("b_newSeg"))));
+    try (QueryEnvironment.CompiledQuery compiledQuery =
+        queryEnvironment.compile(replicatedDimensionJoinQuery(4))) {
+      DispatchablePlanFragment leafB =
+          leafFragmentForTable(compiledQuery.planQuery(0).getQueryPlan(), COLOCATED_TABLE_B);
+      assertEquals(leafB.getWorkerIdToSegmentsMap().size(), 4);
+      for (Map<String, SegmentsToQuery> segmentsMap : leafB.getWorkerIdToSegmentsMap().values()) {
+        assertEquals(segmentsMap, offlineSegments(List.of(), List.of("b_newSeg")));
+      }
+    }
+  }
+
+  @Test
   public void testColocatedJoinReducedGroupWithReplicatedLeaf() {
     // The most common colocated shape: a partitioned fact table joined with a replicated dimension table over a local
     // exchange. The fact table is the group's only source of classes -- a replicated one says nothing about which of
@@ -1970,7 +2123,7 @@ public class WorkerManagerTest {
     // DispatchablePlanContext sizes a WorkerMetadata[] from the server map and indexes it by worker id, so a gap would
     // leave a null entry (and an out-of-range id would throw an ArrayIndexOutOfBoundsException) there instead of here.
     Map<Integer, QueryServerInstance> serverMap = Map.of(0, queryServerInstance(1), 2, queryServerInstance(2));
-    Map<Integer, Map<String, List<String>>> segmentsMap =
+    Map<Integer, Map<String, SegmentsToQuery>> segmentsMap =
         Map.of(0, offlineSegments("seg0"), 2, offlineSegments("seg2"));
     IllegalStateException e = expectThrows(IllegalStateException.class,
         () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, serverMap, segmentsMap));
@@ -1980,7 +2133,7 @@ public class WorkerManagerTest {
   @Test
   public void testCheckLeafWorkerAssignmentRejectsKeySetMismatch() {
     Map<Integer, QueryServerInstance> serverMap = Map.of(0, queryServerInstance(1), 1, queryServerInstance(2));
-    Map<Integer, Map<String, List<String>>> segmentsMap =
+    Map<Integer, Map<String, SegmentsToQuery>> segmentsMap =
         Map.of(0, offlineSegments("seg0"), 5, offlineSegments("seg5"));
     IllegalStateException e = expectThrows(IllegalStateException.class,
         () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, serverMap, segmentsMap));
@@ -1988,13 +2141,13 @@ public class WorkerManagerTest {
   }
 
   @Test
-  public void testCheckLeafWorkerAssignmentRejectsNullSegmentList() {
-    Map<String, List<String>> nullList = new HashMap<>();
-    nullList.put(TableType.OFFLINE.name(), null);
+  public void testCheckLeafWorkerAssignmentRejectsNullSegments() {
+    Map<String, SegmentsToQuery> nullSegments = new HashMap<>();
+    nullSegments.put(TableType.OFFLINE.name(), null);
     IllegalStateException e = expectThrows(IllegalStateException.class,
         () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, Map.of(0, queryServerInstance(1)),
-            Map.of(0, nullList)));
-    assertTrue(e.getMessage().contains("Null segment list for table type: OFFLINE"), e.getMessage());
+            Map.of(0, nullSegments)));
+    assertTrue(e.getMessage().contains("Null segments for table type: OFFLINE"), e.getMessage());
   }
 
   @Test
@@ -2009,10 +2162,10 @@ public class WorkerManagerTest {
 
   @Test
   public void testCheckLeafWorkerAssignmentRejectsThreeTableTypeMap() {
-    Map<String, List<String>> threeTypes = new HashMap<>();
-    threeTypes.put(TableType.OFFLINE.name(), List.of());
-    threeTypes.put(TableType.REALTIME.name(), List.of());
-    threeTypes.put("HYBRID", List.of());
+    Map<String, SegmentsToQuery> threeTypes = new HashMap<>();
+    threeTypes.put(TableType.OFFLINE.name(), new SegmentsToQuery(List.of()));
+    threeTypes.put(TableType.REALTIME.name(), new SegmentsToQuery(List.of()));
+    threeTypes.put("HYBRID", new SegmentsToQuery(List.of()));
     IllegalStateException e = expectThrows(IllegalStateException.class,
         () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, Map.of(0, queryServerInstance(1)),
             Map.of(0, threeTypes)));
@@ -2024,7 +2177,7 @@ public class WorkerManagerTest {
     // The server resolves one table data manager per key in this map, and reports a missing table for an unknown one.
     IllegalStateException e = expectThrows(IllegalStateException.class,
         () -> WorkerManager.checkLeafWorkerAssignment("testTable", null, Map.of(0, queryServerInstance(1)),
-            Map.of(0, Map.of("HYBRID", List.of()))));
+            Map.of(0, Map.of("HYBRID", new SegmentsToQuery(List.of())))));
     assertTrue(e.getMessage().contains("Unexpected table type: HYBRID for worker: 0"), e.getMessage());
   }
 
@@ -2051,20 +2204,24 @@ public class WorkerManagerTest {
   public void testCheckLeafWorkerAssignmentAcceptsHybridAndEmptySegmentWorkers() {
     // The two shapes the partitioned assignment produces: a hybrid worker with both table types, and one with a single
     // table type mapped to an empty list.
-    Map<String, List<String>> hybridSegments = new HashMap<>();
-    hybridSegments.put(TableType.OFFLINE.name(), List.of("segO0"));
-    hybridSegments.put(TableType.REALTIME.name(), List.of("segR0"));
+    Map<String, SegmentsToQuery> hybridSegments = new HashMap<>();
+    hybridSegments.put(TableType.OFFLINE.name(), new SegmentsToQuery(List.of("segO0")));
+    hybridSegments.put(TableType.REALTIME.name(), new SegmentsToQuery(List.of("segR0")));
     WorkerManager.checkLeafWorkerAssignment("testTable", null,
         Map.of(0, queryServerInstance(1), 1, queryServerInstance(2)),
-        Map.of(0, hybridSegments, 1, Map.of(TableType.OFFLINE.name(), new ArrayList<>())));
+        Map.of(0, hybridSegments, 1, Map.of(TableType.OFFLINE.name(), new SegmentsToQuery(new ArrayList<>()))));
   }
 
   private static QueryServerInstance queryServerInstance(int port) {
     return new QueryServerInstance(getServerInstance("localhost", port));
   }
 
-  private static Map<String, List<String>> offlineSegments(String... segments) {
-    return Map.of(TableType.OFFLINE.name(), List.of(segments));
+  private static Map<String, SegmentsToQuery> offlineSegments(String... segments) {
+    return Map.of(TableType.OFFLINE.name(), new SegmentsToQuery(List.of(segments)));
+  }
+
+  private static Map<String, SegmentsToQuery> offlineSegments(List<String> segments, List<String> optionalSegments) {
+    return Map.of(TableType.OFFLINE.name(), new SegmentsToQuery(segments, optionalSegments));
   }
 
   private static final String COLOCATED_TABLE_A = "tableA";
@@ -2251,7 +2408,8 @@ public class WorkerManagerTest {
         // Mutable, like the lists the broker publishes: the assignment must hand out a copy rather than this instance.
         List<String> segments = spec._partitionsWithoutSegments.contains(p) ? new ArrayList<>()
             : new ArrayList<>(List.of(segmentPrefix + p));
-        partitionInfoMap[p] = new TablePartitionReplicatedServersInfo.PartitionInfo(partitionServers, segments);
+        partitionInfoMap[p] = new TablePartitionReplicatedServersInfo.PartitionInfo(partitionServers, segments,
+            spec._optionalSegments.getOrDefault(p, List.of()));
       }
     }
     return new TablePartitionReplicatedServersInfo(tableNameWithType, "col1", "Hashcode", numPartitions,
@@ -2297,6 +2455,9 @@ public class WorkerManagerTest {
     List<String> _survivingSegments;
     List<String> _unavailableSegments = List.of();
     Set<Integer> _partitionsWithoutSegments = Set.of();
+    /// The new segments of each partition that are not online on all of their servers yet, which the broker reports
+    /// as optional segments.
+    Map<Integer, List<String>> _optionalSegments = Map.of();
 
     ColocatedTableSpec(int numPartitions, boolean everyServerHostsEveryPartition) {
       _numPartitions = numPartitions;
@@ -2345,6 +2506,11 @@ public class WorkerManagerTest {
     /// prove them empty and their partition class has to survive.
     ColocatedTableSpec unavailableSegments(List<String> unavailableSegments) {
       _unavailableSegments = unavailableSegments;
+      return this;
+    }
+
+    ColocatedTableSpec optionalSegments(Map<Integer, List<String>> optionalSegments) {
+      _optionalSegments = optionalSegments;
       return this;
     }
   }
@@ -2501,10 +2667,11 @@ public class WorkerManagerTest {
   private static Map<Integer, Set<Integer>> workerIdToPartitions(DispatchablePlanFragment leafFragment,
       String segmentPrefix) {
     Map<Integer, Set<Integer>> workerIdToPartitions = new HashMap<>();
-    for (Map.Entry<Integer, Map<String, List<String>>> entry : leafFragment.getWorkerIdToSegmentsMap().entrySet()) {
+    for (Map.Entry<Integer, Map<String, SegmentsToQuery>> entry
+        : leafFragment.getWorkerIdToSegmentsMap().entrySet()) {
       Set<Integer> partitions = new HashSet<>();
-      for (List<String> segments : entry.getValue().values()) {
-        for (String segment : segments) {
+      for (SegmentsToQuery segmentsToQuery : entry.getValue().values()) {
+        for (String segment : segmentsToQuery.getSegments()) {
           assertTrue(segment.startsWith(segmentPrefix), "Unexpected segment: " + segment);
           partitions.add(Integer.parseInt(segment.substring(segmentPrefix.length())));
         }
@@ -2549,7 +2716,8 @@ public class WorkerManagerTest {
 
   private static List<String> assignedSegments(DispatchablePlanFragment leafFragment, int workerId) {
     List<String> segments = new ArrayList<>();
-    leafFragment.getWorkerIdToSegmentsMap().get(workerId).values().forEach(segments::addAll);
+    leafFragment.getWorkerIdToSegmentsMap().get(workerId).values()
+        .forEach(segmentsToQuery -> segments.addAll(segmentsToQuery.getSegments()));
     return segments;
   }
 
@@ -2765,10 +2933,11 @@ public class WorkerManagerTest {
       }
     }
     Map<String, String> segmentToServer = new HashMap<>();
-    for (Map.Entry<Integer, Map<String, List<String>>> entry : leafFragment.getWorkerIdToSegmentsMap().entrySet()) {
+    for (Map.Entry<Integer, Map<String, SegmentsToQuery>> entry
+        : leafFragment.getWorkerIdToSegmentsMap().entrySet()) {
       String server = workerIdToServer.get(entry.getKey());
-      for (List<String> segments : entry.getValue().values()) {
-        for (String segment : segments) {
+      for (SegmentsToQuery segmentsToQuery : entry.getValue().values()) {
+        for (String segment : segmentsToQuery.getSegments()) {
           segmentToServer.put(segment, server);
         }
       }
@@ -2778,8 +2947,8 @@ public class WorkerManagerTest {
 
   private static List<String> assignedSegments(DispatchablePlanFragment leafFragment) {
     List<String> segments = new ArrayList<>();
-    for (Map<String, List<String>> segmentsByType : leafFragment.getWorkerIdToSegmentsMap().values()) {
-      segmentsByType.values().forEach(segments::addAll);
+    for (Map<String, SegmentsToQuery> segmentsByType : leafFragment.getWorkerIdToSegmentsMap().values()) {
+      segmentsByType.values().forEach(segmentsToQuery -> segments.addAll(segmentsToQuery.getSegments()));
     }
     return segments;
   }
@@ -2910,10 +3079,10 @@ public class WorkerManagerTest {
       return _routingTable;
     }
 
-    @Nullable
     @Override
-    public List<String> getSegments(BrokerRequest brokerRequest) {
-      return new ArrayList<>(_routingTable.getServerInstanceToSegmentsMap().values().iterator().next().getSegments());
+    public SegmentsToQuery getSegmentsToQuery(BrokerRequest brokerRequest, @Nullable String samplerName) {
+      return new SegmentsToQuery(
+          new ArrayList<>(_routingTable.getServerInstanceToSegmentsMap().values().iterator().next().getSegments()));
     }
 
     @Override
@@ -2978,10 +3147,9 @@ public class WorkerManagerTest {
       return _emptyRoutingTable;
     }
 
-    @Nullable
     @Override
-    public List<String> getSegments(BrokerRequest brokerRequest) {
-      return List.of();
+    public SegmentsToQuery getSegmentsToQuery(BrokerRequest brokerRequest, @Nullable String samplerName) {
+      return new SegmentsToQuery(List.of());
     }
 
     @Override
@@ -3073,10 +3241,9 @@ public class WorkerManagerTest {
       return getRoutingTable(brokerRequest, requestId);
     }
 
-    @Nullable
     @Override
-    public List<String> getSegments(BrokerRequest brokerRequest) {
-      return List.of();
+    public SegmentsToQuery getSegmentsToQuery(BrokerRequest brokerRequest, @Nullable String samplerName) {
+      return new SegmentsToQuery(List.of());
     }
 
     @Override
@@ -3168,11 +3335,21 @@ public class WorkerManagerTest {
     }
 
     /// Only the replicated leaf path reads this (a table hinted `is_replicated` holds every segment on every worker),
-    /// so answer it from the same partition layout the partitioned path reads.
-    @Nullable
+    /// so answer it from the same partition layout the partitioned path reads, with the optional segments of the
+    /// layout as the optional segments.
     @Override
-    public List<String> getSegments(BrokerRequest brokerRequest) {
-      return allSegments(brokerRequest.getQuerySource().getTableName());
+    public SegmentsToQuery getSegmentsToQuery(BrokerRequest brokerRequest, @Nullable String samplerName) {
+      String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+      List<String> optionalSegments = new ArrayList<>();
+      TablePartitionReplicatedServersInfo partitionInfo = _partitionInfoByTable.get(tableNameWithType);
+      if (partitionInfo != null) {
+        for (TablePartitionReplicatedServersInfo.PartitionInfo entry : partitionInfo.getPartitionInfoMap()) {
+          if (entry != null) {
+            optionalSegments.addAll(entry._optionalSegments);
+          }
+        }
+      }
+      return new SegmentsToQuery(allSegments(tableNameWithType), optionalSegments);
     }
 
     /// Derives the pruned set the way `BaseBrokerRoutingManager` does -- everything selection offered minus what the

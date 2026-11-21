@@ -124,6 +124,18 @@ public final class SegmentStates {
     return _routings[groupId].getNumCandidates() == 0 && !_segmentGroups._groups[groupId]._new;
   }
 
+  /// Returns whether the given segment is a new segment that an enabled instance might not have loaded yet: it is not
+  /// online on all of its enabled candidates, or it is not tracked yet, which a segment only is while it is being
+  /// added, because the routing components learn about it one after another.
+  public boolean isNewAndNotFullyOnline(String segment) {
+    int groupId = getGroupId(segment);
+    if (groupId == UNKNOWN_SEGMENT) {
+      return true;
+    }
+    GroupRouting routing = _routings[groupId];
+    return routing.getNumCandidates() > 0 ? !routing._allOnline : _segmentGroups._groups[groupId]._new;
+  }
+
   int getNumSlots() {
     return _enabledBySlot.length;
   }

@@ -53,6 +53,7 @@ public class MockRoutingManagerFactory {
   private final Set<String> _hybridTables;
   private final Map<String, ServerInstance> _serverInstances;
   private final Map<String, Map<String, List<ServerInstance>>> _tableSegmentServersMap;
+  private final Map<String, Map<String, ServerInstance>> _tableOptionalSegmentServerMap;
   private final Set<String> _disabledTables;
 
   public MockRoutingManagerFactory(int... ports) {
@@ -61,6 +62,7 @@ public class MockRoutingManagerFactory {
     _hybridTables = new HashSet<>();
     _serverInstances = new HashMap<>();
     _tableSegmentServersMap = new HashMap<>();
+    _tableOptionalSegmentServerMap = new HashMap<>();
     _disabledTables = new HashSet<>();
     for (int port : ports) {
       _serverInstances.put(toHostname(port), getServerInstance(HOST_NAME, port, port, port, port));
@@ -89,6 +91,14 @@ public class MockRoutingManagerFactory {
     _tableSegmentServersMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>())
         .computeIfAbsent(segmentName, k -> new ArrayList<>())
         .add(serverInstance);
+  }
+
+  /// Registers a segment routed to the given server as optional, like a new segment the broker has not seen online
+  /// yet. As in `BaseBrokerRoutingManager`, the routing table holds it only when the server also gets a non-optional
+  /// segment of the table, while [RoutingManager#getSegmentsToQuery] always returns it.
+  public void registerOptionalSegment(int insertToServerPort, String tableNameWithType, String segmentName) {
+    _tableOptionalSegmentServerMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>())
+        .put(segmentName, _serverInstances.get(toHostname(insertToServerPort)));
   }
 
   /// Registers a routing entry for a table that has no routable segments (e.g. an empty table, or one whose segments
@@ -123,9 +133,16 @@ public class MockRoutingManagerFactory {
           server = servers.get(serverId % numServers);
           serverId++;
         }
-        segmentsToQueryMap.computeIfAbsent(server, k -> new SegmentsToQuery(new ArrayList<>(), null))
+        segmentsToQueryMap.computeIfAbsent(server, k -> new SegmentsToQuery(new ArrayList<>(), new ArrayList<>()))
             .getSegments()
             .add(segment);
+      }
+      for (Map.Entry<String, ServerInstance> optionalSegmentServerEntry
+          : _tableOptionalSegmentServerMap.getOrDefault(tableNameWithType, Map.of()).entrySet()) {
+        SegmentsToQuery segmentsToQuery = segmentsToQueryMap.get(optionalSegmentServerEntry.getValue());
+        if (segmentsToQuery != null) {
+          segmentsToQuery.getOptionalSegments().add(optionalSegmentServerEntry.getKey());
+        }
       }
       routingTableMap.put(tableNameWithType, new RoutingTable(segmentsToQueryMap, List.of(), 0));
       tableSegmentsMap.put(tableNameWithType, new ArrayList<>(segmentServersMap.keySet()));
@@ -152,7 +169,7 @@ public class MockRoutingManagerFactory {
       }
     }
     return new FakeRoutingManager(routingTableMap, tableSegmentsMap, _hybridTables, _disabledTables, partitionInfoMap,
-        _serverInstances, tablePartitionInfoMap);
+        _serverInstances, tablePartitionInfoMap, _tableOptionalSegmentServerMap);
   }
 
   public TableCache buildTableCache() {
@@ -204,11 +221,13 @@ public class MockRoutingManagerFactory {
     @Nullable
     private final Map<String, TablePartitionInfo> _partitionInfoMap;
     private final Map<String, ServerInstance> _serverInstances;
+    private final Map<String, Map<String, ServerInstance>> _optionalSegmentServerMap;
 
     public FakeRoutingManager(Map<String, RoutingTable> routingTableMap, Map<String, List<String>> segmentsMap,
         Set<String> hybridTables, Set<String> disabledTables,
         @Nullable Map<String, TablePartitionReplicatedServersInfo> partitionReplicatedServersInfoMap,
-        Map<String, ServerInstance> serverInstances, @Nullable Map<String, TablePartitionInfo> partitionInfoMap) {
+        Map<String, ServerInstance> serverInstances, @Nullable Map<String, TablePartitionInfo> partitionInfoMap,
+        Map<String, Map<String, ServerInstance>> optionalSegmentServerMap) {
       _segmentsMap = segmentsMap;
       _routingTableMap = routingTableMap;
       _hybridTables = hybridTables;
@@ -216,6 +235,7 @@ public class MockRoutingManagerFactory {
       _serverInstances = serverInstances;
       _disabledTables = disabledTables;
       _partitionInfoMap = partitionInfoMap;
+      _optionalSegmentServerMap = optionalSegmentServerMap;
     }
 
     @Override
@@ -238,9 +258,14 @@ public class MockRoutingManagerFactory {
 
     @Nullable
     @Override
-    public List<String> getSegments(BrokerRequest brokerRequest) {
+    public SegmentsToQuery getSegmentsToQuery(BrokerRequest brokerRequest, @Nullable String samplerName) {
       String tableNameWithType = brokerRequest.getPinotQuery().getDataSource().getTableName();
-      return _segmentsMap.get(tableNameWithType);
+      List<String> segments = _segmentsMap.get(tableNameWithType);
+      if (segments == null) {
+        return null;
+      }
+      return new SegmentsToQuery(segments,
+          new ArrayList<>(_optionalSegmentServerMap.getOrDefault(tableNameWithType, Map.of()).keySet()));
     }
 
     @Override

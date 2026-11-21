@@ -32,6 +32,7 @@ import org.apache.calcite.rel.core.TableScan;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
@@ -225,11 +226,12 @@ public class PlanFragmentAndMailboxAssignment {
       // Use putIfAbsent rather than overwrite to be defensive if called multiple times.
       Map<Integer, QueryServerInstance> workers = fragmentMetadata.getWorkerIdToServerInstanceMap();
       if (workers != null) {
-        Map<Integer, Map<String, List<String>>> existing = fragmentMetadata.getWorkerIdToSegmentsMap();
-        Map<Integer, Map<String, List<String>>> fakeSegmentsMap =
+        Map<Integer, Map<String, SegmentsToQuery>> existing = fragmentMetadata.getWorkerIdToSegmentsMap();
+        Map<Integer, Map<String, SegmentsToQuery>> fakeSegmentsMap =
             existing != null ? new HashMap<>(existing) : new HashMap<>();
+        Map<String, SegmentsToQuery> noSegments = Map.of(TableType.OFFLINE.name(), new SegmentsToQuery(List.of()));
         for (Integer workerId : workers.keySet()) {
-          fakeSegmentsMap.putIfAbsent(workerId, Map.of(TableType.OFFLINE.name(), List.of()));
+          fakeSegmentsMap.putIfAbsent(workerId, noSegments);
         }
         fragmentMetadata.setWorkerIdToSegmentsMap(fakeSegmentsMap);
       }

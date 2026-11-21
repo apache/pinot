@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.routing.LogicalTableRouteInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.QueryServerInstance;
@@ -67,9 +68,9 @@ public class DispatchablePlanMetadata implements Serializable {
   private String _partitionFunction;
   // Available for leaf stage only
   // Map from workerId -> {tableType -> segments}
-  private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
+  private Map<Integer, Map<String, SegmentsToQuery>> _workerIdToSegmentsMap;
   // Map from tableType -> segments, available when 'is_replicated' hint is set to true
-  private Map<String, List<String>> _replicatedSegments;
+  private Map<String, SegmentsToQuery> _replicatedSegments;
   private TimeBoundaryInfo _timeBoundaryInfo;
   private int _partitionParallelism = 1;
   private final Map<String, Set<String>> _tableToUnavailableSegmentsMap = new HashMap<>();
@@ -83,7 +84,7 @@ public class DispatchablePlanMetadata implements Serializable {
   private final Map<Integer, Map<Integer, MailboxInfos>> _workerIdToMailboxesMap = new HashMap<>();
 
   /// Map from workerId -> {physicalTableName -> segments} is required for logical tables.
-  private Map<Integer, Map<String, List<String>>> _workerIdToTableSegmentsMap;
+  private Map<Integer, Map<String, SegmentsToQuery>> _workerIdToTableSegmentsMap;
   private LogicalTableRouteInfo _logicalTableRouteInfo;
 
   public List<String> getScannedTables() {
@@ -115,21 +116,23 @@ public class DispatchablePlanMetadata implements Serializable {
     _workerIdToServerInstanceMap = workerIdToServerInstanceMap;
   }
 
+  /// Returns the segments each worker of a leaf stage scans, keyed by table type. A [SegmentsToQuery] holds the
+  /// optional segments of the worker next to its segments.
   @Nullable
-  public Map<Integer, Map<String, List<String>>> getWorkerIdToSegmentsMap() {
+  public Map<Integer, Map<String, SegmentsToQuery>> getWorkerIdToSegmentsMap() {
     return _workerIdToSegmentsMap;
   }
 
-  public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+  public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
   }
 
   @Nullable
-  public Map<String, List<String>> getReplicatedSegments() {
+  public Map<String, SegmentsToQuery> getReplicatedSegments() {
     return _replicatedSegments;
   }
 
-  public void setReplicatedSegments(Map<String, List<String>> replicatedSegments) {
+  public void setReplicatedSegments(Map<String, SegmentsToQuery> replicatedSegments) {
     _replicatedSegments = replicatedSegments;
   }
 
@@ -240,12 +243,11 @@ public class DispatchablePlanMetadata implements Serializable {
   }
 
   @Nullable
-  public Map<Integer, Map<String, List<String>>> getWorkerIdToTableSegmentsMap() {
+  public Map<Integer, Map<String, SegmentsToQuery>> getWorkerIdToTableSegmentsMap() {
     return _workerIdToTableSegmentsMap;
   }
 
-  public void setWorkerIdToTableSegmentsMap(
-      Map<Integer, Map<String, List<String>>> workerIdToTableSegmentsMap) {
+  public void setWorkerIdToTableSegmentsMap(Map<Integer, Map<String, SegmentsToQuery>> workerIdToTableSegmentsMap) {
     _workerIdToTableSegmentsMap = workerIdToTableSegmentsMap;
   }
 }

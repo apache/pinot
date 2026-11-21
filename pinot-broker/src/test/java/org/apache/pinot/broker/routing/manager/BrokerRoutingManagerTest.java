@@ -713,6 +713,27 @@ public class BrokerRoutingManagerTest {
     assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of());
   }
 
+  /// The segments to query on every server are the ones that survive pruning, which the instance selector splits into
+  /// segments and optional segments.
+  @Test
+  public void testGetSegmentsToQueryHandsTheSurvivingSegmentsToTheInstanceSelector()
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.selectOnAllInstances(Set.of("seg2", "seg4")))
+        .thenReturn(new SegmentsToQuery(List.of("seg2"), List.of("seg4")));
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("seg1", "seg2", "seg3", "seg4"),
+            List.of(prunerDropping("seg1", "seg3")), instanceSelector));
+
+    assertEquals(_routingManager.getSegmentsToQuery(brokerRequest(TEST_TABLE), null),
+        new SegmentsToQuery(List.of("seg2"), List.of("seg4")));
+  }
+
+  @Test
+  public void testGetSegmentsToQueryIsNullForUnknownTable() {
+    assertNull(_routingManager.getSegmentsToQuery(brokerRequest("noSuchTable_OFFLINE"), null));
+  }
+
   private static BrokerRequest brokerRequest(String tableNameWithType) {
     QuerySource querySource = new QuerySource();
     querySource.setTableName(tableNameWithType);
