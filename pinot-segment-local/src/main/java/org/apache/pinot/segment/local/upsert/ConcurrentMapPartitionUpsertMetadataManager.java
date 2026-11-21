@@ -307,6 +307,38 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
+  protected void revertReplacedKeys(IndexSegment segment, IndexSegment oldSegment, MutableRoaringBitmap movedDocIds,
+      boolean oldValidDocIdsIntact) {
+    ThreadSafeMutableRoaringBitmap oldValidDocIds = oldSegment.getValidDocIds();
+    ThreadSafeMutableRoaringBitmap oldQueryableDocIds = oldSegment.getQueryableDocIds();
+    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(oldSegment,
+        _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+      Iterator<RecordInfo> recordInfoIterator = UpsertUtils.getRecordInfoIterator(recordInfoReader, movedDocIds);
+      while (recordInfoIterator.hasNext()) {
+        RecordInfo recordInfo = recordInfoIterator.next();
+        int oldDocId = recordInfo.getDocId();
+        _primaryKeyToRecordLocationMap.computeIfPresent(
+            HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), (primaryKey, recordLocation) -> {
+              if (recordLocation.getSegment() == segment) {
+                replaceDocId(oldSegment, oldValidDocIds, oldQueryableDocIds, segment, recordLocation.getDocId(),
+                    oldDocId, recordInfo);
+                return new RecordLocation(oldSegment, oldDocId, recordInfo.getComparisonValue());
+              }
+              if (oldValidDocIdsIntact) {
+                UpsertUtils.doRemoveDocId(oldSegment, oldDocId);
+              }
+              return recordLocation;
+            });
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Caught exception while reverting the replacement of segment: %s, table: %s, message: %s",
+              segment.getSegmentName(), _tableNameWithType, e.getMessage()), e);
+    }
+    trackUpdatedSegmentsSinceLastSnapshot(oldSegment);
+  }
+
+  @Override
   public void doRemoveExpiredPrimaryKeys() {
     AtomicInteger numMetadataTTLKeysRemoved = new AtomicInteger();
     AtomicInteger numDeletedTTLKeysRemoved = new AtomicInteger();

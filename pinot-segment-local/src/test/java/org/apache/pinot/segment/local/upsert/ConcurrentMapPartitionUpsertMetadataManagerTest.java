@@ -886,6 +886,78 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.close();
   }
 
+  @DataProvider
+  public Object[][] replaceConsistencyModes() {
+    return new Object[][]{{UpsertConfig.ConsistencyMode.NONE}, {UpsertConfig.ConsistencyMode.SYNC}};
+  }
+
+  @Test(dataProvider = "replaceConsistencyModes")
+  public void testFailedReplaceSegmentPointsKeysBackAtOldSegment(UpsertConfig.ConsistencyMode consistencyMode) {
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setConsistencyMode(consistencyMode).build());
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    // segment1: 0 -> {0, 100}, 1 -> {1, 100}, 2 -> {2, 100}
+    int[] primaryKeys1 = new int[]{0, 1, 2};
+    int[] timestamps1 = new int[]{100, 100, 100};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegmentWithTimestamps(1, validDocIds1, null, getPrimaryKeyList(3, primaryKeys1), timestamps1);
+    upsertMetadataManager.addSegment(segment1, validDocIds1, null,
+        getRecordInfoListWithIntegerComparison(3, primaryKeys1, timestamps1, null).iterator());
+
+    // segment2: 3 -> {0, 100}
+    int[] primaryKeys2 = new int[]{3};
+    int[] timestamps2 = new int[]{100};
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment2 =
+        mockImmutableSegmentWithTimestamps(2, validDocIds2, null, getPrimaryKeyList(1, primaryKeys2), timestamps2);
+    upsertMetadataManager.addSegment(segment2, validDocIds2, null,
+        getRecordInfoListWithIntegerComparison(1, primaryKeys2, timestamps2, null).iterator());
+
+    // New segment1 takes keys 0 and 1 from segment1, takes key 3 from segment2 and adds key 4. A consuming segment then
+    // takes key 1 from it, and the replacement fails before reaching key 2.
+    int[] newPrimaryKeys1 = new int[]{0, 1, 3, 4, 2};
+    int[] newTimestamps1 = new int[]{100, 100, 120, 100, 100};
+    ThreadSafeMutableRoaringBitmap newValidDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl newSegment1 = mockImmutableSegmentWithTimestamps(1, newValidDocIds1, null,
+        getPrimaryKeyList(5, newPrimaryKeys1), newTimestamps1);
+    ThreadSafeMutableRoaringBitmap consumingValidDocIds = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment consumingSegment = mockMutableSegmentWithDataSource(3, consumingValidDocIds, null, new int[]{1});
+    Iterator<RecordInfo> recordInfoIterator =
+        getRecordInfoListWithIntegerComparison(4, newPrimaryKeys1, newTimestamps1, null).iterator();
+    RuntimeException failure = new RuntimeException("Failed to read record");
+    Iterator<RecordInfo> failingRecordInfoIterator = new Iterator<>() {
+      @Override
+      public boolean hasNext() {
+        return true;
+      }
+
+      @Override
+      public RecordInfo next() {
+        if (recordInfoIterator.hasNext()) {
+          return recordInfoIterator.next();
+        }
+        upsertMetadataManager.addRecord(consumingSegment, new RecordInfo(makePrimaryKey(1), 0, 200, false));
+        throw failure;
+      }
+    };
+    assertSame(expectThrows(RuntimeException.class,
+        () -> upsertMetadataManager.replaceSegment(newSegment1, newValidDocIds1, null, failingRecordInfoIterator,
+            segment1)), failure);
+
+    // segment1: 0 -> {0, 100}, 2 -> {2, 100}
+    // consuming segment: 1 -> {0, 200}
+    assertEquals(recordLocationMap.size(), 3);
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 1, consumingSegment, 0, 200, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, HashFunction.NONE);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 2});
+    assertTrue(validDocIds2.getMutableRoaringBitmap().isEmpty());
+    assertEquals(consumingValidDocIds.getMutableRoaringBitmap().toArray(), new int[]{0});
+  }
+
   private List<RecordInfo> getRecordInfoList(int numRecords, int[] primaryKeys, int[] timestamps,
       @Nullable boolean[] deleteRecordFlags) {
     List<RecordInfo> recordInfoList = new ArrayList<>();

@@ -19,8 +19,10 @@
 package org.apache.pinot.core.data.manager;
 
 import com.google.common.cache.CacheBuilder;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
@@ -174,13 +176,52 @@ public class BaseTableDataManagerPartitionMetadataTest {
       assertSame(expectThrows(IllegalStateException.class,
           () -> table.replaceUpsertSegment(SEGMENT_NAME, oldManager, newManager, partition)), failure);
       assertFalse(newManager.isPartitionMetadataInitialized());
+      assertSame(table.getSegmentDataManager(SEGMENT_NAME), oldManager);
+      assertEquals(oldManager.getReferenceCount(), 1);
       verify(oldSegment, never()).offload();
+      verify(partition).untrackSegmentForUpsertView(replacement);
+      verify(replacement).destroy();
     } else {
       table.replaceUpsertSegment(SEGMENT_NAME, oldManager, newManager, partition);
       assertTrue(newManager.isPartitionMetadataInitialized());
       verify(oldSegment).offload();
     }
     verify(partition).replaceSegment(replacement, oldSegment);
+  }
+
+  @DataProvider
+  public Object[][] consistencyModes() {
+    return new Object[][]{{ConsistencyMode.SYNC}, {ConsistencyMode.SNAPSHOT}};
+  }
+
+  @Test(dataProvider = "consistencyModes")
+  public void testFailedUpsertReplacementDestroyedAfterQueryReleasesIt(ConsistencyMode consistencyMode) {
+    PartitionUpsertMetadataManager partition = mock(PartitionUpsertMetadataManager.class);
+    BaseTableDataManager table = createTableManager(partition);
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.getConsistencyMode()).thenReturn(consistencyMode);
+    when(table._tableUpsertMetadataManager.getContext()).thenReturn(context);
+    ImmutableSegment oldSegment = createSegment();
+    ImmutableSegmentDataManager oldManager = new ImmutableSegmentDataManager(oldSegment);
+    table.registerSegment(SEGMENT_NAME, oldManager);
+    ImmutableSegment replacement = createSegment();
+    ImmutableSegmentDataManager newManager = new ImmutableSegmentDataManager(replacement);
+    IllegalStateException failure = new IllegalStateException("Metadata replacement failed");
+    AtomicReference<SegmentDataManager> queriedManager = new AtomicReference<>();
+    doAnswer(invocation -> {
+      queriedManager.set(table.acquireSegment(SEGMENT_NAME));
+      throw failure;
+    }).when(partition).replaceSegment(replacement, oldSegment);
+
+    assertSame(expectThrows(IllegalStateException.class,
+        () -> table.replaceUpsertSegment(SEGMENT_NAME, oldManager, newManager, partition)), failure);
+    assertSame(table.getSegmentDataManager(SEGMENT_NAME), oldManager);
+    verify(replacement, never()).destroy();
+
+    table.releaseSegment(queriedManager.get());
+    verify(replacement).destroy();
+    verify(oldSegment, never()).destroy();
+    assertEquals(oldManager.getReferenceCount(), 1);
   }
 
   private static BaseTableDataManager createTableManager(PartitionUpsertMetadataManager partition) {

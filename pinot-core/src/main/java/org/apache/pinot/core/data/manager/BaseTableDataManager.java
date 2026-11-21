@@ -1059,22 +1059,50 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
+  /// Replaces the old segment with the new one in the upsert metadata, then publishes the new segment and offloads the
+  /// old one.
+  ///
+  /// If the upsert metadata replacement fails, the upsert metadata manager reverts it, so no primary key points at the
+  /// new segment. The old segment stays registered on its own as before, and the new segment is released (destroyed
+  /// once no query holds it), so a later reload, refresh or `ONLINE` transition can replace the old segment again.
   protected void replaceUpsertSegment(String segmentName, SegmentDataManager oldSegmentManager,
       ImmutableSegmentDataManager newSegmentManager, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     IndexSegment oldSegment = oldSegmentManager.getSegment();
     ImmutableSegment immutableSegment = newSegmentManager.getSegment();
     UpsertConfig.ConsistencyMode consistencyMode = _tableUpsertMetadataManager.getContext().getConsistencyMode();
+    SegmentDataManager duoSegmentDataManager = null;
     if (consistencyMode != UpsertConfig.ConsistencyMode.NONE) {
       // For consistency modes, keep both old and new segments visible to queries during replacement so that queries
       // can see the new updates in the new segment while the old segment's validDocIds are still being updated.
       // Register the new segment to the upsert metadata manager before making it visible to queries so the upsert
       // view is updated before any query can access it.
-      SegmentDataManager duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
+      duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
       registerSegment(segmentName, duoSegmentDataManager, partitionUpsertMetadataManager);
     }
     // Publish the replacement on its own only after its validDocIds and partition metadata are initialized, preserving
     // access to the old segment's valid docs during replacement. Mark completion before offload releases the permit.
-    partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+    try {
+      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+    } catch (RuntimeException e) {
+      _logger.warn("Failed to replace segment: {} with upsert enabled, releasing the new segment", segmentName);
+      partitionUpsertMetadataManager.untrackSegmentForUpsertView(immutableSegment);
+      boolean restored = true;
+      if (duoSegmentDataManager != null) {
+        // The old segment has been serving all along, so restore it without firing the post-registration hook again
+        synchronized (_segmentDataManagerMap) {
+          restored = _segmentDataManagerMap.replace(segmentName, duoSegmentDataManager, oldSegmentManager);
+        }
+      }
+      if (restored) {
+        // Queries still holding the DuoSegmentDataManager keep the new segment until they release it
+        releaseSegment(newSegmentManager);
+      } else {
+        // Whoever replaced or removed the DuoSegmentDataManager releases it, along with the new segment
+        _logger.warn("Segment: {} is no longer registered with both old and new segments, not restoring the old one",
+            segmentName);
+      }
+      throw e;
+    }
     newSegmentManager.markPartitionMetadataInitialized();
     registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
     _logger.info("Replaced {} segment: {} with upsert enabled and consistency mode: {}",
