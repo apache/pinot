@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.List;
 import java.util.function.Predicate;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -104,6 +105,17 @@ public class NoClosePinotFS implements PinotFS {
       Predicate<String> pathFilter, int maxResults)
       throws IOException {
     return _delegate.listFilesWithMetadata(fileUri, recursive, pathFilter, maxResults);
+  }
+
+  @Override
+  public boolean supportsListingAfter() {
+    return _delegate.supportsListingAfter();
+  }
+
+  @Override
+  public List<FileMetadata> listFilesWithMetadataAfter(URI fileUri, @Nullable String startAfter, int maxResults)
+      throws IOException {
+    return _delegate.listFilesWithMetadataAfter(fileUri, startAfter, maxResults);
   }
 
   @Override
