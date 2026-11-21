@@ -38,6 +38,16 @@
       },
       {
         "psql": "4.2.7",
+        "description": "sum and avg of distinct values on int column",
+        "sql": "SELECT sum(distinct(int_col)), avg(distinct(int_col)), sum(int_col), avg(int_col) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "sum and avg of distinct values on int column without reducing the aggregate functions",
+        "sql": "SET plannerRule_skipAggregateReduceFunctions=true; SELECT sum(distinct(int_col)), avg(distinct(int_col)) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
         "description": "aggregations on bool column",
         "sql": "SELECT bool_and(bool_col), bool_or(bool_col), count(bool_col), count(distinct(bool_col)), count(*) FROM {tbl}"
       },
@@ -212,6 +222,11 @@
         "psql": "4.2.7",
         "description": "group by with aggregations on int column and order by",
         "sql": "SELECT double_col, min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} GROUP BY double_col ORDER BY double_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by with sum and avg of distinct values on int column",
+        "sql": "SELECT string_col, sum(distinct(int_col)), avg(distinct(int_col)), sum(int_col), avg(int_col) FROM {tbl} GROUP BY string_col"
       },
       {
         "psql": "4.2.7",
