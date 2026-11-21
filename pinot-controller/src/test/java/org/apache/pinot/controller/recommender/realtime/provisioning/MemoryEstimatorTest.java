@@ -31,10 +31,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class MemoryEstimatorTest {
@@ -97,6 +99,57 @@ public class MemoryEstimatorTest {
       assertEquals(extract(metadata, "column.colTime2.maxNumberOfMultiValues = (\\d+)"), "0");
       assertEquals(extract(metadata, "column.colTime3.maxNumberOfMultiValues = (\\d+)"), "0");
     });
+  }
+
+  @Test
+  public void testMemoryLimitsLeaveEstimateValuesVisible()
+      throws Exception {
+    File fixtureDir = Files.createTempDirectory("memory-estimator-limit").toFile();
+    try {
+      File schemaFile = readFile("memory_estimation/schema-with-metadata.json");
+      Schema schema = JsonUtils.fileToObject(schemaFile, Schema.class);
+      SchemaWithMetaData schemaWithMetadata = JsonUtils.fileToObject(schemaFile, SchemaWithMetaData.class);
+      TableConfig tableConfig = JsonUtils.fileToObject(readFile("memory_estimation/table-config.json"),
+          TableConfig.class);
+      File sample = new MemoryEstimator.SegmentGenerator(schemaWithMetadata, schema, tableConfig, 1000, true,
+          fixtureDir).generate();
+
+      MemoryEstimator baseline = estimateMemory(fixtureDir, sample, schema, tableConfig, Long.MAX_VALUE);
+      String[][] memory = baseline.getActiveMemoryPerHost();
+      String[] activeAndMapped = memory[0][0].split("/");
+      long active = DataSizeUtils.toBytes(activeAndMapped[0]);
+      long mapped = DataSizeUtils.toBytes(activeAndMapped[1]);
+      assertTrue(mapped > 2 * active, "Expected ample separation between active and mapped memory");
+      assertEquals(memory[1], new String[]{MemoryEstimator.NOT_APPLICABLE, MemoryEstimator.NOT_APPLICABLE});
+      assertEquals(baseline.getWarnings().size(), 1);
+      assertTrue(baseline.getWarnings().get(0).contains("retention hours"));
+
+      long limitBetweenActiveAndMapped = active + (mapped - active) / 2;
+      MemoryEstimator mappedOnly = estimateMemory(fixtureDir, sample, schema, tableConfig, limitBetweenActiveAndMapped);
+      assertEquals(mappedOnly.getWarnings(), baseline.getWarnings(), "Mapped memory alone should not warn");
+
+      MemoryEstimator overLimit = estimateMemory(fixtureDir, sample, schema, tableConfig, 1);
+      assertEquals(overLimit.getActiveMemoryPerHost()[0], memory[0]);
+      assertEquals(overLimit.getOptimalSegmentSize()[0], baseline.getOptimalSegmentSize()[0]);
+      assertEquals(overLimit.getConsumingMemoryPerHost()[0], baseline.getConsumingMemoryPerHost()[0]);
+      assertEquals(overLimit.getNumRowsInSegment()[0], baseline.getNumRowsInSegment()[0]);
+      assertEquals(overLimit.getNumSegmentsQueriedPerHost()[0], baseline.getNumSegmentsQueriedPerHost()[0]);
+      assertEquals(overLimit.getActiveMemoryPerHost()[1], memory[1]);
+      assertEquals(overLimit.getWarnings().size(), 2);
+      assertTrue(overLimit.getWarnings().get(0).contains("at numHours=1,numHosts=1) exceeds max usable host memory"));
+      assertEquals(overLimit.getWarnings().get(1), baseline.getWarnings().get(0));
+    } finally {
+      FileUtils.deleteDirectory(fixtureDir);
+    }
+  }
+
+  private MemoryEstimator estimateMemory(File fixtureDir, File sample, Schema schema, TableConfig tableConfig,
+      long hostLimit)
+      throws Exception {
+    File workingDir = Files.createTempDirectory(fixtureDir.toPath(), "estimate-").toFile();
+    MemoryEstimator estimator = new MemoryEstimator(tableConfig, schema, sample, 1, hostLimit, 120, workingDir);
+    estimator.estimateMemoryUsed(estimator.initializeStatsHistory(), new int[]{1, 2}, new int[]{1, 2}, 2, 1);
+    return estimator;
   }
 
   private void runTest(String schemaFileName, Consumer<String> assertFunc)
