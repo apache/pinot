@@ -65,11 +65,16 @@ import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
@@ -90,6 +95,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -119,6 +126,8 @@ public class PinotClientRequestTest {
   @BeforeMethod
   public void setUp() {
     MockitoAnnotations.openMocks(this);
+    when(_tableCache.getTableNameMap()).thenReturn(Map.of());
+    when(_tableCache.getLogicalTableNameMap()).thenReturn(Map.of());
     doAnswer(invocation -> {
       Runnable runnable = invocation.getArgument(0);
       runnable.run();
@@ -1294,5 +1303,185 @@ public class PinotClientRequestTest {
     verify(_brokerMetrics).addMeteredGlobalValue(eq(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES), sizeCaptor.capture());
     assertEquals(sizeCaptor.getValue().longValue(), expectedSize,
         "Metric should record the actual response size in bytes");
+  }
+  @Test
+  public void testValidateQueryCompilationApiSuccess() {
+    SqlCompilationValidationResponse singleStageResponse =
+        validateQueryCompilation("SELECT * FROM myTable", null, null, false);
+    assertSuccessfulValidation(singleStageResponse, "SELECT * FROM myTable");
+
+    SqlCompilationValidationResponse multiStageResponse =
+        validateQueryCompilation("SET useMultistageEngine=true; SELECT 1", null, null, false);
+    assertSuccessfulValidation(multiStageResponse, "SET useMultistageEngine=true; SELECT 1");
+  }
+
+  @Test
+  public void testValidateQueryCompilationApiError() {
+    SqlCompilationValidationResponse invalidSqlResponse =
+        validateQueryCompilation("SELECT FROM WHERE", null, null, false);
+    assertFailedValidation(invalidSqlResponse, QueryErrorCode.SQL_PARSING, "SELECT FROM WHERE");
+
+    SqlCompilationValidationResponse missingTableResponse =
+        validateQueryCompilation("SET useMultistageEngine=true; SELECT COUNT(*) FROM missingTable", null, null,
+            false);
+    assertFailedValidation(missingTableResponse, QueryErrorCode.TABLE_DOES_NOT_EXIST,
+        "SET useMultistageEngine=true; SELECT COUNT(*) FROM missingTable");
+  }
+
+  @Test
+  public void testValidateQueryCompilationApiWithStaticTable() {
+    List<TableConfig> tableConfigs =
+        List.of(new TableConfigBuilder(TableType.OFFLINE).setTableName("staticTableTest").build());
+    List<Schema> schemas = List.of(new Schema.SchemaBuilder().setSchemaName("staticTableTest")
+        .addSingleValueDimension("event_id", DataType.STRING)
+        .addMetric("metric_col", DataType.LONG)
+        .build());
+
+    SqlCompilationValidationResponse successfulResponse =
+        validateQueryCompilation("SET useMultistageEngine=true; SELECT event_id FROM staticTableTest", tableConfigs,
+            schemas, false);
+    assertSuccessfulValidation(successfulResponse,
+        "SET useMultistageEngine=true; SELECT event_id FROM staticTableTest");
+
+    SqlCompilationValidationResponse invalidColumnResponse =
+        validateQueryCompilation("SET useMultistageEngine=true; SELECT missing_column FROM staticTableTest",
+            tableConfigs, schemas, false);
+    assertFailedValidation(invalidColumnResponse, QueryErrorCode.QUERY_VALIDATION,
+        "SET useMultistageEngine=true; SELECT missing_column FROM staticTableTest");
+  }
+
+  @Test
+  public void testValidateQueryCompilationApiFallsBackToLiveTableCache() {
+    String tableName = "liveTableTest";
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
+        .addSingleValueDimension("event_id", DataType.STRING)
+        .build();
+    mockLiveOfflineTableCache(tableName, schema);
+
+    SqlCompilationValidationResponse response = validateQueryCompilation(
+        createQueryNode("SELECT event_id FROM liveTableTest", "useMultistageEngine=true"), null, null, false);
+
+    assertSuccessfulValidation(response, "SELECT event_id FROM liveTableTest");
+  }
+
+  @Test
+  public void testValidateQueryCompilationApiWithIgnoreCaseOption() {
+    List<TableConfig> tableConfigs =
+        List.of(new TableConfigBuilder(TableType.OFFLINE).setTableName("StaticTableTest").build());
+    List<Schema> schemas = List.of(new Schema.SchemaBuilder().setSchemaName("StaticTableTest")
+        .addSingleValueDimension("event_id", DataType.STRING)
+        .build());
+
+    SqlCompilationValidationResponse caseSensitiveResponse =
+        validateQueryCompilation("SET useMultistageEngine=true; SELECT event_id FROM statictabletest", tableConfigs,
+            schemas, false);
+    assertFailedValidation(caseSensitiveResponse, QueryErrorCode.QUERY_VALIDATION,
+        "SET useMultistageEngine=true; SELECT event_id FROM statictabletest");
+
+    SqlCompilationValidationResponse ignoreCaseResponse =
+        validateQueryCompilation("SET useMultistageEngine=true; SELECT event_id FROM statictabletest", tableConfigs,
+            schemas, true);
+    assertSuccessfulValidation(ignoreCaseResponse,
+        "SET useMultistageEngine=true; SELECT event_id FROM statictabletest");
+  }
+
+  @Test
+  public void testValidateQueryCompilationApiBatch() {
+    List<SqlCompilationValidationResponse> responses = validateQueryCompilation(List.of(
+        createQueryNode("SELECT * FROM myTable"),
+        createQueryNode("SELECT FROM WHERE"),
+        createQueryNode("SET useMultistageEngine=true; SELECT COUNT(*) FROM missingTable")), null, null, false);
+    assertEquals(responses.size(), 3);
+    assertSuccessfulValidation(responses.get(0), "SELECT * FROM myTable");
+    assertFailedValidation(responses.get(1), QueryErrorCode.SQL_PARSING, "SELECT FROM WHERE");
+    assertFailedValidation(responses.get(2), QueryErrorCode.TABLE_DOES_NOT_EXIST,
+        "SET useMultistageEngine=true; SELECT COUNT(*) FROM missingTable");
+  }
+
+  @Test
+  public void testValidateQueryCompilationApiRejectsEmptyBatch() {
+    List<SqlCompilationValidationResponse> responses = _pinotClientRequest.validateQueryCompilation(
+        new SqlCompilationValidationRequest(List.of(), null, null, null, false), null);
+    assertEquals(responses.size(), 1);
+    SqlCompilationValidationResponse response = responses.get(0);
+    assertFailedValidation(response, QueryErrorCode.JSON_PARSING, null);
+    assertTrue(response.getErrorMessage().contains("non-empty 'queries'"));
+  }
+
+  @Test
+  public void testValidateQueryCompilationApiMissingSql() {
+    ObjectNode queryNode = JsonUtils.newObjectNode();
+    SqlCompilationValidationResponse response = getOnlyResponse(_pinotClientRequest.validateQueryCompilation(
+        new SqlCompilationValidationRequest(List.of(queryNode), null, null, null, false), null));
+    assertFalse(response.isCompiledSuccessfully());
+    assertNotNull(response.getErrorMessage());
+    assertTrue(response.getErrorMessage().contains("include string field 'sql'"));
+    assertNull(response.getSql());
+    response = getOnlyResponse(_pinotClientRequest.validateQueryCompilation(
+        new SqlCompilationValidationRequest(null, null, null, null, false), null));
+    assertFalse(response.isCompiledSuccessfully());
+    assertEquals(response.getErrorCode(), QueryErrorCode.JSON_PARSING);
+    assertNull(response.getSql());
+  }
+
+  private SqlCompilationValidationResponse validateQueryCompilation(String sql,
+      List<TableConfig> tableConfigs, List<Schema> schemas, boolean ignoreCase) {
+    return validateQueryCompilation(createQueryNode(sql), tableConfigs, schemas, ignoreCase);
+  }
+
+  private SqlCompilationValidationResponse validateQueryCompilation(ObjectNode queryNode,
+      List<TableConfig> tableConfigs, List<Schema> schemas, boolean ignoreCase) {
+    return getOnlyResponse(_pinotClientRequest.validateQueryCompilation(
+        new SqlCompilationValidationRequest(List.of(queryNode), tableConfigs, schemas, null, ignoreCase),
+        null));
+  }
+
+  private List<SqlCompilationValidationResponse> validateQueryCompilation(List<ObjectNode> queries,
+      List<TableConfig> tableConfigs, List<Schema> schemas, boolean ignoreCase) {
+    return _pinotClientRequest.validateQueryCompilation(
+        new SqlCompilationValidationRequest(queries, tableConfigs, schemas, null, ignoreCase), null);
+  }
+
+  private static SqlCompilationValidationResponse getOnlyResponse(List<SqlCompilationValidationResponse> responses) {
+    assertEquals(responses.size(), 1, "Single-query validation should return a singleton response list");
+    return responses.get(0);
+  }
+
+  private static ObjectNode createQueryNode(String sql) {
+    ObjectNode queryNode = JsonUtils.newObjectNode();
+    queryNode.put("sql", sql);
+    return queryNode;
+  }
+
+  private static ObjectNode createQueryNode(String sql, String queryOptions) {
+    ObjectNode queryNode = createQueryNode(sql);
+    queryNode.put(CommonConstants.Broker.Request.QUERY_OPTIONS, queryOptions);
+    return queryNode;
+  }
+
+  private void mockLiveOfflineTableCache(String rawTableName, Schema schema) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put(rawTableName, rawTableName);
+    tableNameMap.put(tableConfig.getTableName(), tableConfig.getTableName());
+    when(_tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(_tableCache.getActualTableName(rawTableName)).thenReturn(rawTableName);
+    when(_tableCache.getSchema(rawTableName)).thenReturn(schema);
+    when(_tableCache.getTableConfig(tableConfig.getTableName())).thenReturn(tableConfig);
+  }
+
+  private static void assertSuccessfulValidation(SqlCompilationValidationResponse response, String expectedSql) {
+    assertTrue(response.isCompiledSuccessfully(), "Query should compile successfully");
+    assertNull(response.getErrorCode(), "Error code should be null for successful validation");
+    assertNull(response.getErrorMessage(), "Error message should be null for successful validation");
+    assertEquals(response.getSql(), expectedSql);
+  }
+
+  private static void assertFailedValidation(SqlCompilationValidationResponse response,
+      QueryErrorCode expectedErrorCode, String expectedSql) {
+    assertFalse(response.isCompiledSuccessfully(), "Query should fail validation");
+    assertEquals(response.getErrorCode(), expectedErrorCode);
+    assertNotNull(response.getErrorMessage(), "Failed validation should include an error message");
+    assertEquals(response.getSql(), expectedSql);
   }
 }
