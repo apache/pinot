@@ -18,17 +18,46 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.concurrent.ScheduledExecutorService;
+import org.apache.helix.HelixManager;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
+import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.mockito.MockedStatic;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.expectThrows;
 
 public class BaseServerStarterTest {
+  @Test
+  public void testMissingClusterConfigCallbackCleansUpStartedServerResources() {
+    HelixServerStarter starter = new HelixServerStarter();
+    starter._helixManager = mock(HelixManager.class);
+    starter._clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    starter._helixMessageCountScheduler = mock(ScheduledExecutorService.class);
+    starter._serverInstance = mock(ServerInstance.class);
+    InstanceDataManager dataManager = mock(InstanceDataManager.class);
+    try {
+      expectThrows(IllegalStateException.class, () -> starter.subscribeToClusterConfig(dataManager));
+      verify(starter._helixManager).disconnect();
+      verify(starter._helixMessageCountScheduler).shutdownNow();
+      verify(dataManager).shutDown();
+      verifyNoInteractions(starter._serverInstance);
+    } finally {
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
+    }
+  }
+
   @Test
   public void testConfiguredServerHostDoesNotResolveDefaultHost()
       throws Exception {

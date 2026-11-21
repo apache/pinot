@@ -3330,12 +3330,19 @@ public class CommonConstants {
   /// User can config different configuration for query and ingestion (table creation and update) static analyzer.
   /// The all configuration is the default configuration for both query and ingestion static analyzer.
   public static class Groovy {
-    /// Cluster-only switch for ingestion Groovy. Query Groovy remains independently controlled.
+    /// Cluster-wide ingestion policy for controllers, servers and minions.
+    public static final String INGESTION_GROOVY_DISABLED = "pinot.groovy.ingestion.disabled";
+    /// Legacy cluster key used by controllers when the role-neutral key is absent.
     public static final String DISABLE_INGESTION_GROOVY = "controller.disable.ingestion.groovy";
     public static final boolean DEFAULT_DISABLE_INGESTION_GROOVY = true;
     public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.groovy.all.static.analyzer";
     public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.groovy.query.static.analyzer";
     public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
+
+    public static boolean isControllerIngestionGroovyDisabled(Map<String, String> clusterConfigs) {
+      String value = clusterConfigs.get(INGESTION_GROOVY_DISABLED);
+      return isIngestionGroovyDisabled(value != null ? value : clusterConfigs.get(DISABLE_INGESTION_GROOVY));
+    }
 
     /// Only an explicit false enables ingestion Groovy; absent or malformed values fail closed.
     public static boolean isIngestionGroovyDisabled(@Nullable String value) {

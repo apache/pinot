@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.pinot.common.utils.config.IngestionGroovyConfigListener;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -113,8 +114,9 @@ public class ServiceStartableUtils {
       Map<String, String> clusterConfigs) {
     if (serviceRole == ServiceRole.CONTROLLER) {
       instanceConfig.setProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY,
-          CommonConstants.Groovy.isIngestionGroovyDisabled(
-              clusterConfigs.get(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY)));
+          CommonConstants.Groovy.isControllerIngestionGroovyDisabled(clusterConfigs));
+    } else if (serviceRole == ServiceRole.SERVER || serviceRole == ServiceRole.MINION) {
+      IngestionGroovyConfigListener.applyClusterConfig(clusterConfigs);
     }
   }
 
