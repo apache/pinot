@@ -527,4 +527,39 @@ public class UrlFunctionsTest {
         "https://example.com/path?param=value");
     assertEquals(UrlFunctions.cutURLParameters("https://example.com/path", new String[0]), "https://example.com/path");
   }
+
+  @Test
+  public void testEncodedSeparatorsInQuery() {
+    // The value of "redirect" is an encoded URL that has its own query string
+    String url = "https://example.com/landing?redirect=https%3A%2F%2Fshop.example.org%2Fcart%3Fitem%3D42%26qty%3D2"
+        + "&utm_source=mail#top";
+    assertEquals(UrlFunctions.extractURLParameter(url, "redirect"), "https://shop.example.org/cart?item=42&qty=2");
+    assertEquals(UrlFunctions.extractURLParameter(url, "qty"), "");
+    assertEquals(UrlFunctions.extractURLParameter(url, "utm_source"), "mail");
+    assertArrayEquals(new String[]{"redirect=https://shop.example.org/cart?item=42&qty=2", "utm_source=mail"},
+        UrlFunctions.extractURLParameters(url));
+    assertArrayEquals(new String[]{"redirect", "utm_source"}, UrlFunctions.extractURLParameterNames(url));
+    assertEquals(UrlFunctions.extractURLParameter("https://example.com/search?q=rock%26roll&page=2", "q"),
+        "rock&roll");
+    assertEquals(UrlFunctions.extractURLParameter("https://example.com/search?a%3Db=1", "a=b"), "1");
+    // Decoding is unchanged otherwise: '+' is kept and %XX escapes are decoded
+    assertEquals(UrlFunctions.extractURLParameter("https://example.com/search?q=a+b%20c%C3%A9", "q"), "a+b cé");
+
+    // The cut functions keep the rest of the URL as it was, escapes included
+    String encodedQuery = "https://example.com/landing?redirect=https%3A%2F%2Fshop.example.org%2Fcart%3Fitem%3D42"
+        + "%26qty%3D2";
+    assertEquals(UrlFunctions.cutFragment(url), encodedQuery + "&utm_source=mail");
+    assertEquals(UrlFunctions.cutWWW(url), url);
+    assertEquals(UrlFunctions.cutWWW("https://user@www.example.com:8080/a%2Fb?q=x%26y#f"),
+        "https://user@example.com:8080/a%2Fb?q=x%26y#f");
+    assertEquals(UrlFunctions.cutURLParameter(url, "utm_source"), encodedQuery + "#top");
+    assertEquals(UrlFunctions.cutURLParameter("https://example.com/search?q=rock%26roll&page=2", "page"),
+        "https://example.com/search?q=rock%26roll");
+    assertEquals(UrlFunctions.cutQueryString("https://example.com/files/a%2Fb?x=1#caf%C3%A9"),
+        "https://example.com/files/a%2Fb#caf%C3%A9");
+    assertEquals(UrlFunctions.cutQueryStringAndFragment("https://example.com/files/a%2Fb?x=1#f"),
+        "https://example.com/files/a%2Fb");
+    assertEquals(UrlFunctions.cutFragment("mailto:someone@example.com?subject=a%26b"),
+        "mailto:someone@example.com?subject=a%26b");
+  }
 }

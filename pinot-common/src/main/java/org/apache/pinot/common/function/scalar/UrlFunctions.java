@@ -329,15 +329,15 @@ public class UrlFunctions {
       }
 
       URI uri = new URI(url);
-      String query = uri.getQuery();
+      String query = uri.getRawQuery();
       if (query == null) {
         return "";
       }
 
       for (String param : query.split("&")) {
         String[] keyValue = param.split("=", 2);
-        if (keyValue[0].equals(name)) {
-          return keyValue.length > 1 ? keyValue[1] : "";
+        if (decodeQueryPart(keyValue[0]).equals(name)) {
+          return keyValue.length > 1 ? decodeQueryPart(keyValue[1]) : "";
         }
       }
 
@@ -362,12 +362,16 @@ public class UrlFunctions {
       }
 
       URI uri = new URI(url);
-      String query = uri.getQuery();
+      String query = uri.getRawQuery();
       if (query == null) {
         return new String[0];
       }
 
-      return query.split("&");
+      String[] params = query.split("&");
+      for (int i = 0; i < params.length; i++) {
+        params[i] = decodeQueryPart(params[i]);
+      }
+      return params;
     } catch (Exception e) {
       return new String[0];
     }
@@ -388,7 +392,7 @@ public class UrlFunctions {
       }
 
       URI uri = new URI(url);
-      String query = uri.getQuery();
+      String query = uri.getRawQuery();
       if (query == null) {
         return new String[0];
       }
@@ -396,7 +400,7 @@ public class UrlFunctions {
       String[] params = query.split("&");
       String[] names = new String[params.length];
       for (int i = 0; i < params.length; i++) {
-        names[i] = params[i].split("=", 2)[0];
+        names[i] = decodeQueryPart(params[i].split("=", 2)[0]);
       }
       return names;
     } catch (Exception e) {
@@ -590,11 +594,13 @@ public class UrlFunctions {
     try {
       URI uri = new URI(url);
       String host = uri.getHost();
+      String authority = uri.getRawAuthority();
       if (host != null && host.startsWith("www.")) {
-        host = host.substring(4);
+        String userInfo = uri.getRawUserInfo();
+        int hostStart = userInfo == null ? 0 : userInfo.length() + 1;
+        authority = authority.substring(0, hostStart) + authority.substring(hostStart + 4);
       }
-      return new URI(uri.getScheme(), uri.getUserInfo(), host, uri.getPort(), uri.getPath(), uri.getQuery(),
-          uri.getFragment()).toString();
+      return buildUrl(uri, authority, uri.getRawQuery(), uri.getRawFragment());
     } catch (Exception e) {
       return url; // Return unchanged if there's an error
     }
@@ -605,8 +611,7 @@ public class UrlFunctions {
   public static String cutQueryString(String url) {
     try {
       URI uri = new URI(url);
-      return new URI(uri.getScheme(), uri.getUserInfo(), uri.getHost(), uri.getPort(), uri.getPath(), null,
-          uri.getFragment()).toString();
+      return buildUrl(uri, uri.getRawAuthority(), null, uri.getRawFragment());
     } catch (Exception e) {
       return url; // Return unchanged if there's an error
     }
@@ -617,8 +622,7 @@ public class UrlFunctions {
   public static String cutFragment(String url) {
     try {
       URI uri = new URI(url);
-      return new URI(uri.getScheme(), uri.getUserInfo(), uri.getHost(), uri.getPort(), uri.getPath(), uri.getQuery(),
-          null).toString();
+      return buildUrl(uri, uri.getRawAuthority(), uri.getRawQuery(), null);
     } catch (Exception e) {
       return url; // Return unchanged if there's an error
     }
@@ -629,8 +633,7 @@ public class UrlFunctions {
   public static String cutQueryStringAndFragment(String url) {
     try {
       URI uri = new URI(url);
-      return new URI(uri.getScheme(), uri.getUserInfo(), uri.getHost(), uri.getPort(), uri.getPath(), null,
-          null).toString();
+      return buildUrl(uri, uri.getRawAuthority(), null, null);
     } catch (Exception e) {
       return url; // Return unchanged if there's an error
     }
@@ -641,7 +644,7 @@ public class UrlFunctions {
   public static String cutURLParameter(String url, String name) {
     try {
       URI uri = new URI(url);
-      String query = uri.getQuery();
+      String query = uri.getRawQuery();
       if (query == null || query.isEmpty()) {
         return url; // No query string to process
       }
@@ -661,8 +664,8 @@ public class UrlFunctions {
         }
       }
 
-      return new URI(uri.getScheme(), uri.getUserInfo(), uri.getHost(), uri.getPort(), uri.getPath(),
-          newQuery.length() > 0 ? newQuery.toString() : null, uri.getFragment()).toString();
+      return buildUrl(uri, uri.getRawAuthority(), newQuery.length() > 0 ? newQuery.toString() : null,
+          uri.getRawFragment());
     } catch (Exception e) {
       return url; // Return unchanged if there's an error
     }
@@ -679,5 +682,42 @@ public class UrlFunctions {
       url = cutURLParameter(url, name);
     }
     return url;
+  }
+
+  /// Decodes the `%XX` escapes in one query parameter the same way `URI.getQuery()` does. Unlike `URLDecoder`, it
+  /// keeps `+` as is.
+  ///
+  /// The query has to be split on `&` and `=` before decoding. Otherwise an escaped `%26` or `%3D` inside a value,
+  /// such as an encoded redirect URL, would be read as a separator.
+  private static String decodeQueryPart(String part) {
+    return URLDecoder.decode(part.replace("+", "%2B"), StandardCharsets.UTF_8);
+  }
+
+  /// Builds a URL from the raw (still percent-encoded) components of `uri`. The multi-argument `URI` constructors
+  /// take decoded components and do not encode `&`, `=`, `/` or `?` again, so rebuilding from decoded components
+  /// would turn escaped separators into real ones.
+  private static String buildUrl(URI uri, @Nullable String rawAuthority, @Nullable String rawQuery,
+      @Nullable String rawFragment) {
+    if (uri.isOpaque()) {
+      // e.g. "mailto:" URLs have no authority, path or query to rebuild from, so they are returned unchanged
+      return uri.toString();
+    }
+    StringBuilder result = new StringBuilder();
+    if (uri.getScheme() != null) {
+      result.append(uri.getScheme()).append(':');
+    }
+    if (rawAuthority != null) {
+      result.append("//").append(rawAuthority);
+    }
+    if (uri.getRawPath() != null) {
+      result.append(uri.getRawPath());
+    }
+    if (rawQuery != null) {
+      result.append('?').append(rawQuery);
+    }
+    if (rawFragment != null) {
+      result.append('#').append(rawFragment);
+    }
+    return result.toString();
   }
 }
