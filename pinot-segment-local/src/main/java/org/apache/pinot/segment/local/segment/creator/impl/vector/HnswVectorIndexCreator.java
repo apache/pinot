@@ -124,9 +124,9 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
       indexDirectory = FSDirectory.open(_hnswIndexDir.toPath());
       LOGGER.info("Creating HNSW index for column: {} at path: {} with {} for segment: {}", column,
           _hnswIndexDir.getAbsolutePath(), vectorIndexConfig.getProperties(), segmentIndexDir.getAbsolutePath());
-        indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig,
-            _mergeExecutor != null ? _buildThreads : 1, _mergeExecutor,
-            vectorIndexConfig.isMmapGraphOnMerge() ? _segmentIndexDir.toPath() : null));
+      indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig,
+          _mergeExecutor != null ? _buildThreads : 1, _mergeExecutor,
+          vectorIndexConfig.isMmapGraphOnMerge() ? _segmentIndexDir.toPath() : null));
     } catch (Exception e) {
       // IndexWriter does not close the Directory passed to it, so both need to be closed.
       try {
