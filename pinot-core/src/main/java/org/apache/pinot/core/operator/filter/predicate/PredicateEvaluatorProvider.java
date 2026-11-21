@@ -66,6 +66,7 @@ public class PredicateEvaluatorProvider {
 
   private static PredicateEvaluator buildEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType, @Nullable QueryContext queryContext, @Nullable DataSource dataSource) {
+    validatePredicate(predicate, dataType);
     try {
       if (dictionary != null) {
         // dictionary based predicate evaluators
@@ -129,6 +130,33 @@ public class PredicateEvaluatorProvider {
       // Exception here is caused by mismatch between the column data type and the predicate value in the query
       throw new BadQueryRequestException(e);
     }
+  }
+
+  /// Validates predicate operations that depend only on the logical column type. This is also called before segment
+  /// pruning so invalid raw VARIANT filters cannot be hidden by an all-segments-pruned result.
+  public static void validatePredicate(Predicate predicate, DataType dataType) {
+    if (dataType != DataType.VARIANT) {
+      return;
+    }
+    String operation;
+    switch (predicate.getType()) {
+      case IN:
+      case NOT_IN:
+        operation = "IN";
+        break;
+      case EQ:
+      case NOT_EQ:
+      case RANGE:
+        operation = "comparison";
+        break;
+      case REGEXP_LIKE:
+        operation = predicate.getType().name();
+        break;
+      default:
+        return;
+    }
+    throw new BadQueryRequestException(new IllegalArgumentException(
+        "Raw VARIANT values do not support " + operation + "; extract a typed path with variantGet first"));
   }
 
   /// Returns the column dictionary if the planner can actually use it for filtering this specific predicate, otherwise

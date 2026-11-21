@@ -60,6 +60,10 @@ public class DistinctExecutorFactory {
       ExpressionContext expression = expressions.get(0);
       ColumnContext columnContext = projectOperator.getResultColumnContext(expression);
       DataType dataType = columnContext.getDataType();
+      if (dataType == DataType.VARIANT) {
+        throw new IllegalArgumentException(
+            "Raw VARIANT values do not support DISTINCT; extract a typed path with variantGet first");
+      }
       OrderByExpressionContext orderByExpression;
       if (orderByExpressions != null) {
         assert orderByExpressions.size() == 1;
@@ -107,6 +111,10 @@ public class DistinctExecutorFactory {
       for (int i = 0; i < numExpressions; i++) {
         ExpressionContext expression = expressions.get(i);
         ColumnContext columnContext = projectOperator.getResultColumnContext(expression);
+        if (columnContext.getDataType() == DataType.VARIANT) {
+          throw new IllegalArgumentException(
+              "Raw VARIANT values do not support DISTINCT; extract a typed path with variantGet first");
+        }
         if (!columnContext.isSingleValue()) {
           hasMVExpression = true;
         }
