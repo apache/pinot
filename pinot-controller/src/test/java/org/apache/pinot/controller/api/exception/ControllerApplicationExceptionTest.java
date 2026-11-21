@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.controller.api.exception;
 
+import java.io.IOException;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException.ExceptionLogMode;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.Logger;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -48,7 +51,9 @@ public class ControllerApplicationExceptionTest {
 
     assertEquals(exception.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
     assertEquals(exception.getMessage(), PUBLIC_MESSAGE);
-    verify(logger).info("{} exception type: {}", PUBLIC_MESSAGE, IllegalArgumentException.class.getName());
+    ArgumentCaptor<Object> description = ArgumentCaptor.forClass(Object.class);
+    verify(logger).info(eq("{} exception type: {}"), eq(PUBLIC_MESSAGE), description.capture());
+    assertTypeOnlyDescription(description.getValue(), IllegalArgumentException.class.getName());
     verifyNoMoreInteractions(logger);
   }
 
@@ -62,8 +67,35 @@ public class ControllerApplicationExceptionTest {
 
     assertEquals(exception.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
     assertEquals(exception.getMessage(), PUBLIC_MESSAGE);
-    verify(logger).error("{} exception type: {}", PUBLIC_MESSAGE, IllegalStateException.class.getName());
+    ArgumentCaptor<Object> description = ArgumentCaptor.forClass(Object.class);
+    verify(logger).error(eq("{} exception type: {}"), eq(PUBLIC_MESSAGE), description.capture());
+    assertTypeOnlyDescription(description.getValue(), IllegalStateException.class.getName());
     verifyNoMoreInteractions(logger);
+  }
+
+  @Test
+  public void testTypeOnlyLoggingNamesTheCauseChainWithoutMessages() {
+    Logger logger = mock(Logger.class);
+    RuntimeException failure = new RuntimeException(SENSITIVE_MESSAGE,
+        new IllegalStateException(SENSITIVE_MESSAGE, new IOException(SENSITIVE_MESSAGE)));
+
+    new ControllerApplicationException(logger, PUBLIC_MESSAGE, Response.Status.INTERNAL_SERVER_ERROR, failure,
+        ExceptionLogMode.TYPE_ONLY);
+
+    ArgumentCaptor<Object> description = ArgumentCaptor.forClass(Object.class);
+    verify(logger).error(eq("{} exception type: {}"), eq(PUBLIC_MESSAGE), description.capture());
+    assertTypeOnlyDescription(description.getValue(), RuntimeException.class.getName() + " caused by "
+        + IllegalStateException.class.getName() + " caused by " + IOException.class.getName());
+    verifyNoMoreInteractions(logger);
+  }
+
+  /// The description starts with the exception types, names the frame that threw the innermost exception (this test),
+  /// and never repeats an exception message.
+  private static void assertTypeOnlyDescription(Object description, String expectedTypes) {
+    String text = String.valueOf(description);
+    assertTrue(text.startsWith(expectedTypes + " at "), text);
+    assertTrue(text.contains(ControllerApplicationExceptionTest.class.getName()), text);
+    assertFalse(text.contains(SENSITIVE_MESSAGE), text);
   }
 
   @Test
