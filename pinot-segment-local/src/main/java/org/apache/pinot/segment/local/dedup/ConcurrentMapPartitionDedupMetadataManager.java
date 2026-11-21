@@ -109,6 +109,32 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   }
 
   @Override
+  public boolean supportsRecordPresenceCheck() {
+    return getClass() == ConcurrentMapPartitionDedupMetadataManager.class;
+  }
+
+  @Override
+  public boolean isRecordPresent(DedupRecordInfo dedupRecordInfo) {
+    if (!startOperation()) {
+      // Stopped managers must not accept a write that we can never claim.
+      return true;
+    }
+    try {
+      Pair<IndexSegment, Double> segmentAndTime = _primaryKeyToSegmentAndTimeMap.get(
+          HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction));
+      if (segmentAndTime == null || isOutOfMetadataTTL(segmentAndTime.getRight())) {
+        // The writer advances the watermark when it successfully claims the new key.
+        return false;
+      }
+      // As in checkRecordPresentOrUpdate(), check TTL before advancing the watermark for a duplicate.
+      updateLargestSeenTime(dedupRecordInfo.getDedupTime());
+      return true;
+    } finally {
+      finishOperation();
+    }
+  }
+
+  @Override
   public boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
     if (!startOperation()) {
       _logger.info("Skip adding record to {} because metadata manager is already stopped",

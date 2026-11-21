@@ -97,6 +97,29 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
   }
 
   @Test
+  public void testPresenceCheckUpdatesWatermarkOnlyAfterClassifyingADuplicate()
+      throws IOException {
+    ConcurrentMapPartitionDedupMetadataManager manager = new ConcurrentMapPartitionDedupMetadataManager(
+        DedupTestUtils.REALTIME_TABLE_NAME, 0, _dedupContextBuilder.setHashFunction(HashFunction.NONE).build());
+    try {
+      PrimaryKey key = DedupTestUtils.getPrimaryKey(0);
+      IndexSegment segment = mock(IndexSegment.class);
+      assertFalse(manager.checkRecordPresentOrUpdate(new DedupRecordInfo(key, 1), segment));
+      double laterTime = METADATA_TTL + 2;
+      assertFalse(manager.isRecordPresent(new DedupRecordInfo(DedupTestUtils.getPrimaryKey(1), laterTime)));
+      assertEquals(manager._largestSeenTime.get(), 1D, "an unclaimed key must leave the watermark intact");
+      assertTrue(manager.isRecordPresent(new DedupRecordInfo(key, laterTime)),
+          "the row is a duplicate at the watermark before this write");
+      assertEquals(manager._largestSeenTime.get(), laterTime);
+      assertFalse(manager.isRecordPresent(new DedupRecordInfo(key, laterTime)),
+          "the old record is outside TTL for the subsequent row");
+    } finally {
+      manager.stop();
+      manager.close();
+    }
+  }
+
+  @Test
   public void testRemoveExpiredPrimaryKeys()
       throws IOException {
     verifyRemoveExpiredPrimaryKeys(HashFunction.NONE);
