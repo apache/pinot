@@ -22,10 +22,12 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidator;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
@@ -42,6 +44,7 @@ import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -123,6 +126,8 @@ public class PinotTableRestletResourceTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
         .addSingleValueDimension("d1", FieldSpec.DataType.STRING).build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
+    tableConfig.setFieldConfigList(List.of(JsonUtils.stringToObject(
+        "{\"name\":\"d1\",\"encodingType\":\"RAW\"}", FieldConfig.class)));
 
     PinotHelixResourceManager helixResourceManager = Mockito.mock(PinotHelixResourceManager.class);
     Mockito.when(helixResourceManager.getTableSchema(tableNameWithType)).thenReturn(schema);
@@ -130,8 +135,13 @@ public class PinotTableRestletResourceTest {
 
     PinotTableRestletResource resource = new PinotTableRestletResource();
     resource._pinotHelixResourceManager = helixResourceManager;
+    resource._controllerConf = new ControllerConf();
+    resource._controllerConf.setProperty(ControllerConf.AUTO_MIGRATE_LEGACY_FIELD_CONFIGS_ENABLED, true);
 
     TableConfigValidator rejecting = (tc, s) -> {
+      FieldConfig migrated = tc.getFieldConfigList().get(0);
+      assertFalse(migrated.hasFieldLevelEncodingType());
+      assertEquals(migrated.getIndexes().path("forward").path("encodingType").asText(), "RAW");
       throw new ConfigValidationException("rejected-by-registry-probe");
     };
     TableConfigValidatorRegistry.register(rejecting);
