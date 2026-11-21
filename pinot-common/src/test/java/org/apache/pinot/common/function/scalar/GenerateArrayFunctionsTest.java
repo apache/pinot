@@ -22,6 +22,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests the `generate*Array` sequence generators, in particular the bounds that keep a literal call from producing
@@ -152,5 +153,88 @@ public class GenerateArrayFunctionsTest {
     assertEquals(ArrayFunctions.generateDoubleArray(0, 0.95, 0.1).length, 10);
     assertEquals(ArrayFunctions.generateDoubleArray(0, 0.2999, 0.1).length, 3);
     assertEquals(ArrayFunctions.generateFloatArray(0f, 0.95f, 0.1f).length, 10);
+  }
+
+  @Test
+  public void testDecimalStepsKeepEndDespiteRounding() {
+    assertEquals(ArrayFunctions.generateDoubleArray(0.1, 0.7, 0.1).length, 7);
+    assertEquals(ArrayFunctions.generateDoubleArray(0.7, 0.1, -0.1).length, 7);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.3, 0.1).length, 4);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.6, 0.1).length, 7);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.7, 0.1).length, 8);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.9, 0.3).length, 4);
+
+    assertEquals(ArrayFunctions.generateFloatArray(0.1f, 0.7f, 0.1f).length, 7);
+    assertEquals(ArrayFunctions.generateFloatArray(0.7f, 0.1f, -0.1f).length, 7);
+    assertEquals(ArrayFunctions.generateFloatArray(0, 0.3f, 0.1f).length, 4);
+    assertEquals(ArrayFunctions.generateFloatArray(0, 0.6f, 0.1f).length, 7);
+    assertEquals(ArrayFunctions.generateFloatArray(0, 0.7f, 0.1f).length, 8);
+    assertEquals(ArrayFunctions.generateFloatArray(0, 0.9f, 0.3f).length, 4);
+
+    // The tolerance scales with the magnitude of the input values.
+    assertEquals(ArrayFunctions.generateDoubleArray(1e6 + 0.1, 1e6 + 0.3, 0.1).length, 3);
+  }
+
+  @Test
+  public void testFractionalStepIsNotPromotedToWholeStep() {
+    // The step count is exactly 0.75 with no rounding error, and the bounds can tell 1000000.75 from 1000000, so the
+    // range holds its start only.
+    assertEquals(ArrayFunctions.generateFloatArray(1000000f, 1000000.75f, 1f), new float[]{1000000f});
+
+    // Exactly 1.5 steps at a magnitude where one ulp of the bounds is about an eighth of the step. The step at 1.5
+    // is genuinely beyond the end, so only the two values up to 1e15 + 1 may be generated.
+    assertEquals(ArrayFunctions.generateDoubleArray(1e15, 1e15 + 1.5, 1d), new double[]{1e15, 1e15 + 1});
+
+    // Ordinary magnitudes: the tolerance used to grow with the bounds until it swallowed a quarter of a step.
+    assertEquals(ArrayFunctions.generateDoubleArray(1.0, 1.5, 1d), new double[]{1.0});
+    assertEquals(ArrayFunctions.generateFloatArray(0.5f, 2.0f, 0.25f).length, 7);
+  }
+
+  @Test
+  public void testFloatDecimalStepDoesNotOvershootEnd() {
+    // In float, (91322.45 - 91321.76) / 0.09 is 7.7257, and no step lands on the end: the last one below it is
+    // 91322.39. Snapping the step count to 8 added 91322.48, three float ulps past the end.
+    float[] values = ArrayFunctions.generateFloatArray(91321.76f, 91322.45f, 0.09f);
+    assertEquals(values.length, 8);
+    assertEquals(values[7], 91322.39f);
+    assertTrue(values[7] < 91322.45f);
+
+    // An ordinary fractional step: 6 steps, ending exactly on the last bound.
+    assertEquals(ArrayFunctions.generateFloatArray(0.5f, 2.0f, 0.25f),
+        new float[]{0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f});
+
+    // A step far below the spacing of the bounds cannot be represented, so the sequence is just the start.
+    assertEquals(ArrayFunctions.generateFloatArray(200000f, 200000.7f, 1f), new float[]{200000f});
+  }
+
+  @Test
+  public void testEndExactlyOnStepIsKept() {
+    // (163909.03 - 163443.44) / 9.7 is 47.9994, so flooring the step count drops the end. In float the 48th element
+    // is 163909.03, exactly the bound, so the sequence has to keep it.
+    float[] values = ArrayFunctions.generateFloatArray(163443.44f, 163909.03f, 9.7f);
+    assertEquals(values.length, 49);
+    assertEquals(values[48], 163909.03f);
+  }
+
+  @Test
+  public void testFloatStepCountAtLargeMagnitude() {
+    // At 1e6 a float holds about an eighth of a step, so the quotient is nearly a whole step away from its exact
+    // count in a way the bounds cannot settle. Twelve steps of 6.9 is 82.8, and 82.8 is the width of the range.
+    float[] values = ArrayFunctions.generateFloatArray(1048558.1f, 1048889.3f, 6.9f);
+    assertEquals(values.length, 48);
+    assertEquals(values[47], 1048882.4f);
+    assertTrue(values[47] < 1048889.3f);
+  }
+
+  @Test
+  public void testDoubleDecimalStepAtLargeMagnitude() {
+    // A tenth at 1e15 is smaller than the spacing of the bounds, so the step count has to come from the values the
+    // arguments denote rather than from their binary expansion.
+    double[] values = ArrayFunctions.generateDoubleArray(1e15, 1e15 + 1.0, 0.1);
+    assertEquals(values.length, 11);
+    assertEquals(values[10], 1e15 + 1.0);
+
+    assertEquals(ArrayFunctions.generateDoubleArray(1e9, 1e9 + 0.3, 0.1).length, 4);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 1e6, 1e3).length, 1001);
   }
 }
