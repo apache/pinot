@@ -28,6 +28,9 @@ import org.apache.pinot.common.utils.ServiceStatus;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ValidDocIdsBitmapResponse {
+  /// A true value on a 404 identifies a loaded segment whose requested snapshot is absent.
+  public static final String MISSING_SNAPSHOT_HEADER = "X-Pinot-Missing-Valid-Doc-Ids-Snapshot";
+
   private final String _segmentName;
   private final String _segmentCrc;
   // Server's data CRC (forward index + dictionary checksum); null when the server doesn't report it.
