@@ -134,7 +134,7 @@ public class HttpSegmentFetcherTest {
   public void testFetchUntarSegmentToLocalStreamedSucceedAtFirstAttempt()
       throws Exception {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
-    when(client.downloadUntarFileStreamed(any(), any(), any(), any(), anyLong(), anyInt(), anyInt())).thenReturn(
+    when(client.downloadUntarSegmentStreamed(any(), any(), any(), any(), anyLong(), anyInt(), anyInt())).thenReturn(
         SEGMENT_FILE);
     HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
     List<URI> uris = List.of(new URI("http://h1:8080"), new URI("http://h2:8080"));
@@ -147,7 +147,7 @@ public class HttpSegmentFetcherTest {
       throws Exception {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
     // All attempts failed
-    when(client.downloadUntarFileStreamed(any(), any(), any(), any(), anyLong(), anyInt(), anyInt())).thenThrow(
+    when(client.downloadUntarSegmentStreamed(any(), any(), any(), any(), anyLong(), anyInt(), anyInt())).thenThrow(
         new IOException("Failed to download"));
     HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
     List<URI> uris = List.of(new URI("http://h1:8080"), new URI("http://h2:8080"));
@@ -159,7 +159,7 @@ public class HttpSegmentFetcherTest {
       throws Exception {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
     // The first two attempts failed and the last attempt succeeded
-    when(client.downloadUntarFileStreamed(any(), any(), any(), any(), anyLong(), anyInt(), anyInt())).thenThrow(
+    when(client.downloadUntarSegmentStreamed(any(), any(), any(), any(), anyLong(), anyInt(), anyInt())).thenThrow(
         new IOException("Failed to download")).thenThrow(new IOException("Failed to download"))
         .thenReturn(SEGMENT_FILE);
     HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
@@ -172,7 +172,7 @@ public class HttpSegmentFetcherTest {
   public void testFetchUntarSegmentToLocalStreamedFailureWithNoPeerServers()
       throws Exception {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
-    when(client.downloadUntarFileStreamed(any(), any(), any(), any(), anyLong(), anyInt(), anyInt())).thenReturn(
+    when(client.downloadUntarSegmentStreamed(any(), any(), any(), any(), anyLong(), anyInt(), anyInt())).thenReturn(
         SEGMENT_FILE);
     HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
     List<URI> uris = List.of();
