@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.zip.Adler32;
 import java.util.zip.Checksum;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,21 +43,49 @@ public class CrcUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(CrcUtils.class);
   private static final int BUFFER_SIZE = 65536;
   private static final String CRC_FILE_EXTENSTION = ".crc";
-  private static final List<String> DATA_FILE_EXTENSIONS = Arrays.asList(".fwd", ".dict");
+  private static final List<String> DATA_FILE_EXTENSIONS_V1 = Arrays.asList(".fwd", ".dict");
+  // Null vectors count as data in version 2, because a null is stored as the default value in the forward index
+  private static final List<String> DATA_FILE_EXTENSIONS_V2 =
+      Arrays.asList(".fwd", ".dict", V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
 
+  private static volatile int _defaultDataCrcVersion = V1Constants.DataCrc.VERSION_1;
+
+  /// Sets the data CRC version used for segments built in this JVM.
+  public static void setDefaultDataCrcVersion(int dataCrcVersion) {
+    _defaultDataCrcVersion = validateDataCrcVersion(dataCrcVersion);
+  }
+
+  public static int getDefaultDataCrcVersion() {
+    return _defaultDataCrcVersion;
+  }
 
   public static long computeCrc(File indexDir) throws IOException {
     List<File> allNormalFiles = new ArrayList<>();
-    collectFiles(indexDir, allNormalFiles, false);
+    collectFiles(indexDir, allNormalFiles, null);
     Collections.sort(allNormalFiles);
     return crcForFiles(allNormalFiles);
   }
 
   public static long computeDataCrc(File indexDir) throws IOException {
+    return computeDataCrc(indexDir, V1Constants.DataCrc.VERSION_1);
+  }
+
+  /// Computes the data CRC with the given version. Version 2 equals version 1 when the segment has no null vectors.
+  public static long computeDataCrc(File indexDir, int dataCrcVersion) throws IOException {
+    List<String> dataFileExtensions =
+        validateDataCrcVersion(dataCrcVersion) == V1Constants.DataCrc.VERSION_1 ? DATA_FILE_EXTENSIONS_V1
+            : DATA_FILE_EXTENSIONS_V2;
     List<File> dataFiles = new ArrayList<>();
-    collectFiles(indexDir, dataFiles, true);
+    collectFiles(indexDir, dataFiles, dataFileExtensions);
     Collections.sort(dataFiles);
     return crcForFiles(dataFiles);
+  }
+
+  private static int validateDataCrcVersion(int dataCrcVersion) {
+    Preconditions.checkArgument(
+        dataCrcVersion >= V1Constants.DataCrc.VERSION_1 && dataCrcVersion <= V1Constants.DataCrc.LATEST_VERSION,
+        "Unsupported data CRC version: %s", dataCrcVersion);
+    return dataCrcVersion;
   }
 
   /// Helper method to get files in the directory to later compute CRC for them.
@@ -64,8 +93,8 @@ public class CrcUtils {
   /// NOTE: do not include the segment creation meta file.
   /// @param dir the directory to collect files from
   /// @param files the list to add collected files to
-  /// @param dataFilesOnly if true, only collect data files (.fwd, .dict); if false, collect all normal files
-  private static void collectFiles(File dir, List<File> files, boolean dataFilesOnly) {
+  /// @param dataFileExtensions if not null, only collect files with these extensions; if null, collect all normal files
+  private static void collectFiles(File dir, List<File> files, @Nullable List<String> dataFileExtensions) {
     File[] dirFiles = dir.listFiles();
     Preconditions.checkNotNull(dirFiles);
     for (File file : dirFiles) {
@@ -74,9 +103,9 @@ public class CrcUtils {
         // Certain file systems, e.g. HDFS will create .crc files when perform data copy.
         // We should ignore both SEGMENT_CREATION_META and generated '.crc' files.
         if (!fileName.equals(V1Constants.SEGMENT_CREATION_META) && !fileName.endsWith(CRC_FILE_EXTENSTION)) {
-          if (dataFilesOnly) {
+          if (dataFileExtensions != null) {
             // Only add data files
-            if (isDataFile(fileName)) {
+            if (isDataFile(fileName, dataFileExtensions)) {
               files.add(file);
             }
           } else {
@@ -85,14 +114,13 @@ public class CrcUtils {
           }
         }
       } else {
-        collectFiles(file, files, dataFilesOnly);
+        collectFiles(file, files, dataFileExtensions);
       }
     }
   }
 
-  /// Determines if a file is considered a "Data File" (one of ".fwd", ".dict" file types).
-  private static boolean isDataFile(String fileName) {
-    for (String ext : DATA_FILE_EXTENSIONS) {
+  private static boolean isDataFile(String fileName, List<String> dataFileExtensions) {
+    for (String ext : dataFileExtensions) {
       if (fileName.endsWith(ext)) {
         return true;
       }

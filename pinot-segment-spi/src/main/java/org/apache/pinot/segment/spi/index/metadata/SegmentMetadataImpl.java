@@ -103,6 +103,7 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   private String _creatorName;
   private long _crc = Long.MIN_VALUE;
   private long _dataCrc = Long.MIN_VALUE;
+  private int _dataCrcVersion = V1Constants.DataCrc.VERSION_1;
   private long _creationTime = Long.MIN_VALUE;
   private long _zkCreationTime = Long.MIN_VALUE;  // ZooKeeper creation time for upsert consistency
   private long _zkPushTime = Long.MIN_VALUE; // ZooKeeper push time for upsert consistency
@@ -217,6 +218,7 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
     _creatorName = mapped._creatorName;
     _crc = mapped._crc;
     _dataCrc = mapped._dataCrc;
+    _dataCrcVersion = mapped._dataCrcVersion;
     _creationTime = mapped._creationTime;
     _zkCreationTime = mapped._zkCreationTime;
     _zkPushTime = mapped._zkPushTime;
@@ -367,18 +369,11 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   private void loadCreationMeta(File crcFile)
       throws IOException {
     if (crcFile.exists()) {
-      try (DataInputStream ds = new DataInputStream(new FileInputStream(crcFile))) {
-        _crc = ds.readLong();
-        _creationTime = ds.readLong();
-        try {
-          _dataCrc = ds.readLong();
-        } catch (IOException e) {
-          LOGGER.debug("Could not find data crc, falling back to default LONG_MIN value");
-        }
-      }
+      loadCreationMeta(new FileInputStream(crcFile));
     }
   }
 
+  /// Reads the creation meta: CRC, creation time, then optionally the data CRC and its version (absent for version 1).
   private void loadCreationMeta(InputStream crcFileInputStream)
       throws IOException {
     try (DataInputStream ds = new DataInputStream(crcFileInputStream)) {
@@ -388,6 +383,12 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
         _dataCrc = ds.readLong();
       } catch (IOException e) {
         LOGGER.debug("Could not find data crc, falling back to default LONG_MIN value");
+        return;
+      }
+      try {
+        _dataCrcVersion = ds.readInt();
+      } catch (IOException e) {
+        LOGGER.debug("Could not find data crc version, falling back to version 1");
       }
     }
   }
@@ -574,6 +575,11 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   @Override
   public long getDataCrc() {
     return _dataCrc;
+  }
+
+  @Override
+  public int getDataCrcVersion() {
+    return _dataCrcVersion;
   }
 
   @Override
@@ -824,6 +830,9 @@ public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
     segmentMetadata.put("crc", _crc);
     if (_dataCrc != Long.MIN_VALUE) {
       segmentMetadata.put("dataCrc", _dataCrc);
+      if (_dataCrcVersion != V1Constants.DataCrc.VERSION_1) {
+        segmentMetadata.put("dataCrcVersion", _dataCrcVersion);
+      }
     }
     segmentMetadata.put("creationTimeMillis", _creationTime);
     TimeZone timeZone = TimeZone.getTimeZone("UTC");
