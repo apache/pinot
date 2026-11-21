@@ -2758,6 +2758,9 @@
                 <!-- Knowledge base (not source code) -->
                 <exclude>kb/**</exclude>
 
+                <!-- Developer documentation (Markdown pages start with YAML front matter) -->
+                <exclude>docs/dev/**</exclude>
+
                 <!-- GenAI Config files -->
                 <exclude>.claude/**</exclude>
                 <exclude>.codex/**</exclude>
@@ -2883,6 +2886,9 @@
 
             <!-- Knowledge base (not source code) -->
             <exclude>kb/**</exclude>
+
+            <!-- Developer documentation (Markdown pages start with YAML front matter) -->
+            <exclude>docs/dev/**</exclude>
 
             <!-- GenAI Config files -->
             <exclude>**/.claude/**</exclude>

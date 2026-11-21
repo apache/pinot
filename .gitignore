@@ -129,3 +129,6 @@ hf_cache/
 __pycache__/
 *.py[cod]
 .bench-compare/
+
+# Zensical build output (developer documentation)
+/site/

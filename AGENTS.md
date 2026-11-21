@@ -36,7 +36,7 @@ repo. It is intentionally short and focused on day-to-day work.
 - pinot-minion: background tasks (segment conversion, purge, etc).
 - pinot-common / pinot-spi: shared utils, config, and SPI interfaces.
 - pinot-segment-local / pinot-segment-spi: segment generation, indexes, storage.
-- pinot-query-planner / pinot-query-runtime: multi-stage query (MSQ) engine.
+- pinot-query-planner / pinot-query-runtime: multi-stage query engine (MSE).
 - pinot-connectors: external tooling to connect to Pinot
 - pinot-plugins: all pinot plugins.
 - pinot-tools: CLI and quickstart scripts.
@@ -105,6 +105,22 @@ compiler warning checks are needed. Fix failures within the authorized scope; do
 - `README.md` for build and quickstart details.
 - `CONTRIBUTING.md` for style, licensing, and contribution guidance.
 
+## Developer documentation (how Pinot works)
+`docs/dev/` explains how Pinot works internally: components, data flow, invariants, and gotchas.
+Before you change a component, read its page if one exists. Start at [docs/dev/index.md](docs/dev/index.md).
+Each page starts with YAML front matter. Read `summary` and `key_classes` to decide if the page is relevant.
+
+| Topic | Page |
+|---|---|
+| Terms and abbreviations (MSE, SSE, stage, worker, routing table) | [docs/dev/glossary.md](docs/dev/glossary.md) |
+| Which servers execute a query (overview) | [docs/dev/routing/index.md](docs/dev/routing/index.md) |
+| Routing entry, segment pruning, instance selection, hybrid time boundary | [docs/dev/routing/routing-table.md](docs/dev/routing/routing-table.md) |
+| MSE worker assignment (`WorkerManager`) | [docs/dev/routing/mse-worker-assignment.md](docs/dev/routing/mse-worker-assignment.md) |
+
+If the code differs from a page, the code is correct. Update the page in the same change.
+To write or update a page, follow [docs/dev/contributing-to-dev-docs.md](docs/dev/contributing-to-dev-docs.md)
+and [kb/skills/verify-dev-doc.md](kb/skills/verify-dev-doc.md).
+
 ## Knowledge base (tool-neutral)
 The `kb/` directory holds AI-optimized procedures and reference material that any
 coding agent (Claude Code, Copilot, Cursor, GPT, Qwen, Gemini, etc.) can read.
@@ -116,7 +132,7 @@ should read kb/ directly.
   [`kb/skills/README.md`](kb/skills/README.md) for the index. Each file is
   self-contained; read it and follow it when your task matches the skill name.
   - Operations: `precommit`, `run-test`, `quickstart`, `bench-compare`,
-    `flaky-analyze`.
+    `flaky-analyze`, `verify-dev-doc`.
   - Review (eight domains, one per file): `review-config-backcompat`,
     `review-concurrency-state`, `review-architecture`, `review-performance`,
     `review-correctness-nulls`, `review-testing`, `review-naming-api`,

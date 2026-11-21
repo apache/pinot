@@ -41,6 +41,9 @@ Apache Pinot is a real-time distributed OLAP datastore for low-latency analytics
 
 When locating a plugin implementation, consult [kb/plugin-modules.md](kb/plugin-modules.md).
 
+To learn how a component works before you change it, read its page in [docs/dev/](docs/dev/index.md).
+The topic index is in [AGENTS.md](AGENTS.md#developer-documentation-how-pinot-works).
+
 ## Build commands
 Use [AGENTS.md](AGENTS.md#build-and-test) for the build JDK, artifact bytecode targets, and scoped build/test commands.
 Use [kb/skills/run-test.md](kb/skills/run-test.md) for targeted tests and
