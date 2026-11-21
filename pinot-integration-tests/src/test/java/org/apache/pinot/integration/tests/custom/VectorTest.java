@@ -207,7 +207,8 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     for (int i = 0; i < topK; i++) {
       double dist1 = jsonNode1.get("resultTable").get("rows").get(i).get(0).asDouble();
       double dist2 = jsonNode2.get("resultTable").get("rows").get(i).get(0).asDouble();
-      assertEquals(dist1, dist2);
+      // query1 takes the distances from the COSINE index search, in single precision
+      assertEquals(dist1, dist2, 1e-5);
     }
   }
 
