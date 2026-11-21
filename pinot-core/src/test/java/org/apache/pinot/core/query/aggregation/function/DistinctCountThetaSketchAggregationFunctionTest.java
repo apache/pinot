@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.Constants;
@@ -31,10 +32,32 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
 public class DistinctCountThetaSketchAggregationFunctionTest {
+  @Test
+  public void testMergeWithAnEmptyIntermediatePreservesThePopulatedSketch() {
+    ExpressionContext expression = ExpressionContext.forIdentifier("col");
+    DistinctCountThetaSketchAggregationFunction function =
+        new DistinctCountThetaSketchAggregationFunction(List.of(expression), false);
+    AggregationResultHolder populatedHolder = function.createAggregationResultHolder();
+    function.aggregate(3, populatedHolder,
+        Map.of(expression, SyntheticBlockValSets.Int.create(null, new int[]{11, 22, 11})));
+    var populated = function.extractAggregationResult(populatedHolder);
+    var empty = function.extractAggregationResult(function.createAggregationResultHolder());
+
+    var merged = function.merge(populated, empty);
+    assertEquals(merged.size(), 1);
+    assertSame(merged.get(0), populated.get(0));
+    assertEquals(((Number) function.extractFinalResult(merged)).longValue(), 2L);
+    assertEquals(((Number) function.extractFinalResult(empty)).longValue(), 0L);
+
+    var reverse = function.merge(empty, populated);
+    assertSame(reverse.get(0), populated.get(0));
+    assertEquals(((Number) function.extractFinalResult(reverse)).longValue(), 2L);
+  }
 
   @Test
   public void testCanUseStarTreeDefaultK() {

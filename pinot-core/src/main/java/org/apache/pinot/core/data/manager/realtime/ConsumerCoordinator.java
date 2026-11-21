@@ -182,7 +182,7 @@ public class ConsumerCoordinator {
             updateReadinessWaiters(partitionGroupId, 1);
           }
           if (releaseVersion == _releaseVersion && !shouldStop.getAsBoolean()) {
-            _readinessMonitor.wait(waitMs);
+            waitBeforeReadinessCheck(waitMs);
           }
         }
       }
@@ -194,6 +194,13 @@ public class ConsumerCoordinator {
         }
       }
     }
+  }
+
+  /// Called under _readinessMonitor so a consumer release can wake the next readiness check.
+  @VisibleForTesting
+  void waitBeforeReadinessCheck(long waitMs)
+      throws InterruptedException {
+    _readinessMonitor.wait(waitMs);
   }
 
   /// Stops the wait if the segment should no longer be consumed; otherwise reports how long the consumer has waited

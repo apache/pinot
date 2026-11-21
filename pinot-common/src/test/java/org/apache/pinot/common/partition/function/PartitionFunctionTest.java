@@ -786,6 +786,18 @@ public class PartitionFunctionTest {
   }
 
   @Test
+  public void testMurmur3X64ThreeByteStringTail() {
+    // Exercise a three-byte tail both alone and after a full 16-byte block.
+    for (String value : new String[]{"123", "abcdefghijklmnop123"}) {
+      byte[] bytes = value.getBytes(UTF_8);
+      for (int seed : new int[]{0, 12345}) {
+        assertEquals(MurmurHashFunctions.murmurHash3X64Bit32(value, seed),
+            MurmurHashFunctions.murmurHash3X64Bit32(bytes, seed));
+      }
+    }
+  }
+
+  @Test
   public void testMurmur3PartitionFunctionEquivalence() {
 
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100

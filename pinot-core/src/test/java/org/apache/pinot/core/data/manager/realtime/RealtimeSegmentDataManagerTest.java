@@ -103,6 +103,7 @@ import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.RetriableDecodeException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -149,6 +150,45 @@ import static org.testng.Assert.assertTrue;
 
 // TODO Re-write this test using the stream abstraction
 public class RealtimeSegmentDataManagerTest {
+  @Test
+  public void testUnsuccessfulAdmissionDoesNotStartConsumption()
+      throws Exception {
+    for (boolean stopped : new boolean[]{false, true}) {
+      TableConfig table = createTableConfig();
+      RealtimeTableDataManager tableManager = createTableDataManager(table);
+      ConsumerCoordinator coordinator = mock(ConsumerCoordinator.class);
+      BooleanSupplier ready = mock(BooleanSupplier.class);
+      AtomicBoolean stopRequested = new AtomicBoolean();
+      doAnswer(invocation -> {
+        BooleanSupplier shouldStop = invocation.getArgument(2);
+        stopRequested.set(shouldStop.getAsBoolean());
+        if (stopRequested.get()) {
+          return false;
+        }
+        throw new ConsumerCoordinator.ShouldNotConsumeException("segment no longer needs consumption");
+      }).when(coordinator).acquire(eq(SEGMENT_NAME), same(ready), any());
+      RealtimeSegmentDataManager manager = new RealtimeSegmentDataManager(createZkMetadata(), table, tableManager,
+          new File(TEMP_DIR, "readiness").getAbsolutePath(),
+          new IndexLoadingConfig(FakeRealtimeSegmentDataManager.makeInstanceDataManagerConfig(), table),
+          Fixtures.createSchema(), SEGMENT_NAME, coordinator, mock(ServerMetrics.class), null, null, ready);
+      try {
+        if (stopped) {
+          manager.stop();
+        }
+        manager.new PartitionConsumer().run();
+        assertEquals(stopRequested.get(), stopped);
+        verify(coordinator).acquire(eq(SEGMENT_NAME), same(ready), any());
+        verify(ready, never()).getAsBoolean();
+        verify(coordinator, never()).register(any());
+        verify(coordinator, never()).release();
+        assertEquals(manager.getCurrentOffset().compareTo(START_OFFSET), 0);
+        assertEquals(manager.getSegment().getNumDocsIndexed(), 0);
+      } finally {
+        manager.destroy();
+      }
+    }
+  }
+
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "RealtimeSegmentDataManagerTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
@@ -2001,6 +2041,58 @@ public class RealtimeSegmentDataManagerTest {
     Field field = RealtimeSegmentDataManager.class.getDeclaredField("_hasMessagesFetched");
     field.setAccessible(true);
     field.set(segmentDataManager, hasMessagesFetched);
+  }
+
+  @Test
+  public void testNullLocalBuildDoesNotReplaceTheConsumingSegment()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager manager = createFakeSegmentManager()) {
+      manager._useRealBuildAndReplace = true;
+      manager._failSegmentBuild = true;
+      assertFalse(manager.buildSegmentAndReplace(null));
+      assertTrue(manager._buildSegmentCalled);
+      verify(manager.getTableDataManager(), never()).replaceConsumingSegment(anyString(), any());
+      manager._failSegmentBuild = false;
+      assertTrue(manager.buildSegmentAndReplace(null));
+      verify(manager.getTableDataManager()).replaceConsumingSegment(eq(SEGMENT_NAME_STR), any(SegmentZKMetadata.class));
+    }
+  }
+
+  @Test
+  public void testIdleEmptyBatchCheckpointsAndRecreatesTheConsumer()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager manager = createFakeSegmentManager()) {
+      manager._stubConsumeLoop = false;
+      manager._state.set(manager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      IdleTimer idleTimer = mock(IdleTimer.class);
+      when(idleTimer.getTimeSinceStreamLastCreatedOrConsumedMs()).thenReturn(TimeUnit.MINUTES.toMillis(4));
+      MessageBatch<?> empty = mock(MessageBatch.class);
+      PartitionGroupConsumer original = mock(PartitionGroupConsumer.class);
+      PartitionGroupConsumer replacement = mock(PartitionGroupConsumer.class);
+      when(original.fetchMessages(any(), anyInt())).thenReturn(empty);
+      StreamPartitionMsgOffset offset = manager.getCurrentOffset();
+      when(original.checkpoint(any())).thenAnswer(invocation -> {
+        manager._shouldStop.set(manager, true);
+        return invocation.getArgument(0);
+      });
+      StreamConsumerFactory factory = mock(StreamConsumerFactory.class);
+      when(factory.createPartitionGroupConsumer(anyString(), any(), any())).thenReturn(replacement);
+      Map<String, Object> replacements = Map.of("_idleTimer", idleTimer, "_partitionGroupConsumer", original,
+          "_streamConsumerFactory", factory);
+      for (Map.Entry<String, Object> entry : replacements.entrySet()) {
+        Field field = RealtimeSegmentDataManager.class.getDeclaredField(entry.getKey());
+        field.setAccessible(true);
+        field.set(manager, entry.getValue());
+      }
+
+      assertTrue(manager.consumeLoop());
+      assertEquals(manager.getCurrentOffset(), offset);
+      assertEquals(manager.getSegment().getNumDocsIndexed(), 0);
+      verify(original).checkpoint(offset);
+      verify(original).close();
+      verify(replacement).start(offset);
+      verify(idleTimer).markStreamCreated();
+    }
   }
 
   // If commit fails, make sure that we do not re-build the segment when we try to commit again.

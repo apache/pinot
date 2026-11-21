@@ -36,9 +36,32 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotSame;
+import static org.testng.Assert.assertSame;
 
 
 public class ArrayLiteralTransformFunctionTest {
+  @Test
+  public void testFloatArrayResultReusesCapacityAndGrowsForLargerBlocks() {
+    ArrayLiteralTransformFunction function = new ArrayLiteralTransformFunction(List.of(
+        ExpressionContext.forLiteral(DataType.FLOAT, 1.25f),
+        ExpressionContext.forLiteral(DataType.FLOAT, -2.5f)));
+    when(_projectionBlock.getNumDocs()).thenReturn(2);
+    float[][] initial = function.transformToFloatValuesMV(_projectionBlock);
+    assertEquals(initial.length, 2);
+    assertEquals(initial[0], new float[]{1.25f, -2.5f});
+    when(_projectionBlock.getNumDocs()).thenReturn(1);
+    assertSame(function.transformToFloatValuesMV(_projectionBlock), initial);
+    when(_projectionBlock.getNumDocs()).thenReturn(3);
+    float[][] grown = function.transformToFloatValuesMV(_projectionBlock);
+    assertNotSame(grown, initial);
+    assertEquals(grown.length, 3);
+    for (float[] row : grown) {
+      assertEquals(row, new float[]{1.25f, -2.5f});
+    }
+    assertEquals(initial[1], new float[]{1.25f, -2.5f});
+  }
+
   private static final int NUM_DOCS = 100;
   private AutoCloseable _mocks;
 

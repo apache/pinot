@@ -40,6 +40,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.testng.Assert.assertEquals;
 
 
 /// Tests for [FieldSpec].
@@ -279,6 +280,29 @@ public class FieldSpecTest {
 
     timeFieldSpec1.setOutgoingGranularitySpec(outgoingTimeGranularitySpec);
     Assert.assertEquals(timeFieldSpec1, timeFieldSpec2);
+  }
+
+  /// Legacy schema deserialization must keep outgoing metadata authoritative when incoming setters run later.
+  @Test
+  @SuppressWarnings("deprecation") // Exercises the legacy time-field schema compatibility contract.
+  public void testIncomingTimeGranularityPreservesOutgoingMetadata() {
+    TimeGranularitySpec incoming = new TimeGranularitySpec(LONG, TimeUnit.HOURS, "incoming");
+    TimeGranularitySpec outgoing = new TimeGranularitySpec(INT, TimeUnit.DAYS, "outgoing");
+    TimeFieldSpec outgoingFirst = new TimeFieldSpec();
+    outgoingFirst.setOutgoingGranularitySpec(outgoing);
+    outgoingFirst.setIncomingGranularitySpec(incoming);
+    assertEquals(outgoingFirst.getName(), "outgoing");
+    assertEquals(outgoingFirst.getDataType(), INT);
+    assertEquals(outgoingFirst.getIncomingGranularitySpec(), incoming);
+    assertEquals(outgoingFirst.getOutgoingGranularitySpec(), outgoing);
+
+    TimeFieldSpec incomingFirst = new TimeFieldSpec();
+    incomingFirst.setIncomingGranularitySpec(incoming);
+    assertEquals(incomingFirst.getName(), "incoming");
+    assertEquals(incomingFirst.getDataType(), LONG);
+    assertEquals(incomingFirst.getOutgoingGranularitySpec(), incoming);
+    incomingFirst.setOutgoingGranularitySpec(outgoing);
+    assertEquals(incomingFirst, outgoingFirst);
   }
 
   /// Test [DateTimeFieldSpec] constructors.

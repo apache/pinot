@@ -38,7 +38,12 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class ControllerLeaderLocatorTest {
@@ -302,5 +307,38 @@ public class ControllerLeaderLocatorTest {
     void setCurrentTimeMs(long currentTimeMs) {
       _currentTimeMs = currentTimeMs;
     }
+  }
+
+  @Test
+  public void testFirstInvalidationUsesTheRealClockAndRefreshesTheLeader() {
+    HelixManager manager = mock(HelixManager.class);
+    HelixDataAccessor accessor = mock(HelixDataAccessor.class);
+    ConfigAccessor configs = mock(ConfigAccessor.class);
+    ResourceConfig resource = mock(ResourceConfig.class);
+    PropertyKey.Builder builder = mock(PropertyKey.Builder.class);
+    PropertyKey leaderKey = mock(PropertyKey.class);
+    LiveInstance leader = mock(LiveInstance.class);
+    when(manager.getConfigAccessor()).thenReturn(configs);
+    when(configs.getResourceConfig(any(), anyString())).thenReturn(resource);
+    when(resource.getSimpleConfig(anyString())).thenReturn("false");
+    when(manager.getHelixDataAccessor()).thenReturn(accessor);
+    when(accessor.keyBuilder()).thenReturn(builder);
+    when(builder.controllerLeader()).thenReturn(leaderKey);
+    when(accessor.getProperty(leaderKey)).thenReturn(leader);
+    when(leader.getInstanceName()).thenReturn("first_9000");
+
+    // A fresh instance avoids the fake clock and the process-wide locator singleton.
+    ControllerLeaderLocator locator = new ControllerLeaderLocator(manager);
+    assertEquals(locator.getControllerLeader(TEST_TABLE), Pair.of("first", 9000));
+    when(leader.getInstanceName()).thenReturn("replacement_9001");
+    assertEquals(locator.getControllerLeader(TEST_TABLE), Pair.of("first", 9000));
+    long before = System.currentTimeMillis();
+    locator.invalidateCachedControllerLeader();
+    long after = System.currentTimeMillis();
+    assertFalse(locator.isCachedControllerLeaderValid());
+    assertTrue(locator.getLastCacheInvalidationTimeMs() >= Math.min(before, after));
+    assertTrue(locator.getLastCacheInvalidationTimeMs() <= Math.max(before, after));
+    assertEquals(locator.getControllerLeader(TEST_TABLE), Pair.of("replacement", 9001));
+    verify(accessor, times(2)).getProperty(leaderKey);
   }
 }

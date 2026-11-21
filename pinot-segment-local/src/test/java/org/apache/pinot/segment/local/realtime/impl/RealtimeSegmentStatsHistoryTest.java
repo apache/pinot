@@ -20,17 +20,57 @@ package org.apache.pinot.segment.local.realtime.impl;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+
 
 public class RealtimeSegmentStatsHistoryTest {
   private static final String STATS_FILE_NAME = RealtimeSegmentStatsHistoryTest.class.getSimpleName() + ".ser";
+
   private static final String COL1 = "col1";
   private static final String COL2 = "col2";
+
+  @Test
+  public void testStatsRemainUsableAfterPersistenceFailure()
+      throws Exception {
+    File directory = Files.createTempDirectory("segment-stats-save-failure").toFile();
+    try {
+      File historyFile = new File(directory, "missing/history.ser");
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserializeFrom(historyFile);
+      RealtimeSegmentStatsHistory.SegmentStats first = new RealtimeSegmentStatsHistory.SegmentStats();
+      first.setNumRowsIndexed(42);
+      first.setMemUsedBytes(1024);
+      history.addSegmentStats(first);
+
+      assertFalse(historyFile.exists(), "A missing parent directory must make persistence fail");
+      assertEquals(history.getCursor(), 1);
+      assertEquals(history.getLatestSegmentMemoryConsumed(), 1024L);
+      assertEquals(history.getSegmentStatsAt(0).getNumRowsIndexed(), 42);
+
+      Files.createDirectories(historyFile.getParentFile().toPath());
+      RealtimeSegmentStatsHistory.SegmentStats second = new RealtimeSegmentStatsHistory.SegmentStats();
+      second.setNumRowsIndexed(84);
+      second.setMemUsedBytes(2048);
+      history.addSegmentStats(second);
+      assertTrue(historyFile.isFile(), "The next update must persist after the directory is repaired");
+
+      RealtimeSegmentStatsHistory restored = RealtimeSegmentStatsHistory.deserializeFrom(historyFile);
+      assertEquals(restored.getCursor(), 2);
+      assertEquals(restored.getLatestSegmentMemoryConsumed(), 2048L);
+      assertEquals(restored.getSegmentStatsAt(0).getNumRowsIndexed(), 42);
+      assertEquals(restored.getSegmentStatsAt(1).getNumRowsIndexed(), 84);
+    } finally {
+      FileUtils.deleteDirectory(directory);
+    }
+  }
 
   private void addSegmentStats(int segmentId, RealtimeSegmentStatsHistory history) {
     RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();

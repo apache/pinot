@@ -23,23 +23,27 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 
+
+/// Verifies CLP ingestion and querying in the shared cluster; instances run sequentially.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class CLPEncodingRealtimeTest extends CustomDataQueryClusterIntegrationTest {
 
-  private final FieldConfig.CompressionCodec _selectedCompressionCodec =
-      RANDOM.nextBoolean() ? FieldConfig.CompressionCodec.CLP : FieldConfig.CompressionCodec.CLPV2;
+  protected CompressionCodec getCompressionCodec() {
+    return CompressionCodec.CLP;
+  }
 
   @Override
   public String getTableName() {
-    return "CLPEncodingRealtimeTest";
+    return getClass().getSimpleName();
   }
 
   @Override
@@ -109,7 +113,7 @@ public class CLPEncodingRealtimeTest extends CustomDataQueryClusterIntegrationTe
   protected List<FieldConfig> getFieldConfigs() {
     List<FieldConfig> fieldConfigs = new ArrayList<>();
     fieldConfigs.add(new FieldConfig.Builder("logLine").withEncodingType(FieldConfig.EncodingType.RAW)
-        .withCompressionCodec(_selectedCompressionCodec).build());
+        .withCompressionCodec(getCompressionCodec()).build());
     return fieldConfigs;
   }
 
@@ -126,7 +130,7 @@ public class CLPEncodingRealtimeTest extends CustomDataQueryClusterIntegrationTe
   @Test
   public void testValues()
       throws Exception {
-    Assert.assertEquals(getPinotConnection().execute(
+    assertEquals(getPinotConnection().execute(
             "SELECT count(*) FROM " + getTableName() + " WHERE REGEXP_LIKE(logLine, '.*executor.*')").getResultSet(0)
         .getLong(0), 53);
   }

@@ -22,11 +22,19 @@ import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.CountValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
 public class CountStarTreeV2Test extends BaseStarTreeV2Test<Object, Long> {
+
+  @Test
+  public void testNonOverlappingOrRangesWithAnAdditionalPredicate()
+      throws Exception {
+    testQuery(String.format("SELECT COUNT(*) FROM %s WHERE %s != 5 AND (%s < 10 OR %s > 90)",
+        TABLE_NAME, DIMENSION1, DIMENSION1, DIMENSION1));
+  }
 
   @Override
   ValueAggregator<Object, Long> getValueAggregator() {

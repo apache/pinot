@@ -44,6 +44,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
+import org.apache.pinot.integration.tests.BatchedKafkaDataProducer;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
@@ -154,11 +155,13 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
       TableConfig tableConfig = createOfflineTableConfig();
       addTableConfig(tableConfig);
 
-      // create & upload segments
+      // Create all segments before uploading each completed segment once.
       int segmentIndex = 0;
       for (File avroFile : avroFiles) {
         ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex++, _segmentDir,
             _tarDir);
+      }
+      if (!avroFiles.isEmpty()) {
         uploadSegments(getTableName(), _tarDir);
       }
     }
@@ -240,9 +243,11 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   @Override
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
-    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles,
-        _sharedClusterTestSuite.getKafkaBrokerList(), getKafkaTopic(),
-        getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
+    try (BatchedKafkaDataProducer producer = new BatchedKafkaDataProducer(
+        _sharedClusterTestSuite.getKafkaBrokerList(), getMaxNumKafkaMessagesPerBatch())) {
+      ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(),
+          getKafkaMessageHeader(), getPartitionColumn(), injectTombstones(), producer);
+    }
   }
 
   /// Pushes data into Kafka for realtime ingestion. Subclasses using non-Avro formats
