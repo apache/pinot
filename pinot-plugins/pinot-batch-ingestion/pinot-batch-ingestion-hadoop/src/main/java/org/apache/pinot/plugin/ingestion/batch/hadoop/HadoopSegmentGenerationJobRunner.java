@@ -275,10 +275,12 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
         throw new RuntimeException("Job failed: " + job);
       }
 
-      LOGGER.info("Moving segment tars from staging directory [{}] to output directory [{}]", stagingDirURI,
-          outputDirURI);
+      int stagingCopyParallelism = SegmentGenerationJobUtils.getStagingCopyParallelism(
+          _spec.getExecutionFrameworkSpec().getExtraConfigs());
+      LOGGER.info("Moving segment tars from staging directory [{}] to output directory [{}] with parallelism {}",
+          stagingDirURI, outputDirURI, stagingCopyParallelism);
       SegmentGenerationJobUtils.moveFiles(outputDirFS, new Path(stagingDir, SEGMENT_TAR_SUBDIR_NAME).toUri(),
-          outputDirURI, _spec.isOverwriteOutput());
+          outputDirURI, _spec.isOverwriteOutput(), stagingCopyParallelism);
     } finally {
       LOGGER.info("Trying to clean up staging directory: [{}]", stagingDirURI);
       outputDirFS.delete(stagingDirURI, true);
