@@ -387,8 +387,6 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
       throws Exception {
     Properties producerProps = new Properties();
     producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + getKafkaPort());
-    // Each send waits for its acknowledgement, so no other record can join the batch.
-    producerProps.put(ProducerConfig.LINGER_MS_CONFIG, 0);
     producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
         "org.apache.kafka.common.serialization.ByteArraySerializer");
     producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
