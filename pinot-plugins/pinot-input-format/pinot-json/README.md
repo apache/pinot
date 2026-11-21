@@ -27,8 +27,24 @@ This plugin reads JSON records into Pinot. It provides:
 - `JSONRecordReader` — a `RecordReader` for batch ingestion of newline-delimited JSON files.
 - `JSONRecordExtractor` — the shared extractor that turns a parsed JSON object into a Pinot `GenericRow`.
 
-By default the stream decoder reads **UTF-8 text JSON**, exactly as it always has. It can additionally decode
-several **binary** JSON encodings, selected with the `jsonFormat` decoder property described below.
+By default the stream decoder reads **UTF-8 text JSON**. Floating JSON literals are parsed as `BigDecimal` so
+high-precision decimals survive ingestion; integers still narrow to `INT` / `LONG` / `BIG_DECIMAL`. The
+decoder can additionally decode several **binary** JSON encodings, selected with the `jsonFormat` decoder
+property described below.
+
+This precision-preserving parse applies only to **JSON text** (and PostgreSQL `jsonb`, whose wire body is
+text JSON). Avro and Protobuf extractors already carry typed numeric values; Avro's `decimal` logical type
+is already `BigDecimal`. Smile and CBOR keep native IEEE floats. SQLite JSONB still decodes its ASCII floats
+as `DOUBLE` (including JSON5 `Infinity` / `NaN`).
+
+Batch `JSONRecordReader` uses the same BigDecimal-aware reader, so stream and batch text JSON now agree.
+
+**Upgrade note.** Floating JSON literals that previously became `java.lang.Double` are now
+`java.math.BigDecimal` until schema conversion. Typed `DOUBLE` / `FLOAT` / `BIG_DECIMAL` columns still
+convert through `PinotDataType`. Custom `recordExtractorClass` implementations and Groovy transforms that
+do `instanceof Double` (or otherwise assume Jackson's default `Double`) must accept `BigDecimal`. A
+`STRING` column stores `BigDecimal.toPlainString()` rather than `Double.toString()` (so `1.23e10` becomes
+`12300000000` instead of `1.23E10`). There is no opt-out flag.
 
 > The `jsonFormat` property applies to the **stream decoder** (`JSONMessageDecoder`) only. Batch ingestion via
 > `JSONRecordReader` always reads text JSON.
@@ -40,7 +56,7 @@ of:
 
 | `jsonFormat`     | Payload encoding                                                        |
 |------------------|-------------------------------------------------------------------------|
-| *(unset)* / `TEXT` | UTF-8 text JSON. The historical behavior; unchanged.                  |
+| *(unset)* / `TEXT` | UTF-8 text JSON. The historical default encoding; decimals are `BigDecimal`. |
 | `POSTGRES_JSONB` | PostgreSQL `jsonb` binary wire format (version byte + text JSON).        |
 | `SQLITE_JSONB`   | SQLite 3.45+ JSONB binary format.                                       |
 | `SMILE`          | [Jackson Smile](https://github.com/FasterXML/smile-format-specification) binary JSON. |
@@ -50,14 +66,16 @@ of:
 The value is case-insensitive. An unrecognized value fails table creation with a message listing the supported
 values.
 
-Every format decodes to the same value contract, so the same table config, schema, and transform functions
-work regardless of the wire encoding. Numbers narrow to `INT` / `LONG` / `BIG_DECIMAL`, decimals to `DOUBLE`,
-and objects/arrays to nested JSON — just as for text JSON. (The binary formats can additionally carry native
-`float` and `byte[]` scalars, which Pinot converts to the target column type.)
+Every format still feeds the same extractor and schema conversion, so the same table config, schema, and
+transform functions work regardless of the wire encoding. Integers narrow to `INT` / `LONG` / `BIG_DECIMAL`.
+Text JSON and PostgreSQL `jsonb` keep floating literals as `BigDecimal` until the target column type is
+applied. Smile and CBOR keep native IEEE floats. Objects and arrays become nested JSON. (The binary formats
+can additionally carry native `float` and `byte[]` scalars, which Pinot converts to the target column type.)
 
 ## Default behavior and `AUTO`
 
-An unset `jsonFormat` means `TEXT`, so **existing tables are completely unaffected** by this feature.
+An unset `jsonFormat` means `TEXT`. Existing tables keep that encoding; the only behavior change is that
+text JSON floating literals that previously became `DOUBLE` now remain `BigDecimal` until schema conversion.
 
 `AUTO` is opt-in rather than the default. Detection is a heuristic over a few leading bytes; it never
 mis-routes a well-formed text JSON document (a top-level `{` or `[`, optionally after whitespace, matches none

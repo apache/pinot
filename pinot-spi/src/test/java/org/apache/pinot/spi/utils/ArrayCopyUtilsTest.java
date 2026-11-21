@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.math.BigDecimal;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class ArrayCopyUtilsTest {
@@ -107,6 +110,23 @@ public class ArrayCopyUtilsTest {
       Assert.assertEquals(FLOAT_BUFFER[i], (float) DOUBLE_ARRAY[i]);
       Assert.assertEquals(STRING_BUFFER[i], Double.toString(DOUBLE_ARRAY[i]));
     }
+  }
+
+  /// BigDecimal.equals() is scale-sensitive, so scaled zeros (e.g. decoded from JSON "0.0") must copy to
+  /// boolean 0, not 1.
+  @Test
+  public void testCopyToBooleanFromBigDecimalArray() {
+    BigDecimal[] src = {
+        new BigDecimal("0.0"), new BigDecimal("-0.0"), new BigDecimal("0.00"), new BigDecimal("0E+3"),
+        new BigDecimal("1.5"), new BigDecimal("-2"), new BigDecimal("1E-400")
+    };
+    int[] dest = new int[src.length];
+    ArrayCopyUtils.copyToBoolean(src, dest, src.length);
+    assertEquals(dest, new int[]{0, 0, 0, 0, 1, 1, 1});
+
+    int[][] dest2d = new int[1][];
+    ArrayCopyUtils.copyToBoolean(new BigDecimal[][]{src}, dest2d, 1);
+    assertEquals(dest2d[0], new int[]{0, 0, 0, 0, 1, 1, 1});
   }
 
   @Test

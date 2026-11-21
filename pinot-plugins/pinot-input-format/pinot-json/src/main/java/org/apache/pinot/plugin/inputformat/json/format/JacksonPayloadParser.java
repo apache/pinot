@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.json.format;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import java.io.IOException;
@@ -41,18 +42,23 @@ abstract class JacksonPayloadParser implements JsonPayloadParser {
   private final JsonFactory _factory;
   private final ObjectReader _mapReader;
   private final ObjectReader _valueReader;
+  private final boolean _preserveDecimalFloats;
 
   JacksonPayloadParser(JsonFactory factory) {
     this(new ObjectMapper(factory).reader());
   }
 
-  /// The reader must use default deserialization features: [#readValue]'s scalar fast path bypasses databind,
-  /// so features like `USE_BIG_DECIMAL_FOR_FLOATS` would apply to containers but silently not to top-level
-  /// scalars. Every current caller passes a default-configured reader.
+  /// When the reader has `USE_BIG_DECIMAL_FOR_FLOATS` (text JSON and PostgreSQL jsonb), floating tokens
+  /// become `BigDecimal` on both the map path and the streaming scalar path. Binary formats keep the
+  /// default reader so native `Float` / `Double` values are not rewritten.
+  ///
+  /// [#readValue] reads top-level scalars straight off the parser, so the same feature must be honored
+  /// there with `getDecimalValue()`; databind alone would preserve precision only inside containers.
   JacksonPayloadParser(ObjectReader reader) {
     _factory = reader.getFactory();
     _mapReader = reader.forType(JsonUtils.MAP_TYPE_REFERENCE);
     _valueReader = reader.forType(Object.class);
+    _preserveDecimalFloats = reader.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
   }
 
   @Override
@@ -109,7 +115,8 @@ abstract class JacksonPayloadParser implements JsonPayloadParser {
   /// Materializes the value at the parser's current token in [JSONRecordExtractor]'s converted shape. Scalars
   /// are read straight off the parser rather than through databind, which allocates a fresh
   /// `DeserializationContext` per `readValue` call. `getNumberValue()` keeps the binary formats' `Float`
-  /// (never upcast to `Double`) and text JSON's `Double`, matching Jackson's untyped materialization.
+  /// (never upcast to `Double`). Text-backed formats use `getDecimalValue()` for floats so decimal literals
+  /// are not rounded to `Double` before Pinot's schema conversion.
   @Nullable
   private Object readValue(JsonParser parser, JsonToken valueToken)
       throws IOException {
@@ -117,9 +124,15 @@ abstract class JacksonPayloadParser implements JsonPayloadParser {
       case VALUE_STRING:
         return parser.getText();
       case VALUE_NUMBER_INT:
-      case VALUE_NUMBER_FLOAT:
         // Oversized ints widen to BigDecimal via the shared contract (Pinot has no BigInteger type)
         return JSONRecordExtractor.convert(parser.getNumberValue());
+      case VALUE_NUMBER_FLOAT:
+        // JSON text stores decimals as decimal *text*. Jackson's default getNumberValue() rounds that text
+        // to Double. Avro and Protobuf extractors do not have this problem: they carry typed numeric
+        // values (Avro's decimal logical type is already BigDecimal). Binary JSON formats encode IEEE
+        // floats natively, so they keep getNumberValue().
+        return JSONRecordExtractor.convert(
+            _preserveDecimalFloats ? parser.getDecimalValue() : parser.getNumberValue());
       case VALUE_TRUE:
         return Boolean.TRUE;
       case VALUE_FALSE:

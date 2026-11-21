@@ -200,7 +200,8 @@ public class ArrayCopyUtils {
 
   public static void copyToBoolean(BigDecimal[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = !src[i].equals(BigDecimal.ZERO) ? 1 : 0;
+      // BigDecimal.equals() is scale-sensitive (0.0 does not equal ZERO), so test the numerical value.
+      dest[i] = src[i].signum() != 0 ? 1 : 0;
     }
   }
 
