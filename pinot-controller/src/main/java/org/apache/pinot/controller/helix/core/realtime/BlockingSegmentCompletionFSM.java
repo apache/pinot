@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -83,13 +84,14 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
 
   public final Logger _logger;
 
-  BlockingSegmentCompletionFSMState _state = BlockingSegmentCompletionFSMState.HOLDING;
+  volatile BlockingSegmentCompletionFSMState _state = BlockingSegmentCompletionFSMState.HOLDING;
       // Typically start off in HOLDING state.
   final long _startTimeMs;
   protected final LLCSegmentName _segmentName;
   protected final String _rawTableName;
   protected final String _realtimeTableName;
   protected final int _numReplicas;
+  protected final boolean _replicateMode;
   protected final Set<String> _excludedServerStateMap;
   protected final Map<String, StreamPartitionMsgOffset> _commitStateMap;
   protected final StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
@@ -104,7 +106,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   // time that we need to consider.
   // We may need to add some time here to allow for getting the lock? For now 0
   // We may need to add some time for the committer come back to us (after the build)? For now 0.
-  protected long _maxTimeAllowedToCommitMs;
+  protected volatile long _maxTimeAllowedToCommitMs;
   protected final String _controllerVipUrl;
 
   public BlockingSegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
@@ -113,7 +115,9 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _segmentName = segmentName;
     _rawTableName = _segmentName.getTableName();
     _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
-    _numReplicas = segmentMetadata.getNumReplicas();
+    // Followers only load the committed artifact; they never report consumption offsets to this FSM.
+    _replicateMode = segmentMetadata.isReplicateMode();
+    _numReplicas = _replicateMode ? 1 : segmentMetadata.getNumReplicas();
     _segmentManager = segmentManager;
     _commitStateMap = new HashMap<>(HashUtil.getHashMapCapacity(_numReplicas));
     _excludedServerStateMap = new HashSet<>(_numReplicas);
@@ -189,6 +193,33 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   public boolean isImmutableSegmentCreated() {
     return _state.equals(BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING) || _state.equals(
         BlockingSegmentCompletionFSMState.COMMITTING) || _state.equals(BlockingSegmentCompletionFSMState.COMMITTED);
+  }
+
+  /// Does not take the FSM monitor, which a final commit holds while publishing files and metadata. A selected
+  /// winner is conservatively considered an active attempt even before it receives COMMIT, and during build/upload.
+  /// An expired build/upload is only an observation: this method does not cancel it or prevent a late commit.
+  /// COMMITTING always remains in progress because reaching a deadline does not stop Controller-side I/O.
+  @Override
+  public RecoveryStatus getRecoveryStatus() {
+    BlockingSegmentCompletionFSMState state = _state;
+    return switch (state) {
+      case COMMITTING -> RecoveryStatus.COMMIT_IN_PROGRESS;
+      case COMMITTER_DECIDED, COMMITTER_NOTIFIED, COMMITTER_UPLOADING ->
+          _segmentCompletionManager.getCurrentTimeMs() > _maxTimeAllowedToCommitMs
+              ? RecoveryStatus.COMMIT_EXPIRED
+              : RecoveryStatus.COMMIT_IN_PROGRESS;
+      default -> RecoveryStatus.NO_ACTIVE_COMMIT;
+    };
+  }
+
+  @Override
+  public boolean isAcceptedCommitter(String instanceId, String offset) {
+    BlockingSegmentCompletionFSMState state = _state;
+    return (state == BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING
+        || state == BlockingSegmentCompletionFSMState.COMMITTING
+        || state == BlockingSegmentCompletionFSMState.COMMITTED)
+        && instanceId.equals(_winner) && _winningOffset != null
+        && _streamPartitionMsgOffsetFactory.create(offset).compareTo(_winningOffset) == 0;
   }
 
   @Override
@@ -270,6 +301,9 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     }
     synchronized (this) {
       _logger.info("Processing segmentCommitStart({}, {})", instanceId, offset);
+      if (_replicateMode && _winner != null && !instanceId.equals(_winner)) {
+        return SegmentCompletionProtocol.RESP_FAILED;
+      }
       switch (_state) {
         case PARTIAL_CONSUMING:
           return partialConsumingCommit(instanceId, offset, now);
@@ -345,6 +379,10 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     final long now = _segmentCompletionManager.getCurrentTimeMs();
     synchronized (this) {
       _logger.info("Processing extendBuildTime({}, {}, {})", instanceId, offset, extTimeSec);
+      if (_replicateMode && (!instanceId.equals(_winner) || _winningOffset == null
+          || offset.compareTo(_winningOffset) != 0)) {
+        return SegmentCompletionProtocol.RESP_FAILED;
+      }
       switch (_state) {
         case PARTIAL_CONSUMING:
         case HOLDING:
@@ -373,7 +411,10 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     StreamPartitionMsgOffset offset =
         _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
     synchronized (this) {
-      if (_excludedServerStateMap.contains(instanceId)) {
+      if (_replicateMode && !isAcceptedCommitter(instanceId, reqParams.getStreamPartitionMsgOffset())) {
+        return SegmentCompletionProtocol.RESP_FAILED;
+      }
+      if (!_replicateMode && _excludedServerStateMap.contains(instanceId)) {
         _logger.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
         return abortAndReturnFailed();
       }
@@ -825,7 +866,9 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
           .equalsIgnoreCase(URIUtils.getUri(committingSegmentDescriptor.getSegmentLocation()).getScheme())) {
         committingSegmentDescriptor.setSegmentLocation(URIUtils
             .constructDownloadUrl(_controllerVipUrl, TableNameBuilder.extractRawTableName(_realtimeTableName),
-                _segmentName.getSegmentName()));
+                _replicateMode ? StringUtils.substringAfterLast(
+                    URIUtils.getUri(committingSegmentDescriptor.getSegmentLocation()).getPath(), "/")
+                    : _segmentName.getSegmentName()));
       }
       commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor);
     } catch (Exception e) {

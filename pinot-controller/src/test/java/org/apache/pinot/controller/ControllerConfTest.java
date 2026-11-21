@@ -32,7 +32,9 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.*;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -44,6 +46,7 @@ public class ControllerConfTest {
       RETENTION_MANAGER_FREQUENCY_PERIOD,
       OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD,
       REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD,
+      REPLICATE_MODE_FAILOVER_FREQUENCY_PERIOD,
       BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD,
       STATUS_CHECKER_FREQUENCY_PERIOD,
       STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD,
@@ -135,6 +138,54 @@ public class ControllerConfTest {
   }
 
   @Test
+  public void testReplicateModeFailoverDefaultConfig() {
+    ControllerConf conf = new ControllerConf(Map.of());
+    assertEquals(conf.getReplicateModeFailoverFrequencyInSeconds(), 10);
+    assertEquals(conf.getReplicateModeFailoverInitialDelayInSeconds(), 10L);
+    assertNull(conf.getReplicateModeFailoverCronExpression());
+    assertEquals(conf.getReplicateModeFailoverCooldownMs(), 30_000L);
+    assertEquals(conf.getReplicateModeRecoveryMaxActionsPerTable(), 10);
+    assertEquals(conf.getReplicateModeRecoveryRetryMaxDelayMs(), 300_000L);
+  }
+
+  @Test
+  public void testReplicateModeRecoveryPolicyBounds() {
+    ControllerConf conf = new ControllerConf(Map.of(
+        "controller.realtime.replicateMode.failover.cooldownMs", -1,
+        "controller.realtime.replicateMode.recovery.maxActionsPerTable", 0,
+        "controller.realtime.replicateMode.recovery.retryMaxDelayMs", 1));
+    assertEquals(conf.getReplicateModeFailoverCooldownMs(), 0L);
+    assertEquals(conf.getReplicateModeRecoveryMaxActionsPerTable(), 1);
+    assertEquals(conf.getReplicateModeRecoveryRetryMaxDelayMs(), 10_000L);
+  }
+
+  @Test
+  public void testReplicateModeFailoverConfiguredSchedule() {
+    String cronExpression = "0/15 * * * * ?";
+    ControllerConf conf = new ControllerConf(Map.of(
+        REPLICATE_MODE_FAILOVER_FREQUENCY_PERIOD, "2m",
+        REPLICATE_MODE_FAILOVER_INITIAL_DELAY_IN_SECONDS, 3L,
+        REPLICATE_MODE_FAILOVER_CRON_EXPRESSION, cronExpression));
+    assertEquals(conf.getReplicateModeFailoverFrequencyInSeconds(), 120);
+    assertEquals(conf.getReplicateModeFailoverInitialDelayInSeconds(), 3L);
+    assertEquals(conf.getReplicateModeFailoverCronExpression(), cronExpression);
+  }
+
+  @Test
+  public void testReplicateModeFailoverDisabledSchedule() {
+    for (int frequency : List.of(-1, 0)) {
+      ControllerConf conf = new ControllerConf(Map.of(REPLICATE_MODE_FAILOVER_FREQUENCY_PERIOD, frequency + "s"));
+      assertEquals(conf.getReplicateModeFailoverFrequencyInSeconds(), frequency);
+    }
+  }
+
+  @Test
+  public void testReplicateModeFailoverInvalidFrequencyFallsBackToDefault() {
+    ControllerConf conf = new ControllerConf(Map.of(REPLICATE_MODE_FAILOVER_FREQUENCY_PERIOD, "notAValidPeriod"));
+    assertEquals(conf.getReplicateModeFailoverFrequencyInSeconds(), 10);
+  }
+
+  @Test
   public void shouldBeAbleToSetDataDir() {
     Map<String, Object> controllerConfig = new HashMap<>();
     ControllerConf conf = new ControllerConf(controllerConfig);
@@ -177,6 +228,7 @@ public class ControllerConfTest {
     Assert.assertEquals(statusCheckerFrequencyInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(brokerResourceValidationFrequencyInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(realtimeSegmentValidationFrequencyInSeconds, expectedDuration, confAsString);
+    assertEquals(conf.getReplicateModeFailoverFrequencyInSeconds(), expectedDuration, confAsString);
     Assert.assertEquals(offlineSegmentIntervalCheckerFrequencyInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(retentionControllerFrequencyInSeconds, expectedDuration, confAsString);
     Assert.assertEquals(statusCheckerWaitForPushTimeInSeconds, expectedDuration, confAsString);

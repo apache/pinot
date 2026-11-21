@@ -27,6 +27,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
+import org.apache.pinot.common.assignment.ReplicateModeAssignmentUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -41,6 +42,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -179,6 +181,42 @@ public class StaleInstancesCleanupTaskTest {
 
     verify(_pinotHelixResourceManager, never()).dropInstance(SERVER_IN_USE);
     verify(_pinotHelixResourceManager, never()).dropInstance(serverInPartitionAssignment);
+  }
+
+  @Test
+  public void testReplicateModeFollowerIsRetainedUntilCandidateReferenceIsRemoved() {
+    String table = "replicateModeTable_REALTIME";
+    String follower = "Server_follower.example.com_8098";
+    IdealState tableIdealState = buildTableIdealState(table,
+        Map.of(SEGMENT_1, Map.of(SERVER_IN_USE, "CONSUMING")));
+    tableIdealState.enable(false);
+    ReplicateModeAssignmentUtils.setAssignment(tableIdealState, 0, SERVER_IN_USE, List.of(SERVER_IN_USE, follower));
+    when(_pinotHelixResourceManager.getAllTables()).thenReturn(List.of(table));
+    when(_pinotHelixResourceManager.getTableIdealState(table)).thenReturn(tableIdealState);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(_pinotHelixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+    when(helixAdmin.getResourceIdealState(CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE))
+        .thenReturn(buildBrokerIdealState(Map.of()));
+    when(_pinotHelixResourceManager.getAllInstances()).thenReturn(List.of(SERVER_IN_USE, follower, SERVER_NOT_IN_USE));
+    when(_pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(List.of());
+    when(_pinotHelixResourceManager.isInstanceOfflineFor(anyString(), eq(RETENTION_MS))).thenReturn(true);
+    when(_pinotHelixResourceManager.dropInstance(anyString()))
+        .thenReturn(PinotResourceManagerResponse.success("dropped"));
+
+    _task.runTask(new Properties());
+
+    verify(_pinotHelixResourceManager, never()).dropInstance(SERVER_IN_USE);
+    verify(_pinotHelixResourceManager, never()).dropInstance(follower);
+    verify(_pinotHelixResourceManager).dropInstance(SERVER_NOT_IN_USE);
+
+    ReplicateModeAssignmentUtils.setAssignment(tableIdealState, 0, SERVER_IN_USE, List.of(SERVER_IN_USE));
+    clearInvocations(_pinotHelixResourceManager);
+
+    _task.runTask(new Properties());
+
+    verify(_pinotHelixResourceManager, never()).dropInstance(SERVER_IN_USE);
+    verify(_pinotHelixResourceManager).dropInstance(follower);
+    verify(_pinotHelixResourceManager).dropInstance(SERVER_NOT_IN_USE);
   }
 
   /// Verifies behavior with multiple tables — a server referenced in ANY table's

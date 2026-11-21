@@ -40,6 +40,7 @@ import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 public class RealtimeSegmentConfig {
@@ -379,6 +380,15 @@ public class RealtimeSegmentConfig {
 
     public Builder setIngestionAggregationConfigs(List<AggregationConfig> ingestionAggregationConfigs) {
       _ingestionAggregationConfigs = ingestionAggregationConfigs;
+      return this;
+    }
+
+    /// Applies the table's ingestion semantics to both normal consumption and fixed-range reconstruction.
+    /// Index layouts and resource/lifecycle settings remain supplied by the caller.
+    public Builder setIngestionSemantics(TableConfig tableConfig) {
+      _aggregateMetrics = tableConfig.getIndexingConfig().isAggregateMetrics();
+      _ingestionAggregationConfigs = IngestionConfigUtils.getAggregationConfigs(tableConfig);
+      _defaultNullHandlingEnabled = tableConfig.getIndexingConfig().isNullHandlingEnabled();
       return this;
     }
 

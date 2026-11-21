@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -56,6 +57,7 @@ import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTas
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
+import org.apache.pinot.controller.util.SegmentArtifactUtils;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -590,10 +592,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
 
     Set<String> segmentsPresentInZK = getSegmentNames(tableNameWithType, segmentZKMetadataList);
+    addReferencedArtifacts(segmentsPresentInZK, segmentZKMetadataList);
     if (isHybridTable) {
       // This must be the OFFLINE table
       // Add segments from the REALTIME table as well
       segmentsPresentInZK.addAll(getSegmentNames(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)));
+      addReferencedArtifacts(segmentsPresentInZK, _pinotHelixResourceManager.getSegmentsZKMetadata(
+          TableNameBuilder.REALTIME.tableNameWithType(rawTableName)));
     }
 
     try {
@@ -618,6 +623,19 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     return segmentsToDelete;
   }
 
+  private void addReferencedArtifacts(Set<String> segmentNames, List<SegmentZKMetadata> metadataList) {
+    for (SegmentZKMetadata metadata : metadataList) {
+      try {
+        String fileName = SegmentArtifactUtils.getReferencedFileName(metadata);
+        if (fileName != null && SegmentArtifactUtils.getLogicalSegmentName(fileName) != null) {
+          segmentNames.add(fileName);
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Could not resolve referenced artifact for segment: {}", metadata.getSegmentName(), e);
+      }
+    }
+  }
+
   /// Identifies segments in deepstore that are ready for deletion based on the retention strategy.
   ///
   /// This method finds segments that are beyond the retention period and are ready to be purged.
@@ -637,6 +655,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     List<String> segmentsToDelete = new ArrayList<>();
     String tableNameWithType = context.getTableNameWithType();
+    String rawTableName = context.getRawTableName();
     long startTimeMs = System.currentTimeMillis();
 
     List<FileMetadata> deepstoreFiles = context.getDeepStoreFiles();
@@ -660,9 +679,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       // A metadata sidecar (<segment>.metadata.tar.gz) belongs to its segment: keep it while that segment is tracked.
       // An orphaned one is cleaned up like any other untracked file.
       String filePath = fileMetadata.getFilePath();
-      if (filePath.endsWith(Constants.METADATA_TAR_GZ_FILE_EXT) && segmentsToExclude.contains(
-          StringUtils.removeEnd(filePath.substring(filePath.lastIndexOf('/') + 1),
-              Constants.METADATA_TAR_GZ_FILE_EXT))) {
+      String artifactName = filePath.endsWith(Constants.METADATA_TAR_GZ_FILE_EXT)
+          ? filePath.substring(filePath.lastIndexOf('/') + 1,
+              filePath.length() - Constants.METADATA_TAR_GZ_FILE_EXT.length())
+          : segmentName;
+      if (segmentsToExclude.contains(artifactName)) {
+        continue;
+      }
+      // Immutable attempts and their metadata share ownership. A concurrent publication can select either after
+      // the initial inventory was read, so use the physical artifact name for the fresh reference check as well.
+      String logicalSegmentName = SegmentArtifactUtils.getLogicalSegmentName(artifactName);
+      if (logicalSegmentName != null && !canDeleteImmutableArtifact(rawTableName, logicalSegmentName, artifactName,
+          fileMetadata.getLastModifiedTime())) {
         continue;
       }
 
@@ -683,6 +711,48 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             + " entry in the property store.",
         endTimeMs - startTimeMs, segmentsToDelete.size(), tableNameWithType);
     return segmentsToDelete;
+  }
+
+  /// A directory listing can race with a commit. Consult current metadata before treating an immutable attempt as an
+  /// orphan, including REALTIME metadata when this is an OFFLINE scan of a hybrid table's shared directory.
+  private boolean canDeleteImmutableArtifact(String rawTableName, String logicalSegmentName, String artifactName,
+      long lastModifiedTime) {
+    if (lastModifiedTime <= 0 || System.currentTimeMillis() - lastModifiedTime
+        <= TimeUnit.SECONDS.toMillis(_controllerConf.getTmpSegmentRetentionInSeconds())) {
+      return false;
+    }
+    try {
+      if (_pinotHelixResourceManager.getHelixZkManager() == null
+          || !_pinotHelixResourceManager.getHelixZkManager().isConnected()) {
+        return false;
+      }
+      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+      for (TableType tableType : List.of(TableType.REALTIME, TableType.OFFLINE)) {
+        String tableName = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
+        String path = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, logicalSegmentName);
+        SegmentZKMetadata metadata = ZKMetadataProvider.getSegmentZKMetadata(propertyStore, tableName,
+            logicalSegmentName);
+        if (metadata == null) {
+          if (propertyStore.exists(path, AccessOption.PERSISTENT)) {
+            return false;
+          }
+          continue;
+        }
+        if (artifactName.equals(SegmentArtifactUtils.getReferencedFileName(metadata))) {
+          return false;
+        }
+        // An unfinished replay/native commit can still select any of its attempt files. A record not owned by this
+        // feature, or missing its selected URL, cannot prove that an attempt is safe to remove either.
+        if (StringUtils.isBlank(metadata.getDownloadUrl()) || tableType == TableType.REALTIME
+            && (!metadata.isReplicateMode() || metadata.getStatus() != Status.DONE)) {
+          return false;
+        }
+      }
+      return _pinotHelixResourceManager.getHelixZkManager().isConnected();
+    } catch (Exception e) {
+      LOGGER.warn("Could not verify immutable artifact: {} for table: {}; retaining it", artifactName, rawTableName, e);
+      return false;
+    }
   }
 
   @Nullable

@@ -1227,6 +1227,80 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testReplicateModeValidation() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+    StreamIngestionConfig streamConfig = new StreamIngestionConfig(List.of(getStreamConfigs()));
+    streamConfig.setReplicateMode(true);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(streamConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setIngestionConfig(ingestionConfig).build();
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    tableConfig.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL));
+    expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateIngestionConfig(tableConfig, schema));
+    tableConfig.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.PARTIAL));
+    expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateIngestionConfig(tableConfig, schema));
+    tableConfig.setUpsertConfig(null);
+    tableConfig.setDedupConfig(new DedupConfig());
+    expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateIngestionConfig(tableConfig, schema));
+
+    streamConfig.setReplicateMode(false);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(ingestionConfig).build();
+    streamConfig.setReplicateMode(true);
+    expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateIngestionConfig(offlineTableConfig, schema));
+  }
+
+  @DataProvider
+  public Object[][] replicateModeRoutingConfigs() {
+    return new Object[][]{
+        {null, true},
+        {new RoutingConfig(null, null, null, false), true},
+        {new RoutingConfig(null, null, RoutingConfig.BALANCED_INSTANCE_SELECTOR_TYPE, false), true},
+        {new RoutingConfig(null, null, RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false), true},
+        {STRICT_REPLICA_ROUTING_CONFIG, false},
+        {new RoutingConfig(null, null, RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE, false), false},
+        {new RoutingConfig(null, null, "STRICTREPLICAGROUP", false), false},
+        {new RoutingConfig(null, null, "MULTISTAGEREPLICAGROUP", false), false}
+    };
+  }
+
+  @Test(dataProvider = "replicateModeRoutingConfigs")
+  public void testReplicateModeRoutingValidation(RoutingConfig routingConfig, boolean supported) {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    StreamIngestionConfig streamConfig = new StreamIngestionConfig(List.of(getStreamConfigs()));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(streamConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setIngestionConfig(ingestionConfig).setRoutingConfig(routingConfig).build();
+
+    // The replicate-mode restriction must not change ingestion validation when the mode is disabled.
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    streamConfig.setReplicateMode(true);
+    TableConfig existingTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setIngestionConfig(ingestionConfig).build();
+    TableConfigUtils.validate(existingTableConfig, schema);
+    if (supported) {
+      TableConfigUtils.validate(tableConfig, schema);
+      TableConfigUtils.validate(tableConfig, schema, null, existingTableConfig);
+    } else {
+      String expectedMessage = "replicateMode=true does not support routing.instanceSelectorType="
+          + routingConfig.getInstanceSelectorType() + "; use balanced or replicaGroup";
+      IllegalStateException createError = expectThrows(IllegalStateException.class,
+          () -> TableConfigUtils.validate(tableConfig, schema));
+      assertEquals(createError.getMessage(), expectedMessage);
+      IllegalStateException updateError = expectThrows(IllegalStateException.class,
+          () -> TableConfigUtils.validate(tableConfig, schema, null, existingTableConfig));
+      assertEquals(updateError.getMessage(), expectedMessage);
+    }
+  }
+
+  @Test
   public void ingestionBatchConfigsTest() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
 

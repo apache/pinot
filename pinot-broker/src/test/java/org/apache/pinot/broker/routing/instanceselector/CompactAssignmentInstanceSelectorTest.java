@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,6 +49,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.Segmen
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -160,6 +165,11 @@ public class CompactAssignmentInstanceSelectorTest {
     when(tableConfig.isUpsertEnabled()).thenReturn(upsert);
     @SuppressWarnings("unchecked")
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    // Missing metadata has one null result per requested path, matching the native batch-read contract.
+    when(propertyStore.get(anyList(), any(), anyInt(), anyBoolean())).thenAnswer(invocation -> {
+      List<String> paths = invocation.getArgument(0);
+      return Collections.nCopies(paths.size(), null);
+    });
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
     when(brokerRequest.getPinotQuery()).thenReturn(mock(PinotQuery.class));
 

@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -49,6 +50,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
@@ -61,7 +63,9 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.util.TestUtils;
+import org.apache.zookeeper.data.Stat;
 import org.joda.time.DateTime;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -69,12 +73,21 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.metadata.ZKMetadataProvider.constructPropertyStorePathForResource;
 import static org.apache.pinot.common.metadata.ZKMetadataProvider.constructPropertyStorePathForSegment;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentDeletionManagerTest {
@@ -895,6 +908,318 @@ public class SegmentDeletionManagerTest {
         "Unable to verify that a segment named metadata is swept like any other aged file");
   }
 
+  @DataProvider
+  public Object[][] immutableArtifactLocations() {
+    return new Object[][]{{"commit", false}, {"recovery", false}, {"commit", true}, {"recovery", true}};
+  }
+
+  @DataProvider
+  public Object[][] immutableSidecarRetention() {
+    return new Object[][]{{false, 0L}, {true, 0L},
+        {false, TimeUnit.DAYS.toMillis(1)}, {true, TimeUnit.DAYS.toMillis(1)}};
+  }
+
+  @Test(dataProvider = "immutableSidecarRetention")
+  public void testSelectedImmutableArtifactUsesOnlyItsOwnMetadataSidecar(boolean preserveMetadata, long retentionMs)
+      throws Exception {
+    initializeLocalFileSystem();
+    File dataDir = Files.createTempDirectory("pinot-selected-sidecar-").toFile();
+    String table = TABLE_NAME + "_REALTIME";
+    String segment = "table__0__0__20250228T1903Z";
+    String artifact = segment + ".commit.00000000-0000-0000-0000-000000000001";
+    String otherArtifact = segment + ".commit.00000000-0000-0000-0000-000000000002";
+    File tableDir = new File(dataDir, TABLE_NAME);
+    File selected = writeArtifactFile(tableDir, artifact);
+    File selectedMetadata = writeArtifactFile(tableDir, artifact + METADATA_TAR_GZ_EXT);
+    File other = writeArtifactFile(tableDir, otherArtifact);
+    File otherMetadata = writeArtifactFile(tableDir, otherArtifact + METADATA_TAR_GZ_EXT);
+    File canonical = writeArtifactFile(tableDir, segment);
+    File canonicalMetadata = writeArtifactFile(tableDir, segment + METADATA_TAR_GZ_EXT);
+    ZkHelixPropertyStore<ZNRecord> store = makeArtifactPropertyStore();
+    when(store.get(eq(constructPropertyStorePathForSegment(table, segment)), isNull(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(artifactMetadata(segment, selected.toURI().toString()).toZNRecord());
+    SegmentDeletionManager manager =
+        new SegmentDeletionManager(dataDir.toURI().toString(), artifactDeletionAdmin(table), CLUSTER_NAME, store, 0,
+            preserveMetadata, null);
+    try {
+      manager.removeSegmentsFromStoreInBatch(table, List.of(segment), retentionMs);
+
+      assertFalse(selected.exists());
+      assertFalse(selectedMetadata.exists());
+      assertTrue(other.exists());
+      assertTrue(otherMetadata.exists());
+      assertTrue(canonical.exists());
+      assertTrue(canonicalMetadata.exists(), "An attempt must not delete a logical-name metadata sidecar");
+      List<String> archivedSegments = sortedNames(new File(dataDir,
+          SegmentDeletionManager.DELETED_SEGMENTS + File.separator + TABLE_NAME));
+      List<String> archivedMetadata = sortedNames(new File(dataDir, METADATA_ROOT + File.separator + TABLE_NAME));
+      if (retentionMs > 0) {
+        assertEquals(archivedSegments.size(), 1);
+        assertTrue(archivedSegments.get(0).startsWith(segment + RETENTION_UNTIL_SEPARATOR));
+        assertEquals(archivedMetadata, preserveMetadata ? archivedSegments : List.of());
+      } else {
+        assertTrue(archivedSegments.isEmpty());
+        assertTrue(archivedMetadata.isEmpty());
+      }
+    } finally {
+      manager.stop();
+      FileUtils.deleteDirectory(dataDir);
+    }
+  }
+
+  @Test(dataProvider = "immutableArtifactLocations")
+  public void testCapturesSelectedImmutableArtifactBeforeDeletingItsMetadata(String attemptType, boolean controllerUrl)
+      throws Exception {
+    initializeLocalFileSystem();
+    File dataDir = Files.createTempDirectory("pinot-selected-artifact-").toFile();
+    String table = TABLE_NAME + "_REALTIME";
+    String segment = "table__0__0__20250228T1903Z";
+    String artifactName = segment + "." + attemptType + ".00000000-0000-0000-0000-000000000001";
+    File tableDir = new File(dataDir, TABLE_NAME);
+    File selected = writeArtifactFile(tableDir, artifactName);
+    File unselected = writeArtifactFile(tableDir,
+        segment + "." + attemptType + ".00000000-0000-0000-0000-000000000002");
+    File canonical = writeArtifactFile(tableDir, segment);
+    String location = controllerUrl
+        ? "http://controller:9000/segments/" + TABLE_NAME + "/" + artifactName
+        : selected.toURI().toString();
+    AtomicReference<ZNRecord> record = new AtomicReference<>(artifactMetadata(segment, location).toZNRecord());
+    ZkHelixPropertyStore<ZNRecord> store = makeArtifactPropertyStore();
+    String metadataPath = constructPropertyStorePathForSegment(table, segment);
+    when(store.get(eq(metadataPath), isNull(), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> record.get());
+    when(store.remove(anyList(), anyInt())).thenAnswer(invocation -> {
+      List<?> paths = invocation.getArgument(0);
+      assertEquals(paths, List.of(metadataPath));
+      record.set(null);
+      return new boolean[]{true};
+    });
+    FakeDeletionManager manager = new FakeDeletionManager(dataDir.toURI().toString(), artifactDeletionAdmin(table),
+        store, 0, "http://controller:9000");
+    try {
+      manager.deleteSegmentsFromPropertyStoreAndLocal(table, List.of(segment));
+
+      assertNull(record.get());
+      assertFalse(selected.exists(), "The selected URI must be captured before its only metadata pointer disappears");
+      assertTrue(unselected.exists(), "A different commit/recovery attempt belongs to orphan retention");
+      assertTrue(canonical.exists(), "Selected-artifact cleanup must not substitute the conventional segment file");
+      assertTrue(manager._segmentsToRetry.isEmpty());
+    } finally {
+      manager.stop();
+      FileUtils.deleteDirectory(dataDir);
+    }
+  }
+
+  @Test(dataProvider = "immutableArtifactLocations")
+  public void testDirectStoreCleanupUsesSelectedImmutableArtifact(String attemptType, boolean controllerUrl)
+      throws Exception {
+    initializeLocalFileSystem();
+    File dataDir = Files.createTempDirectory("pinot-table-artifact-").toFile();
+    String table = TABLE_NAME + "_REALTIME";
+    String segment = "table__0__0__20250228T1903Z";
+    String artifactName = segment + "." + attemptType + ".00000000-0000-0000-0000-000000000001";
+    File tableDir = new File(dataDir, TABLE_NAME);
+    File selected = writeArtifactFile(tableDir, artifactName);
+    File unrelated = writeArtifactFile(tableDir, "other_segment");
+    String location = controllerUrl
+        ? "https://controller:9000/segments/" + TABLE_NAME + "/" + artifactName
+        : selected.toURI().toString();
+    ZkHelixPropertyStore<ZNRecord> store = makeArtifactPropertyStore();
+    when(store.get(eq(constructPropertyStorePathForSegment(table, segment)), isNull(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(artifactMetadata(segment, location).toZNRecord());
+    SegmentDeletionManager manager =
+        new SegmentDeletionManager(dataDir.toURI().toString(), artifactDeletionAdmin(table),
+        CLUSTER_NAME, store, 0, "https://controller:9000");
+    try {
+      // Table deletion invokes this store-cleanup API while segment metadata is still available.
+      manager.removeSegmentsFromStoreInBatch(table, List.of(segment), 0L);
+
+      assertFalse(selected.exists());
+      assertTrue(unrelated.exists());
+      verify(store, never()).remove(anyList(), anyInt());
+    } finally {
+      manager.stop();
+      FileUtils.deleteDirectory(dataDir);
+    }
+  }
+
+  @DataProvider
+  public Object[][] externalArtifactLocations() {
+    return new Object[][]{{"commit", false}, {"recovery", false}, {"commit", true}, {"recovery", true}};
+  }
+
+  @Test(dataProvider = "externalArtifactLocations")
+  public void testStoreCleanupDoesNotDeleteAnExternalArtifact(String attemptType, boolean httpUrl)
+      throws Exception {
+    initializeLocalFileSystem();
+    File dataDir = Files.createTempDirectory("pinot-owned-artifacts-").toFile();
+    File externalDir = Files.createTempDirectory("pinot-external-artifact-").toFile();
+    String table = TABLE_NAME + "_REALTIME";
+    String segment = "table__0__0__20250228T1903Z";
+    String artifactName = segment + "." + attemptType + ".00000000-0000-0000-0000-000000000001";
+    File external = writeArtifactFile(externalDir, artifactName);
+    File tableDir = new File(dataDir, TABLE_NAME);
+    File unselectedLocal = writeArtifactFile(tableDir, artifactName);
+    File canonical = writeArtifactFile(tableDir, segment);
+    File unrelated = writeArtifactFile(tableDir, "other_segment");
+    String location = httpUrl
+        ? "https://external.example/segments/" + TABLE_NAME + "/" + artifactName
+        : external.toURI().toString();
+    ZkHelixPropertyStore<ZNRecord> store = makeArtifactPropertyStore();
+    when(store.get(eq(constructPropertyStorePathForSegment(table, segment)), isNull(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(artifactMetadata(segment, location).toZNRecord());
+    SegmentDeletionManager manager =
+        new SegmentDeletionManager(dataDir.toURI().toString(), artifactDeletionAdmin(table),
+        CLUSTER_NAME, store, 0, "https://controller:9000");
+    try {
+      manager.removeSegmentsFromStoreInBatch(table, List.of(segment), 0L);
+
+      assertTrue(external.exists());
+      assertTrue(unselectedLocal.exists(), "An unowned URL must not be mapped to a similarly named local attempt");
+      assertFalse(canonical.exists(), "Conventional owned segment cleanup remains available");
+      assertTrue(unrelated.exists());
+    } finally {
+      manager.stop();
+      FileUtils.deleteDirectory(dataDir);
+      FileUtils.deleteDirectory(externalDir);
+    }
+  }
+
+  @DataProvider
+  public Object[][] sharedArtifactReferences() {
+    return new Object[][]{{"commit", false}, {"recovery", false}, {"commit", true}, {"recovery", true}};
+  }
+
+  @Test(dataProvider = "sharedArtifactReferences")
+  public void testSelectedArtifactRemainsWhileOfflineMetadataReferencesIt(String attemptType, boolean alias)
+      throws Exception {
+    initializeLocalFileSystem();
+    File dataDir = Files.createTempDirectory("pinot-shared-artifact-").toFile();
+    String realtimeTable = TABLE_NAME + "_REALTIME";
+    String offlineTable = TABLE_NAME + "_OFFLINE";
+    String segment = "table__0__0__20250228T1903Z";
+    String offlineSegment = alias ? "offline_alias" : segment;
+    String artifactName = segment + "." + attemptType + ".00000000-0000-0000-0000-000000000001";
+    File selected = writeArtifactFile(new File(dataDir, TABLE_NAME), artifactName);
+    AtomicReference<ZNRecord> realtimeRecord =
+        new AtomicReference<>(artifactMetadata(segment, selected.toURI().toString()).toZNRecord());
+    ZkHelixPropertyStore<ZNRecord> store = makeArtifactPropertyStore();
+    when(store.get(eq(constructPropertyStorePathForSegment(realtimeTable, segment)), isNull(),
+        eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> realtimeRecord.get());
+    when(store.remove(anyList(), anyInt())).thenAnswer(invocation -> {
+      realtimeRecord.set(null);
+      return new boolean[]{true};
+    });
+    // A conventional OFFLINE segment can reference the selected file under a completely different logical ID.
+    SegmentZKMetadata offlineMetadata = artifactMetadata(offlineSegment,
+        "https://controller:9000/segments/" + TABLE_NAME + "/" + artifactName);
+    offlineMetadata.setReplicateMode(false);
+    when(store.getChildNames(constructPropertyStorePathForResource(offlineTable), AccessOption.PERSISTENT))
+        .thenReturn(List.of(offlineSegment));
+    when(store.get(eq(List.of(constructPropertyStorePathForSegment(offlineTable, offlineSegment))), isNull(),
+        eq(AccessOption.PERSISTENT), eq(true))).thenReturn(List.of(offlineMetadata.toZNRecord()));
+    FakeDeletionManager manager =
+        new FakeDeletionManager(dataDir.toURI().toString(), artifactDeletionAdmin(realtimeTable),
+        store, 0, "https://controller:9000");
+    try {
+      manager.deleteSegmentsFromPropertyStoreAndLocal(realtimeTable, List.of(segment));
+
+      assertNull(realtimeRecord.get());
+      assertTrue(selected.exists(), "Deleting the realtime pointer must preserve its conventional OFFLINE consumer");
+      assertTrue(manager._segmentsToRetry.isEmpty());
+    } finally {
+      manager.stop();
+      FileUtils.deleteDirectory(dataDir);
+    }
+  }
+
+  @DataProvider
+  public Object[][] unknownCompanionMetadata() {
+    return new Object[][]{{"listingFailure"}, {"nullListingExistingParent"}, {"missingChildRecord"}};
+  }
+
+  @Test(dataProvider = "unknownCompanionMetadata")
+  public void testSelectedArtifactRemainsWhenCompanionReferenceLookupIsIncomplete(String failure)
+      throws Exception {
+    initializeLocalFileSystem();
+    File dataDir = Files.createTempDirectory("pinot-unknown-artifact-owner-").toFile();
+    String table = TABLE_NAME + "_REALTIME";
+    String offlineTable = TABLE_NAME + "_OFFLINE";
+    String offlineParent = constructPropertyStorePathForResource(offlineTable);
+    String segment = "table__0__0__20250228T1903Z";
+    String artifactName = segment + ".recovery.00000000-0000-0000-0000-000000000001";
+    File selected = writeArtifactFile(new File(dataDir, TABLE_NAME), artifactName);
+    ZkHelixPropertyStore<ZNRecord> store = makeArtifactPropertyStore();
+    when(store.get(eq(constructPropertyStorePathForSegment(table, segment)), isNull(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(artifactMetadata(segment, selected.toURI().toString()).toZNRecord());
+    switch (failure) {
+      case "listingFailure" -> when(store.getChildNames(offlineParent, AccessOption.PERSISTENT))
+          .thenThrow(new IllegalStateException("unavailable"));
+      case "nullListingExistingParent" -> {
+        when(store.getChildNames(offlineParent, AccessOption.PERSISTENT)).thenReturn(null);
+        when(store.get(eq(List.of(offlineParent)), anyList(), eq(AccessOption.PERSISTENT), eq(true)))
+            .thenAnswer(invocation -> {
+              List<Stat> stats = invocation.getArgument(1);
+              stats.add(new Stat());
+              return Collections.singletonList(null);
+            });
+      }
+      case "missingChildRecord" -> {
+        when(store.getChildNames(offlineParent, AccessOption.PERSISTENT)).thenReturn(List.of("offline_alias"));
+        when(store.get(eq(List.of(constructPropertyStorePathForSegment(offlineTable, "offline_alias"))), isNull(),
+            eq(AccessOption.PERSISTENT), eq(true))).thenReturn(Collections.singletonList(null));
+      }
+      default -> throw new IllegalArgumentException(failure);
+    }
+    SegmentDeletionManager manager =
+        new SegmentDeletionManager(dataDir.toURI().toString(), artifactDeletionAdmin(table),
+        CLUSTER_NAME, store, 0, "https://controller:9000");
+    try {
+      manager.removeSegmentsFromStoreInBatch(table, List.of(segment), 0L);
+
+      assertTrue(selected.exists(), "Unknown companion references must fail closed before physical deletion");
+    } finally {
+      manager.stop();
+      FileUtils.deleteDirectory(dataDir);
+    }
+  }
+
+  private ZkHelixPropertyStore<ZNRecord> makeArtifactPropertyStore() {
+    ZkHelixPropertyStore<ZNRecord> store = makePropertyStore();
+    for (String table : List.of(TABLE_NAME + "_OFFLINE", TABLE_NAME + "_REALTIME")) {
+      when(store.getChildNames(constructPropertyStorePathForResource(table), AccessOption.PERSISTENT))
+          .thenReturn(List.of());
+    }
+    return store;
+  }
+
+  private static void initializeLocalFileSystem() {
+    PinotFSFactory.init(new PinotConfiguration(Map.of(
+        CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class", LocalPinotFS.class.getName())));
+  }
+
+  private static File writeArtifactFile(File directory, String fileName)
+      throws IOException {
+    Files.createDirectories(directory.toPath());
+    File file = new File(directory, fileName);
+    Files.writeString(file.toPath(), "artifact");
+    return file;
+  }
+
+  private static SegmentZKMetadata artifactMetadata(String segment, String location) {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(segment);
+    metadata.setReplicateMode(true);
+    metadata.setStatus(Status.DONE);
+    metadata.setDownloadUrl(location);
+    return metadata;
+  }
+
+  private HelixAdmin artifactDeletionAdmin(String table) {
+    HelixAdmin admin = makeHelixAdmin();
+    when(admin.getResourceExternalView(CLUSTER_NAME, table)).thenReturn(new ExternalView(table));
+    when(admin.getResourceIdealState(CLUSTER_NAME, table)).thenReturn(new IdealState(table));
+    return admin;
+  }
+
   public void createTableAndSegmentFiles(File tempDir, List<String> segmentIds)
       throws Exception {
     File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
@@ -948,6 +1273,11 @@ public class SegmentDeletionManagerTest {
     FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore, int
         deletedSegmentsRetentionInDays) {
       super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, deletedSegmentsRetentionInDays);
+    }
+
+    FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
+        int deletedSegmentsRetentionInDays, String controllerVipUrl) {
+      super(localDiskDir, helixAdmin, CLUSTER_NAME, propertyStore, deletedSegmentsRetentionInDays, controllerVipUrl);
     }
 
     public void deleteSegmentsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {

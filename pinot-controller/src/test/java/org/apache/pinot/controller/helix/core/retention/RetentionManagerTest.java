@@ -38,6 +38,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -45,6 +46,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -57,6 +59,7 @@ import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
+import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -128,6 +131,117 @@ public class RetentionManagerTest {
     if (_tempDir != null) {
       FileUtils.deleteDirectory(_tempDir.toFile());
     }
+  }
+
+  @Test
+  public void testOfflineScanProtectsRealtimeImmutableArtifactsAndCollectsOldOrphans()
+      throws Exception {
+    String commitWinner = "committed.commit.11111111-1111-1111-1111-111111111111";
+    String replayWinner = "replayed.recovery.22222222-2222-2222-2222-222222222222";
+    String losingAttempt = "committed.recovery.33333333-3333-3333-3333-333333333333";
+    String missingSegment = "removed.commit.44444444-4444-4444-4444-444444444444";
+    String pendingAttempt = "pending.recovery.55555555-5555-5555-5555-555555555555";
+    String recentAttempt = "recent.commit.66666666-6666-6666-6666-666666666666";
+    for (String artifact : List.of(commitWinner, replayWinner, losingAttempt, missingSegment, pendingAttempt,
+        recentAttempt)) {
+      for (String fileName : List.of(artifact, artifact + Constants.METADATA_TAR_GZ_FILE_EXT)) {
+        File file = new File(_tableDir, fileName);
+        createFileWithContent(file, fileName);
+        setFileModificationTime(file, System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30));
+      }
+    }
+    setFileModificationTime(new File(_tableDir, recentAttempt), System.currentTimeMillis());
+    setFileModificationTime(new File(_tableDir, recentAttempt + Constants.METADATA_TAR_GZ_FILE_EXT),
+        System.currentTimeMillis());
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.isConnected()).thenReturn(true);
+    when(resourceManager.getHelixZkManager()).thenReturn(helixManager);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    when(resourceManager.getDataDir()).thenReturn(_tempDir.toString());
+    stubImmutableArtifact(propertyStore, REALTIME_TABLE_NAME, "committed", Status.DONE,
+        new File(_tableDir, commitWinner).toURI().toString());
+    stubImmutableArtifact(propertyStore, REALTIME_TABLE_NAME, "replayed", Status.DONE,
+        "http://controller:9000/segments/" + TEST_TABLE_NAME + "/" + replayWinner);
+    stubImmutableArtifact(propertyStore, REALTIME_TABLE_NAME, "pending", Status.COMMITTING, null);
+    RetentionManager retentionManager = createRetentionManager(resourceManager, mock(LeadControllerManager.class),
+        new ControllerConf(), mock(ControllerMetrics.class), mock(BrokerServiceHelper.class));
+    RetentionStrategy retention = new TimeRetentionStrategy(TimeUnit.DAYS, 1);
+
+    // OFFLINE and REALTIME tables share the raw table directory. Current REALTIME winners remain protected even
+    // when an OFFLINE scan does not have them in its snapshot of logical segment names.
+    List<String> orphans = retentionManager.findUntrackedSegmentsToDeleteFromDeepstore(
+        retentionManager.new TableRunContext(OFFLINE_TABLE_NAME), retention, Set.of(), retention);
+    assertEquals(Set.copyOf(orphans),
+        Set.of(losingAttempt, losingAttempt + ".metadata", missingSegment, missingSegment + ".metadata"));
+  }
+
+  @Test
+  public void testImmutableArtifactScanRetainsFilesWhenMetadataCannotBeVerified()
+      throws Exception {
+    String artifact = "segment.commit.11111111-1111-1111-1111-111111111111";
+    File file = new File(_tableDir, artifact);
+    createFileWithContent(file, artifact);
+    setFileModificationTime(file, System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30));
+    File sidecar = new File(_tableDir, artifact + Constants.METADATA_TAR_GZ_FILE_EXT);
+    createFileWithContent(sidecar, artifact);
+    setFileModificationTime(sidecar, System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    HelixManager helixManager = mock(HelixManager.class);
+    when(resourceManager.getHelixZkManager()).thenReturn(helixManager);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    when(resourceManager.getDataDir()).thenReturn(_tempDir.toString());
+    RetentionManager retentionManager = createRetentionManager(resourceManager, mock(LeadControllerManager.class),
+        new ControllerConf(), mock(ControllerMetrics.class), mock(BrokerServiceHelper.class));
+    RetentionStrategy retention = new TimeRetentionStrategy(TimeUnit.DAYS, 1);
+
+    assertTrue(retentionManager.findUntrackedSegmentsToDeleteFromDeepstore(
+        retentionManager.new TableRunContext(REALTIME_TABLE_NAME), retention, Set.of(), retention).isEmpty());
+    when(helixManager.isConnected()).thenReturn(true);
+    when(propertyStore.get(anyString(), isNull(), eq(AccessOption.PERSISTENT)))
+        .thenThrow(new IllegalStateException("Metadata unavailable"));
+    assertTrue(retentionManager.findUntrackedSegmentsToDeleteFromDeepstore(
+        retentionManager.new TableRunContext(REALTIME_TABLE_NAME), retention, Set.of(), retention).isEmpty());
+  }
+
+  @Test
+  public void testOfflineMetadataReferenceAlsoProtectsImmutableArtifact()
+      throws Exception {
+    String artifact = "segment.recovery.11111111-1111-1111-1111-111111111111";
+    File file = new File(_tableDir, artifact);
+    createFileWithContent(file, artifact);
+    setFileModificationTime(file, System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30));
+    File sidecar = new File(_tableDir, artifact + Constants.METADATA_TAR_GZ_FILE_EXT);
+    createFileWithContent(sidecar, artifact);
+    setFileModificationTime(sidecar, System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30));
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.isConnected()).thenReturn(true);
+    when(resourceManager.getHelixZkManager()).thenReturn(helixManager);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    when(resourceManager.getDataDir()).thenReturn(_tempDir.toString());
+    stubImmutableArtifact(propertyStore, OFFLINE_TABLE_NAME, "segment", Status.DONE, file.toURI().toString());
+    RetentionManager retentionManager = createRetentionManager(resourceManager, mock(LeadControllerManager.class),
+        new ControllerConf(), mock(ControllerMetrics.class), mock(BrokerServiceHelper.class));
+    RetentionStrategy retention = new TimeRetentionStrategy(TimeUnit.DAYS, 1);
+
+    assertTrue(retentionManager.findUntrackedSegmentsToDeleteFromDeepstore(
+        retentionManager.new TableRunContext(REALTIME_TABLE_NAME), retention, Set.of(), retention).isEmpty());
+  }
+
+  private void stubImmutableArtifact(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName, String segmentName,
+      Status status, String downloadUrl) {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(segmentName);
+    metadata.setReplicateMode(true);
+    metadata.setStatus(status);
+    metadata.setDownloadUrl(downloadUrl);
+    ZNRecord record = metadata.toZNRecord();
+    when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentName), null,
+        AccessOption.PERSISTENT)).thenReturn(record);
   }
 
   private void testDifferentTimeUnits(long pastTimeStamp, TimeUnit timeUnit, long dayAfterTomorrowTimeStamp,

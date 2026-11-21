@@ -33,6 +33,8 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   PERCENT_OF_REPLICAS("percent", false),
 
   SEGMENTS_IN_ERROR_STATE("segments", false),
+  REPLICATE_MODE_PENDING_RECOVERIES("segments", false),
+  REPLICATE_MODE_BLOCKED_RECOVERIES("segments", false),
   // Segment start and end time is stored in milliseconds.
   // Invalid start/end time means the broker time pruner will not work correctly.
   // Invalid end times means time retention will not happen for that segment.

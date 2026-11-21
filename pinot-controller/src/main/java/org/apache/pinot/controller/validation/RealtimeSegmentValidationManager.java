@@ -122,6 +122,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       return;
     }
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+    _llcRealtimeSegmentManager.repairCompletedReplicateModeSegments(tableNameWithType);
 
     if (shouldEnsureConsuming(tableNameWithType)) {
       _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfigs, context._offsetCriteria);

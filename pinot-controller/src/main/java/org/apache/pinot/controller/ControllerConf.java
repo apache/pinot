@@ -334,6 +334,16 @@ public class ControllerConf extends PinotConfiguration {
     public static final String RT_CONSUMER_MONITOR_CRON_EXPRESSION =
         "controller.realtimeConsumerMonitor.cronExpression";
     public static final String DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_PERIOD = "-1s"; // Disabled by default
+
+    // Replicate mode failover coordination
+    public static final String REPLICATE_MODE_FAILOVER_FREQUENCY_PERIOD =
+        "controller.realtime.replicateMode.failover.frequencyPeriod";
+    public static final String REPLICATE_MODE_FAILOVER_INITIAL_DELAY_IN_SECONDS =
+        "controller.realtime.replicateMode.failover.initialDelayInSeconds";
+    public static final String REPLICATE_MODE_FAILOVER_CRON_EXPRESSION =
+        "controller.realtime.replicateMode.failover.cronExpression";
+    public static final String DEFAULT_REPLICATE_MODE_FAILOVER_FREQUENCY_PERIOD = "10s";
+    public static final long DEFAULT_REPLICATE_MODE_FAILOVER_INITIAL_DELAY_IN_SECONDS = 10L;
   }
 
   public static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
@@ -974,6 +984,37 @@ public class ControllerConf extends PinotConfiguration {
   public long getRealtimeConsumerMonitorInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.RT_CONSUMER_MONITOR_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+  }
+
+  public int getReplicateModeFailoverFrequencyInSeconds() {
+    String period = getProperty(ControllerPeriodicTasksConf.REPLICATE_MODE_FAILOVER_FREQUENCY_PERIOD,
+        ControllerPeriodicTasksConf.DEFAULT_REPLICATE_MODE_FAILOVER_FREQUENCY_PERIOD);
+    if (!isValidPeriodWithLogging(ControllerPeriodicTasksConf.REPLICATE_MODE_FAILOVER_FREQUENCY_PERIOD, period)) {
+      period = ControllerPeriodicTasksConf.DEFAULT_REPLICATE_MODE_FAILOVER_FREQUENCY_PERIOD;
+    }
+    return (int) convertPeriodToSeconds(period);
+  }
+
+  public long getReplicateModeFailoverInitialDelayInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.REPLICATE_MODE_FAILOVER_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_REPLICATE_MODE_FAILOVER_INITIAL_DELAY_IN_SECONDS);
+  }
+
+  public String getReplicateModeFailoverCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.REPLICATE_MODE_FAILOVER_CRON_EXPRESSION);
+  }
+
+  public long getReplicateModeFailoverCooldownMs() {
+    return Math.max(0L, getProperty("controller.realtime.replicateMode.failover.cooldownMs", 30_000L));
+  }
+
+  public int getReplicateModeRecoveryMaxActionsPerTable() {
+    return Math.max(1, getProperty("controller.realtime.replicateMode.recovery.maxActionsPerTable", 10));
+  }
+
+  public long getReplicateModeRecoveryRetryMaxDelayMs() {
+    return Math.max(10_000L,
+        getProperty("controller.realtime.replicateMode.recovery.retryMaxDelayMs", 300_000L));
   }
 
   public int getTaskMetricsEmitterFrequencyInSeconds() {
