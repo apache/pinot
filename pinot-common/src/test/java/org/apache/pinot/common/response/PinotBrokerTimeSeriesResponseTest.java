@@ -50,4 +50,18 @@ public class PinotBrokerTimeSeriesResponseTest {
         + "{\"metric\":{\"__name__\":\"requests\"},\"values\":[[10,\"1.0\"],[20,\"2.0\"],[30,\"3.0\"]]}]}}";
     assertEquals(JsonUtils.stringToJsonNode(response), JsonUtils.stringToJsonNode(expected));
   }
+
+  @Test
+  public void testMatrixIsEmptyWhenAllSeriesHaveNoSamples()
+      throws Exception {
+    TimeBuckets buckets = TimeBuckets.ofSeconds(10L, Duration.ofSeconds(10L), 3);
+    List<String> tags = List.of("__name__");
+    TimeSeries requests = new TimeSeries("1", null, buckets, new Double[3], tags, new Object[]{"requests"});
+    TimeSeries errors = new TimeSeries("2", null, buckets, new Double[3], tags, new Object[]{"errors"});
+    TimeSeriesBlock block = new TimeSeriesBlock(buckets, Map.of(1L, List.of(requests), 2L, List.of(errors)));
+
+    String response = PinotBrokerTimeSeriesResponse.fromTimeSeriesBlock(block).serialize();
+    String expected = "{\"status\":\"success\",\"data\":{\"resultType\":\"matrix\",\"result\":[]}}";
+    assertEquals(JsonUtils.stringToJsonNode(response), JsonUtils.stringToJsonNode(expected));
+  }
 }
