@@ -359,6 +359,89 @@ final class MappedSegmentMetadataStore implements Closeable {
     }
   }
 
+  synchronized boolean isOutsideRange(int ordinal, @Nullable Comparable<?> lowerBound, boolean lowerInclusive,
+      @Nullable Comparable<?> upperBound, boolean upperInclusive) {
+    ensureOpen();
+    long recordOffset = _tableOffset + (long) ordinal * RECORD_SIZE;
+    return (upperBound != null && isOutsideBound(ordinal, recordOffset, upperBound, upperInclusive, true))
+        || (lowerBound != null && isOutsideBound(ordinal, recordOffset, lowerBound, lowerInclusive, false));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private boolean isOutsideBound(int ordinal, long recordOffset, Comparable endpoint, boolean inclusive,
+      boolean minimum) {
+    int tag = _buffer.getInt(recordOffset + (minimum ? MIN_TAG : MAX_TAG));
+    if (tag == NO_VALUE) {
+      return false;
+    }
+    long raw = _buffer.getLong(recordOffset + (minimum ? MIN_RAW : MAX_RAW));
+    int comparison;
+    switch (tag) {
+      case INT_VALUE:
+        comparison = Integer.compare((Integer) endpoint, (int) raw);
+        break;
+      case LONG_VALUE:
+        comparison = Long.compare((Long) endpoint, raw);
+        break;
+      case FLOAT_VALUE:
+        comparison = Float.compare((Float) endpoint, Float.intBitsToFloat((int) raw));
+        break;
+      case DOUBLE_VALUE:
+        comparison = Double.compare((Double) endpoint, Double.longBitsToDouble(raw));
+        break;
+      default:
+        comparison = endpoint.compareTo(value(ordinal, minimum));
+        break;
+    }
+    return minimum ? comparison < (inclusive ? 0 : 1) : comparison > (inclusive ? 0 : -1);
+  }
+
+  boolean isOutsideValues(int ordinal, List<? extends Comparable<?>> values) {
+    if (values.isEmpty()) {
+      return true;
+    }
+    int minTag;
+    int maxTag;
+    long min;
+    long max;
+    Comparable<?> decodedMin;
+    Comparable<?> decodedMax;
+    // Copy both bounds once and release the mapping's monitor before scanning the IN list.
+    synchronized (this) {
+      ensureOpen();
+      long recordOffset = _tableOffset + (long) ordinal * RECORD_SIZE;
+      minTag = _buffer.getInt(recordOffset + MIN_TAG);
+      maxTag = _buffer.getInt(recordOffset + MAX_TAG);
+      min = _buffer.getLong(recordOffset + MIN_RAW);
+      max = _buffer.getLong(recordOffset + MAX_RAW);
+      decodedMin = minTag > DOUBLE_VALUE ? value(ordinal, true) : null;
+      decodedMax = maxTag > DOUBLE_VALUE ? value(ordinal, false) : null;
+    }
+    for (Comparable<?> endpoint : values) {
+      if ((minTag == NO_VALUE || compareBound(endpoint, minTag, min, decodedMin) >= 0)
+          && (maxTag == NO_VALUE || compareBound(endpoint, maxTag, max, decodedMax) <= 0)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static int compareBound(Comparable endpoint, int tag, long raw, @Nullable Comparable<?> decoded) {
+    switch (tag) {
+      case INT_VALUE:
+        return Integer.compare((Integer) endpoint, (int) raw);
+      case LONG_VALUE:
+        return Long.compare((Long) endpoint, raw);
+      case FLOAT_VALUE:
+        return Float.compare((Float) endpoint, Float.intBitsToFloat((int) raw));
+      case DOUBLE_VALUE:
+        return Double.compare((Double) endpoint, Double.longBitsToDouble(raw));
+      default:
+        return endpoint.compareTo(decoded);
+    }
+  }
+
   synchronized PropertiesConfiguration segmentConfiguration()
       throws IOException, ConfigurationException {
     ensureOpen();

@@ -46,6 +46,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -55,10 +56,12 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.IndexPlugin;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.MappedColumnMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -75,6 +78,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -369,6 +373,103 @@ public class SegmentMetadataImplTest {
         Files.move(movedDirectory.toPath(), _segmentDirectory.toPath());
       }
     }
+  }
+
+  @Test
+  public void testMappedColumnRangeComparison()
+      throws Exception {
+    File segmentDir = Files.createTempDirectory("mapped-column-range").toFile();
+    try {
+      Files.writeString(new File(segmentDir, "metadata.properties").toPath(), """
+          segment.name = mappedBounds
+          segment.table.name = testTable
+          segment.total.docs = 2
+          segment.version = v1
+          segment.dimension.column.names = ints,longs,doubles,floats,strings,uuids
+          column.ints.columnType = DIMENSION
+          column.ints.cardinality = 2
+          column.ints.dataType = INT
+          column.ints.maxValue = -7
+          column.longs.columnType = DIMENSION
+          column.longs.cardinality = 2
+          column.longs.dataType = LONG
+          column.longs.minValue = 9007199254740993
+          column.longs.maxValue = 9007199254740994
+          column.doubles.columnType = DIMENSION
+          column.doubles.cardinality = 2
+          column.doubles.dataType = DOUBLE
+          column.doubles.minValue = -0.0
+          column.doubles.maxValue = -0.0
+          column.floats.columnType = DIMENSION
+          column.floats.cardinality = 2
+          column.floats.dataType = FLOAT
+          column.floats.minValue = Infinity
+          column.floats.maxValue = NaN
+          column.strings.columnType = DIMENSION
+          column.strings.cardinality = 2
+          column.strings.dataType = STRING
+          column.strings.minValue = beta
+          column.strings.maxValue = beta
+          column.uuids.columnType = DIMENSION
+          column.uuids.cardinality = 2
+          column.uuids.dataType = UUID
+          column.uuids.minValue = 00000000000000000000000000000001
+          column.uuids.maxValue = 00000000000000000000000000000001
+          """);
+      try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
+        assertTrue(mapped.isMapped());
+        DataSourceMetadata ints = getDataSourceMetadata(mapped, "ints");
+        assertFalse(ints.isOutsideMinMaxRange(null, false, Integer.MIN_VALUE, true));
+        assertFalse(ints.isOutsideMinMaxRange(-7, true, null, false));
+        assertTrue(ints.isOutsideMinMaxRange(-7, false, null, false));
+        assertTrue(ints.isOutsideMinMaxRange(List.of()));
+        assertTrue(ints.isOutsideMinMaxRange(List.of(-6, 0)));
+        assertFalse(ints.isOutsideMinMaxRange(List.of(-6, Integer.MIN_VALUE)));
+        assertNull(ints.getMinValue());
+
+        DataSourceMetadata longs = getDataSourceMetadata(mapped, "longs");
+        long min = 9_007_199_254_740_993L;
+        assertTrue(longs.isOutsideMinMaxRange(null, false, min - 1, true));
+        assertTrue(longs.isOutsideMinMaxRange(null, false, min, false));
+        assertFalse(longs.isOutsideMinMaxRange(null, false, min, true));
+        assertTrue(longs.isOutsideMinMaxRange(min + 1, false, null, false));
+        assertFalse(longs.isOutsideMinMaxRange(min + 1, true, null, false));
+        assertTrue(longs.isOutsideMinMaxRange(List.of(min - 1, min + 2)));
+        assertFalse(longs.isOutsideMinMaxRange(List.of(min - 1, min + 1)));
+        Comparable<?> minimum = longs.getMinValue();
+        assertEquals(minimum, Long.valueOf(min));
+        assertEquals(longs.getMaxValue(), Long.valueOf(min + 1));
+        assertNotSame(longs.getMinValue(), minimum);
+
+        DataSourceMetadata doubles = getDataSourceMetadata(mapped, "doubles");
+        assertTrue(doubles.isOutsideMinMaxRange(0.0d, true, 0.0d, true));
+        assertFalse(doubles.isOutsideMinMaxRange(-0.0d, true, -0.0d, true));
+        assertEquals(doubles.getMinValue(), Double.valueOf(-0.0d));
+        DataSourceMetadata floats = getDataSourceMetadata(mapped, "floats");
+        assertTrue(floats.isOutsideMinMaxRange(null, false, Float.MAX_VALUE, true));
+        assertFalse(floats.isOutsideMinMaxRange(Float.NaN, true, null, false));
+        assertTrue(floats.isOutsideMinMaxRange(Float.NaN, false, null, false));
+
+        DataSourceMetadata strings = getDataSourceMetadata(mapped, "strings");
+        assertTrue(strings.isOutsideMinMaxRange(null, false, "beta", false));
+        assertFalse(strings.isOutsideMinMaxRange("beta", true, "beta", true));
+        assertTrue(strings.isOutsideMinMaxRange(List.of("alpha", "gamma")));
+        assertFalse(strings.isOutsideMinMaxRange(List.of("alpha", "beta")));
+
+        DataSourceMetadata uuids = getDataSourceMetadata(mapped, "uuids");
+        Comparable<?> uuid = DataType.UUID.convertInternal("00000000-0000-0000-0000-000000000001");
+        assertTrue(uuids.isOutsideMinMaxRange(null, false, uuid, false));
+        assertFalse(uuids.isOutsideMinMaxRange(uuid, true, uuid, true));
+        assertSame(uuids.getMinValue(), uuids.getMinValue());
+      }
+    } finally {
+      FileUtils.deleteQuietly(segmentDir);
+    }
+  }
+
+  private static DataSourceMetadata getDataSourceMetadata(SegmentMetadataImpl metadata, String column) {
+    return new ImmutableDataSource(metadata.getColumnMetadataFor(column), ColumnIndexContainer.Empty.INSTANCE)
+        .getDataSourceMetadata();
   }
 
   @Test

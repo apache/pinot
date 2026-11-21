@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.index.datasource;
 
+import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.metadata.MappedColumnMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -82,6 +84,23 @@ public class ImmutableDataSource extends BaseDataSource {
     @Override
     public Comparable getMaxValue() {
       return _columnMetadata.getMaxValue();
+    }
+
+    @Override
+    public boolean isOutsideMinMaxRange(@Nullable Comparable lowerBound, boolean lowerInclusive,
+        @Nullable Comparable upperBound, boolean upperInclusive) {
+      if (_columnMetadata instanceof MappedColumnMetadata mapped && getDataType().getStoredType().isFixedWidth()) {
+        return mapped.isOutsideFixedWidthRange(lowerBound, lowerInclusive, upperBound, upperInclusive);
+      }
+      return DataSourceMetadata.super.isOutsideMinMaxRange(lowerBound, lowerInclusive, upperBound, upperInclusive);
+    }
+
+    @Override
+    public boolean isOutsideMinMaxRange(List<? extends Comparable<?>> values) {
+      if (_columnMetadata instanceof MappedColumnMetadata mapped && getDataType().getStoredType().isFixedWidth()) {
+        return mapped.isOutsideFixedWidthRange(values);
+      }
+      return DataSourceMetadata.super.isOutsideMinMaxRange(values);
     }
 
     @Nullable
