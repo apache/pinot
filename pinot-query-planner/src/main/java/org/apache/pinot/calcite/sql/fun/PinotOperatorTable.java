@@ -315,7 +315,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.TIMESTAMP_DIFF,
       SqlStdOperatorTable.CAST,
       SqlStdOperatorTable.EXTRACT,
-      SqlStdOperatorTable.ITEM,
+      // ITEM typed for OPEN_STRUCT columns; standard ITEM otherwise
+      PinotItemOperator.INSTANCE,
       SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR,
       SqlStdOperatorTable.LISTAGG
   );

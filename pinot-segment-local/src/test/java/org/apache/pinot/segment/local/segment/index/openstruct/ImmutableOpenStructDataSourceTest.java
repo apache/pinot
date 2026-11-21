@@ -64,6 +64,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -359,6 +363,29 @@ public class ImmutableOpenStructDataSourceTest {
     DataSource anyDs = ds.getDataSource("anything");
     assertNotNull(anyDs);
     assertTrue(anyDs instanceof SparseKeyDataSource);
+  }
+
+  @Test
+  public void testNestedMultiValueKeyWithoutLengthManifest() {
+    String[] blobs = {null, "{\"o\":{\"z\":[1,2]}}"};
+    ComplexFieldSpec spec = new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true,
+        Map.of("o.z", new DimensionFieldSpec("o.z", DataType.LONG, false)));
+    FakeStringForwardIndex reader = spy(new FakeStringForwardIndex(blobs));
+    DataSource sparse = mock(DataSource.class);
+    doReturn(reader).when(sparse).getForwardIndex();
+    doReturn(FakeStringForwardIndex.nullVector(blobs)).when(sparse).getNullValueVector();
+    ImmutableOpenStructDataSource ds =
+        new ImmutableOpenStructDataSource(spec, Map.of(), sparse, blobs.length, null, null, null);
+    DataSource key = ds.getDataSource("o.z");
+    verify(reader, never()).getString(1, null);
+    assertTrue(key.getNullValueVector().isNull(0));
+    verify(reader).getString(1, null);
+
+    long[] buffer = new long[key.getDataSourceMetadata().getMaxNumValuesPerMVEntry()];
+    assertEquals(key.getDataSourceMetadata().getMaxNumValuesPerMVEntry(), 2);
+    verify(reader, times(2)).getString(1, null);
+    assertEquals(key.getForwardIndex().getLongMV(1, buffer, null), 2);
+    assertEquals(buffer, new long[]{1, 2});
   }
 
   @Test

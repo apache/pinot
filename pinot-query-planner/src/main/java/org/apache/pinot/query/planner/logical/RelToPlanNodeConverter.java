@@ -97,6 +97,7 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.query.type.OpenStructSqlType;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -1462,6 +1463,10 @@ public final class RelToPlanNodeConverter {
   }
 
   public static ColumnDataType convertToColumnDataType(RelDataType relDataType) {
+    if (relDataType instanceof OpenStructSqlType) {
+      // The leaf returns an OPEN_STRUCT column as JSON text, as the single-stage engine does
+      return ColumnDataType.JSON;
+    }
     SqlTypeName sqlTypeName = relDataType.getSqlTypeName();
     if (sqlTypeName == SqlTypeName.NULL) {
       return ColumnDataType.UNKNOWN;
