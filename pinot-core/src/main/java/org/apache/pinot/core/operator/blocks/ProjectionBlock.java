@@ -21,9 +21,11 @@ package org.apache.pinot.core.operator.blocks;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -35,6 +37,7 @@ import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource.MapValueReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -93,10 +96,11 @@ public class ProjectionBlock implements ValueBlock {
     int numDocs = getNumDocs();
     int[] docIds = getDocIds();
     String[] documents = new String[numDocs];
+    Set<String> booleanKeys = booleanKeys(openStructDataSource);
     try (MapValueReader reader = openStructDataSource.openMapValueReader()) {
       for (int i = 0; i < numDocs; i++) {
         Map<String, Object> document = reader.getMapValue(docIds[i]);
-        documents[i] = document == null ? "{}" : JsonUtils.objectToString(renderDocument(document));
+        documents[i] = document == null ? "{}" : JsonUtils.objectToString(renderDocument(document, booleanKeys));
       }
     } catch (IOException e) {
       throw new RuntimeException("Failed to read OPEN_STRUCT column: " + column, e);
@@ -111,14 +115,32 @@ public class ProjectionBlock implements ValueBlock {
   /// the shape the source had, so it wins and the paths into it are dropped. `.` is an ordinary key character with
   /// no escape, and that is exactly what makes the container's own entry the thing that disambiguates: a dotted key
   /// whose prefix is not itself a key was never a path, so it stays a key spelled with a dot.
-  private static Map<String, Object> renderDocument(Map<String, Object> document) {
+  ///
+  /// `booleanKeys` names the materialized keys declared BOOLEAN, whose stored INT 0/1 reads as a boolean. Only the top
+  /// level carries them: a nested object is the source's own JSON, where a boolean is already one.
+  private static Map<String, Object> renderDocument(Map<String, Object> document, Set<String> booleanKeys) {
     Map<String, Object> rendered = new LinkedHashMap<>(document.size());
     for (Map.Entry<String, Object> entry : document.entrySet()) {
-      if (!isPathIntoPresentObject(entry.getKey(), document)) {
-        rendered.put(entry.getKey(), renderValue(entry.getValue()));
+      String key = entry.getKey();
+      if (!isPathIntoPresentObject(key, document)) {
+        Object value = entry.getValue();
+        rendered.put(key, value instanceof Number number && booleanKeys.contains(key)
+            ? number.intValue() != 0 : renderValue(value));
       }
     }
     return rendered;
+  }
+
+  /// The materialized keys declared BOOLEAN. A BOOLEAN is stored as INT 0/1 and the reconstruction hands back the
+  /// stored number, so the document needs the declared type to say `true` instead of `1`, the way `col['key']` does.
+  private static Set<String> booleanKeys(OpenStructDataSource openStructDataSource) {
+    Set<String> booleanKeys = new HashSet<>();
+    for (Map.Entry<String, DataSource> entry : openStructDataSource.getDataSources().entrySet()) {
+      if (entry.getValue().getDataSourceMetadata().getDataType() == DataType.BOOLEAN) {
+        booleanKeys.add(entry.getKey());
+      }
+    }
+    return booleanKeys;
   }
 
   /// Whether `key` is a path into an object that the document also carries whole. `configApi.timeTaken` is, when
@@ -199,7 +221,7 @@ public class ProjectionBlock implements ValueBlock {
     }
     if (value instanceof Map<?, ?> map) {
       // Keys re-typed, values left raw: renderDocument renders each one as it walks them.
-      return renderDocument(asStringKeyedMap(map));
+      return renderDocument(asStringKeyedMap(map), Set.of());
     }
     if (value instanceof String text) {
       // A container reaches here as the JSON text the flattener stored, so inserting it as a string would nest a

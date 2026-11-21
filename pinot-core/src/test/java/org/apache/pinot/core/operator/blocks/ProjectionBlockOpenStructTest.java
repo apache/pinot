@@ -259,6 +259,38 @@ public class ProjectionBlockOpenStructTest {
     assertEquals(project(Map.of("tags", List.of("a", "b"))).getStringValuesSV()[0], "{\"tags\":[\"a\",\"b\"]}");
   }
 
+  /// A BOOLEAN key is stored as INT 0/1, and the reconstruction hands that stored number back. The document must read
+  /// it as the boolean it is, the way `SELECT col['flag']` does, not as `1`.
+  @Test
+  public void testBooleanKeyRendersAsBoolean() {
+    Map<String, Object> document = new LinkedHashMap<>();
+    document.put("flag", 1);
+    document.put("off", 0);
+    document.put("count", 5);
+    OpenStructDataSource openStruct = mockOpenStructDataSource();
+    when(openStruct.openMapValueReader()).thenReturn(docId -> document);
+    DataSource flag = keyDataSource(FieldSpec.DataType.BOOLEAN);
+    DataSource off = keyDataSource(FieldSpec.DataType.BOOLEAN);
+    DataSource count = keyDataSource(FieldSpec.DataType.INT);
+    when(openStruct.getDataSources()).thenReturn(Map.of("flag", flag, "off", off, "count", count));
+
+    assertEquals(projectWith(openStruct).getStringValuesSV()[0], "{\"flag\":true,\"off\":false,\"count\":5}");
+  }
+
+  /// A boolean that lives in the sparse blob is already a JSON boolean and has no per-key source, so it stays as is.
+  @Test
+  public void testSparseBooleanStaysBoolean() {
+    assertEquals(project(Map.of("flag", true)).getStringValuesSV()[0], "{\"flag\":true}");
+  }
+
+  private static DataSource keyDataSource(FieldSpec.DataType dataType) {
+    DataSource dataSource = mock(DataSource.class);
+    DataSourceMetadata metadata = mock(DataSourceMetadata.class);
+    when(metadata.getDataType()).thenReturn(dataType);
+    when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
+    return dataSource;
+  }
+
   /// Projects a single-row block whose OPEN_STRUCT column reconstructs to `document`.
   private static BlockValSet project(Map<String, Object> document) {
     OpenStructDataSource openStruct = mockOpenStructDataSource();
