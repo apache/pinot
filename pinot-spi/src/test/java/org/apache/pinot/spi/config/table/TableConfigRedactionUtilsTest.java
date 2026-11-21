@@ -32,6 +32,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotSame;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -907,6 +908,28 @@ public class TableConfigRedactionUtilsTest {
         () -> TableConfigRedactionUtils.restoreRedactedValues(renamed, stored));
     assertThrows(IllegalArgumentException.class,
         () -> TableConfigRedactionUtils.restoreRedactedValues(redacted, null));
+  }
+
+  @Test
+  public void testRedactPropertiesAppliesTheTableConfigDisplayPolicy() {
+    Map<String, String> properties = new LinkedHashMap<>();
+    properties.put("tableName", "events_OFFLINE");
+    properties.put("authToken", "Basic task-token");
+    properties.put("input.fs.prop.secretKey", "${FS_SECRET:fs-default}");
+    properties.put("downloadURL", "https://user:download-pass@store.example/segment?token=download-token");
+    properties.put("optional", null);
+
+    Map<String, String> redacted = TableConfigRedactionUtils.redactProperties(properties);
+
+    assertEquals(List.copyOf(redacted.keySet()), List.copyOf(properties.keySet()));
+    assertEquals(redacted.get("tableName"), "events_OFFLINE");
+    assertEquals(redacted.get("authToken"), MARKER);
+    assertEquals(redacted.get("input.fs.prop.secretKey"), "${FS_SECRET:" + MARKER + "}");
+    assertEquals(redacted.get("downloadURL"),
+        "https://" + MARKER + ":" + MARKER + "@store.example/segment?token=" + MARKER);
+    assertTrue(redacted.containsKey("optional"));
+    assertNull(redacted.get("optional"));
+    assertEquals(properties.get("authToken"), "Basic task-token", "The input map must not be modified");
   }
 
   @Test

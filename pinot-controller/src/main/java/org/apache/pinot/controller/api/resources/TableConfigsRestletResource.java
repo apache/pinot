@@ -67,6 +67,7 @@ import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException.ExceptionLogMode;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -216,7 +217,7 @@ public class TableConfigsRestletResource {
       return JsonUtils.objectToString(new RedactedTableConfigsResponse(config, baseVersions));
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to retrieve TableConfigs",
-          Response.Status.INTERNAL_SERVER_ERROR);
+          Response.Status.INTERNAL_SERVER_ERROR, e, ExceptionLogMode.TYPE_ONLY);
     }
   }
 
@@ -330,7 +331,7 @@ public class TableConfigsRestletResource {
         throw e;
       } else {
         throw new ControllerApplicationException(LOGGER, "Failed to add TableConfigs: " + rawTableName,
-            Response.Status.INTERNAL_SERVER_ERROR);
+            Response.Status.INTERNAL_SERVER_ERROR, e, ExceptionLogMode.TYPE_ONLY);
       }
     }
   }
@@ -544,7 +545,7 @@ public class TableConfigsRestletResource {
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, "Failed to update TableConfigs for: " + tableName,
-          Response.Status.INTERNAL_SERVER_ERROR);
+          Response.Status.INTERNAL_SERVER_ERROR, e, ExceptionLogMode.TYPE_ONLY);
     }
 
     return new ConfigSuccessResponse("TableConfigs updated for " + tableName,

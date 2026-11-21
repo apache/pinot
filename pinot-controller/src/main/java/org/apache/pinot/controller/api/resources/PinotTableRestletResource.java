@@ -104,6 +104,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException.ExceptionLogMode;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -292,7 +293,7 @@ public class PinotTableRestletResource {
         throw e;
       } else {
         throw new ControllerApplicationException(LOGGER, "Failed to add table " + tableNameWithType,
-            Response.Status.INTERNAL_SERVER_ERROR);
+            Response.Status.INTERNAL_SERVER_ERROR, e, ExceptionLogMode.TYPE_ONLY);
       }
     }
   }
@@ -408,7 +409,7 @@ public class PinotTableRestletResource {
       throw e;
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Error copying table: " + tableName,
-          Response.Status.INTERNAL_SERVER_ERROR);
+          Response.Status.INTERNAL_SERVER_ERROR, e, ExceptionLogMode.TYPE_ONLY);
     }
   }
 
@@ -694,7 +695,7 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to retrieve table config",
-          Response.Status.INTERNAL_SERVER_ERROR);
+          Response.Status.INTERNAL_SERVER_ERROR, e, ExceptionLogMode.TYPE_ONLY);
     }
   }
 
@@ -986,7 +987,7 @@ public class PinotTableRestletResource {
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, "Failed to update table " + tableName,
-          Response.Status.INTERNAL_SERVER_ERROR);
+          Response.Status.INTERNAL_SERVER_ERROR, e, ExceptionLogMode.TYPE_ONLY);
     }
     LOGGER.info("Successfully updated table configs: {}", tableConfigs.keySet());
     return new ConfigSuccessResponse("Table config updated for " + tableName,

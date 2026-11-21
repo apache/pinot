@@ -26,11 +26,16 @@ import org.slf4j.Logger;
 
 public class ControllerApplicationException extends WebApplicationException {
 
-  /// Controls whether server logs include the supplied exception details or only its type.
+  /// Controls whether server logs include the supplied exception details or only its types.
+  ///
+  /// `TYPE_ONLY` is for failures whose messages can repeat request or configuration values: it logs the class names
+  /// of the exception and its causes and the frame that threw the innermost one, and never a message.
   public enum ExceptionLogMode {
     FULL,
     TYPE_ONLY
   }
+
+  private static final int MAX_LOGGED_CAUSES = 8;
 
   private final boolean _includeCausesInResponse;
 
@@ -68,7 +73,7 @@ public class ControllerApplicationException extends WebApplicationException {
       if (e == null) {
         logger.info(message);
       } else if (exceptionLogMode == ExceptionLogMode.TYPE_ONLY) {
-        logger.info("{} exception type: {}", message, e.getClass().getName());
+        logger.info("{} exception type: {}", message, describeTypes(e));
       } else {
         logger.info("{} exception: {}", message, e.getMessage());
       }
@@ -76,11 +81,32 @@ public class ControllerApplicationException extends WebApplicationException {
       if (e == null) {
         logger.error(message);
       } else if (exceptionLogMode == ExceptionLogMode.TYPE_ONLY) {
-        logger.error("{} exception type: {}", message, e.getClass().getName());
+        logger.error("{} exception type: {}", message, describeTypes(e));
       } else {
         logger.error(message, e);
       }
     }
+  }
+
+  /// Describes `e` without repeating any exception message: the class names of `e` and its causes, outermost first,
+  /// followed by the frame that threw the innermost one. Class names and frames locate a failure but cannot carry
+  /// request or configuration values.
+  private static String describeTypes(Throwable e) {
+    StringBuilder description = new StringBuilder(e.getClass().getName());
+    Throwable innermost = e;
+    for (int i = 0; i < MAX_LOGGED_CAUSES; i++) {
+      Throwable cause = innermost.getCause();
+      if (cause == null || cause == innermost) {
+        break;
+      }
+      description.append(" caused by ").append(cause.getClass().getName());
+      innermost = cause;
+    }
+    StackTraceElement[] stackTrace = innermost.getStackTrace();
+    if (stackTrace.length > 0) {
+      description.append(" at ").append(stackTrace[0]);
+    }
+    return description.toString();
   }
 
   /// Creates an exception whose response also carries the messages of `e` and its causes. Use it only where those

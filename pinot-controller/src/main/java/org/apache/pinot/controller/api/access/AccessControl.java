@@ -68,7 +68,17 @@ public interface AccessControl extends FineGrainedAccessControl {
     return hasAccess(null, accessType, httpHeaders, endpointUrl);
   }
 
-  /// Determine whether authentication is required for annotated (controller) endpoints only
+  /// Determine whether only annotated (controller) endpoints are protected.
+  ///
+  /// An endpoint counts as annotated when it carries [Authenticate] or
+  /// [org.apache.pinot.core.auth.Authorize]. For such an endpoint the filter runs both the access-type check
+  /// ([#hasAccess(String, AccessType, HttpHeaders, String)]) and the fine-grained check
+  /// ([#hasAccess(HttpHeaders, org.apache.pinot.core.auth.TargetType, String, String)]). Endpoints that carry
+  /// neither annotation are skipped when this returns `true`.
+  ///
+  /// Earlier versions consulted an implementation returning `true` only for [Authenticate] endpoints, so an
+  /// implementation that denies by default in `hasAccess` now also denies the endpoints that are annotated with
+  /// `Authorize` alone, which includes most read endpoints.
   ///
   /// @return `true` if annotated methods are protected only, `false` otherwise
   default boolean protectAnnotatedOnly() {

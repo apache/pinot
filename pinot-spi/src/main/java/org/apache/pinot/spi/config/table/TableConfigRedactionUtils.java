@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -45,7 +46,15 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// Redaction is recursive so plugin-owned stream, batch, filesystem, decoder, provider, task, and custom property maps
 /// receive the same treatment as first-class table config fields. Literal values under credential-bearing keys are
 /// masked, as are JAAS/connection-string assignments and credentials embedded in URI user-info or query parameters.
-/// Whole-value environment and system-property placeholders are preserved and are never resolved by this class.
+/// Whole-value environment and system-property placeholders keep their variable name and are never resolved by this
+/// class; a placeholder default is redacted like a literal value because it is the effective value whenever the
+/// variable is unset.
+///
+/// Credential-bearing keys are recognized by a deny-list of suffixes on the normalized property name (see
+/// `isSensitiveKey`). The policy is not fail-closed: a property whose name matches no listed suffix is displayed
+/// unless its value has a recognized credential shape (URI user-info or query credential, `key=value` assignment, or
+/// JSON with credential-bearing keys). A new credential property must use a recognized suffix or be added to the
+/// list.
 ///
 /// The redaction marker is reserved in credential-bearing positions. During an update, an unchanged marker restores
 /// the corresponding value from the unresolved stored config. Marker-bearing array elements are matched to their
@@ -64,6 +73,7 @@ public final class TableConfigRedactionUtils {
           + "'(?:\\\\.|[^'\\\\]++)*+(?=;|\\r|\\n|$)|"
           + "(?:(?![&,][a-z][a-z0-9._-]*\\s*=)(?!\\s+[a-z][a-z0-9._-]*\\s*=(?!=))"
           + "[^;\\r\\n'\"])+)");
+  private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile("[^a-z0-9]");
   private static final Pattern JAAS_MODULE_PATTERN = Pattern.compile(
       "(?i)([a-z_$][a-z0-9_.$-]*)\\s+(?:required|requisite|sufficient|optional)\\b");
 
@@ -96,6 +106,20 @@ public final class TableConfigRedactionUtils {
   public static String maskPlaceholderDefault(String value) {
     Objects.requireNonNull(value, "value must not be null");
     return isPlaceholder(value) ? redactPlaceholder(value, true) : value;
+  }
+
+  /// Returns a copy of a flat property map with the display policy of [#redact(TableConfig)] applied to each value:
+  /// values under credential-bearing keys are masked and other values have embedded credentials redacted. Use it for
+  /// representations derived from table configs, such as minion task configs, which copy filesystem properties and
+  /// auth tokens out of the table config.
+  public static Map<String, String> redactProperties(Map<String, String> properties) {
+    Objects.requireNonNull(properties, "properties must not be null");
+    Map<String, String> redacted = new LinkedHashMap<>();
+    for (Map.Entry<String, String> property : properties.entrySet()) {
+      String value = property.getValue();
+      redacted.put(property.getKey(), value != null ? redactText(property.getKey(), value, false) : null);
+    }
+    return redacted;
   }
 
   /// Returns whether a property name is classified as credential-bearing by the shared display policy.
@@ -319,16 +343,16 @@ public final class TableConfigRedactionUtils {
   private static JsonNode redactNode(JsonNode node, @Nullable String fieldName, boolean parentSensitive) {
     boolean sensitive = parentSensitive || isSensitiveKey(fieldName);
     if (node.isObject()) {
-      ObjectNode copy = (ObjectNode) node.deepCopy();
-      for (Map.Entry<String, JsonNode> field : copy.properties()) {
+      ObjectNode copy = JsonUtils.newObjectNode();
+      for (Map.Entry<String, JsonNode> field : node.properties()) {
         copy.set(field.getKey(), redactNode(field.getValue(), field.getKey(), sensitive));
       }
       return copy;
     }
     if (node.isArray()) {
-      ArrayNode copy = (ArrayNode) node.deepCopy();
-      for (int i = 0; i < copy.size(); i++) {
-        copy.set(i, redactNode(copy.get(i), fieldName, sensitive));
+      ArrayNode copy = JsonUtils.newArrayNode();
+      for (JsonNode element : node) {
+        copy.add(redactNode(element, fieldName, sensitive));
       }
       return copy;
     }
@@ -921,7 +945,7 @@ public final class TableConfigRedactionUtils {
   }
 
   private static String normalizeKey(String key) {
-    return key.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    return NON_ALPHANUMERIC_PATTERN.matcher(key.toLowerCase(Locale.ROOT)).replaceAll("");
   }
 
   private static String redactStructuredCredentials(String value) {
