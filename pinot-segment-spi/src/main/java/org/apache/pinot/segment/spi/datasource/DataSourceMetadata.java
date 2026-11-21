@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.datasource;
 
+import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
@@ -63,6 +64,42 @@ public interface DataSourceMetadata {
   /// Returns the maximum value of the column, or `null` if it is not available.
   @Nullable
   Comparable getMaxValue();
+
+  /// Returns whether the available column bounds rule out the given predicate range.
+  /// A null predicate endpoint or missing column bound leaves that side unbounded.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  default boolean isOutsideMinMaxRange(@Nullable Comparable lowerBound, boolean lowerInclusive,
+      @Nullable Comparable upperBound, boolean upperInclusive) {
+    if (upperBound != null) {
+      Comparable min = getMinValue();
+      if (min != null && upperBound.compareTo(min) < (upperInclusive ? 0 : 1)) {
+        return true;
+      }
+    }
+    if (lowerBound != null) {
+      Comparable max = getMaxValue();
+      if (max != null && lowerBound.compareTo(max) > (lowerInclusive ? 0 : -1)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Returns whether all values in an IN predicate fall outside the available column bounds.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  default boolean isOutsideMinMaxRange(List<? extends Comparable<?>> values) {
+    if (values.isEmpty()) {
+      return true;
+    }
+    Comparable min = getMinValue();
+    Comparable max = getMaxValue();
+    for (Comparable value : values) {
+      if ((min == null || value.compareTo(min) >= 0) && (max == null || value.compareTo(max) <= 0)) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   /// Returns the partition function of the column, or `null` if the column is not partitioned.
   @Nullable

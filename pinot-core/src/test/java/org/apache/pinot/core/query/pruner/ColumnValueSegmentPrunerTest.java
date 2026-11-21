@@ -53,8 +53,12 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -81,8 +85,7 @@ public class ColumnValueSegmentPrunerTest {
 
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
-    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
-    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    DataSourceMetadata dataSourceMetadata = mockIntDataSourceMetadata();
     when(dataSourceMetadata.getMinValue()).thenReturn(10);
     when(dataSourceMetadata.getMaxValue()).thenReturn(20);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
@@ -99,6 +102,7 @@ public class ColumnValueSegmentPrunerTest {
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column > 20"));
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 20 AND 30"));
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 30 AND 40"));
+    verify(dataSourceMetadata).isOutsideMinMaxRange(30, true, 40, true);
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 10 AND 10"));
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column BETWEEN 20 AND 20"));
     // Invalid range predicate
@@ -137,8 +141,7 @@ public class ColumnValueSegmentPrunerTest {
 
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
-    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
-    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    DataSourceMetadata dataSourceMetadata = mockIntDataSourceMetadata();
     when(dataSourceMetadata.getMinValue()).thenReturn(10);
     when(dataSourceMetadata.getMaxValue()).thenReturn(20);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
@@ -167,8 +170,7 @@ public class ColumnValueSegmentPrunerTest {
 
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
-    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
-    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    DataSourceMetadata dataSourceMetadata = mockIntDataSourceMetadata();
     when(dataSourceMetadata.getMinValue()).thenReturn(10);
     when(dataSourceMetadata.getMaxValue()).thenReturn(20);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
@@ -185,8 +187,7 @@ public class ColumnValueSegmentPrunerTest {
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
 
-    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
-    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    DataSourceMetadata dataSourceMetadata = mockIntDataSourceMetadata();
     when(dataSourceMetadata.getPartitionFunction()).thenReturn(
         PartitionFunctionFactory.getPartitionFunction("Modulo", 5, null));
     when(dataSourceMetadata.getPartitions()).thenReturn(Set.of(2));
@@ -398,6 +399,19 @@ public class ColumnValueSegmentPrunerTest {
     }
   }
 
+  @Test
+  public void testMinMaxPruningAcrossColumnTypes() {
+    IndexSegment matching = segmentWithRange(10, 20, () -> { });
+    IndexSegment nonMatching = segmentWithRange(DataType.LONG, 30L, 40L, () -> { });
+    List<IndexSegment> segments = List.of(matching, nonMatching, matching);
+    for (String predicate : List.of("column IN (0, 10, 20)", "column BETWEEN 10 AND 20")) {
+      QueryContext query = QueryContextConverterUtils.getQueryContext(
+          "SELECT COUNT(*) FROM testTable WHERE " + predicate);
+      query.setSchema(mock(Schema.class));
+      assertEquals(PRUNER.prune(segments, query), List.of(matching, matching));
+    }
+  }
+
   private QueryContext pruningQuery() {
     QueryContext query = QueryContextConverterUtils.getQueryContext(
         "SELECT COUNT(*) FROM testTable WHERE column = 10");
@@ -408,18 +422,34 @@ public class ColumnValueSegmentPrunerTest {
   }
 
   private IndexSegment segmentWithRange(int minValue, int maxValue, Runnable onAccess) {
+    return segmentWithRange(DataType.INT, minValue, maxValue, onAccess);
+  }
+
+  private IndexSegment segmentWithRange(DataType type, Comparable<?> minValue, Comparable<?> maxValue,
+      Runnable onAccess) {
     IndexSegment indexSegment = mockIndexSegment();
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenAnswer(invocation -> {
       onAccess.run();
       return dataSource;
     });
-    DataSourceMetadata metadata = mock(DataSourceMetadata.class);
-    when(metadata.getDataType()).thenReturn(DataType.INT);
+    DataSourceMetadata metadata = mockDataSourceMetadata(type);
     when(metadata.getMinValue()).thenReturn(minValue);
     when(metadata.getMaxValue()).thenReturn(maxValue);
     when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
     return indexSegment;
+  }
+
+  private DataSourceMetadata mockIntDataSourceMetadata() {
+    return mockDataSourceMetadata(DataType.INT);
+  }
+
+  private DataSourceMetadata mockDataSourceMetadata(DataType type) {
+    DataSourceMetadata metadata = mock(DataSourceMetadata.class);
+    when(metadata.getDataType()).thenReturn(type);
+    doCallRealMethod().when(metadata).isOutsideMinMaxRange(any(), anyBoolean(), any(), anyBoolean());
+    doCallRealMethod().when(metadata).isOutsideMinMaxRange(anyList());
+    return metadata;
   }
 
   private IndexSegment mockIndexSegment() {
