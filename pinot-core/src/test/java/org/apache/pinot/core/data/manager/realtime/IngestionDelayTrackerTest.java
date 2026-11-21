@@ -29,12 +29,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -42,6 +45,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -49,9 +53,19 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -155,6 +169,143 @@ public class IngestionDelayTrackerTest {
 
   private IngestionDelayTracker createTracker() {
     return new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER);
+  }
+
+  /// Shutdown must stop an in-flight upstream offset fetch before closing the provider it runs on: a stream consumer
+  /// such as Kafka's throws ConcurrentModificationException when closed under a concurrent fetch.
+  @Test
+  public void testShutdownClosesProviderOnlyAfterInFlightFetchStops()
+      throws Exception {
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    IngestionDelayTracker tracker = new IngestionDelayTracker(serverMetrics, REALTIME_TABLE_NAME,
+        REALTIME_TABLE_DATA_MANAGER, 60_000, 5, () -> true);
+    AtomicBoolean inFetch = new AtomicBoolean();
+    AtomicBoolean closedDuringFetch = new AtomicBoolean();
+    CountDownLatch fetchStarted = new CountDownLatch(1);
+    CountDownLatch neverReleased = new CountDownLatch(1);
+    StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    when(provider.supportsOffsetLag()).thenReturn(true);
+    when(provider.fetchLatestStreamOffset(anySet(), anyLong())).thenAnswer(invocation -> {
+      inFetch.set(true);
+      fetchStarted.countDown();
+      try {
+        // Blocks until the tracking task is interrupted, like a consumer waiting on the broker
+        neverReleased.await();
+      } finally {
+        inFetch.set(false);
+      }
+      return Map.of();
+    });
+    doAnswer(invocation -> {
+      closedDuringFetch.set(inFetch.get());
+      return null;
+    }).when(provider).close();
+    tracker._streamConfigIndexToStreamMetadataProvider.put(0, provider);
+    tracker._partitionsHostedByThisServer.put(0, true);
+
+    assertTrue(fetchStarted.await(10, TimeUnit.SECONDS), "The tracking task should start a fetch");
+    tracker.shutdown();
+    verify(provider).close();
+    assertFalse(closedDuringFetch.get(), "The provider was closed while a fetch was still running on it");
+    // The fetch that shutdown interrupts is not counted as a fetch error, which would trip alerts on table deletes
+    verify(serverMetrics, never()).addMeteredTableValue(any(),
+        eq(ServerMeter.INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS), anyLong());
+  }
+
+  /// Removing a partition's metrics asks its provider whether it registered the offset gauges, so the provider must
+  /// still be known then: closing it first leaves the offset lag, upstream offset and consuming offset gauges behind.
+  @Test
+  public void testShutdownRemovesOffsetGaugesOfTrackedPartitions()
+      throws Exception {
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    IngestionDelayTracker tracker = new IngestionDelayTracker(serverMetrics, REALTIME_TABLE_NAME,
+        REALTIME_TABLE_DATA_MANAGER, 60_000, 5, () -> true);
+    StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    when(provider.supportsOffsetLag()).thenReturn(true);
+    when(provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of());
+    tracker._streamConfigIndexToStreamMetadataProvider.put(0, provider);
+    tracker._partitionsHostedByThisServer.put(0, true);
+    // A consuming segment reports its progress, which puts the partition in the tracker's ingestion info
+    String segment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, 123).getSegmentName();
+    tracker.updateMetrics(segment, 0, Long.MIN_VALUE, Long.MIN_VALUE, new LongMsgOffset(50));
+    // The tracking task registers the gauges of a hosted partition on its first tick
+    verify(serverMetrics, timeout(10_000)).setOrUpdatePartitionGauge(any(), eq(0),
+        eq(ServerGauge.REALTIME_INGESTION_OFFSET_LAG), any());
+
+    tracker.shutdown();
+
+    verify(serverMetrics).removePartitionGauge(any(), eq(0), eq(ServerGauge.REALTIME_INGESTION_OFFSET_LAG));
+    verify(serverMetrics).removePartitionGauge(any(), eq(0), eq(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET));
+    verify(serverMetrics).removePartitionGauge(any(), eq(0), eq(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET));
+    verify(serverMetrics).removePartitionGauge(any(), eq(0), eq(ServerGauge.REALTIME_INGESTION_DELAY_MS));
+    verify(provider).close();
+  }
+
+  /// When the caller is interrupted, or the wait for the tracking task runs out, the task can still be inside a fetch.
+  /// The provider is then closed once that fetch returns, not under it, and not left open for good.
+  @Test
+  public void testInterruptedShutdownClosesProviderAfterTheFetchReturns()
+      throws Exception {
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    IngestionDelayTracker tracker = new IngestionDelayTracker(serverMetrics, REALTIME_TABLE_NAME,
+        REALTIME_TABLE_DATA_MANAGER, 60_000, 5, () -> true);
+    AtomicBoolean inFetch = new AtomicBoolean();
+    AtomicBoolean closedDuringFetch = new AtomicBoolean();
+    CountDownLatch fetchStarted = new CountDownLatch(1);
+    CountDownLatch releaseFetch = new CountDownLatch(1);
+    StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    when(provider.supportsOffsetLag()).thenReturn(true);
+    when(provider.fetchLatestStreamOffset(anySet(), anyLong())).thenAnswer(invocation -> {
+      inFetch.set(true);
+      fetchStarted.countDown();
+      try {
+        // A fetch stuck in a blocking call: it ignores the interrupt and returns only when released
+        while (true) {
+          try {
+            releaseFetch.await();
+            break;
+          } catch (InterruptedException e) {
+            // keep waiting
+          }
+        }
+      } finally {
+        inFetch.set(false);
+      }
+      return Map.of();
+    });
+    doAnswer(invocation -> {
+      closedDuringFetch.set(inFetch.get());
+      return null;
+    }).when(provider).close();
+    tracker._streamConfigIndexToStreamMetadataProvider.put(0, provider);
+    tracker._partitionsHostedByThisServer.put(0, true);
+    assertTrue(fetchStarted.await(10, TimeUnit.SECONDS), "The tracking task should start a fetch");
+
+    // The caller is interrupted, so its bounded wait for the tracking task ends at once
+    Thread.currentThread().interrupt();
+    try {
+      tracker.shutdown();
+      assertTrue(Thread.currentThread().isInterrupted(), "Shutdown must keep the caller's interrupt");
+    } finally {
+      Thread.interrupted();
+    }
+    verify(provider, never()).close();
+
+    releaseFetch.countDown();
+    verify(provider, timeout(10_000)).close();
+    assertFalse(closedDuringFetch.get(), "The provider was closed while a fetch was still running on it");
+  }
+
+  /// A provider that fails to close with a runtime exception must not make shutdown throw, which would skip stopping
+  /// the table's consumers in the caller.
+  @Test
+  public void testShutdownSurvivesProviderCloseFailure()
+      throws Exception {
+    IngestionDelayTracker tracker = createTracker();
+    StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    doThrow(new IllegalStateException("KafkaConsumer is not safe for multi-threaded access")).when(provider).close();
+    tracker._streamConfigIndexToStreamMetadataProvider.put(0, provider);
+    tracker.shutdown();
   }
 
   @Test
