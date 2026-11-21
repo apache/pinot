@@ -382,6 +382,31 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (%s = 2)", COLUMN1)).get(0)[0], 0L);
   }
 
+  /// A multi-value column always gets the legacy range index, which is not exact: the documents of a range that the
+  /// predicate covers only in part are found by a scan. The null row is left out once, from the combined result.
+  @Test
+  public void testRangeFilterOnMultiValueColumnWithLegacyRangeIndex()
+      throws Exception {
+    initializeRows();
+    for (int i = 0; i < 30; i++) {
+      insertRow(new Object[]{i, i + 1});
+    }
+    insertRow(null);
+    Schema schema = schemaBuilder().addMultiValueDimension(COLUMN1, DataType.INT).build();
+    setUpSegments(TABLE_CONFIG_WITH_RANGE_INDEX_COLUMN, schema);
+
+    // Rows 4 to 29 hold a value above 4
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s > 4", COLUMN1)).get(0)[0],
+        (long) 26 * NUM_OF_SEGMENT_COPIES);
+    // Rows 0 to 3 hold no value above 4, and the null row is UNKNOWN
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (%s > 4)", COLUMN1)).get(0)[0],
+        (long) 4 * NUM_OF_SEGMENT_COPIES);
+    // Rows 4 to 20 hold a value from 5 to 20
+    assertEquals(
+        getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s BETWEEN 5 AND 20", COLUMN1)).get(0)[0],
+        (long) 17 * NUM_OF_SEGMENT_COPIES);
+  }
+
   /// A consuming segment reports its null rows through a vector that grows with ingestion and hands out a copy on each
   /// read. The filter takes that copy once, and the index-based count has to leave those rows out as on a sealed
   /// segment.
