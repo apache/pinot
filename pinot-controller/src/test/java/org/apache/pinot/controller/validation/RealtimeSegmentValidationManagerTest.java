@@ -31,9 +31,11 @@ import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentMa
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -178,6 +180,7 @@ public class RealtimeSegmentValidationManagerTest {
     String tableName = "testTable_REALTIME";
     PauseStatusDetails pauseStatus = mock(PauseStatusDetails.class);
     TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(new TenantConfig(null, null, null));
 
     when(pauseStatus.getPauseFlag()).thenReturn(isTablePaused);
     when(pauseStatus.getReasonCode()).thenReturn(reasonCode);
@@ -209,6 +212,7 @@ public class RealtimeSegmentValidationManagerTest {
     String tableName = "testTable_REALTIME";
     PauseStatusDetails pauseStatus = mock(PauseStatusDetails.class);
     TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(new TenantConfig(null, null, null));
 
     when(pauseStatus.getPauseFlag()).thenReturn(false);
     when(pauseStatus.getReasonCode()).thenReturn(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
@@ -232,6 +236,7 @@ public class RealtimeSegmentValidationManagerTest {
     String tableName = "testTable_REALTIME";
     PauseStatusDetails pauseStatus = mock(PauseStatusDetails.class);
     TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(new TenantConfig(null, null, null));
 
     when(pauseStatus.getPauseFlag()).thenReturn(true);
     when(pauseStatus.getReasonCode()).thenReturn(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
@@ -249,5 +254,26 @@ public class RealtimeSegmentValidationManagerTest {
         eq(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED), anyString());
     verify(_llcRealtimeSegmentManager).updatePauseStateInIdealState(eq(tableName), eq(false),
         eq(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED), anyString());
+  }
+
+  @Test
+  public void testPauseCommentReportsTenantDefaultStorageLimit() {
+    String tableName = "testTable_REALTIME";
+    PauseStatusDetails pauseStatus = mock(PauseStatusDetails.class);
+    TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTenantConfig()).thenReturn(new TenantConfig(null, "storageTenant", null));
+    when(_pinotHelixResourceManager.getTenantQuotaConfig("storageTenant")).thenReturn(new QuotaConfig("10G", null));
+
+    when(pauseStatus.getPauseFlag()).thenReturn(false);
+    when(_llcRealtimeSegmentManager.getPauseStatusDetails(tableName)).thenReturn(pauseStatus);
+    when(_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION)).thenReturn(UtilizationChecker.CheckResult.PASS);
+    when(_pinotHelixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+    when(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig)).thenReturn(true);
+    when(_storageQuotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.ENFORCED);
+
+    Assert.assertFalse(_realtimeSegmentValidationManager.shouldEnsureConsuming(tableName));
+    verify(_llcRealtimeSegmentManager).pauseConsumption(tableName, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
+        "Storage quota of 10G exceeded.");
   }
 }
