@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -55,6 +56,7 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
   @Nullable
   private final ImmutableRoaringBitmap _validDocIds;
   private final QueryContext _queryContext;
+  private final boolean _streamingRestrictionEnabled;
 
   @Nullable
   private ImmutableRoaringBitmap _rowFilterDocIds;
@@ -65,13 +67,26 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
   /// @param numDocs the number of documents that the plan read
   public RowLevelSecurityFilterOperator(BaseFilterOperator rowFilterOperator, BaseFilterOperator userFilterOperator,
       @Nullable ImmutableRoaringBitmap validDocIds, QueryContext queryContext, int numDocs) {
+    this(rowFilterOperator, userFilterOperator, validDocIds, queryContext, numDocs, false);
+  }
+
+  /// Keeps the RLS candidate boundary even when the policy matches every document if streaming is enabled.
+  public RowLevelSecurityFilterOperator(BaseFilterOperator rowFilterOperator, BaseFilterOperator userFilterOperator,
+      @Nullable ImmutableRoaringBitmap validDocIds, QueryContext queryContext, int numDocs,
+      boolean streamingRestrictionEnabled) {
     super(numDocs, false);
-    assert !rowFilterOperator.isResultEmpty() && !rowFilterOperator.isResultMatchingAll()
+    assert !rowFilterOperator.isResultEmpty()
+        && (streamingRestrictionEnabled || !rowFilterOperator.isResultMatchingAll())
         && !userFilterOperator.isResultEmpty();
     _rowFilterOperator = rowFilterOperator;
     _userFilterOperator = userFilterOperator;
     _validDocIds = validDocIds;
     _queryContext = queryContext;
+    _streamingRestrictionEnabled = streamingRestrictionEnabled;
+  }
+
+  public boolean isStreamingRestrictionEnabled() {
+    return _streamingRestrictionEnabled;
   }
 
   @Override
@@ -110,10 +125,14 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
           scanCost.addEntriesScannedInFilter(numEntriesScanned);
         }
       }
-      assert docIds != null : "The RLS filter operator must not match all documents";
       // A mutable index can hold documents added after the plan read the number of documents. The rest of the plan
       // does not see them, so neither does the RLS filter.
-      if (!docIds.isEmpty() && docIds.last() >= _numDocs) {
+      if (docIds == null) {
+        // Use the same restricted scan for a match-all policy and a policy that excludes hidden rows.
+        Preconditions.checkState(_streamingRestrictionEnabled && _rowFilterOperator.isResultMatchingAll(),
+            "Expected row-level security candidate documents");
+        docIds = MutableRoaringBitmap.bitmapOfRange(0, _numDocs);
+      } else if (!docIds.isEmpty() && docIds.last() >= _numDocs) {
         MutableRoaringBitmap bounded = docIds.toMutableRoaringBitmap();
         bounded.remove(_numDocs, Integer.toUnsignedLong(docIds.last()) + 1);
         docIds = bounded;

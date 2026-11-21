@@ -26,18 +26,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntPredicate;
+import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.RowLevelSecurityFilterOperator;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.Plan;
+import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
@@ -53,6 +59,9 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -60,6 +69,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -70,10 +80,21 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// End-to-end test of the row-level security (RLS) row filter on the server.
@@ -94,12 +115,15 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
   private static final int NUM_SEGMENT_COPIES = 4;
   private static final String RLS_FILTER = "tenant = 'A'";
   private static final String HIDDEN_PREFIX = "secret-";
+  private static final String VISIBLE_POISON = "authorized-poison";
 
   private ImmutableSegment _noIndexSegment;
   private ImmutableSegment _invertedIndexSegment;
   // Segments with only the rows of tenant B and only the rows of tenant A
   private ImmutableSegment _hiddenOnlySegment;
   private ImmutableSegment _tenantOnlySegment;
+  private ImmutableSegment _tenantOnlyWithPoisonSegment;
+  private ImmutableSegment _mixedWithPoisonSegment;
   // Segment with a star-tree on (tenant, bucket)
   private ImmutableSegment _starTreeSegment;
   private Schema _schema;
@@ -147,6 +171,9 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
         new IndexLoadingConfig(invertedIndexConfig, schema));
     _hiddenOnlySegment = buildSegment("hiddenOnly", noIndexConfig, schema, i -> !isTenantA(i));
     _tenantOnlySegment = buildSegment("tenantOnly", noIndexConfig, schema, RowLevelSecurityScanQueriesTest::isTenantA);
+    _tenantOnlyWithPoisonSegment = buildSegment("tenantOnlyWithPoison", invertedIndexConfig, schema,
+        rowsWithVisiblePoison(false));
+    _mixedWithPoisonSegment = buildSegment("mixedWithPoison", invertedIndexConfig, schema, rowsWithVisiblePoison(true));
     _starTreeSegment = buildSegment("starTree", starTreeConfig, schema, i -> true);
     _schema = schema;
   }
@@ -161,6 +188,12 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
       }
       rows.add(row(i));
     }
+    return buildSegment(segmentName, tableConfig, schema, rows);
+  }
+
+  private static ImmutableSegment buildSegment(String segmentName, TableConfig tableConfig, Schema schema,
+      List<GenericRow> rows)
+      throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setTableName(RAW_TABLE_NAME);
     config.setSegmentName(segmentName);
@@ -169,6 +202,21 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
     driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), new IndexLoadingConfig(tableConfig, schema));
+  }
+
+  private static List<GenericRow> rowsWithVisiblePoison(boolean includeHiddenRows) {
+    int poisonId = 4 * BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE;
+    List<GenericRow> rows = new ArrayList<>();
+    for (int id = 0; id <= poisonId; id++) {
+      if (includeHiddenRows || isTenantA(id)) {
+        GenericRow row = row(id);
+        if (id == poisonId) {
+          row.putValue("payload", VISIBLE_POISON);
+        }
+        rows.add(row);
+      }
+    }
+    return rows;
   }
 
   private static GenericRow row(int i) {
@@ -186,6 +234,8 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
     _invertedIndexSegment.destroy();
     _hiddenOnlySegment.destroy();
     _tenantOnlySegment.destroy();
+    _tenantOnlyWithPoisonSegment.destroy();
+    _mixedWithPoisonSegment.destroy();
     _starTreeSegment.destroy();
     FileUtils.deleteQuietly(INDEX_DIR);
   }
@@ -275,6 +325,90 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
       int id = (Integer) row[0];
       assertTrue(isTenantA(id) && expected.test(id), name + ": unexpected row " + id);
     }
+  }
+
+  @Test
+  public void testSelectionStreamsRestrictedExpression() {
+    String filter = "CAST(payload AS INT) > 50";
+    SelectionRun streamed = runSingleSegmentSelection(_invertedIndexSegment, filter + " LIMIT 10");
+    SelectionRun eager = runSingleSegmentSelection(_invertedIndexSegment, filter + " ORDER BY id LIMIT 10");
+
+    // The segment's ids increase with docId. A cast on any intervening hidden row would fail the query.
+    assertEquals(streamed.ids(), IntStream.range(0, 10).map(i -> 50 + 2 * i).boxed().toList());
+    assertEquals(streamed.ids(), eager.ids());
+    assertEquals(eager.entriesScanned(), NUM_ROWS / 2L);
+    assertTrue(streamed.entriesScanned() >= streamed.ids().size());
+    assertTrue(streamed.entriesScanned() < eager.entriesScanned(),
+        "The unordered LIMIT should stop reading payload before all authorized rows are evaluated");
+  }
+
+  @Test
+  public void testSinglePredicateLimitDoesNotDependOnHiddenRows() {
+    List<Integer> expectedIds = IntStream.range(0, 10).map(i -> 2 * i).boxed().toList();
+    for (ImmutableSegment segment : List.of(_tenantOnlyWithPoisonSegment, _mixedWithPoisonSegment)) {
+      SelectionRun result = runSingleSegmentSelection(segment, "CAST(payload AS INT) > 0 LIMIT 10");
+      assertEquals(result.ids(), expectedIds, segment.getSegmentName());
+    }
+  }
+
+  @Test
+  public void testCompositePredicateStaysEagerWhenOneBranchIsPruned() {
+    // A bucket of 9 is absent from the first segment and exists only on hidden rows in the second.
+    String filter = "(CAST(payload AS INT) > 0 OR bucket = 9) LIMIT 10";
+    for (ImmutableSegment segment : List.of(_tenantOnlyWithPoisonSegment, _mixedWithPoisonSegment)) {
+      NumberFormatException failure =
+          expectThrows(NumberFormatException.class, () -> runSingleSegmentSelection(segment, filter));
+      assertTrue(failure.getMessage().contains(VISIBLE_POISON), failure.toString());
+    }
+  }
+
+  @DataProvider
+  public static Object[][] streamingScanPredicates() {
+    return new Object[][]{
+        {"payload = '51'", IntStream.range(0, 10).map(i -> 50 + 100 * i).boxed().toList()},
+        {"CAST(payload AS INT) = 99", IntStream.range(0, 10).map(i -> 98 + 100 * i).boxed().toList()},
+        // The literal exists in the segment dictionary, so the predicate needs a scan even though RLS hides it.
+        {"payload = 'secret-1'", List.of()}
+    };
+  }
+
+  @Test(dataProvider = "streamingScanPredicates")
+  public void testRestrictedSelectionClosesScanReader(String filter, List<Integer> expectedIds) {
+    DataSource source = _invertedIndexSegment.getDataSource("payload");
+    ForwardIndexReader<?> forwardIndex = source.getForwardIndex();
+    assertTrue(forwardIndex.isDictionaryEncoded());
+    ForwardIndexReader<?> trackedReader = mock(ForwardIndexReader.class, delegatesTo(forwardIndex));
+    ForwardIndexReaderContext context = mock(ForwardIndexReaderContext.class);
+    doReturn(context).when(trackedReader).createContext(anyMap());
+    AtomicInteger docsRead = new AtomicInteger();
+    doAnswer(invocation -> {
+      int[] docIds = invocation.getArgument(0);
+      int length = invocation.getArgument(1);
+      assertSame(invocation.getArgument(3), context);
+      for (int i = 0; i < length; i++) {
+        assertTrue(isTenantA(docIds[i]), "Read hidden document " + docIds[i]);
+      }
+      forwardIndex.readDictIds(docIds, length, invocation.getArgument(2), null);
+      docsRead.addAndGet(length);
+      return null;
+    }).when(trackedReader).readDictIds(any(int[].class), anyInt(), any(int[].class), any());
+    DataSource trackedSource = mock(DataSource.class, delegatesTo(source));
+    doReturn(trackedReader).when(trackedSource).getForwardIndex();
+    IndexSegment segment = mock(IndexSegment.class, delegatesTo(_invertedIndexSegment));
+    doReturn(trackedSource).when(segment).getDataSource("payload", _schema);
+
+    SelectionRun result = runSingleSegmentSelection(segment, filter + " LIMIT 10");
+
+    assertEquals(result.ids(), expectedIds);
+    assertEquals(result.entriesScanned(), docsRead.longValue());
+    if (expectedIds.isEmpty()) {
+      assertEquals(docsRead.get(), NUM_ROWS / 2);
+    } else {
+      assertTrue(docsRead.get() < NUM_ROWS / 2, "The LIMIT should stop the scan before it reaches EOF");
+      verify(trackedReader, atLeast(2)).readDictIds(any(int[].class), anyInt(), any(int[].class), any());
+    }
+    verify(trackedReader).createContext(anyMap());
+    verify(context).close();
   }
 
   /// Group-by, distinct and order-by queries use the same filter plan, so they must not evaluate the expression on
@@ -647,6 +781,20 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(withRowFilter(query, userFilter));
     pinotQuery.setQueryOptions(rlsOptions(Map.of()));
     return QueryContextConverterUtils.getQueryContext(pinotQuery);
+  }
+
+  private SelectionRun runSingleSegmentSelection(IndexSegment segment, String filter) {
+    QueryContext queryContext = getRlsQueryContext("SELECT id FROM testTable", filter);
+    queryContext.setSchema(_schema);
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      Operator<SelectionResultsBlock> selection =
+          new SelectionPlanNode(new SegmentContext(segment), queryContext).run();
+      List<Integer> ids = selection.nextBlock().getRows().stream().map(row -> (Integer) row[0]).toList();
+      return new SelectionRun(ids, selection.getExecutionStatistics().getNumEntriesScannedInFilter());
+    }
+  }
+
+  private record SelectionRun(List<Integer> ids, long entriesScanned) {
   }
 
   private static String withRowFilter(String query, @Nullable String userFilter) {
