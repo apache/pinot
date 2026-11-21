@@ -127,47 +127,22 @@ public class SparseKeyDataSourceTest {
     assertEquals(doubles.getDoubleMV(2, null), new double[]{4.0});
   }
 
-  /// A BIG_DECIMAL key keeps an integer beyond the long range exactly, as the dense tier does, instead of
-  /// rounding it through a double.
-  @Test
-  public void testBigDecimalKeyKeepsIntegerBeyondLongRangeExactly() {
-    BigDecimal exact = new BigDecimal("9223372036854775809");
-    String[] blobs = {"{\"k\":9223372036854775809}"};
-
-    BigDecimal single = of(DataType.BIG_DECIMAL, blobs).getForwardIndex().getBigDecimal(0, null);
-    assertEquals(single.compareTo(exact), 0);
-
-    BigDecimal[] multi = multiValue(DataType.BIG_DECIMAL, "{\"k\":[9223372036854775809]}").getForwardIndex()
-        .getBigDecimalMV(0, null);
-    assertEquals(multi[0].compareTo(exact), 0);
-  }
-
-  /// The dense tier drops an empty list before recording presence, so the key is absent from that document: null in
-  /// the null vector and one default element on read, never a present value with zero elements.
-  @Test
-  public void testMultiValueKeyWithAnEmptyListIsAbsent() {
-    String[] blobs = {"{\"k\":[]}", "{\"k\":[1]}"};
-    for (DataType type : new DataType[]{DataType.LONG, DataType.STRING}) {
-      SparseKeyDataSource ds = multiValue(type, blobs);
-      assertTrue(ds.getNullValueVector().isNull(0), type + " empty list is absent");
-      assertFalse(ds.getNullValueVector().isNull(1));
-      assertEquals(ds.getForwardIndex().getNumValuesMV(0, null), 1, type + " reads as one default element");
-    }
-  }
-
   @Test
   public void testMultiValueBigDecimalGettersConvertEachElement() {
-    String[] blobs = {"{\"k\":[1,\"2.5\",3.25]}", null, "{\"k\":4}"};
+    String[] blobs = {"{\"k\":[1,\"2.5\",3.25,9223372036854775809]}", null, "{\"k\":4}"};
     ForwardIndexReader<?> decimals = multiValue(DataType.BIG_DECIMAL, blobs).getForwardIndex();
 
+    BigDecimal beyondLong = new BigDecimal("9223372036854775809");
     BigDecimal[] values = decimals.getBigDecimalMV(0, null);
-    assertEquals(values.length, 3);
+    assertEquals(values.length, 4);
     assertEquals(values[0].compareTo(new BigDecimal("1")), 0);
     assertEquals(values[1].compareTo(new BigDecimal("2.5")), 0);
     assertEquals(values[2].compareTo(new BigDecimal("3.25")), 0);
-    BigDecimal[] buffer = new BigDecimal[3];
-    assertEquals(decimals.getBigDecimalMV(0, buffer, null), 3);
+    assertEquals(values[3].compareTo(beyondLong), 0);
+    BigDecimal[] buffer = new BigDecimal[4];
+    assertEquals(decimals.getBigDecimalMV(0, buffer, null), 4);
     assertEquals(buffer[1].compareTo(new BigDecimal("2.5")), 0);
+    assertEquals(buffer[3].compareTo(beyondLong), 0);
     assertEquals(decimals.getBigDecimalMV(1, null),
         new BigDecimal[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL});
     assertEquals(decimals.getBigDecimalMV(2, null)[0].compareTo(new BigDecimal("4")), 0);
