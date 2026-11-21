@@ -18,16 +18,24 @@
  */
 package org.apache.pinot.common.evaluator;
 
+import java.sql.Timestamp;
 import java.util.List;
+import java.util.UUID;
+import org.apache.parquet.variant.Variant;
+import org.apache.parquet.variant.VariantBuilder;
 import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.PinotDataType;
+import org.apache.pinot.spi.utils.VariantEnvelope;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -249,5 +257,113 @@ public class InbuiltFunctionEvaluatorTest {
     longRow.putValue("value", 1L << 40);
     longRow.putValue("shift", 40);
     assertEquals(new InbuiltFunctionEvaluator("bitExtract(value, shift)").evaluate(longRow), 1);
+  }
+
+  @Test
+  public void testPlannedVariantScalarFunctions() {
+    byte[] first = VariantUtils.parseJsonToVariant(
+        "{\"value\":7,\"name\":\"pinot\",\"nested\":{\"flag\":true},\"nullValue\":null}");
+    byte[] second = VariantUtils.parseJsonToVariant(
+        "{\"value\":9,\"name\":\"apache\",\"nested\":{\"flag\":false},\"nullValue\":null}");
+    GenericRow row = new GenericRow();
+
+    InbuiltFunctionEvaluator getInt =
+        new InbuiltFunctionEvaluator("variantGet(variant, '$.value', 'INT')");
+    InbuiltFunctionEvaluator getNested = new InbuiltFunctionEvaluator("variantGet(variant, '$.nested')");
+    InbuiltFunctionEvaluator exists =
+        new InbuiltFunctionEvaluator("variantExists(variant, '$.nullValue')");
+    InbuiltFunctionEvaluator isNull =
+        new InbuiltFunctionEvaluator("isVariantNull(variant, '$.nullValue')");
+    InbuiltFunctionEvaluator typeOf =
+        new InbuiltFunctionEvaluator("variantTypeOf(variant, '$.nested')");
+
+    assertEquals(getInt.getArguments(), List.of("variant"));
+    row.putValue("variant", first);
+    assertEquals(getInt.evaluate(row), 7);
+    assertEquals(getInt.evaluate(new Object[]{first}), 7);
+    assertEquals(VariantUtils.variantToJson((byte[]) getNested.evaluate(row)), "{\"flag\":true}");
+    assertEquals(exists.evaluate(row), true);
+    assertEquals(isNull.evaluate(row), true);
+    assertEquals(typeOf.evaluate(row), "OBJECT");
+
+    row.putValue("variant", second);
+    assertEquals(getInt.evaluate(row), 9);
+    assertEquals(VariantUtils.variantToJson((byte[]) getNested.evaluate(row)), "{\"flag\":false}");
+    assertEquals(exists.evaluate(row), true);
+    assertEquals(isNull.evaluate(row), true);
+    assertEquals(typeOf.evaluate(row), "OBJECT");
+  }
+
+  @Test
+  public void testPlannedVariantUsesExternalUuidAndTimestampRepresentations() {
+    UUID uuid = UUID.fromString("00112233-4455-6677-8899-aabbccddeeff");
+    VariantBuilder builder = new VariantBuilder();
+    builder.appendUUID(uuid);
+    GenericRow row = new GenericRow();
+    row.putValue("variant", encode(builder));
+    assertEquals(new InbuiltFunctionEvaluator("variantGet(variant, '$', 'UUID')").evaluate(row), uuid);
+    assertEquals(new InbuiltFunctionEvaluator("tryVariantGet(variant, '$', 'UUID')").evaluate(row), uuid);
+
+    builder = new VariantBuilder();
+    builder.appendTimestampTz(1_700_000_000_123_000L);
+    row.putValue("variant", encode(builder));
+    Timestamp timestamp = new Timestamp(1_700_000_000_123L);
+    assertEquals(new InbuiltFunctionEvaluator("variantGet(variant, '$', 'TIMESTAMP')").evaluate(row), timestamp);
+    assertEquals(new InbuiltFunctionEvaluator("tryVariantGet(variant, '$', 'TIMESTAMP')").evaluate(row), timestamp);
+  }
+
+  @Test
+  public void testPlannedVariantStrictTryAndSqlNullSemantics() {
+    byte[] variant = VariantUtils.parseJsonToVariant("{\"score\":\"not-a-number\",\"nullValue\":null}");
+    GenericRow row = new GenericRow();
+    row.putValue("variant", variant);
+
+    InbuiltFunctionEvaluator strict =
+        new InbuiltFunctionEvaluator("variantGet(variant, '$.score', 'DOUBLE')");
+    InbuiltFunctionEvaluator tolerant =
+        new InbuiltFunctionEvaluator("tryVariantGet(variant, '$.score', 'DOUBLE')");
+    assertThrows(RuntimeException.class, () -> strict.evaluate(row));
+    assertNull(tolerant.evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("variantGet(variant, '$.missing', 'STRING')").evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("tryVariantGet(variant, '$.missing', 'STRING')").evaluate(row));
+    assertFalse((Boolean) new InbuiltFunctionEvaluator("variantExists(variant, '$.missing')").evaluate(row));
+    assertFalse((Boolean) new InbuiltFunctionEvaluator("isVariantNull(variant, '$.missing')").evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("variantTypeOf(variant, '$.missing')").evaluate(row));
+
+    row.putValue("variant", new byte[]{1});
+    assertThrows(RuntimeException.class, () -> strict.evaluate(row));
+    assertNull(tolerant.evaluate(row));
+
+    row.putValue("variant", null);
+    assertNull(new InbuiltFunctionEvaluator("variantGet(variant, '$.score', 'STRING')").evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("variantExists(variant, '$.score')").evaluate(row));
+    assertFalse((Boolean) new InbuiltFunctionEvaluator("isVariantNull(variant)").evaluate(row));
+    assertNull(new InbuiltFunctionEvaluator("variantTypeOf(variant)").evaluate(row));
+  }
+
+  @Test
+  public void testPlannedVariantLiteralsAreValidatedAtConstruction() {
+    assertThrows(IllegalArgumentException.class,
+        () -> new InbuiltFunctionEvaluator("variantGet(variant, 'not-a-path', 'STRING')"));
+    assertThrows(IllegalArgumentException.class,
+        () -> new InbuiltFunctionEvaluator("variantGet(variant, '$.value', 'NOT_A_TYPE')"));
+  }
+
+  @Test
+  public void testDynamicVariantOperandsRetainCompatibilityPath() {
+    byte[] variant = VariantUtils.parseJsonToVariant("{\"value\":11}");
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator("variantGet(variant, path, targetType)");
+    assertEquals(evaluator.getArguments(), List.of("variant", "path", "targetType"));
+
+    GenericRow row = new GenericRow();
+    row.putValue("variant", variant);
+    row.putValue("path", "$.value");
+    row.putValue("targetType", "INT");
+    assertEquals(evaluator.evaluate(row), 11);
+  }
+
+  private static byte[] encode(VariantBuilder builder) {
+    Variant variant = builder.build();
+    return VariantEnvelope.encode(variant.getMetadataBuffer(), variant.getValueBuffer());
   }
 }
