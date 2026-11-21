@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.codecs.lucene912.Lucene912Codec;
@@ -325,11 +326,25 @@ public class VectorIndexUtils {
   }
 
   public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig) {
-    return getIndexWriterConfig(vectorIndexConfig, null);
+    return getIndexWriterConfig(vectorIndexConfig, 1, null, null);
   }
 
   public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig,
       @Nullable Path mmapMergeDirectory) {
+    return getIndexWriterConfig(vectorIndexConfig, 1, null, mmapMergeDirectory);
+  }
+
+  /// Same as [#getIndexWriterConfig(VectorIndexConfig)], but merges HNSW graphs with `numMergeWorkers` threads from
+  /// `mergeExec` (see [HnswVectorsFormat]).
+  public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig, int numMergeWorkers,
+      @Nullable ExecutorService mergeExec) {
+    return getIndexWriterConfig(vectorIndexConfig, numMergeWorkers, mergeExec, null);
+  }
+
+  /// Same as [#getIndexWriterConfig(VectorIndexConfig, int, ExecutorService)], and routes the final forced merge
+  /// through the mmap writer when `mmapMergeDirectory` is set.
+  public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig, int numMergeWorkers,
+      @Nullable ExecutorService mergeExec, @Nullable Path mmapMergeDirectory) {
     IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
 
     double maxBufferSizeMB = Double.parseDouble(vectorIndexConfig.getProperties()
@@ -349,7 +364,8 @@ public class VectorIndexUtils {
     int maxDimensions = Integer.parseInt(vectorIndexConfig.getProperties()
         .getOrDefault("maxDimensions", String.valueOf(HnswVectorsFormat.DEFAULT_MAX_DIMENSIONS)));
 
-    HnswVectorsFormat knnVectorsFormat = new HnswVectorsFormat(maxCon, beamWidth, maxDimensions, mmapMergeDirectory);
+    HnswVectorsFormat knnVectorsFormat =
+        new HnswVectorsFormat(maxCon, beamWidth, maxDimensions, numMergeWorkers, mergeExec, mmapMergeDirectory);
 
     Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(vectorIndexConfig.getProperties()
         .getOrDefault("mode", Lucene912Codec.Mode.BEST_SPEED.name()));

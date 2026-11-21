@@ -33,12 +33,17 @@ import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.hnsw.HnswGraphProvider;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsWriter;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.KnnFloatVectorField;
+import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfos;
+import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.SegmentInfo;
 import org.apache.lucene.index.SegmentReader;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.store.ByteBuffersDirectory;
+import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.MergeInfo;
@@ -49,6 +54,7 @@ import org.apache.lucene.util.hnsw.HnswGraph;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -56,6 +62,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
@@ -304,6 +311,105 @@ public class HnswVectorIndexCreatorTest {
       Assert.assertEquals(debugInfo.get("effectiveHnswUseBoundedQueue"), Boolean.FALSE);
       Assert.assertEquals(debugInfo.get("supportsPreFilter"), reader.supportsPreFilter(),
           "Debug info must report the reader's actual pre-filter capability, not a hardcoded literal");
+    }
+  }
+
+  @DataProvider
+  public Object[][] parallelBuilds() {
+    // buildThreads, forceMerge, concurrentMerge, parallelBuildMaxDocs: the last case outgrows the buffer and falls back
+    // to one writer
+    return new Object[][]{
+        {1, true, false, 50_000}, {4, true, false, 50_000}, {4, true, true, 50_000}, {4, false, false, 50_000},
+        {3, true, false, 100}
+    };
+  }
+
+  /// Every build mode, including the default single writer, must index each row under its own doc id: searching for a
+  /// stored vector finds that row.
+  @Test(dataProvider = "parallelBuilds")
+  public void testParallelBuildKeepsDocIds(int buildThreads, boolean forceMerge, boolean concurrentMerge,
+      int parallelBuildMaxDocs)
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "parallel");
+    FileUtils.forceMkdir(indexDir);
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "8");
+    properties.put("buildThreads", String.valueOf(buildThreads));
+    properties.put("forceMerge", String.valueOf(forceMerge));
+    properties.put("concurrentMerge", String.valueOf(concurrentMerge));
+    properties.put("parallelBuildMaxDocs", String.valueOf(parallelBuildMaxDocs));
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    int numDocs = 1000;
+    float[][] vectors = new float[numDocs][8];
+    Random random = new Random(42);
+    try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("bar", indexDir, config)) {
+      float[] reused = new float[8];
+      for (int i = 0; i < numDocs; i++) {
+        for (int d = 0; d < 8; d++) {
+          vectors[i][d] = random.nextFloat();
+          reused[d] = vectors[i][d];
+        }
+        // The creator must copy the row, since callers reuse the array
+        creator.add(reused);
+      }
+      creator.seal();
+    }
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader("bar", indexDir, numDocs, config)) {
+      for (int docId = 0; docId < numDocs; docId += 37) {
+        // k widens the HNSW search beam; with k = 1 the approximate search can miss even an exact match
+        Assert.assertTrue(reader.getDocIds(vectors[docId], 10).contains(docId), "Doc " + docId + " not found");
+      }
+    }
+    String[] leftovers = indexDir.list((dir, name) -> name.contains(".hnsw.part"));
+    Assert.assertEquals(leftovers.length, 0, "Per-thread build directories must be removed");
+  }
+
+  /// A part directory left by a build that crashed before cleaning up must not add its documents to the next build.
+  @Test
+  public void testParallelBuildIgnoresLeftoverPartDirectory()
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "leftover");
+    FileUtils.deleteQuietly(indexDir);
+    FileUtils.forceMkdir(indexDir);
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "8");
+    properties.put("buildThreads", "2");
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    // A committed part from an earlier, crashed build
+    try (Directory staleDirectory = FSDirectory.open(new File(indexDir, "bar.hnsw.part0").toPath());
+        IndexWriter staleWriter = new IndexWriter(staleDirectory, VectorIndexUtils.getIndexWriterConfig(config))) {
+      Random staleRandom = new Random(3);
+      for (int i = 0; i < 50; i++) {
+        float[] vector = new float[8];
+        for (int d = 0; d < 8; d++) {
+          vector[d] = staleRandom.nextFloat();
+        }
+        Document document = new Document();
+        document.add(new KnnFloatVectorField("bar", vector,
+            VectorIndexUtils.toSimilarityFunction(config.getVectorDistanceFunction())));
+        document.add(new StoredField(HnswVectorIndexCreator.VECTOR_INDEX_DOC_ID_COLUMN_NAME, i));
+        staleWriter.addDocument(document);
+      }
+      staleWriter.commit();
+    }
+    int numDocs = 200;
+    Random random = new Random(7);
+    try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("bar", indexDir, config)) {
+      for (int i = 0; i < numDocs; i++) {
+        float[] vector = new float[8];
+        for (int d = 0; d < 8; d++) {
+          vector[d] = random.nextFloat();
+        }
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+    File indexFile = new File(indexDir, "bar" + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    try (Directory directory = FSDirectory.open(indexFile.toPath());
+        DirectoryReader reader = DirectoryReader.open(directory)) {
+      Assert.assertEquals(reader.numDocs(), numDocs);
     }
   }
 }

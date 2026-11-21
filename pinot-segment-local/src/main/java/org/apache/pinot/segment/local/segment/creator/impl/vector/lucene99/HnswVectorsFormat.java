@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.KnnVectorsReader;
@@ -50,11 +51,28 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
   /// @param beamWidth     the size of the queue maintained during graph construction.
   /// @param maxDimensions the maximum number of dimensions supported by this format
   public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions) {
-    this(maxConn, beamWidth, maxDimensions, null);
+    this(maxConn, beamWidth, maxDimensions, 1, null, null);
   }
 
   /// Constructs a format with an optional scratch directory for the final forced merge.
   public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions, @Nullable Path mmapMergeDirectory) {
+    this(maxConn, beamWidth, maxDimensions, 1, null, mmapMergeDirectory);
+  }
+
+  /// Constructs a format that merges HNSW graphs with `numMergeWorkers` threads from `mergeExec`, so merging several
+  /// segments into one inserts their vectors concurrently instead of on a single thread.
+  ///
+  /// @param numMergeWorkers the number of threads used to merge graphs; 1 merges on the calling thread
+  /// @param mergeExec       the executor that runs the merge workers; required when `numMergeWorkers` > 1
+  public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions, int numMergeWorkers,
+      @Nullable ExecutorService mergeExec) {
+    this(maxConn, beamWidth, maxDimensions, numMergeWorkers, mergeExec, null);
+  }
+
+  /// Constructs a format with both: `numMergeWorkers` merge threads from `mergeExec` for ordinary merges, and an
+  /// optional scratch directory that routes the final forced merge through the mmap writer instead.
+  public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions, int numMergeWorkers,
+      @Nullable ExecutorService mergeExec, @Nullable Path mmapMergeDirectory) {
     super("Lucene99HnswVectorsFormat");
     if (maxDimensions <= 0 || maxDimensions > DEFAULT_MAX_DIMENSIONS) {
       throw new IllegalArgumentException(
@@ -63,7 +81,8 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
               + "; maxDimensions="
               + maxDimensions);
     }
-    _delegate = new Lucene99HnswVectorsFormat(maxConn, beamWidth);
+    _delegate = numMergeWorkers > 1 ? new Lucene99HnswVectorsFormat(maxConn, beamWidth, numMergeWorkers, mergeExec)
+        : new Lucene99HnswVectorsFormat(maxConn, beamWidth);
     _maxDimensions = maxDimensions;
     _maxConn = maxConn;
     _beamWidth = beamWidth;
