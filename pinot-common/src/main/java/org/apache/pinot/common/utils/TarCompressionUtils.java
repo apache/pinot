@@ -195,6 +195,27 @@ public class TarCompressionUtils {
     }
   }
 
+  /// Un-tars a compressed segment file and synchronizes each extracted file before returning.
+  ///
+  /// Use this only when the extracted files will immediately be installed as a durable local segment. Ordinary
+  /// extraction should use [#untar(File, File)] to avoid a storage sync for every archive entry.
+  public static List<File> untarDurably(File inputFile, File outputDir)
+      throws IOException {
+    try (InputStream fileIn = Files.newInputStream(inputFile.toPath())) {
+      return untar(fileIn, outputDir, NO_DISK_WRITE_RATE_LIMIT, true);
+    }
+  }
+
+  /// Un-tars a compressed segment stream and synchronizes each extracted file before returning.
+  ///
+  /// Use this only when the extracted files will immediately be installed as a durable local segment. Ordinary
+  /// extraction should use [#untarWithRateLimiter(InputStream, File, long)] to avoid a storage sync for every archive
+  /// entry.
+  public static List<File> untarDurably(InputStream inputStream, File outputDir, long maxStreamRateInByte)
+      throws IOException {
+    return untar(inputStream, outputDir, maxStreamRateInByte, true);
+  }
+
   /// Un-tars an inputstream of a compressed tar file into a directory, returns all the untarred files/directories.
   ///
   /// For security reason, the untarred files must reside in the output directory.
@@ -208,6 +229,12 @@ public class TarCompressionUtils {
   ///
   /// For security reason, the untarred files must reside in the output directory.
   public static List<File> untarWithRateLimiter(InputStream inputStream, File outputDir, long maxStreamRateInByte)
+      throws IOException {
+    return untar(inputStream, outputDir, maxStreamRateInByte, false);
+  }
+
+  private static List<File> untar(InputStream inputStream, File outputDir, long maxStreamRateInByte,
+      boolean syncExtractedFiles)
       throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
     // Prevent partial path traversal
@@ -255,8 +282,17 @@ public class TarCompressionUtils {
             if (maxStreamRateInByte != NO_DISK_WRITE_RATE_LIMIT) {
               copyWithRateLimiter(tarIn, out, maxStreamRateInByte);
             } else {
-              try (OutputStream bufferedOut = new BufferedOutputStream(out)) {
-                IOUtils.copy(tarIn, bufferedOut);
+              // Flush, don't close: closing the wrapper would close `out`, which must stay open for the fsync below
+              // (and is closed by the enclosing try-with-resources).
+              OutputStream bufferedOut = new BufferedOutputStream(out);
+              IOUtils.copy(tarIn, bufferedOut);
+              bufferedOut.flush();
+            }
+            if (syncExtractedFiles) {
+              try {
+                out.getFD().sync();
+              } catch (IOException e) {
+                throw new IOException("Failed to fsync extracted file: " + outputFile, e);
               }
             }
           }
