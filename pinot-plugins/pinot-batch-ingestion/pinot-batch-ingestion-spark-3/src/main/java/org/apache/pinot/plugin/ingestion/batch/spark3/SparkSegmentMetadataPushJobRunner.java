@@ -273,7 +273,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
   private String[] listFiles(PinotFS outputDirFS, URI outputDirURI)
       throws RuntimeException {
     try {
-      return outputDirFS.listFiles(outputDirURI, true);
+      return SegmentPushUtils.listFiles(outputDirFS, outputDirURI);
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
@@ -308,7 +308,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
     Collection<String> tarFilePaths = segmentsUriToTarPathMap.values();
     List<String> segmentNames = new ArrayList<>(tarFilePaths.size());
     for (String tarFilePath : tarFilePaths) {
-      segmentNames.add(SegmentPushUtils.getSegmentNameFromTarFile(tarFilePath));
+      segmentNames.add(SegmentPushUtils.getSegmentName(tarFilePath));
     }
     return segmentNames;
   }

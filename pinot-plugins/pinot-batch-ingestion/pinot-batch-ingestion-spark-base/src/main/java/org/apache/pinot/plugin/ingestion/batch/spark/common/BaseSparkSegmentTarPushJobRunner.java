@@ -73,7 +73,7 @@ public abstract class BaseSparkSegmentTarPushJobRunner implements IngestionJobRu
     //Get list of files to process
     String[] files;
     try {
-      files = outputDirFS.listFiles(outputDirURI, true);
+      files = SegmentPushUtils.listFiles(outputDirFS, outputDirURI);
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
