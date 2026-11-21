@@ -174,7 +174,9 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
   private List<String> plannedKeyTypes(String sql) {
     List<RexExpression> expressions = new ArrayList<>();
     for (DispatchablePlanFragment fragment : planQuery(sql).getQueryStageMap().values()) {
-      collectExpressions(fragment.getPlanFragment().getFragmentRoot(), expressions);
+      if (fragment.getTableName() != null) {
+        collectExpressions(fragment.getPlanFragment().getFragmentRoot(), expressions);
+      }
     }
     List<String> types = new ArrayList<>();
     expressions.forEach(expression -> collectItemTypes(expression, types));
@@ -195,7 +197,8 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
   private static void collectItemTypes(RexExpression expression, List<String> types) {
     if (expression instanceof RexExpression.FunctionCall call) {
       List<RexExpression> operands = call.getFunctionOperands();
-      if (call.getFunctionName().equals("ITEM") && operands.size() == 3) {
+      if (call.getFunctionName().equals("ITEM")) {
+        assertEquals(operands.size(), 3, "OPEN_STRUCT key lookup must carry its planned type");
         types.add(String.valueOf(((RexExpression.Literal) operands.get(2)).getValue()));
       }
       operands.forEach(operand -> collectItemTypes(operand, types));
