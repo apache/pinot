@@ -114,14 +114,20 @@ public class PinotBufferLuceneDirectory extends Directory {
     if (fileInfo == null) {
       throw new IOException("File not found: " + name);
     }
+    long offset = fileInfo.getOffset();
     long size = fileInfo.getSize();
-    if (size <= Integer.MAX_VALUE) {
-      // A direct view of the buffer: Lucene reads vectors and postings with bulk, zero-copy accessors instead of
-      // refilling a small heap buffer for every read
-      ByteBuffer view = _indexBuffer.toDirectByteBuffer(fileInfo.getOffset(), (int) size, ByteOrder.LITTLE_ENDIAN);
-      return new ByteBuffersIndexInput(new ByteBuffersDataInput(List.of(view)), name);
+    long bufferSize = _indexBuffer.size();
+    if (offset < 0 || size < 0 || offset > bufferSize - size) {
+      throw new IOException("Invalid file range for " + name + ": offset=" + offset + ", size=" + size
+          + ", bufferSize=" + bufferSize);
     }
-    return new PinotBufferIndexInput(name, _indexBuffer, fileInfo.getOffset(), size);
+    if (size <= Integer.MAX_VALUE) {
+      ByteBuffer view = _indexBuffer.tryViewAsByteBuffer(offset, (int) size, ByteOrder.LITTLE_ENDIAN);
+      if (view != null) {
+        return new ByteBuffersIndexInput(new ByteBuffersDataInput(List.of(view)), name);
+      }
+    }
+    return new PinotBufferIndexInput(name, _indexBuffer, offset, size);
   }
 
   @Override

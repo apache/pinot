@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -36,16 +39,30 @@ import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.ByteBuffersDirectory;
+import org.apache.lucene.store.ByteBuffersIndexInput;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.pinot.segment.spi.memory.ByteBufferPinotBufferFactory;
 import org.apache.pinot.segment.spi.memory.PinotBufferFactory;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 /// Reads a Lucene index packed into a [PinotDataBuffer], as the combined text and vector index files are, through
@@ -80,7 +97,7 @@ public class PinotBufferLuceneDirectoryTest {
         writer.forceMerge(1);
       }
 
-      // Pack every file at an odd offset, so views do not start on an aligned boundary
+      // Add padding between files to exercise unaligned offsets.
       Map<String, LuceneTextIndexHeader.FileInfo> fileMap = new HashMap<>();
       long size = PADDING;
       for (String name : source.listAll()) {
@@ -105,6 +122,7 @@ public class PinotBufferLuceneDirectoryTest {
         for (LuceneTextIndexHeader.FileInfo file : fileMap.values()) {
           try (IndexInput expected = source.openInput(file.getName(), IOContext.READONCE);
               IndexInput actual = directory.openInput(file.getName(), IOContext.READONCE)) {
+            assertTrue(actual instanceof ByteBuffersIndexInput);
             assertEquals(actual.length(), expected.length());
             for (long i = 0; i < expected.length(); i++) {
               assertEquals(actual.readByte(), expected.readByte(), file.getName() + " at " + i);
@@ -118,6 +136,51 @@ public class PinotBufferLuceneDirectoryTest {
           assertEquals(nearest.scoreDocs[0].doc, 42);
         }
       }
+    }
+  }
+
+  @Test
+  public void testBufferedFallback()
+      throws IOException {
+    byte[] bytes = new byte[16 * 1024];
+    bytes[0] = 42;
+    long largeSize = 1L + Integer.MAX_VALUE;
+    PinotDataBuffer buffer = mock(PinotDataBuffer.class, CALLS_REAL_METHODS);
+    when(buffer.size()).thenReturn(bytes.length + largeSize);
+    doReturn(buffer).when(buffer).view(0, bytes.length);
+    doReturn(buffer).when(buffer).view(bytes.length, bytes.length + largeSize);
+    when(buffer.toDirectByteBuffer(anyLong(), anyInt(), any())).thenAnswer(call -> {
+      int offset = Math.toIntExact(call.<Long>getArgument(0));
+      int size = call.getArgument(1);
+      assertTrue(size < bytes.length, "A buffered read should only copy the requested block");
+      return ByteBuffer.wrap(Arrays.copyOfRange(bytes, offset, offset + size));
+    });
+    Map<String, LuceneTextIndexHeader.FileInfo> files = Map.of(
+        "small", new LuceneTextIndexHeader.FileInfo("small", 0, bytes.length),
+        "large", new LuceneTextIndexHeader.FileInfo("large", bytes.length, largeSize));
+    try (PinotBufferLuceneDirectory directory = new PinotBufferLuceneDirectory(buffer, files, "text");
+        IndexInput small = directory.openInput("small", IOContext.DEFAULT);
+        IndexInput large = directory.openInput("large", IOContext.DEFAULT)) {
+      verify(buffer, never()).toDirectByteBuffer(anyLong(), anyInt(), any());
+      verify(buffer, never()).tryViewAsByteBuffer(eq((long) bytes.length), anyInt(), any());
+      assertEquals(small.readByte(), (byte) 42);
+      assertEquals(large.length(), largeSize);
+    }
+  }
+
+  @DataProvider
+  public Object[][] invalidFileRanges() {
+    return new Object[][]{{-1L, 1L}, {0L, -(1L << 32)}, {7L, 2L}, {Long.MAX_VALUE, 1L}};
+  }
+
+  @Test(dataProvider = "invalidFileRanges")
+  public void testInvalidFileRange(long offset, long length)
+      throws IOException {
+    Map<String, LuceneTextIndexHeader.FileInfo> files =
+        Map.of("file", new LuceneTextIndexHeader.FileInfo("file", offset, length));
+    try (PinotBufferLuceneDirectory directory =
+        new PinotBufferLuceneDirectory(PinotByteBuffer.wrap(new byte[8]), files, "text")) {
+      assertThrows(IOException.class, () -> directory.openInput("file", IOContext.DEFAULT));
     }
   }
 }

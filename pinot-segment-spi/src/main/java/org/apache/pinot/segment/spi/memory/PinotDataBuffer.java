@@ -633,6 +633,14 @@ public abstract class PinotDataBuffer implements DataBuffer {
   ///                  buffer will be different.
   public abstract ByteBuffer toDirectByteBuffer(long offset, int size, ByteOrder byteOrder);
 
+  /// Returns a shared view starting at `offset`, positioned at zero with limit `size` and the requested byte order.
+  /// Returns null if the range cannot be exposed without copying or fetching data. The caller may retain the view
+  /// until the owning buffer is closed and must not release it.
+  @Nullable
+  public ByteBuffer tryViewAsByteBuffer(long offset, int size, ByteOrder byteOrder) {
+    return null;
+  }
+
   /// Returns an ByteBuffer with the same content of this buffer.
   ///
   /// This receiver object and the returned ByteBuffer share the same memory address, but the receiver conserves the
