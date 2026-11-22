@@ -341,24 +341,24 @@ public class HnswVectorIndexCreatorTest {
         MutableRoaringBitmap allowed = new MutableRoaringBitmap();
         allowed.add(10L, 60L);
         if (distanceFunction.equals("EUCLIDEAN")) {
-          Assert.assertNull(reader.getDocDistances(query, 5));
-          Assert.assertNull(reader.getDocDistances(query, 5, allowed));
+          Assert.assertNull(reader.getCosineDistances(query, 5));
+          Assert.assertNull(reader.getCosineDistances(query, 5, allowed));
           continue;
         }
-        Int2FloatMap distances = reader.getDocDistances(query, 20);
+        Int2FloatMap distances = reader.getCosineDistances(query, 20);
         Assert.assertEquals(sortedDocIds(distances), reader.getDocIds(query, 20).toArray());
         assertCosineDistances(distances, vectors, query);
 
-        Int2FloatMap filtered = reader.getDocDistances(query, 5, allowed);
+        Int2FloatMap filtered = reader.getCosineDistances(query, 5, allowed);
         Assert.assertEquals(sortedDocIds(filtered), reader.getDocIds(query, 5, allowed).toArray());
         for (int docId : filtered.keySet()) {
           Assert.assertTrue(allowed.contains(docId), "Filtered search returned doc outside the filter: " + docId);
         }
         assertCosineDistances(filtered, vectors, query);
-        Assert.assertTrue(reader.getDocDistances(query, 5, new MutableRoaringBitmap()).isEmpty());
+        Assert.assertTrue(reader.getCosineDistances(query, 5, new MutableRoaringBitmap()).isEmpty());
 
         // Stateless: a later search does not see the documents of an earlier one.
-        Assert.assertEquals(reader.getDocDistances(query, 3).size(), 3);
+        Assert.assertEquals(reader.getCosineDistances(query, 3).size(), 3);
       }
     }
   }
@@ -384,10 +384,10 @@ public class HnswVectorIndexCreatorTest {
       try (HnswVectorIndexReader reader =
           new HnswVectorIndexReader("baz", indexDir, vectors.length, hnswConfig(builtAndLoaded[1]))) {
         if (builtAndLoaded[0].equals("EUCLIDEAN")) {
-          Assert.assertNull(reader.getDocDistances(query, 4));
-          Assert.assertNull(reader.getDocDistances(query, 4, MutableRoaringBitmap.bitmapOf(0, 1)));
+          Assert.assertNull(reader.getCosineDistances(query, 4));
+          Assert.assertNull(reader.getCosineDistances(query, 4, MutableRoaringBitmap.bitmapOf(0, 1)));
         } else {
-          assertCosineDistances(reader.getDocDistances(query, 4), vectors, query);
+          assertCosineDistances(reader.getCosineDistances(query, 4), vectors, query);
         }
       }
     }

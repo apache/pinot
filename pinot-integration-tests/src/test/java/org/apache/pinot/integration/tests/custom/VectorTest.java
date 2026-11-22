@@ -207,8 +207,29 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     for (int i = 0; i < topK; i++) {
       double dist1 = jsonNode1.get("resultTable").get("rows").get(i).get(0).asDouble();
       double dist2 = jsonNode2.get("resultTable").get("rows").get(i).get(0).asDouble();
-      // query1 takes the distances from the COSINE index search, in single precision
-      assertEquals(dist1, dist2, 1e-5);
+      assertEquals(dist1, dist2);
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testApproximateCosineDistance(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String queryVector = "ARRAY[1.0" + StringUtils.repeat(", 0.0", VECTOR_DIM_SIZE - 1) + "]";
+    String distance = "cosineDistance(" + VECTOR_1 + ", " + queryVector + ")";
+    String query = "SELECT " + distance + " AS dist FROM " + getTableName()
+        + " WHERE vectorSimilarity(" + VECTOR_1 + ", " + queryVector + ", " + getCountStarResult() + ")";
+    String orderBy = " ORDER BY dist LIMIT 1";
+
+    // The nearly parallel fixture row has positive scalar distance, but Lucene rounds its score to 1.
+    double expected = VectorFunctions.cosineDistance(new float[]{1, 0.0001f}, new float[]{1, 0});
+    JsonNode exact = postQuery(query + " AND " + distance + " > 0" + orderBy);
+    assertTrue(exact.has("resultTable"), exact.toString());
+    assertEquals(exact.get("resultTable").get("rows").get(0).get(0).asDouble(), expected);
+    if (!useMultiStageQueryEngine) {
+      JsonNode approximate = postQuery("SET vectorApproximateDistance=true; " + query + orderBy);
+      assertTrue(approximate.has("resultTable"), approximate.toString());
+      assertEquals(approximate.get("resultTable").get("rows").get(0).get(0).asDouble(), 0.0);
     }
   }
 
@@ -491,7 +512,11 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
 
-        float[] vector1 = createRandomVector(VECTOR_DIM_SIZE);
+        float[] vector1 = i == 0 ? new float[VECTOR_DIM_SIZE] : createRandomVector(VECTOR_DIM_SIZE);
+        if (i == 0) {
+          vector1[0] = 1;
+          vector1[1] = 0.0001f;
+        }
         float[] vector2 = createRandomVector(VECTOR_DIM_SIZE);
         float[] zeroVector = createZeroVector(VECTOR_DIM_SIZE);
 

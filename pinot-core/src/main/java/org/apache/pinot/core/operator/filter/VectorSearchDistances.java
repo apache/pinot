@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 
@@ -34,6 +35,13 @@ import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 /// only when one exists, so queries that do not project it collect nothing.
 public final class VectorSearchDistances {
   private final ConcurrentHashMap<Key, Request> _requests = new ConcurrentHashMap<>();
+
+  /// A query with a row-level security filter always uses scalar distances. Its policy and user filters are
+  /// evaluated independently and must not share search results.
+  public static boolean isEnabled(QueryContext queryContext) {
+    return queryContext.getRowFilter() == null && QueryOptionsUtils.isVectorApproximateDistance(
+        queryContext.getQueryOptions());
+  }
 
   /// Returns the instance of the given query.
   public static VectorSearchDistances of(QueryContext queryContext) {

@@ -478,7 +478,9 @@ public class FilterPlanNode implements PlanNode {
       }
       VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs,
           searchParams, forwardIndexReader, vectorIndexConfig, hasMetadataFilter, _requiredVectorDocIds);
-      operator.setSearchDistances(VectorSearchDistances.of(_queryContext));
+      if (VectorSearchDistances.isEnabled(_queryContext)) {
+        operator.setSearchDistances(VectorSearchDistances.of(_queryContext));
+      }
       return operator;
     }
 

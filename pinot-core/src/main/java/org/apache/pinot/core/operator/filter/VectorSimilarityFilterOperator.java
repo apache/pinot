@@ -408,7 +408,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
         FilterAwareVectorIndexReader filterAwareReader = (FilterAwareVectorIndexReader) _vectorIndexReader;
         _vectorSearchMode = VectorSearchMode.FILTER_THEN_ANN;
         if (distancesRequest != null) {
-          distances = filterAwareReader.getDocDistances(queryVector, searchCount, preFilter);
+          distances = filterAwareReader.getCosineDistances(queryVector, searchCount, preFilter);
         }
         annResults = distances != null ? toBitmap(distances)
             : filterAwareReader.getDocIds(queryVector, searchCount, preFilter);
@@ -418,7 +418,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       } else {
         _vectorSearchMode = VectorSearchMode.POST_FILTER_ANN;
         if (distancesRequest != null) {
-          distances = _vectorIndexReader.getDocDistances(queryVector, searchCount);
+          distances = _vectorIndexReader.getCosineDistances(queryVector, searchCount);
         }
         annResults = distances != null ? toBitmap(distances) : _vectorIndexReader.getDocIds(queryVector, searchCount);
       }

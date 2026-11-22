@@ -1056,10 +1056,9 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK));
   }
 
-  /// Returns whether `cosineDistance` must compute exact distances instead of taking them from a paired vector index
-  /// search. Defaults to `false`.
-  public static boolean isVectorExactDistance(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_DISTANCE));
+  /// Returns whether `cosineDistance` may reuse approximate distances from a paired vector index search.
+  public static boolean isVectorApproximateDistance(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_APPROXIMATE_DISTANCE));
   }
 
   @Nullable

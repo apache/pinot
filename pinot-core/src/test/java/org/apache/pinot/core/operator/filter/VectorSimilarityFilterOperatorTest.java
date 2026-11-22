@@ -642,7 +642,7 @@ public class VectorSimilarityFilterOperatorTest {
     float[] queryVector = {1.0f, 2.0f, 3.0f};
     VectorIndexReader reader = mock(VectorIndexReader.class);
     Int2FloatMap distances = distances(1, 3, 5);
-    when(reader.getDocDistances(queryVector, 3)).thenReturn(distances);
+    when(reader.getCosineDistances(queryVector, 3)).thenReturn(distances);
     VectorSearchDistances searchDistances = new VectorSearchDistances();
     VectorSearchDistances.Request request = searchDistances.request(reader, queryVector.clone());
 
@@ -673,7 +673,7 @@ public class VectorSimilarityFilterOperatorTest {
 
     Assert.assertEquals(operator.getBitmaps().reduce().toArray(), new int[]{0});
     Assert.assertNull(request.getDistances());
-    verify(reader, never()).getDocDistances(any(float[].class), anyInt());
+    verify(reader, never()).getCosineDistances(any(float[].class), anyInt());
   }
 
   /// Without a request, a search collects only doc ids, so queries that do not project cosineDistance pay nothing.
@@ -689,7 +689,7 @@ public class VectorSimilarityFilterOperatorTest {
     operator.setSearchDistances(searchDistances);
 
     Assert.assertEquals(operator.getBitmaps().reduce().toArray(), new int[]{1, 3, 5});
-    verify(reader, never()).getDocDistances(any(float[].class), anyInt());
+    verify(reader, never()).getCosineDistances(any(float[].class), anyInt());
   }
 
   /// An index that returns no distances still answers the filter through `getDocIds`.
@@ -697,7 +697,7 @@ public class VectorSimilarityFilterOperatorTest {
   public void testFallsBackToDocIdsWhenIndexReturnsNoDistances() {
     float[] queryVector = {1.0f, 2.0f, 3.0f};
     VectorIndexReader reader = mock(VectorIndexReader.class);
-    when(reader.getDocDistances(queryVector, 3)).thenReturn(null);
+    when(reader.getCosineDistances(queryVector, 3)).thenReturn(null);
     when(reader.getDocIds(queryVector, 3)).thenReturn(MutableRoaringBitmap.bitmapOf(1, 3, 5));
     VectorSearchDistances searchDistances = new VectorSearchDistances();
     VectorSearchDistances.Request request = searchDistances.request(reader, queryVector);
@@ -717,7 +717,7 @@ public class VectorSimilarityFilterOperatorTest {
     FilterAwareVectorIndexReader reader = mock(FilterAwareVectorIndexReader.class);
     when(reader.supportsPreFilter()).thenReturn(true);
     Int2FloatMap distances = distances(4, 8);
-    when(reader.getDocDistances(any(float[].class), anyInt(), any(ImmutableRoaringBitmap.class)))
+    when(reader.getCosineDistances(any(float[].class), anyInt(), any(ImmutableRoaringBitmap.class)))
         .thenReturn(distances);
     VectorSearchDistances searchDistances = new VectorSearchDistances();
     VectorSearchDistances.Request request = searchDistances.request(reader, queryVector);

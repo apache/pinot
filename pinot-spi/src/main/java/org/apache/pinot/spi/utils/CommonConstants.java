@@ -1310,10 +1310,9 @@ public class CommonConstants {
         /// Setting false uses an unbounded per-query collector and requires vectorEfSearch.
         public static final String VECTOR_USE_BOUNDED_QUEUE = "vectorUseBoundedQueue";
 
-        /// When true, `cosineDistance` always computes distances from the forward index, even when it is paired with
-        /// a `VECTOR_SIMILARITY` search on a COSINE vector index that could hand over its single-precision distances.
-        /// Defaults to false.
-        public static final String VECTOR_EXACT_DISTANCE = "vectorExactDistance";
+        /// Allows `cosineDistance` to use approximate scores from a paired COSINE vector index search.
+        /// This can change projected values and their ordering. Defaults to false.
+        public static final String VECTOR_APPROXIMATE_DISTANCE = "vectorApproximateDistance";
       }
 
       public static class QueryOptionValue {
