@@ -19,9 +19,14 @@
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.lucene.store.ByteBuffersDataInput;
+import org.apache.lucene.store.ByteBuffersIndexInput;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
@@ -109,7 +114,20 @@ public class PinotBufferLuceneDirectory extends Directory {
     if (fileInfo == null) {
       throw new IOException("File not found: " + name);
     }
-    return new PinotBufferIndexInput(name, _indexBuffer, fileInfo.getOffset(), fileInfo.getSize());
+    long offset = fileInfo.getOffset();
+    long size = fileInfo.getSize();
+    long bufferSize = _indexBuffer.size();
+    if (offset < 0 || size < 0 || offset > bufferSize - size) {
+      throw new IOException("Invalid file range for " + name + ": offset=" + offset + ", size=" + size
+          + ", bufferSize=" + bufferSize);
+    }
+    if (size <= Integer.MAX_VALUE) {
+      ByteBuffer view = _indexBuffer.tryViewAsByteBuffer(offset, (int) size, ByteOrder.LITTLE_ENDIAN);
+      if (view != null) {
+        return new ByteBuffersIndexInput(new ByteBuffersDataInput(List.of(view)), name);
+      }
+    }
+    return new PinotBufferIndexInput(name, _indexBuffer, offset, size);
   }
 
   @Override
