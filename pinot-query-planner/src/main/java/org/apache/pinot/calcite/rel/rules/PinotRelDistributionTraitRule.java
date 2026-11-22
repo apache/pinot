@@ -150,7 +150,9 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
       // TODO: we only map a single RelTrait from the LEFT table, later we should support RIGHT table as well
       assert inputs.size() == 2;
       RelDistribution inputRelDistribution = inputs.get(0).getTraitSet().getDistribution();
-      if (inputRelDistribution != null) {
+      // A RIGHT or FULL join emits the unmatched right rows with null left columns on the workers that hold them, so
+      // the output is not distributed like the left input.
+      if (inputRelDistribution != null && !((LogicalJoin) node).getJoinType().generatesNullsOnLeft()) {
         // Since we only support LEFT RelTrait propagation, the inputRelDistribution can directly be applied
         // b/c the Join node always puts left relation RowTypes then right relation RowTypes sequentially.
         return inputRelDistribution;
