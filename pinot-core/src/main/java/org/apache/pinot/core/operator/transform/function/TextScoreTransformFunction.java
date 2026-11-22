@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -36,9 +37,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// document for a text search query, read from the column's text index (Lucene BM25 by default). Documents that do
 /// not match the query score `0`.
 ///
-/// The query is parsed exactly like `TEXT_MATCH` with the same arguments, so
-/// `TEXT_SCORE(col, q) > 0` holds exactly for the documents `TEXT_MATCH(col, q)` accepts (BM25 scores of matching
-/// documents are strictly positive; constant-score queries such as wildcards score `1`).
+/// Matching documents receive Lucene's score, which can also be zero for a zero-boost query. Use
+/// `TEXT_MATCH` to test membership. Scoring requires a per-row index on a single-valued STRING column.
+/// Queries with row-level security filters cannot use index-wide scores.
 ///
 /// The index is searched once per segment, on the first block, and the doc id to score map is reused for the
 /// remaining blocks of that segment. The map holds every document of the segment that matches the search query,
@@ -52,7 +53,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// `TEXT_SCORE_STATS(column, 'search query'[, 'options'])` for the same query, every segment scores with those
 /// corpus-wide statistics instead, so equal documents get equal scores in every segment (two-step search, like
 /// Elasticsearch's `dfs_query_then_fetch`). An empty string means no global statistics. Pass `''` as options to use
-/// the default parser with global statistics.
+/// the default parser with global statistics. Global scoring supports term and phrase queries, Boolean combinations,
+/// boosts and uncapped constant-score rewrites. Queries with segment-specific expansions such as fuzzy queries use
+/// local scoring. Repeat the statistics query if the supplied counters have become inconsistent with the index.
 ///
 /// Not thread-safe: like other transform functions, an instance serves one segment on one thread.
 public class TextScoreTransformFunction extends BaseTransformFunction {
@@ -76,6 +79,15 @@ public class TextScoreTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      QueryContext queryContext) {
+    if (queryContext.getRowFilter() != null) {
+      throw new IllegalArgumentException("TEXT_SCORE is not supported when row-level security filters apply");
+    }
+    super.init(arguments, columnContextMap, queryContext);
+  }
+
+  @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
     int numArguments = arguments.size();
@@ -85,10 +97,10 @@ public class TextScoreTransformFunction extends BaseTransformFunction {
     }
 
     TransformFunction columnArg = arguments.get(0);
-    if (!(columnArg instanceof IdentifierTransformFunction && columnArg.getResultMetadata().isSingleValue())) {
-      throw new IllegalArgumentException("The first argument of TEXT_SCORE must be a single-valued column");
+    if (!(columnArg instanceof IdentifierTransformFunction identifier)) {
+      throw new IllegalArgumentException("The first argument of TEXT_SCORE must be a column with a text index");
     }
-    String columnName = ((IdentifierTransformFunction) columnArg).getColumnName();
+    String columnName = identifier.getColumnName();
     DataSource dataSource = columnContextMap.get(columnName).getDataSource();
     TextIndexReader textIndexReader = dataSource != null ? dataSource.getTextIndex() : null;
     if (textIndexReader == null && dataSource != null) {
@@ -97,6 +109,10 @@ public class TextScoreTransformFunction extends BaseTransformFunction {
     }
     if (textIndexReader == null) {
       throw new IllegalArgumentException("Cannot apply TEXT_SCORE on column: " + columnName + " without text index");
+    }
+    TransformResultMetadata metadata = identifier.getResultMetadata();
+    if (!metadata.isSingleValue() || metadata.getDataType() != DataType.STRING) {
+      throw new IllegalArgumentException("TEXT_SCORE requires a single-valued STRING column: " + columnName);
     }
     _textIndexReader = textIndexReader;
 
@@ -131,8 +147,7 @@ public class TextScoreTransformFunction extends BaseTransformFunction {
     Int2FloatMap scores = getScores();
     int[] docIds = valueBlock.getDocIds();
     for (int i = 0; i < length; i++) {
-      // Int2FloatMap returns its default (0) for documents that do not match
-      _doubleValuesSV[i] = scores.get(docIds[i]);
+      _doubleValuesSV[i] = scores.getOrDefault(docIds[i], 0f);
     }
     return _doubleValuesSV;
   }

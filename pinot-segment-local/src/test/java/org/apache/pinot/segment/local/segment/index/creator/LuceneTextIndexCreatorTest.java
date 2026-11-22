@@ -360,6 +360,8 @@ public class LuceneTextIndexCreatorTest {
       assertEquals(reader.getDictIds("*:* ").toArray(), new int[]{0, 1, 2});
       expectThrows(UnsupportedOperationException.class, () -> reader.getDocIds("alpha", null));
       expectThrows(UnsupportedOperationException.class, () -> reader.getNumMatchingDocs("alpha", null));
+      expectThrows(UnsupportedOperationException.class, () -> reader.getDocScores("alpha", null));
+      expectThrows(UnsupportedOperationException.class, () -> reader.getTextScoreStats("alpha", null));
     }
   }
 

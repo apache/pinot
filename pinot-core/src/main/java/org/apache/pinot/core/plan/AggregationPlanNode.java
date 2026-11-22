@@ -120,6 +120,9 @@ public class AggregationPlanNode implements PlanNode {
     }
     Preconditions.checkArgument(numTextScoreStats == aggregationFunctions.length,
         "TEXT_SCORE_STATS cannot be combined with other aggregation functions");
+    // Corpus statistics include every indexed document. They cannot be restricted to rows visible to this caller.
+    Preconditions.checkArgument(_queryContext.getRowFilter() == null,
+        "TEXT_SCORE_STATS is not supported when row-level security filters apply");
     // The statistics describe the whole segment, so a FILTER clause would be silently ignored
     Preconditions.checkArgument(!_queryContext.hasFilteredAggregations(),
         "TEXT_SCORE_STATS does not support a FILTER clause");

@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
@@ -118,18 +117,14 @@ public final class TextScoreStats {
           "Invalid text score statistics, missing '" + FIELDS + "' object: " + json);
     }
     TextScoreStats stats = new TextScoreStats();
-    Iterator<Map.Entry<String, JsonNode>> fields = fieldsNode.fields();
-    while (fields.hasNext()) {
-      Map.Entry<String, JsonNode> field = fields.next();
+    for (Map.Entry<String, JsonNode> field : fieldsNode.properties()) {
       JsonNode fieldNode = field.getValue();
       FieldStats fieldStats = stats.getOrCreateField(field.getKey());
       fieldStats.addCollectionStats(getLong(fieldNode, MAX_DOC), getLong(fieldNode, DOC_COUNT),
           getLong(fieldNode, SUM_TOTAL_TERM_FREQ), getLong(fieldNode, SUM_DOC_FREQ));
       JsonNode termsNode = fieldNode.get(TERMS);
       if (termsNode != null) {
-        Iterator<Map.Entry<String, JsonNode>> terms = termsNode.fields();
-        while (terms.hasNext()) {
-          Map.Entry<String, JsonNode> term = terms.next();
+        for (Map.Entry<String, JsonNode> term : termsNode.properties()) {
           JsonNode value = term.getValue();
           if (!value.isArray() || value.size() != 2) {
             throw new IllegalArgumentException(

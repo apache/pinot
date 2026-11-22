@@ -18,54 +18,60 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
-import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.io.IOException;
-import java.util.function.IntUnaryOperator;
+import java.util.Set;
+import java.util.concurrent.CancellationException;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.NoMergePolicy;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
+import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class LuceneDocScoreCollectorTest {
 
   @Test
-  public void testCollectsScoresUntilCancelled()
+  public void testTranslatedScoresAndCancellation()
       throws IOException {
     try (Directory directory = new ByteBuffersDirectory()) {
-      try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()))) {
+      IndexWriterConfig config = new IndexWriterConfig(new StandardAnalyzer()).setMergePolicy(NoMergePolicy.INSTANCE);
+      try (IndexWriter writer = new IndexWriter(directory, config)) {
         for (int i = 0; i < 10; i++) {
           Document document = new Document();
-          document.add(new TextField("title", "usb charger " + i, Field.Store.NO));
+          document.add(new TextField("title", i % 2 == 0 ? "usb charger" : "cable", Field.Store.NO));
+          document.add(new StoredField(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME, 9 - i));
           writer.addDocument(document);
+          if (i == 4) {
+            writer.commit();
+          }
         }
       }
       try (DirectoryReader reader = DirectoryReader.open(directory)) {
         IndexSearcher searcher = new IndexSearcher(reader);
         TermQuery query = new TermQuery(new Term("title", "usb"));
 
-        Int2FloatOpenHashMap scores = new Int2FloatOpenHashMap();
-        searcher.search(query, new LuceneDocScoreCollector(scores, IntUnaryOperator.identity()));
-        assertEquals(scores.size(), 10);
+        Int2FloatMap scores = new LuceneDocScoreCollector(docId -> 9 - docId).collectScores(searcher, query);
+        assertEquals(scores.keySet(), Set.of(1, 3, 5, 7, 9));
+        assertEquals(LuceneDocScoreCollector.forConsumingSegment().collectScores(searcher, query), scores);
 
-        // A query thread that stopped waiting cancels the search: nothing more is collected
-        Int2FloatOpenHashMap cancelledScores = new Int2FloatOpenHashMap();
-        LuceneDocScoreCollector cancelled = new LuceneDocScoreCollector(cancelledScores, IntUnaryOperator.identity());
+        LuceneDocScoreCollector cancelled = LuceneDocScoreCollector.forConsumingSegment();
         cancelled.markShouldCancel();
-        searcher.search(query, cancelled);
-        assertTrue(cancelledScores.isEmpty());
+        expectThrows(CancellationException.class, () -> cancelled.collectScores(searcher, query));
       }
     }
   }

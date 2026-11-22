@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -30,9 +31,11 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// Implements `TEXT_SCORE_STATS(column, 'search query'[, 'options'])`: the corpus statistics BM25 needs for the
@@ -41,12 +44,15 @@ import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 /// corpus-wide document frequencies and average field length (two-step search, like Elasticsearch's
 /// `dfs_query_then_fetch`).
 ///
+/// The column must be a single-valued STRING with a per-row text index.
 /// The query and options are parsed exactly as `TEXT_SCORE` parses them, so the statistics cover the same analyzed
-/// terms. Each segment's statistics are read from its text index metadata without scanning documents (see
+/// terms. Global scoring supports term and phrase queries, Boolean and boosted combinations, and uncapped
+/// constant-score multi-term queries such as wildcards. Index-dependent scoring rewrites, including fuzzy and
+/// synonym expansion, require local scoring. Each segment's statistics come from its text index metadata (see
 /// `AggregationPlanNode`); the filter does not restrict them, only segment pruning does. The function must be the
-/// only aggregation of its query and does not support GROUP BY.
+/// only type of aggregation in its query and does not support GROUP BY or row-level security filters.
 ///
-/// Because no filter is applied, filters Pinot adds on its own are not applied either:
+/// The following implicit filters do not restrict corpus statistics:
 /// - Hybrid tables: the broker's time-boundary predicate only prunes whole segments, so documents of a segment that
 ///   straddles the boundary count on both the offline and the realtime side.
 /// - Upsert tables: replaced rows (not in the valid doc ids) still count toward document count, document frequency
@@ -62,39 +68,59 @@ import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 public class TextScoreStatsAggregationFunction extends BaseSingleInputAggregationFunction<String, String> {
   private static final String EMPTY_STATS = new TextScoreStats().toJson();
 
+  private final String _resultColumnName;
   private final String _searchQuery;
   @Nullable
   private final String _options;
 
   public TextScoreStatsAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(arguments.get(0), nullHandlingEnabled);
-    int numArguments = arguments.size();
-    Preconditions.checkArgument(numArguments == 2 || numArguments == 3,
-        "TEXT_SCORE_STATS expects 2 or 3 arguments: TEXT_SCORE_STATS(column, 'searchQuery'[, 'options'])");
-    Preconditions.checkArgument(arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER,
-        "The first argument of TEXT_SCORE_STATS must be a column with a text index");
+    super(getColumnArgument(arguments), nullHandlingEnabled);
     _searchQuery = getStringLiteral(arguments.get(1), "second");
-    _options = numArguments == 3 ? getStringLiteral(arguments.get(2), "third") : null;
+    _options = arguments.size() == 3 ? getStringLiteral(arguments.get(2), "third") : null;
+    _resultColumnName =
+        new FunctionContext(FunctionContext.Type.AGGREGATION, getType().getName(), arguments).toString();
+  }
+
+  private static ExpressionContext getColumnArgument(List<ExpressionContext> arguments) {
+    Preconditions.checkArgument(arguments.size() == 2 || arguments.size() == 3,
+        "TEXT_SCORE_STATS expects 2 or 3 arguments: TEXT_SCORE_STATS(column, 'searchQuery'[, 'options'])");
+    ExpressionContext column = arguments.get(0);
+    Preconditions.checkArgument(column.getType() == ExpressionContext.Type.IDENTIFIER,
+        "The first argument of TEXT_SCORE_STATS must be a column with a text index");
+    return column;
   }
 
   private static String getStringLiteral(ExpressionContext argument, String position) {
-    Preconditions.checkArgument(argument.getType() == ExpressionContext.Type.LITERAL,
-        "The %s argument of TEXT_SCORE_STATS must be a string literal", position);
-    return argument.getLiteral().getStringValue();
+    if (argument.getType() == ExpressionContext.Type.LITERAL
+        && argument.getLiteral().getValue() instanceof String literal) {
+      return literal;
+    }
+    throw new IllegalArgumentException("The " + position + " argument of TEXT_SCORE_STATS must be a string literal");
+  }
+
+  @Override
+  public String getResultColumnName() {
+    return _resultColumnName;
+  }
+
+  @Override
+  public String toExplainString() {
+    return _resultColumnName;
   }
 
   /// Returns the serialized statistics of one segment, read from the column's (single- or multi-column) text index.
   public String getSegmentStats(DataSource dataSource) {
     String column = _expression.getIdentifier();
     TextIndexReader textIndexReader = dataSource.getTextIndex();
-    if (textIndexReader != null) {
-      return textIndexReader.getTextScoreStats(_searchQuery, _options).toJson();
-    }
-    MultiColumnTextIndexReader multiColumnTextIndex = dataSource.getMultiColumnTextIndex();
-    if (multiColumnTextIndex != null) {
-      return multiColumnTextIndex.getTextScoreStats(column, _searchQuery, _options).toJson();
-    }
-    throw new IllegalArgumentException("Cannot apply TEXT_SCORE_STATS on column: " + column + " without text index");
+    MultiColumnTextIndexReader multiColumnTextIndex =
+        textIndexReader == null ? dataSource.getMultiColumnTextIndex() : null;
+    Preconditions.checkArgument(textIndexReader != null || multiColumnTextIndex != null,
+        "Cannot apply TEXT_SCORE_STATS on column: %s without text index", column);
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    Preconditions.checkArgument(metadata.isSingleValue() && metadata.getDataType() == DataType.STRING,
+        "TEXT_SCORE_STATS requires a single-valued STRING column: %s", column);
+    return textIndexReader != null ? textIndexReader.getTextScoreStats(_searchQuery, _options).toJson()
+        : multiColumnTextIndex.getTextScoreStats(column, _searchQuery, _options).toJson();
   }
 
   @Override
@@ -135,7 +161,7 @@ public class TextScoreStatsAggregationFunction extends BaseSingleInputAggregatio
   /// function does not support.
   private static UnsupportedOperationException unsupportedScan() {
     return new UnsupportedOperationException(
-        "TEXT_SCORE_STATS must be the only aggregation function of a query without GROUP BY or FILTER clauses");
+        "TEXT_SCORE_STATS requires a query without other aggregation types, GROUP BY or FILTER clauses");
   }
 
   @Override

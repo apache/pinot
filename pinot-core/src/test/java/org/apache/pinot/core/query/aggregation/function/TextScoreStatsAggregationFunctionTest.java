@@ -21,14 +21,24 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.operator.transform.function.TextScoreTransformFunction;
+import org.apache.pinot.core.plan.AggregationPlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.expectThrows;
 
@@ -42,6 +52,11 @@ public class TextScoreStatsAggregationFunctionTest {
 
   @Test
   public void testArgumentValidation() {
+    expectThrows(IllegalArgumentException.class, () -> new TextScoreStatsAggregationFunction(List.of(), false));
+    expectThrows(IllegalArgumentException.class, () -> new TextScoreStatsAggregationFunction(
+        List.of(COLUMN, ExpressionContext.forLiteral(DataType.INT, 123)), false));
+    expectThrows(IllegalArgumentException.class, () -> new TextScoreStatsAggregationFunction(
+        List.of(COLUMN, QUERY, ExpressionContext.forLiteral(DataType.UNKNOWN, null)), false));
     expectThrows(IllegalArgumentException.class, () -> new TextScoreStatsAggregationFunction(List.of(COLUMN), false));
     expectThrows(IllegalArgumentException.class,
         () -> new TextScoreStatsAggregationFunction(List.of(COLUMN, QUERY, QUERY, QUERY), false));
@@ -57,8 +72,23 @@ public class TextScoreStatsAggregationFunctionTest {
   public void testResultTypes() {
     TextScoreStatsAggregationFunction function = newFunction();
     assertEquals(function.getType(), AggregationFunctionType.TEXTSCORESTATS);
+    assertEquals(function.getResultColumnName(), "textscorestats(title,'usb')");
+    assertEquals(new TextScoreStatsAggregationFunction(List.of(COLUMN, QUERY, QUERY), false).getResultColumnName(),
+        "textscorestats(title,'usb','usb')");
     assertEquals(function.getIntermediateResultColumnType(), ColumnDataType.STRING);
     assertEquals(function.getFinalResultColumnType(), ColumnDataType.STRING);
+  }
+
+  @Test
+  public void testRowFilterPreventsTextIndexAccess() {
+    QueryContext context = QueryContextConverterUtils.getQueryContext("SELECT TEXT_SCORE_STATS(title, 'usb') FROM t");
+    context.setRowFilter(FilterContext.CONSTANT_FALSE);
+    AggregationPlanNode node = new AggregationPlanNode(new SegmentContext(mock(IndexSegment.class)), context);
+    assertEquals(expectThrows(IllegalArgumentException.class, node::run).getMessage(),
+        "TEXT_SCORE_STATS is not supported when row-level security filters apply");
+    assertEquals(expectThrows(IllegalArgumentException.class,
+        () -> new TextScoreTransformFunction().init(List.of(), Map.of(), context)).getMessage(),
+        "TEXT_SCORE is not supported when row-level security filters apply");
   }
 
   @Test
@@ -98,10 +128,17 @@ public class TextScoreStatsAggregationFunctionTest {
   }
 
   @Test
-  public void testColumnWithoutTextIndexIsRejected() {
-    IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
-        () -> newFunction().getSegmentStats(mock(DataSource.class)));
-    assertEquals(e.getMessage(), "Cannot apply TEXT_SCORE_STATS on column: title without text index");
+  public void testColumnValidation() {
+    DataSource dataSource = mock(DataSource.class);
+    assertEquals(expectThrows(IllegalArgumentException.class, () -> newFunction().getSegmentStats(dataSource))
+        .getMessage(), "Cannot apply TEXT_SCORE_STATS on column: title without text index");
+
+    DataSourceMetadata metadata = mock(DataSourceMetadata.class);
+    when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
+    when(dataSource.getTextIndex()).thenReturn(mock(TextIndexReader.class));
+    when(metadata.getDataType()).thenReturn(DataType.STRING);
+    assertEquals(expectThrows(IllegalArgumentException.class, () -> newFunction().getSegmentStats(dataSource))
+        .getMessage(), "TEXT_SCORE_STATS requires a single-valued STRING column: title");
   }
 
   private static TextScoreStatsAggregationFunction newFunction() {

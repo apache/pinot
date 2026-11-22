@@ -181,18 +181,43 @@ public class TextScoreGlobalStatsQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /// The fuzzy `hubb~1` matches only `hub` in A and nothing in B, so B's rewritten query has no terms; B's documents
-  /// must still count towards the corpus size and field length, which fuzzy scoring reads.
   @Test
-  public void testFuzzyStatsCountSegmentsWithoutMatches() {
+  public void testFuzzyScoringRequiresLocalStatistics() {
     for (String column : TEXT_COLUMNS) {
-      TextScoreStats stats = TextScoreStats.fromJson(getStats(column, "hubb~1", null));
-      TextScoreStats.FieldStats fieldStats = stats.getField(column);
-      assertNotNull(fieldStats, stats.toJson());
-      assertEquals(fieldStats.getDocCount(), TITLES_A.length + TITLES_B.length);
-      assertEquals(fieldStats.getSumTotalTermFreq(), 12 + 22);
-      assertEquals(fieldStats.getTermStats("hub"), new long[]{1, 1});
-      assertEquals(stats, unionStats(column, "hubb~1", null));
+      String query = "usb OR hubb~1";
+      assertTrue(scoresById(column, query, null).get(0) > 0);
+      BrokerResponseNative response = getBrokerResponse(
+          "SELECT TEXT_SCORE_STATS(" + column + ", '" + query + "') FROM products");
+      assertFalse(response.getExceptions().isEmpty());
+      assertTrue(response.getExceptions().toString().contains("FuzzyQuery"), response.getExceptions().toString());
+      String stats = getStats(column, "usb", null);
+      response = getBrokerResponse("SELECT TEXT_SCORE(" + column + ", '" + query + "', '', '" + stats
+          + "') FROM products");
+      assertFalse(response.getExceptions().isEmpty());
+      assertTrue(response.getExceptions().toString().contains("FuzzyQuery"), response.getExceptions().toString());
+    }
+  }
+
+  @Test
+  public void testRejectInconsistentGlobalStats() {
+    TextScoreStats stats = new TextScoreStats();
+    TextScoreStats.FieldStats title = stats.getOrCreateField(TITLE_COL);
+    title.addCollectionStats(1, 1, 1, 1);
+    title.addTermStats("usb", 1, 1);
+    BrokerResponseNative response = getBrokerResponse(
+        "SELECT TEXT_SCORE(title, 'usb', '', '" + stats.toJson() + "') FROM products");
+    assertFalse(response.getExceptions().isEmpty());
+    assertTrue(response.getExceptions().toString().contains("inconsistent"), response.getExceptions().toString());
+  }
+
+  @Test
+  public void testSharedIndexScoringUsesDeclaredColumn() {
+    for (String function : List.of("TEXT_SCORE", "TEXT_SCORE_STATS")) {
+      BrokerResponseNative response = getBrokerResponse(
+          "SELECT " + function + "(descr, 'usb -title:charger') FROM products");
+      assertFalse(response.getExceptions().isEmpty());
+      assertTrue(response.getExceptions().toString().contains("cannot reference field title"),
+          response.getExceptions().toString());
     }
   }
 

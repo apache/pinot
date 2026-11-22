@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import com.google.common.annotations.VisibleForTesting;
 import it.unimi.dsi.fastutil.ints.Int2FloatMap;
-import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -305,14 +304,12 @@ public class LuceneTextIndexReader implements TextIndexReader {
   @Override
   public Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString,
       @Nullable TextScoreStats globalStats) {
-    Int2FloatOpenHashMap scores = new Int2FloatOpenHashMap();
+    requirePerRowIndex();
     try {
       validateDocCount();
-      IndexSearcher searcher = globalStats != null
-          ? LuceneTextScoreStatsUtils.newGlobalStatsSearcher(_indexReader, globalStats) : _indexSearcher;
-      searcher.search(buildQuery(searchQuery, optionsString, null),
-          new LuceneDocScoreCollector(scores, _docIdTranslator::getPinotDocId));
-      return scores;
+      Query query = buildQuery(searchQuery, optionsString, null);
+      IndexSearcher searcher = LuceneTextScoreStatsUtils.scoringSearcher(_indexSearcher, query, _column, globalStats);
+      return new LuceneDocScoreCollector(_docIdTranslator::getPinotDocId).collectScores(searcher, query);
     } catch (QueryException e) {
       throw e;
     } catch (Exception e) {
@@ -323,8 +320,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public TextScoreStats getTextScoreStats(String searchQuery, @Nullable String optionsString) {
+    requirePerRowIndex();
     try {
-      return LuceneTextScoreStatsUtils.collect(_indexSearcher, buildQuery(searchQuery, optionsString, null));
+      return LuceneTextScoreStatsUtils.collect(_indexSearcher, buildQuery(searchQuery, optionsString, null), _column);
     } catch (QueryException e) {
       throw e;
     } catch (Exception e) {
@@ -423,7 +421,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private void requirePerRowIndex() {
     if (_buildOnDictionary) {
       throw new UnsupportedOperationException(
-          "Document IDs and counts require a per-row text index for column: " + _column);
+          "Document IDs, counts and relevance scoring require a per-row text index for column: " + _column);
     }
   }
 

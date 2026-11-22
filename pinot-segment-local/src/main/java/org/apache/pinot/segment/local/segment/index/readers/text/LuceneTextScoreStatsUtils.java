@@ -22,79 +22,132 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.CollectionStatistics;
+import org.apache.lucene.search.ConstantScoreQuery;
+import org.apache.lucene.search.FieldExistsQuery;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.MatchAllDocsQuery;
+import org.apache.lucene.search.MatchNoDocsQuery;
+import org.apache.lucene.search.MultiTermQuery;
+import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.QueryVisitor;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TermStatistics;
 import org.apache.lucene.util.automaton.ByteRunAutomaton;
 import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /// Collects and applies cross-segment ("global") BM25 statistics for `TEXT_SCORE`, the Lucene side of
 /// [TextScoreStats].
 ///
-/// - [#collect] reads, from one index, the statistics scoring a query would consult: the collection statistics of
-///   every field the query targets and the document / total term frequency of every query term.
-/// - [#newGlobalStatsSearcher] returns an [IndexSearcher] whose [IndexSearcher#termStatistics] and
-///   [IndexSearcher#collectionStatistics] answer from merged statistics instead of the local index. Lucene's
-///   similarities build their per-query weights exclusively from these two methods, so a search through this
-///   searcher scores every document exactly as a single index holding the whole corpus would (this is how
-///   Elasticsearch implements `dfs_query_then_fetch`).
+/// The collection and scoring passes accept the same query shapes. Queries whose expansions or weights depend on
+/// the local index (such as fuzzy and synonym queries) cannot use global statistics.
 ///
-/// Stateless; thread-safe.
+/// Stateless and thread-safe.
 public final class LuceneTextScoreStatsUtils {
   private LuceneTextScoreStatsUtils() {
   }
 
-  /// Returns the statistics of `query`'s terms in `searcher`'s index. The query is rewritten first, so terms are
-  /// extracted from the same query shape the scorer would see. Terms absent from the index are recorded with zero
-  /// frequencies, and the collection statistics of their field are recorded even when no term occurs, so that this
-  /// index's documents count towards the corpus size and average field length.
-  public static TextScoreStats collect(IndexSearcher searcher, Query query)
-      throws IOException {
-    Set<Term> terms = new HashSet<>();
-    searcher.rewrite(query).visit(QueryVisitor.termCollector(terms));
-    // A wildcard, prefix or fuzzy term that matches nothing in this index rewrites to a query without terms, so the
-    // fields are also taken from the original query: the index's documents still count towards the corpus.
-    Set<String> fields = new HashSet<>();
+  /// Verifies the field of every clause, including prohibited clauses, before executing a scoring query.
+  private static void requireColumn(Query query, String column) {
     query.visit(new QueryVisitor() {
       @Override
-      public void consumeTerms(Query termQuery, Term... queryTerms) {
-        for (Term term : queryTerms) {
-          fields.add(term.field());
+      public boolean acceptField(String field) {
+        if (!column.equals(field)) {
+          throw QueryErrorCode.QUERY_VALIDATION.asException(
+              "Text scoring on column " + column + " cannot reference field " + field);
+        }
+        return true;
+      }
+
+      @Override
+      public QueryVisitor getSubVisitor(BooleanClause.Occur occur, Query parent) {
+        return this;
+      }
+
+      @Override
+      public void consumeTerms(Query termQuery, Term... terms) {
+        for (Term term : terms) {
+          acceptField(term.field());
         }
       }
 
       @Override
       public void consumeTermsMatching(Query termQuery, String field, Supplier<ByteRunAutomaton> automaton) {
-        fields.add(field);
+        acceptField(field);
+      }
+
+      @Override
+      public void visitLeaf(Query leaf) {
+        if (leaf instanceof FieldExistsQuery exists) {
+          acceptField(exists.getField());
+        } else if (!(leaf instanceof MatchAllDocsQuery || leaf instanceof MatchNoDocsQuery)) {
+          throw QueryErrorCode.QUERY_VALIDATION.asException(
+              "Cannot verify the field of " + leaf.getClass().getSimpleName() + " for column " + column);
+        }
       }
     });
+  }
+
+  /// Collects statistics for the declared column, including its documents when the segment has no matching terms.
+  public static TextScoreStats collect(IndexSearcher searcher, Query query, String column)
+      throws IOException {
+    requireColumn(query, column);
+    requireGlobalStatsSupport(query);
+    Set<Term> terms = new HashSet<>();
+    query.visit(QueryVisitor.termCollector(terms));
     IndexReader reader = searcher.getIndexReader();
     TextScoreStats stats = new TextScoreStats();
+    TextScoreStats.FieldStats field = stats.getOrCreateField(column);
+    field.addCollectionStats(reader.maxDoc(), reader.getDocCount(column), reader.getSumTotalTermFreq(column),
+        reader.getSumDocFreq(column));
     for (Term term : terms) {
-      fields.add(term.field());
-    }
-    for (String field : fields) {
-      stats.getOrCreateField(field).addCollectionStats(reader.maxDoc(), reader.getDocCount(field),
-          reader.getSumTotalTermFreq(field), reader.getSumDocFreq(field));
-    }
-    for (Term term : terms) {
-      stats.getField(term.field()).addTermStats(term.text(), reader.docFreq(term), reader.totalTermFreq(term));
+      field.addTermStats(term.text(), reader.docFreq(term), reader.totalTermFreq(term));
     }
     return stats;
   }
 
-  /// Returns a searcher over `reader` that scores with `globalStats`. Terms and fields the statistics do not cover
-  /// (for example terms a wildcard expands to in this segment) use the local statistics.
-  public static IndexSearcher newGlobalStatsSearcher(IndexReader reader, TextScoreStats globalStats) {
-    IndexSearcher searcher = new GlobalStatsIndexSearcher(reader, globalStats);
-    // Scored searches are not cached by Lucene anyway; keep it explicit so this searcher never holds heap
+  /// Uses the original searcher for local scoring, including Lucene's native index-dependent rewrites.
+  public static IndexSearcher scoringSearcher(IndexSearcher localSearcher, Query query, String column,
+      @Nullable TextScoreStats globalStats) {
+    requireColumn(query, column);
+    if (globalStats == null || globalStats.getFields().isEmpty()) {
+      return localSearcher;
+    }
+    requireGlobalStatsSupport(query);
+    IndexSearcher searcher = new GlobalStatsIndexSearcher(localSearcher.getIndexReader(), globalStats);
+    searcher.setSimilarity(localSearcher.getSimilarity());
     searcher.setQueryCache(null);
     return searcher;
+  }
+
+  private static void requireGlobalStatsSupport(Query query) {
+    if (query instanceof BooleanQuery bool) {
+      for (BooleanClause clause : bool) {
+        requireGlobalStatsSupport(clause.getQuery());
+      }
+    } else if (query instanceof BoostQuery boost) {
+      requireGlobalStatsSupport(boost.getQuery());
+    } else if (query instanceof ConstantScoreQuery constant) {
+      requireGlobalStatsSupport(constant.getQuery());
+    } else if (!(query instanceof TermQuery || query instanceof PhraseQuery
+        || query instanceof MatchAllDocsQuery || query instanceof MatchNoDocsQuery)) {
+      // Uncapped constant-score prefix, wildcard and range queries do not use term statistics.
+      if (query instanceof MultiTermQuery multi && (multi.getRewriteMethod() == MultiTermQuery.CONSTANT_SCORE_REWRITE
+          || multi.getRewriteMethod() == MultiTermQuery.CONSTANT_SCORE_BLENDED_REWRITE)) {
+        return;
+      }
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Global text score statistics do not support "
+          + query.getClass().getSimpleName() + ". Use TEXT_SCORE without global statistics for this query");
+    }
   }
 
   /// [IndexSearcher] answering term and collection statistics from [TextScoreStats].
@@ -111,10 +164,10 @@ public final class LuceneTextScoreStatsUtils {
         throws IOException {
       TextScoreStats.FieldStats fieldStats = _globalStats.getField(term.field());
       long[] counts = fieldStats != null ? fieldStats.getTermStats(term.text()) : null;
-      // Lucene only asks for terms present in this index (docFreq > 0); merged counts include this index's, so they
-      // are at least as large. Guard anyway so inconsistent input degrades to local scoring instead of failing.
-      if (counts == null || counts[0] < docFreq || counts[1] < counts[0]) {
-        return super.termStatistics(term, docFreq, totalTermFreq);
+      if (counts == null || counts[0] < docFreq || counts[0] > fieldStats.getDocCount()
+          || counts[1] < counts[0] || counts[1] < totalTermFreq || counts[1] > fieldStats.getSumTotalTermFreq()) {
+        throw QueryErrorCode.QUERY_VALIDATION.asException(
+            "Global text score statistics are missing or inconsistent for term " + term);
       }
       return new TermStatistics(term.bytes(), counts[0], counts[1]);
     }
@@ -123,10 +176,19 @@ public final class LuceneTextScoreStatsUtils {
     public CollectionStatistics collectionStatistics(String field)
         throws IOException {
       TextScoreStats.FieldStats fieldStats = _globalStats.getField(field);
+      CollectionStatistics local = super.collectionStatistics(field);
+      if (local == null) {
+        // Lucene requests collection statistics even for an unindexed field; it has no local scorer.
+        return null;
+      }
       if (fieldStats == null || fieldStats.getDocCount() <= 0 || fieldStats.getMaxDoc() < fieldStats.getDocCount()
           || fieldStats.getSumDocFreq() < fieldStats.getDocCount()
-          || fieldStats.getSumTotalTermFreq() < fieldStats.getSumDocFreq()) {
-        return super.collectionStatistics(field);
+          || fieldStats.getSumTotalTermFreq() < fieldStats.getSumDocFreq()
+          || fieldStats.getMaxDoc() < local.maxDoc() || fieldStats.getDocCount() < local.docCount()
+          || fieldStats.getSumDocFreq() < local.sumDocFreq()
+          || fieldStats.getSumTotalTermFreq() < local.sumTotalTermFreq()) {
+        throw QueryErrorCode.QUERY_VALIDATION.asException(
+            "Global text score statistics are missing or inconsistent for field " + field);
       }
       return new CollectionStatistics(field, fieldStats.getMaxDoc(), fieldStats.getDocCount(),
           fieldStats.getSumTotalTermFreq(), fieldStats.getSumDocFreq());

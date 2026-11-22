@@ -103,8 +103,8 @@ public interface TextIndexReader extends IndexReader {
   /// this index only (document frequency, average field length), so they are comparable within one segment but
   /// not across segments.
   ///
-  /// The query is parsed exactly like [#getDocIds(String, String)], so a document has a score if and only if
-  /// it would be returned by the same `TEXT_MATCH`.
+  /// Lucene readers use the parser and options from [#getDocIds(String, String)]. Field references must resolve
+  /// to the scoring column. Queries whose fields cannot be determined are rejected.
   ///
   /// @param searchQuery The search query string
   /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
@@ -116,8 +116,9 @@ public interface TextIndexReader extends IndexReader {
 
   /// Like [#getDocScores(String, String)], but when `globalStats` is given the similarity uses those corpus
   /// statistics (document count, average field length, per-term document frequency) instead of this index's own,
-  /// so that scores are comparable across segments. Terms or fields the statistics do not cover fall back to this
-  /// index's statistics. `globalStats` normally comes from merging [#getTextScoreStats] over every segment.
+  /// so that scores are comparable across segments. Merge [#getTextScoreStats] over every segment for the same query.
+  /// Lucene readers use local statistics when the supplied result contains no fields. With nonempty statistics,
+  /// scoring fails if required counters are missing or inconsistent with the local index.
   ///
   /// @param searchQuery The search query string
   /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
@@ -136,7 +137,9 @@ public interface TextIndexReader extends IndexReader {
   /// Returns this index's statistics for the terms of `searchQuery`, parsed and analyzed exactly as
   /// [#getDocScores(String, String)] parses it: per queried field the collection statistics, and per query term its
   /// document frequency and total term frequency. Merging the result of every segment gives the statistics of
-  /// the whole corpus, to pass to [#getDocScores(String, String, TextScoreStats)].
+  /// the whole corpus, to pass to [#getDocScores(String, String, TextScoreStats)]. Lucene supports term and phrase
+  /// queries, Boolean and boosted combinations, and uncapped constant-score multi-term queries. Index-dependent
+  /// scoring rewrites such as fuzzy or synonym expansion require local scoring.
   ///
   /// @param searchQuery The search query string
   /// @param optionsString Options string in format "key1=value1,key2=value2", can be null

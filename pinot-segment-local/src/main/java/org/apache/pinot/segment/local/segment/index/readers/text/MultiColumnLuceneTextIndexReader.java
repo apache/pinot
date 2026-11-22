@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import it.unimi.dsi.fastutil.ints.Int2FloatMap;
-import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -59,6 +58,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.CsvParser;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.exception.QueryException;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
@@ -376,7 +376,8 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
-      _indexSearcher.search(parseQueryWithoutOptions(column, searchQuery), docIDCollector);
+      Query query = parseQueryWithoutOptions(column, searchQuery);
+      _indexSearcher.search(query, docIDCollector);
       return docIds;
     } catch (Exception e) {
       String msg =
@@ -393,13 +394,12 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
   @Override
   public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString,
       @Nullable TextScoreStats globalStats) {
-    Int2FloatOpenHashMap scores = new Int2FloatOpenHashMap();
     try {
-      IndexSearcher searcher = globalStats != null
-          ? LuceneTextScoreStatsUtils.newGlobalStatsSearcher(_indexReader, globalStats) : _indexSearcher;
-      searcher.search(parseQuery(column, searchQuery, optionsString),
-          new LuceneDocScoreCollector(scores, _docIdTranslator::getPinotDocId));
-      return scores;
+      Query query = parseQuery(column, searchQuery, optionsString);
+      IndexSearcher searcher = LuceneTextScoreStatsUtils.scoringSearcher(_indexSearcher, query, column, globalStats);
+      return new LuceneDocScoreCollector(_docIdTranslator::getPinotDocId).collectScores(searcher, query);
+    } catch (QueryException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while scoring the text index for column: " + column + " search query:" + searchQuery, e);
@@ -409,7 +409,9 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
   @Override
   public TextScoreStats getTextScoreStats(String column, String searchQuery, @Nullable String optionsString) {
     try {
-      return LuceneTextScoreStatsUtils.collect(_indexSearcher, parseQuery(column, searchQuery, optionsString));
+      return LuceneTextScoreStatsUtils.collect(_indexSearcher, parseQuery(column, searchQuery, optionsString), column);
+    } catch (QueryException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while collecting text score statistics for column: " + column + " search query:"
