@@ -105,14 +105,12 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     Map<String, Object> properties1 = getDefaultControllerConfiguration();
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties1.put(ControllerConf.CONTROLLER_PORT, 21002);
 
     // Setup second controller with distributed locking enabled (different port)
     Map<String, Object> properties2 = getDefaultControllerConfiguration();
     // Disable scheduler to avoid Quartz conflicts
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties2.put(ControllerConf.CONTROLLER_PORT, 21003);
 
     // Start both controllers
     startController(properties1);
@@ -260,13 +258,11 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     Map<String, Object> properties1 = getDefaultControllerConfiguration();
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties1.put(ControllerConf.CONTROLLER_PORT, 21000);
 
     // Setup second controller with distributed locking enabled (different port)
     Map<String, Object> properties2 = getDefaultControllerConfiguration();
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties2.put(ControllerConf.CONTROLLER_PORT, 21001);
 
     // Start both controllers
     startController(properties1);
@@ -396,14 +392,12 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     Map<String, Object> properties1 = getDefaultControllerConfiguration();
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties1.put(ControllerConf.CONTROLLER_PORT, 21002);
 
     // Setup second controller with distributed locking enabled (different port)
     Map<String, Object> properties2 = getDefaultControllerConfiguration();
     // Disable scheduler to avoid Quartz conflicts
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties2.put(ControllerConf.CONTROLLER_PORT, 21003);
 
     // Start both controllers
     startController(properties1);
@@ -572,14 +566,12 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     Map<String, Object> properties1 = getDefaultControllerConfiguration();
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties1.put(ControllerConf.CONTROLLER_PORT, 21002);
 
     // Setup second controller with distributed locking enabled (different port)
     Map<String, Object> properties2 = getDefaultControllerConfiguration();
     // Disable scheduler to avoid Quartz conflicts
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties2.put(ControllerConf.CONTROLLER_PORT, 21003);
 
     // Start both controllers
     startController(properties1);

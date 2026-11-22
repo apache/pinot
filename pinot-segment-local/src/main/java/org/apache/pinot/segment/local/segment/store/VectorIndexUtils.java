@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -324,6 +325,11 @@ public class VectorIndexUtils {
   }
 
   public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig) {
+    return getIndexWriterConfig(vectorIndexConfig, null);
+  }
+
+  public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig,
+      @Nullable Path mmapMergeDirectory) {
     IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
 
     double maxBufferSizeMB = Double.parseDouble(vectorIndexConfig.getProperties()
@@ -343,8 +349,7 @@ public class VectorIndexUtils {
     int maxDimensions = Integer.parseInt(vectorIndexConfig.getProperties()
         .getOrDefault("maxDimensions", String.valueOf(HnswVectorsFormat.DEFAULT_MAX_DIMENSIONS)));
 
-    HnswVectorsFormat knnVectorsFormat =
-        new HnswVectorsFormat(maxCon, beamWidth, maxDimensions);
+    HnswVectorsFormat knnVectorsFormat = new HnswVectorsFormat(maxCon, beamWidth, maxDimensions, mmapMergeDirectory);
 
     Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(vectorIndexConfig.getProperties()
         .getOrDefault("mode", Lucene912Codec.Mode.BEST_SPEED.name()));

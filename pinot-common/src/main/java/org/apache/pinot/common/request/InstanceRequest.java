@@ -38,6 +38,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   private static final org.apache.thrift.protocol.TField CID_FIELD_DESC = new org.apache.thrift.protocol.TField("cid", org.apache.thrift.protocol.TType.STRING, (short)7);
   private static final org.apache.thrift.protocol.TField TABLE_SEGMENTS_INFO_LIST_FIELD_DESC = new org.apache.thrift.protocol.TField("tableSegmentsInfoList", org.apache.thrift.protocol.TType.LIST, (short)8);
   private static final org.apache.thrift.protocol.TField PING_FIELD_DESC = new org.apache.thrift.protocol.TField("ping", org.apache.thrift.protocol.TType.BOOL, (short)9);
+  private static final org.apache.thrift.protocol.TField DEADLINE_MS_FIELD_DESC = new org.apache.thrift.protocol.TField("deadlineMs", org.apache.thrift.protocol.TType.I64, (short)10);
 
   private static final org.apache.thrift.scheme.SchemeFactory STANDARD_SCHEME_FACTORY = new InstanceRequestStandardSchemeFactory();
   private static final org.apache.thrift.scheme.SchemeFactory TUPLE_SCHEME_FACTORY = new InstanceRequestTupleSchemeFactory();
@@ -51,6 +52,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   private @org.apache.thrift.annotation.Nullable java.lang.String cid; // optional
   private @org.apache.thrift.annotation.Nullable java.util.List<TableSegmentsInfo> tableSegmentsInfoList; // optional
   private boolean ping; // optional
+  private long deadlineMs; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -62,7 +64,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     OPTIONAL_SEGMENTS((short)6, "optionalSegments"),
     CID((short)7, "cid"),
     TABLE_SEGMENTS_INFO_LIST((short)8, "tableSegmentsInfoList"),
-    PING((short)9, "ping");
+    PING((short)9, "ping"),
+    DEADLINE_MS((short)10, "deadlineMs");
 
     private static final java.util.Map<java.lang.String, _Fields> byName = new java.util.HashMap<java.lang.String, _Fields>();
 
@@ -96,6 +99,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
           return TABLE_SEGMENTS_INFO_LIST;
         case 9: // PING
           return PING;
+        case 10: // DEADLINE_MS
+          return DEADLINE_MS;
         default:
           return null;
       }
@@ -142,8 +147,9 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   private static final int __REQUESTID_ISSET_ID = 0;
   private static final int __ENABLETRACE_ISSET_ID = 1;
   private static final int __PING_ISSET_ID = 2;
+  private static final int __DEADLINEMS_ISSET_ID = 3;
   private byte __isset_bitfield = 0;
-  private static final _Fields optionals[] = {_Fields.SEARCH_SEGMENTS,_Fields.ENABLE_TRACE,_Fields.BROKER_ID,_Fields.OPTIONAL_SEGMENTS,_Fields.CID,_Fields.TABLE_SEGMENTS_INFO_LIST,_Fields.PING};
+  private static final _Fields optionals[] = {_Fields.SEARCH_SEGMENTS,_Fields.ENABLE_TRACE,_Fields.BROKER_ID,_Fields.OPTIONAL_SEGMENTS,_Fields.CID,_Fields.TABLE_SEGMENTS_INFO_LIST,_Fields.PING,_Fields.DEADLINE_MS};
   public static final java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -168,6 +174,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TableSegmentsInfo.class))));
     tmpMap.put(_Fields.PING, new org.apache.thrift.meta_data.FieldMetaData("ping", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
+    tmpMap.put(_Fields.DEADLINE_MS, new org.apache.thrift.meta_data.FieldMetaData("deadlineMs", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     metaDataMap = java.util.Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(InstanceRequest.class, metaDataMap);
   }
@@ -217,6 +225,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       this.tableSegmentsInfoList = __this__tableSegmentsInfoList;
     }
     this.ping = other.ping;
+    this.deadlineMs = other.deadlineMs;
   }
 
   @Override
@@ -238,6 +247,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     this.tableSegmentsInfoList = null;
     setPingIsSet(false);
     this.ping = false;
+    setDeadlineMsIsSet(false);
+    this.deadlineMs = 0;
   }
 
   public long getRequestId() {
@@ -498,6 +509,28 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     __isset_bitfield = org.apache.thrift.EncodingUtils.setBit(__isset_bitfield, __PING_ISSET_ID, value);
   }
 
+  public long getDeadlineMs() {
+    return this.deadlineMs;
+  }
+
+  public void setDeadlineMs(long deadlineMs) {
+    this.deadlineMs = deadlineMs;
+    setDeadlineMsIsSet(true);
+  }
+
+  public void unsetDeadlineMs() {
+    __isset_bitfield = org.apache.thrift.EncodingUtils.clearBit(__isset_bitfield, __DEADLINEMS_ISSET_ID);
+  }
+
+  /** Returns true if field deadlineMs is set (has been assigned a value) and false otherwise */
+  public boolean isSetDeadlineMs() {
+    return org.apache.thrift.EncodingUtils.testBit(__isset_bitfield, __DEADLINEMS_ISSET_ID);
+  }
+
+  public void setDeadlineMsIsSet(boolean value) {
+    __isset_bitfield = org.apache.thrift.EncodingUtils.setBit(__isset_bitfield, __DEADLINEMS_ISSET_ID, value);
+  }
+
   @Override
   public void setFieldValue(_Fields field, @org.apache.thrift.annotation.Nullable java.lang.Object value) {
     switch (field) {
@@ -573,6 +606,14 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       }
       break;
 
+    case DEADLINE_MS:
+      if (value == null) {
+        unsetDeadlineMs();
+      } else {
+        setDeadlineMs((java.lang.Long)value);
+      }
+      break;
+
     }
   }
 
@@ -607,6 +648,9 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     case PING:
       return isPing();
 
+    case DEADLINE_MS:
+      return getDeadlineMs();
+
     }
     throw new java.lang.IllegalStateException();
   }
@@ -637,6 +681,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       return isSetTableSegmentsInfoList();
     case PING:
       return isSetPing();
+    case DEADLINE_MS:
+      return isSetDeadlineMs();
     }
     throw new java.lang.IllegalStateException();
   }
@@ -735,6 +781,15 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
         return false;
     }
 
+    boolean this_present_deadlineMs = true && this.isSetDeadlineMs();
+    boolean that_present_deadlineMs = true && that.isSetDeadlineMs();
+    if (this_present_deadlineMs || that_present_deadlineMs) {
+      if (!(this_present_deadlineMs && that_present_deadlineMs))
+        return false;
+      if (this.deadlineMs != that.deadlineMs)
+        return false;
+    }
+
     return true;
   }
 
@@ -775,6 +830,10 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     hashCode = hashCode * 8191 + ((isSetPing()) ? 131071 : 524287);
     if (isSetPing())
       hashCode = hashCode * 8191 + ((ping) ? 131071 : 524287);
+
+    hashCode = hashCode * 8191 + ((isSetDeadlineMs()) ? 131071 : 524287);
+    if (isSetDeadlineMs())
+      hashCode = hashCode * 8191 + org.apache.thrift.TBaseHelper.hashCode(deadlineMs);
 
     return hashCode;
   }
@@ -877,6 +936,16 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
         return lastComparison;
       }
     }
+    lastComparison = java.lang.Boolean.compare(isSetDeadlineMs(), other.isSetDeadlineMs());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetDeadlineMs()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.deadlineMs, other.deadlineMs);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     return 0;
   }
 
@@ -972,6 +1041,12 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       if (!first) sb.append(", ");
       sb.append("ping:");
       sb.append(this.ping);
+      first = false;
+    }
+    if (isSetDeadlineMs()) {
+      if (!first) sb.append(", ");
+      sb.append("deadlineMs:");
+      sb.append(this.deadlineMs);
       first = false;
     }
     sb.append(")");
@@ -1136,6 +1211,14 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 10: // DEADLINE_MS
+            if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
+              struct.deadlineMs = iprot.readI64();
+              struct.setDeadlineMsIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1224,6 +1307,11 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
         oprot.writeBool(struct.ping);
         oprot.writeFieldEnd();
       }
+      if (struct.isSetDeadlineMs()) {
+        oprot.writeFieldBegin(DEADLINE_MS_FIELD_DESC);
+        oprot.writeI64(struct.deadlineMs);
+        oprot.writeFieldEnd();
+      }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -1266,7 +1354,10 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       if (struct.isSetPing()) {
         optionals.set(6);
       }
-      oprot.writeBitSet(optionals, 7);
+      if (struct.isSetDeadlineMs()) {
+        optionals.set(7);
+      }
+      oprot.writeBitSet(optionals, 8);
       if (struct.isSetSearchSegments()) {
         {
           oprot.writeI32(struct.searchSegments.size());
@@ -1306,6 +1397,9 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       if (struct.isSetPing()) {
         oprot.writeBool(struct.ping);
       }
+      if (struct.isSetDeadlineMs()) {
+        oprot.writeI64(struct.deadlineMs);
+      }
     }
 
     @Override
@@ -1316,7 +1410,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       struct.query = new BrokerRequest();
       struct.query.read(iprot);
       struct.setQueryIsSet(true);
-      java.util.BitSet incoming = iprot.readBitSet(7);
+      java.util.BitSet incoming = iprot.readBitSet(8);
       if (incoming.get(0)) {
         {
           org.apache.thrift.protocol.TList _list31 = iprot.readListBegin(org.apache.thrift.protocol.TType.STRING);
@@ -1372,6 +1466,10 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       if (incoming.get(6)) {
         struct.ping = iprot.readBool();
         struct.setPingIsSet(true);
+      }
+      if (incoming.get(7)) {
+        struct.deadlineMs = iprot.readI64();
+        struct.setDeadlineMsIsSet(true);
       }
     }
   }

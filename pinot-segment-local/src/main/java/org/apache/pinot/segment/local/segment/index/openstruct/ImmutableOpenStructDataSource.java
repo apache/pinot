@@ -43,6 +43,8 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -63,7 +65,6 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   /// Sparse keys whose values are collections, mapped to the longest value each one holds. Read from the parent
   /// column's metadata, where the segment build records it for exactly the keys whose shape is not visible in a
   /// column of their own.
-  @Nullable
   private final Map<String, Integer> _sparseMultiValueKeys;
   /// Sparse keys mapped to the type the segment build resolved for them, read from the parent column's metadata
   /// for the same reason as the shape above: the blob is JSON and carries no type of its own.
@@ -83,7 +84,7 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     _perKeyDataSources = perKeyDataSources;
     _sparseDataSource = sparseDataSource;
     _sparseKeys = sparseKeys != null ? Set.copyOf(sparseKeys) : null;
-    _sparseMultiValueKeys = sparseMultiValueKeys != null ? Map.copyOf(sparseMultiValueKeys) : null;
+    _sparseMultiValueKeys = sparseMultiValueKeys != null ? Map.copyOf(sparseMultiValueKeys) : Map.of();
     _sparseKeyTypes = sparseKeyTypes != null ? Map.copyOf(sparseKeyTypes) : null;
     if (sparseDataSource != null) {
       ForwardIndexReader<?> blobFwd = sparseDataSource.getForwardIndex();
@@ -128,8 +129,8 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
       // Definitively absent: no sparse blob, or the sparse manifest does not list the key
       return new NullDataSource(getValueFieldSpec(key), getDataSourceMetadata().getNumDocs());
     }
-    return _sparseKeyDataSourceCache.computeIfAbsent(key,
-        k -> new SparseKeyDataSource(getValueFieldSpec(k), _sparseBlobReader, maxNumValues(k)));
+    return _sparseKeyDataSourceCache.computeIfAbsent(key, k -> new SparseKeyDataSource(getValueFieldSpec(k),
+        _sparseBlobReader, _sparseMultiValueKeys.getOrDefault(k, SparseKeyDataSource.UNKNOWN_MAX_NUM_VALUES)));
   }
 
   /// Field spec for a key's values, with an undeclared sparse key's shape and type taken from the segment's
@@ -146,22 +147,11 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     if (childFieldSpec != null) {
       return childFieldSpec;
     }
-    boolean singleValue = _sparseMultiValueKeys == null || !_sparseMultiValueKeys.containsKey(key);
+    boolean singleValue = !_sparseMultiValueKeys.containsKey(key);
     FieldSpec.DataType dataType = _sparseKeyTypes != null
         ? _sparseKeyTypes.getOrDefault(key, FieldSpec.DataType.STRING)
         : FieldSpec.DataType.STRING;
     return new DimensionFieldSpec(key, dataType, singleValue);
-  }
-
-  /// Longest value a multi-value sparse key holds, which is what the readers over it size their buffers from.
-  /// Zero for a single-value key, as [DataSourceMetadata#getMaxNumValuesPerMVEntry()] reports for one.
-  private int maxNumValues(String key) {
-    FieldSpec valueFieldSpec = getValueFieldSpec(key);
-    if (valueFieldSpec.isSingleValueField()) {
-      return 0;
-    }
-    // A declared multi-value key has no manifest entry when every one of its values was a scalar.
-    return _sparseMultiValueKeys != null ? _sparseMultiValueKeys.getOrDefault(key, 1) : 1;
   }
 
   @Override
@@ -191,6 +181,35 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   public ColumnIndexContainer getIndexContainer(String key) {
     DataSource ds = getDataSource(key);
     return ds instanceof ImmutableDataSource immutableDs ? immutableDs.getIndexContainer() : null;
+  }
+
+  @Override
+  public boolean hasUnambiguousSparseJsonPath(String key) {
+    int dot = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR);
+    if (dot < 0) {
+      return true;
+    }
+    // The native build writes each manifest key as a literal field. Only a physical scalar STRING is indexed
+    // as its projected text.
+    if (_sparseKeys == null || !_sparseKeys.contains(key) || _sparseKeyTypes == null
+        || _sparseKeyTypes.get(key) != DataType.STRING
+        || _sparseMultiValueKeys.containsKey(key)) {
+      return false;
+    }
+    // The JSON index merges nested paths with literal dotted fields. A prefix absent from the blob or stored
+    // as a scalar (including a flattened container serialized as STRING) cannot contribute a competing path.
+    for (; dot >= 0; dot = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR, dot + 1)) {
+      String prefix = key.substring(0, dot);
+      if (!_sparseKeys.contains(prefix)) {
+        continue;
+      }
+      DataType type = _sparseKeyTypes.get(prefix);
+      if (type == null || (!type.isNumeric() && type != DataType.STRING && type != DataType.BYTES)
+          || _sparseMultiValueKeys.containsKey(prefix)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
@@ -294,8 +313,10 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
       if (fwdReader == null) {
         return null;
       }
+      int maxNumValues = !fwdReader.isSingleValue() && fwdReader.isDictionaryEncoded()
+          ? dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry() : 0;
       return new PinotSegmentColumnReader(key, fwdReader, dataSource.getDictionary(),
-          dataSource.getNullValueVector(), 0);
+          dataSource.getNullValueVector(), maxNumValues);
     }
 
     @Override

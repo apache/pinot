@@ -101,12 +101,28 @@ public class RequestUtils {
     return sqlNodeAndOptions;
   }
 
+  /// Extracts and merges SQL and request payload options without parsing the executable SQL statement.
+  /// Callers can pass null when they only need the payload options. The broker still validates the statement,
+  /// including policies that depend on the statement type.
+  public static Map<String, String> extractQueryOptions(@Nullable String query, JsonNode request) {
+    Map<String, String> sqlOptions = query != null ? CalciteSqlParser.extractQueryOptions(query) : new HashMap<>();
+    mergeOptions(sqlOptions, getRequestOptions(request), false);
+    return sqlOptions;
+  }
+
   /// Merges the request payload options (`queryOptions` and `trace`) into the options parsed from the SQL. The SQL
   /// options take precedence, unless the request sets [Request.QueryOptionKey#SQL_OPTIONS_MODE] to `IGNORE` (the SQL
   /// options are dropped, or a DELETE statement fails when it carries any) or `REJECT` (the query fails when it
   /// carries any).
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
+    Map<String, String> requestOptions = getRequestOptions(jsonRequest);
+    if (!requestOptions.isEmpty()) {
+      setOptions(sqlNodeAndOptions, requestOptions);
+    }
+  }
+
+  private static Map<String, String> getRequestOptions(JsonNode jsonRequest) {
     Map<String, String> requestOptions = new HashMap<>();
     if (jsonRequest.has(Request.QUERY_OPTIONS)) {
       requestOptions.putAll(getOptionsFromString(jsonRequest.get(Request.QUERY_OPTIONS).asText()));
@@ -115,25 +131,29 @@ public class RequestUtils {
       requestOptions.put(Request.TRACE, "true");
     }
     if (requestOptions.isEmpty()) {
-      return;
+      return requestOptions;
     }
     LOGGER.debug("Query options are set to: {}", requestOptions);
-    setOptions(sqlNodeAndOptions, QueryOptionsUtils.resolveCaseInsensitiveOptions(requestOptions));
+    return QueryOptionsUtils.resolveCaseInsensitiveOptions(requestOptions);
   }
 
   /// Merges the given options into the options parsed from the SQL, like [#setOptions(SqlNodeAndOptions, JsonNode)]
   /// does with the options of the request payload. The keys of the given options must be resolved, see
   /// [QueryOptionsUtils#resolveCaseInsensitiveOptions(Map)].
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, Map<String, String> requestOptions) {
+    mergeOptions(sqlNodeAndOptions.getOptions(), requestOptions, sqlNodeAndOptions.getSqlNode() instanceof SqlDelete);
+  }
+
+  private static void mergeOptions(Map<String, String> sqlOptions, Map<String, String> requestOptions,
+      boolean isDelete) {
     SqlOptionsMode sqlOptionsMode = QueryOptionsUtils.getSqlOptionsMode(requestOptions);
-    Map<String, String> sqlOptions = sqlNodeAndOptions.getOptions();
     if (sqlOptionsMode != SqlOptionsMode.ALLOW && !sqlOptions.isEmpty()) {
       if (sqlOptionsMode == SqlOptionsMode.REJECT) {
         throw QueryErrorCode.QUERY_VALIDATION.asException(
             "Query options are not allowed in the SQL for this request, found: " + sqlOptions.keySet());
       }
       // Dropping a DELETE option (e.g. dryRun) would change its effect
-      if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+      if (isDelete) {
         throw QueryErrorCode.QUERY_VALIDATION.asException(
             "SQL options cannot be ignored for DELETE, found: " + sqlOptions.keySet());
       }
@@ -608,6 +628,26 @@ public class RequestUtils {
   public static String canonicalizeFunctionNamePreservingSpecialKey(String functionName) {
     String canonicalName = canonicalizeFunctionName(functionName);
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalName, canonicalName);
+  }
+
+  /// Canonical names, see [#canonicalizeFunctionName(String)], of the functions that read rows from somewhere other
+  /// than the FROM clause of the query that calls them: `lookup()` joins a dimension table by primary key,
+  /// `IN_SUBQUERY` runs its quoted subquery as a request of its own and `IN_PARTITIONED_SUBQUERY` runs it on the
+  /// server. The access checks keyed on the FROM clause do not cover them, so the single-stage broker rejects them
+  /// under row-level security, see [#isCrossTableFunction(String)].
+  ///
+  /// Nothing derives this set from the function registries, so a function that reads another table or runs a nested
+  /// query must be added here when it is defined, and to `DeleteStatement#CROSS_TABLE_FUNCTIONS`, which keeps the
+  /// same list in its own fold: `lookup` is `TransformFunctionType#LOOKUP` (with `LookupTransformFunction` in
+  /// pinot-core), `insubquery` is rewritten by `BaseSingleStageBrokerRequestHandler#IN_SUBQUERY` in pinot-broker and
+  /// `inpartitionedsubquery` by `ServerQueryExecutorV1Impl#IN_PARTITIONED_SUBQUERY` in pinot-core.
+  private static final Set<String> CROSS_TABLE_FUNCTIONS = Set.of("lookup", "insubquery", "inpartitionedsubquery");
+
+  /// Returns whether `canonicalName` names a function that reads rows from somewhere other than the FROM clause, see
+  /// [#CROSS_TABLE_FUNCTIONS]. The name must already be canonical, see [#canonicalizeFunctionName(String)], as the
+  /// parser leaves the operator of every compiled function call; a name as written in a query is not matched.
+  public static boolean isCrossTableFunction(String canonicalName) {
+    return CROSS_TABLE_FUNCTIONS.contains(canonicalName);
   }
 
   /// Returns true iff `expression` is an `AS`-wrapped function call

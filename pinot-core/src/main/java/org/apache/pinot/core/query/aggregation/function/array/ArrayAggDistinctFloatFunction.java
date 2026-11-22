@@ -24,14 +24,16 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
 import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 
 
 public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<FloatSet> {
+  private static final int FLOAT_SET_TYPE = 16;
+
   public ArrayAggDistinctFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }
@@ -91,9 +93,8 @@ public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<Flo
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(FloatSet floatSet) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FloatSet.getValue(),
-        ObjectSerDeUtils.FLOAT_SET_SER_DE.serialize(floatSet));
+  public SerializedResult serializeIntermediateResult(FloatSet floatSet) {
+    return new SerializedValue<>(FLOAT_SET_TYPE, floatSet, ObjectSerDeUtils.FLOAT_SET_SER_DE);
   }
 
   @Override

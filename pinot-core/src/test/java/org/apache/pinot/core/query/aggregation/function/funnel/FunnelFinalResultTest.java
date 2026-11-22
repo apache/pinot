@@ -113,6 +113,22 @@ public class FunnelFinalResultTest {
   }
 
   @Test
+  public void testFunnelCountFinalResultMerge() {
+    List<ExpressionContext> arguments = List.of(
+        ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "steps",
+            List.of(ExpressionContext.forIdentifier("step0"), ExpressionContext.forIdentifier("step1")))),
+        ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "correlateby",
+            List.of(ExpressionContext.forIdentifier("userId")))));
+    FunnelCountAggregationFunction<?, ?> function =
+        (FunnelCountAggregationFunction<?, ?>) new FunnelCountAggregationFunctionFactory(arguments, true).get();
+    long[] finalResult1 = {2, 1};
+    long[] finalResult2 = {1, 0};
+    assertEquals(function.mergeFinalResult(finalResult1, finalResult2), new long[]{3, 1});
+    assertEquals(finalResult1, new long[]{2, 1});
+    assertEquals(finalResult2, new long[]{1, 0});
+  }
+
+  @Test
   public void testBitmapFinalExtractionAvoidsUnnecessaryCopies() {
     RoaringBitmap firstStep = mock(RoaringBitmap.class);
     when(firstStep.getCardinality()).thenReturn(1_000_000);

@@ -33,6 +33,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SECONDARY_QUERIES("queries", false),
   NUM_SECONDARY_QUERIES_SCHEDULED("queries", false),
   SERVER_OUT_OF_CAPACITY_EXCEPTIONS("exceptions", false),
+  /// Requests that reached the server after the broker's deadline plus the clock-skew allowance and were answered with
+  /// a timeout error instead of being executed.
+  QUERIES_EXPIRED_ON_ARRIVAL("queries", true),
 
   QUERY_EXECUTION_EXCEPTIONS("exceptions", false),
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
@@ -45,6 +48,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_ROWS_FETCHED("rows", false),
   REALTIME_ROWS_FILTERED("rows", false),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
+  // Messages fetched again after their decoder threw RetriableDecodeException
+  REALTIME_DECODE_RETRIES("retries", false),
   INCOMPLETE_REALTIME_ROWS_CONSUMED("rows", false),
   REALTIME_CLP_TOO_MANY_ENCODED_VARS("rows", false),
   REALTIME_CLP_UNENCODABLE("rows", false),
@@ -103,11 +108,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_BUILD_WITH_CRC_MISMATCH("segments", false),
   SEGMENT_BUILD_FAILURE("segments", false),
   SEGMENT_UPLOAD_FAILURE("segments", false),
   SEGMENT_UPLOAD_SUCCESS("segments", false),
   // Emitted only by Server to Deep-store segment uploader.
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
+  METADATA_TAR_UPLOAD_FAILURE("segments", false),
+  METADATA_TAR_UPLOAD_SUCCESS("segments", false),
+  // Emitted only by the Server to Deep-store metadata tar uploader.
+  METADATA_TAR_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   RESIZE_TIME_MS("resizeTimeMs", false),
   STAR_TREE_INDEX_BUILD_FAILURES("segments", false),
@@ -207,6 +217,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   MULTI_STAGE_SUBMISSION_STARTED_TASKS("tasks", true),
   /// Number of tasks completed by the MSE query submission executor
   MULTI_STAGE_SUBMISSION_COMPLETED_TASKS("tasks", true),
+  /// Number of MSE requests (mailbox streams and stage plans) this server rejected because they were addressed to
+  /// another instance and reached this one through a stale connection of the sender.
+  MULTI_STAGE_MISROUTED_REQUESTS_REJECTED("requests", true),
+  /// Number of mailbox streams this server sent that the receiving instance rejected as addressed to another
+  /// instance. Each one makes this server reset its connection to that address, at most once a second.
+  MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER("requests", true),
 
   // predownload metrics
   PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),

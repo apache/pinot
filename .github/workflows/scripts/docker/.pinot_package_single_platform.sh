@@ -71,6 +71,7 @@ for runtimeImage in "${runtimeImages[@]}"; do
     fi
   done
 
+  docker pull --platform "linux/${BUILD_ARCH}" "apachepinot/pinot-base-runtime:${runtimeImage}"
   echo "Building docker image for platform: ${BUILD_ARCH} with tags: ${DOCKER_BUILD_TAGS}"
   docker build \
     --no-cache \

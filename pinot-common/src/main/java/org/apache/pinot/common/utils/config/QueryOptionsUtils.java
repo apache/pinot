@@ -40,6 +40,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
+import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -652,6 +653,36 @@ public class QueryOptionsUtils {
     return checkedParseIntNonNegative(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD, value);
   }
 
+  /// Returns the streaming selection ORDER BY merge mode, or null if not set. Accepts the enum constant names in
+  /// any case (`on` / `off` / `auto`).
+  @Nullable
+  public static SortedSelectionMergeMode getSortedSelectionMergeMode(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_MODE);
+    if (value == null) {
+      return null;
+    }
+    try {
+      return SortedSelectionMergeMode.valueOf(value.trim().toUpperCase());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("%s must be one of %s, got: %s", QueryOptionKey.SORTED_SELECTION_MERGE_MODE,
+              Arrays.toString(SortedSelectionMergeMode.values()), value));
+    }
+  }
+
+  /// Returns the minimum sorted-segment fraction for [SortedSelectionMergeMode#AUTO], or null if not set.
+  @Nullable
+  public static Double getSortedSelectionMergeAutoMinSortedRatio(Map<String, String> queryOptions) {
+    return checkedParseRatio(QueryOptionKey.SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO,
+        queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO));
+  }
+
+  @Nullable
+  public static Integer getSortedSelectionMergeBlockSize(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_BLOCK_SIZE);
+    return checkedParseIntPositive(QueryOptionKey.SORTED_SELECTION_MERGE_BLOCK_SIZE, value);
+  }
+
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_NULL_HANDLING));
   }
@@ -937,6 +968,29 @@ public class QueryOptionsUtils {
     return value;
   }
 
+  /// Parses a fraction in the closed range [0, 1].
+  @Nullable
+  private static Double checkedParseRatio(String optionName, @Nullable String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    double value;
+    try {
+      value = Double.parseDouble(optionValue.trim());
+    } catch (NumberFormatException nfe) {
+      throw ratioParseException(optionName, optionValue);
+    }
+    if (!Double.isFinite(value) || value < 0 || value > 1) {
+      throw ratioParseException(optionName, optionValue);
+    }
+    return value;
+  }
+
+  private static IllegalArgumentException ratioParseException(String optionName, String optionValue) {
+    return new IllegalArgumentException(
+        String.format("%s must be a number between 0 and 1, got: %s", optionName, optionValue));
+  }
+
   @Nullable
   private static Long checkedParseLongPositive(String optionName, @Nullable String optionValue) {
     return checkedParseLong(optionName, optionValue, 1);
@@ -1092,5 +1146,11 @@ public class QueryOptionsUtils {
     Integer value =
         uncheckedParseInt(QueryOptionKey.SEALED_IN_LIST_THRESHOLD, threshold != null ? threshold.trim() : null);
     return value != null ? value : defaultValue;
+  }
+
+  /// Returns the [QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY] option, or `defaultValue` when the option is not set.
+  public static boolean isPreferSelectAliasInGroupBy(Map<String, String> options, boolean defaultValue) {
+    String option = options.get(QueryOptionKey.PREFER_SELECT_ALIAS_IN_GROUP_BY);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 }

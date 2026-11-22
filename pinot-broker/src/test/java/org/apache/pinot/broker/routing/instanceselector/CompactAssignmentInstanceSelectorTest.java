@@ -43,6 +43,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.broker.routing.instanceselector.SelectionResultTestUtils.getSegmentToInstanceMap;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
@@ -168,12 +169,12 @@ public class CompactAssignmentInstanceSelectorTest {
     List<Map<String, String>> results = new ArrayList<>();
     for (int requestId = 0; requestId < 6; requestId++) {
       InstanceSelector.SelectionResult result = selector.select(brokerRequest, segments, requestId);
-      results.add(result.getSegmentToInstanceMap());
+      results.add(getSegmentToInstanceMap(result));
       results.add(Map.of("unavailable", String.valueOf(result.getUnavailableSegments())));
     }
     // A second assignment change on the same selector
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
-    results.add(selector.select(brokerRequest, segments, 0).getSegmentToInstanceMap());
+    results.add(getSegmentToInstanceMap(selector.select(brokerRequest, segments, 0)));
     return results;
   }
 }

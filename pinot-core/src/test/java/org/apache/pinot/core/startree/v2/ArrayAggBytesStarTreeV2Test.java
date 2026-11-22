@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Random;
+import java.util.Set;
 import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -30,10 +30,11 @@ import static org.testng.Assert.assertEquals;
 
 /// Same as [ArrayAggStarTreeV2Test] but over a BYTES source column, whose raw values are structurally identical to
 /// the serialized-set cells the star-tree stores — the case that requires the pre-aggregation provenance marker.
-public class ArrayAggBytesStarTreeV2Test extends BaseStarTreeV2Test<Object, ObjectSet<Object>> {
+@SuppressWarnings("rawtypes")
+public class ArrayAggBytesStarTreeV2Test extends BaseStarTreeV2Test<Object, Set> {
 
   @Override
-  ValueAggregator<Object, ObjectSet<Object>> getValueAggregator() {
+  ValueAggregator<Object, Set> getValueAggregator() {
     return new ArrayAggDistinctValueAggregator();
   }
 
@@ -55,7 +56,7 @@ public class ArrayAggBytesStarTreeV2Test extends BaseStarTreeV2Test<Object, Obje
   }
 
   @Override
-  void assertAggregatedValue(ObjectSet<Object> starTreeResult, ObjectSet<Object> nonStarTreeResult) {
+  void assertAggregatedValue(Set starTreeResult, Set nonStarTreeResult) {
     // Distinct arrayAgg is order-independent; the aggregator normalizes byte[] elements to ByteArray, so the sets
     // compare by content.
     assertEquals(starTreeResult, nonStarTreeResult);

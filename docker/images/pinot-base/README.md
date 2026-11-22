@@ -25,30 +25,34 @@ This is the base docker image to build [Apache Pinot](https://github.com/apache/
 
 ## Build and publish the docker image
 
-Here is
-the [Github Action task](https://github.com/apachepinot/pinot-fork/actions/workflows/build-pinot-docker-base-image.yml)
-to build and publish pinot base docker images.
+Use the [Pinot Base Docker Image Build and Publish workflow](https://github.com/apache/pinot/actions/workflows/build-pinot-base-docker-image.yml)
+to build and publish base images for amd64 and arm64.
 
-This task can be triggered manually to build the cross platform(amd64 and arm64v8) base image.
+To roll out a JDK security update, publish the build and runtime base images,
+then rebuild and publish the Pinot application images that use them. The Pinot
+image builds check the JDK in their base images before compiling or packaging. For the
+[November 2026 OpenJDK advisory](https://openjdk.org/groups/vulnerability/advisories/2026-11-17),
+the base image workflow verifies OpenJDK 25.0.5.1 or newer within the Java 25 release line.
 
-The build shell is:
+Use the workflow for official base image publishing. The following commands are
+for manual builds:
 
 For Amazon Corretto 25:
 
 ```SHELL
-docker buildx build --no-cache --platform=linux/arm64,linux/amd64 --file pinot-base-build/amazoncorretto.dockerfile --tag apachepinot/pinot-base-build:25-amazoncorretto --push .
+docker buildx build --pull --no-cache --build-arg JAVA_VERSION=25 --platform=linux/arm64,linux/amd64 --file pinot-base-build/amazoncorretto.dockerfile --tag apachepinot/pinot-base-build:25-amazoncorretto --push .
 ```
 
 ```SHELL
-docker buildx build --no-cache --platform=linux/arm64,linux/amd64 --file pinot-base-runtime/amazoncorretto.dockerfile --tag apachepinot/pinot-base-runtime:25-amazoncorretto --push .
+docker buildx build --pull --no-cache --build-arg JAVA_VERSION=25 --platform=linux/arm64,linux/amd64 --file pinot-base-runtime/amazoncorretto.dockerfile --tag apachepinot/pinot-base-runtime:25-amazoncorretto --push .
 ```
 
 For MS OpenJDK, the build shell is:
 
 ```SHELL
-docker buildx build --no-cache --platform=linux/arm64,linux/amd64 --file pinot-base-build/ms-openjdk.dockerfile --tag apachepinot/pinot-base-build:25-ms-openjdk --push .
+docker buildx build --pull --no-cache --build-arg JAVA_VERSION=25 --platform=linux/arm64,linux/amd64 --file pinot-base-build/ms-openjdk.dockerfile --tag apachepinot/pinot-base-build:25-ms-openjdk --push .
 ```
 
 ```SHELL
-docker buildx build --no-cache --platform=linux/arm64,linux/amd64 --file pinot-base-runtime/ms-openjdk.dockerfile --tag apachepinot/pinot-base-runtime:25-ms-openjdk --push .
+docker buildx build --pull --no-cache --build-arg JAVA_VERSION=25 --platform=linux/arm64,linux/amd64 --file pinot-base-runtime/ms-openjdk.dockerfile --tag apachepinot/pinot-base-runtime:25-ms-openjdk --push .
 ```

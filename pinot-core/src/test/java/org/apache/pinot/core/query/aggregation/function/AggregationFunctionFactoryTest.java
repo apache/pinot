@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -200,6 +203,12 @@ public class AggregationFunctionFactoryTest {
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
     assertTrue(aggregationFunction instanceof DistinctCountRawHLLPlusAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUS);
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("DiStInCtCoUnTrAwUlL");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
+    assertTrue(aggregationFunction instanceof DistinctCountRawULLAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWULL);
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("FaStHlL");
@@ -483,6 +492,21 @@ public class AggregationFunctionFactoryTest {
     assertTrue(aggregationFunction instanceof FourthMomentAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.KURTOSIS);
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+  }
+
+  @Test
+  public void testDistinctCountHLLPlusSp() {
+    for (String functionName : List.of("distinctCountHLLPlus", "distinctCountRawHLLPlus", "distinctCountHLLPlusMV",
+        "distinctCountRawHLLPlusMV")) {
+      AggregationFunctionFactory.getAggregationFunction(getFunction(functionName, "(column, 12, 25)"), false);
+      assertThrows(BadQueryRequestException.class,
+          () -> AggregationFunctionFactory.getAggregationFunction(getFunction(functionName, "(column, 12, 26)"),
+              false));
+    }
+    AggregationFunctionFactory.getAggregationFunction(getFunction("distinctCountSmartHLLPlus", "(column, 'sp=25')"),
+        false);
+    assertThrows(BadQueryRequestException.class, () -> AggregationFunctionFactory.getAggregationFunction(
+        getFunction("distinctCountSmartHLLPlus", "(column, 'sp=26')"), false));
   }
 
   private FunctionContext getFunction(String functionName) {

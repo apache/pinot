@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -40,10 +41,13 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 
 
 public class ForwardIndexConfig extends IndexConfig {
-  // TODO: Make the maximum number of multi-values configurable, and also enforce it when creating the immutable forward
-  //       index, which currently accepts any number of values per entry.
+  public static final String MAX_NUM_MULTI_VALUES = "maxNumMultiValues";
+
   /// Default maximum number of values in a single multi-value entry of the mutable forward index.
   public static final int DEFAULT_MAX_NUM_MULTI_VALUES = 1000;
+
+  // Bound one fixed-width raw entry to about 1 MiB even with 16-byte values.
+  private static final int MAX_SUPPORTED_NUM_MULTI_VALUES = 65_536;
 
   private static int _defaultRawIndexWriterVersion = 4;
   private static String _defaultTargetMaxChunkSize = "1MB";
@@ -179,6 +183,8 @@ public class ForwardIndexConfig extends IndexConfig {
   private final String _targetMaxChunkSize;
   private final int _targetMaxChunkSizeBytes;
   private final int _targetDocsPerChunk;
+  @Nullable
+  private final Integer _maxNumMultiValues;
 
   @Nullable
   private final ChunkCompressionType _chunkCompressionType;
@@ -198,6 +204,7 @@ public class ForwardIndexConfig extends IndexConfig {
       @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion,
       @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
       @JsonProperty("targetDocsPerChunk") @Nullable Integer targetDocsPerChunk,
+      @JsonProperty(MAX_NUM_MULTI_VALUES) @Nullable Integer maxNumMultiValues,
       @JsonProperty("configs") @Nullable Map<String, Object> configs) {
     super(disabled);
     // Backward-compat for legacy JSON that lacks `encodingType`: default to DICTIONARY (matches the historical
@@ -218,6 +225,11 @@ public class ForwardIndexConfig extends IndexConfig {
     _targetMaxChunkSizeBytes =
         targetMaxChunkSize == null ? _defaultTargetMaxChunkSizeBytes : (int) DataSizeUtils.toBytes(targetMaxChunkSize);
     _targetDocsPerChunk = targetDocsPerChunk == null ? _defaultTargetDocsPerChunk : targetDocsPerChunk;
+    Preconditions.checkArgument(
+        maxNumMultiValues == null || (maxNumMultiValues > 0 && maxNumMultiValues <= MAX_SUPPORTED_NUM_MULTI_VALUES),
+        "%s must be between 1 and %s, found: %s", MAX_NUM_MULTI_VALUES, MAX_SUPPORTED_NUM_MULTI_VALUES,
+        maxNumMultiValues);
+    _maxNumMultiValues = maxNumMultiValues;
     _configs = configs != null ? configs : new HashMap<>();
     if (_compressionCodec != null) {
       _chunkCompressionType = toChunkCompressionType(_compressionCodec);
@@ -300,6 +312,18 @@ public class ForwardIndexConfig extends IndexConfig {
     return _targetDocsPerChunk;
   }
 
+  /// Optional per-row limit (1–65,536) for a multi-value column. Vector indexes use their configured dimension.
+  /// If omitted, realtime ingestion uses [#DEFAULT_MAX_NUM_MULTI_VALUES] and batch builds have no limit from
+  /// this setting.
+  /// Set a string in `fieldConfigList[].properties.maxNumMultiValues` or an integer in
+  /// `fieldConfigList[].indexes.forward.maxNumMultiValues`. Pinot reads the limit when creating a consuming segment.
+  /// Upgrade consuming replicas and batch builders to a build that supports this setting before enabling it.
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  public Integer getMaxNumMultiValues() {
+    return _maxNumMultiValues;
+  }
+
   @JsonIgnore
   public int getTargetMaxChunkSizeBytes() {
     return _targetMaxChunkSizeBytes;
@@ -345,13 +369,14 @@ public class ForwardIndexConfig extends IndexConfig {
         && _rawIndexWriterVersion == that._rawIndexWriterVersion
         && Objects.equals(_targetMaxChunkSize, that._targetMaxChunkSize)
         && _targetDocsPerChunk == that._targetDocsPerChunk
+        && Objects.equals(_maxNumMultiValues, that._maxNumMultiValues)
         && _encodingType == that._encodingType;
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _compressionCodec, _codecSpec, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
-        _targetMaxChunkSize, _targetDocsPerChunk, _encodingType);
+        _targetMaxChunkSize, _targetDocsPerChunk, _maxNumMultiValues, _encodingType);
   }
 
   public static class Builder {
@@ -365,6 +390,8 @@ public class ForwardIndexConfig extends IndexConfig {
     private int _rawIndexWriterVersion = _defaultRawIndexWriterVersion;
     private String _targetMaxChunkSize = _defaultTargetMaxChunkSize;
     private int _targetDocsPerChunk = _defaultTargetDocsPerChunk;
+    @Nullable
+    private Integer _maxNumMultiValues;
     private Map<String, Object> _configs = new HashMap<>();
 
     /// Constructs a builder with the given forward-index encoding. Callers should pass `FieldConfig.getEncodingType()`
@@ -389,6 +416,7 @@ public class ForwardIndexConfig extends IndexConfig {
       _rawIndexWriterVersion = other._rawIndexWriterVersion;
       _targetMaxChunkSize = other._targetMaxChunkSize;
       _targetDocsPerChunk = other._targetDocsPerChunk;
+      _maxNumMultiValues = other._maxNumMultiValues;
       _configs = other._configs;
     }
 
@@ -435,6 +463,11 @@ public class ForwardIndexConfig extends IndexConfig {
 
     public Builder withTargetDocsPerChunk(int targetDocsPerChunk) {
       _targetDocsPerChunk = targetDocsPerChunk;
+      return this;
+    }
+
+    public Builder withMaxNumMultiValues(@Nullable Integer maxNumMultiValues) {
+      _maxNumMultiValues = maxNumMultiValues;
       return this;
     }
 
@@ -500,7 +533,8 @@ public class ForwardIndexConfig extends IndexConfig {
 
     public ForwardIndexConfig build() {
       return new ForwardIndexConfig(_disabled, _encodingType, _compressionCodec, null, null, _codecSpec,
-          _deriveNumDocsPerChunk, _rawIndexWriterVersion, _targetMaxChunkSize, _targetDocsPerChunk, _configs);
+          _deriveNumDocsPerChunk, _rawIndexWriterVersion, _targetMaxChunkSize, _targetDocsPerChunk,
+          _maxNumMultiValues, _configs);
     }
   }
 }

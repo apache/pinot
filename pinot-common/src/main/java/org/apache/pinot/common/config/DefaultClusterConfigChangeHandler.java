@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.common.config;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.listeners.BatchMode;
 import org.apache.helix.api.listeners.ClusterConfigChangeListener;
 import org.apache.helix.model.ClusterConfig;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigProvider;
 import org.slf4j.Logger;
@@ -41,14 +44,51 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
   private final List<PinotClusterConfigChangeListener> _listeners = new ArrayList<>();
   private Map<String, String> _clusterConfigs = Map.of();
 
+  private volatile boolean _initialSnapshotApplied;
+  private boolean _subscriptionFailed;
+
+  /// Registers this fresh handler at startup. Helix delivers INIT synchronously but can swallow initialization errors.
+  /// On failure, runs the policy cleanup before disconnecting, then releases resources in the given order.
+  public void subscribe(HelixManager manager, Runnable beforeDisconnect, Runnable... failureCleanup) {
+    try {
+      manager.addClusterfigChangeListener(this);
+      Preconditions.checkState(_initialSnapshotApplied, "Helix did not deliver the initial cluster config");
+    } catch (Exception e) {
+      synchronized (this) {
+        // Prevent late callbacks, including FINALIZE during disconnect, from overwriting fail-closed cleanup.
+        _subscriptionFailed = true;
+      }
+      runCleanup(beforeDisconnect, e);
+      runCleanup(manager::disconnect, e);
+      for (Runnable cleanup : failureCleanup) {
+        runCleanup(cleanup, e);
+      }
+      throw new IllegalStateException("Failed to subscribe to cluster config", e);
+    }
+  }
+
+  private static void runCleanup(Runnable cleanup, Exception cause) {
+    try {
+      cleanup.run();
+    } catch (RuntimeException e) {
+      ExceptionUtils.suppress(e, cause);
+    }
+  }
+
   @Override
   public synchronized void onClusterConfigChange(ClusterConfig clusterConfig, NotificationContext context) {
+    if (_subscriptionFailed) {
+      return;
+    }
     Map<String, String> clusterConfigs = copyWithoutNullValues(clusterConfig.getRecord().getSimpleFields());
     Set<String> changedConfigs = getChangedProperties(_clusterConfigs, clusterConfigs);
     LOGGER.info("Cluster configs changed: {}", changedConfigs);
     _clusterConfigs = clusterConfigs;
     for (PinotClusterConfigChangeListener listener : _listeners) {
       listener.onChange(changedConfigs, clusterConfigs);
+    }
+    if (context != null && context.getType() == NotificationContext.Type.INIT) {
+      _initialSnapshotApplied = true;
     }
   }
 

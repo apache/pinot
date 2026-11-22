@@ -50,6 +50,8 @@ import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.AuthorizationInterceptor;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
+import org.apache.pinot.query.grpc.ReceiverIdentity;
+import org.apache.pinot.query.grpc.ReceiverIdentityInterceptor;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -100,6 +102,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
   // See https://github.com/apache/pinot/issues/10331
   private final int _maxInboundMessageSizeBytes;
+  /// Identity requests are checked against, or `null` if the check is disabled. See
+  /// [CommonConstants.MultiStageQueryRunner#KEY_OF_REJECT_MISROUTED_REQUESTS].
+  @Nullable
+  private final ReceiverIdentity _receiverIdentity;
 
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
@@ -134,8 +140,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @VisibleForTesting
   public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
       @Nullable QueryAccessControlFactory accessControlFactory) {
-    this(new PinotConfiguration(), "serverId", port, queryRunner, tlsConfig, accessControlFactory,
-        ThreadAccountantUtils.getNoOpAccountant());
+    // Tests address this server with made-up instance ids, so it cannot check them
+    this(new PinotConfiguration(Map.of(CommonConstants.MultiStageQueryRunner.KEY_OF_REJECT_MISROUTED_REQUESTS, false)),
+        "serverId", port, queryRunner, tlsConfig, accessControlFactory, ThreadAccountantUtils.getNoOpAccountant());
   }
 
   public QueryServer(PinotConfiguration serverConf, String instanceId, int port, QueryRunner queryRunner,
@@ -168,6 +175,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     Preconditions.checkArgument(_maxInboundMessageSizeBytes > 0, "%s must be positive, got: %s",
         CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES,
         _maxInboundMessageSizeBytes);
+    boolean rejectMisroutedRequests = serverConf.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_REJECT_MISROUTED_REQUESTS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_REJECT_MISROUTED_REQUESTS);
+    _receiverIdentity = rejectMisroutedRequests ? new ReceiverIdentity(instanceId, "port " + port) : null;
 
     ExecutorService baseExecutorService =
         ExecutorServiceUtils.create(serverConf, CommonConstants.Server.MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX,
@@ -228,6 +239,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private Server buildGrpcServer(NettyServerBuilder builder) {
     // By using directExecutor, GRPC doesn't need to manage its own thread pool
     builder.directExecutor();
+    // Interceptors run in the reverse order they are added: authorization first, then the receiver identity check,
+    // which rejects a request meant for another instance before it runs
+    if (_receiverIdentity != null) {
+      builder.intercept(new ReceiverIdentityInterceptor(_receiverIdentity, null,
+          () -> MseMetrics.get().addMeteredGlobalValue(MseMeter.MISROUTED_REQUESTS_REJECTED, 1L)));
+    }
     if (_accessControlFactory != null) {
       builder.intercept(new AuthorizationInterceptor(_accessControlFactory));
     }

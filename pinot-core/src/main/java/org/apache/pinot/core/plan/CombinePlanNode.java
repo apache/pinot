@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SequentialSortedGroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.SortedGroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.StreamingSelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingDistinctCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingGroupByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
@@ -130,6 +131,17 @@ public class CombinePlanNode implements PlanNode {
       if (QueryContextUtils.isSelectionOnlyQuery(_queryContext) && _queryContext.getLimit() != 0) {
         // Use streaming operator only for non-empty selection-only query
         return createStreamingSelectionOnlyCombineOperator(operators);
+      }
+      // Streaming selection order-by (opt-in via the sortedSelectionMergeMode hint). Selection-only already returned
+      // above, so reaching here with a non-empty limit and an order-by present implies selection order-by.
+      //
+      // No sortedness check here: InstancePlanMakerImplV2 has already resolved AUTO against segment metadata, and a
+      // leading order-by expression is deliberately allowed because that is what ON is for. The merge handles a
+      // non-identifier leading expression by giving up frontier pruning, see
+      // StreamingSelectionOrderByCombineOperator.
+      if (_queryContext.isSortedSelectionMergeEnabled() && QueryContextUtils.isSelectionQuery(_queryContext)
+          && _queryContext.getLimit() != 0 && _queryContext.getOrderByExpressions() != null) {
+        return new StreamingSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
       }
       // Streaming flushes partial results, so it needs an aggregation above to merge them back together.
       // Leaves that must return final results are excluded, see StreamingGroupByCombineOperator.

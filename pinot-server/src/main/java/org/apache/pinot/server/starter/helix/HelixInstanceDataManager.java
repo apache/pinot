@@ -67,12 +67,14 @@ import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -87,6 +89,10 @@ import static java.util.Objects.requireNonNull;
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
+
+  // Under the class lock, co-located servers share the lease executor until the last manager shuts down.
+  private static int _leaseExecutorUsers;
+  private boolean _ownsLeaseExecutor;
 
   private final Map<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
   /// Serializes table creation with the previous owner's entire shutdown, including table-scoped resource cleanup
@@ -164,14 +170,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
 
-    File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
-    initInstanceDataDir(instanceDataDir);
+    initInstanceDataDir();
+    initInstanceSegmentTarDir();
 
-    File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
-    initInstanceSegmentTarDir(instanceSegmentTarDir);
-
-    // Initialize segment build time lease extender executor
-    SegmentBuildTimeLeaseExtender.initExecutor();
     // Initialize a semaphore and a fixed thread pool to reload/refresh segments in parallel.
     int maxParallelRefreshThreads = getMaxParallelRefreshThreads();
     Preconditions.checkArgument(maxParallelRefreshThreads > 0,
@@ -196,6 +197,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _errorCache = CacheBuilder.newBuilder().maximumSize(_instanceDataManagerConfig.getErrorCacheSize()).build();
     _recentlyDeletedTables = CacheBuilder.newBuilder()
         .expireAfterWrite(_instanceDataManagerConfig.getDeletedTablesCacheTtlMinutes(), TimeUnit.MINUTES).build();
+    synchronized (HelixInstanceDataManager.class) {
+      if (!_ownsLeaseExecutor) {
+        SegmentBuildTimeLeaseExtender.initExecutor();
+        _leaseExecutorUsers++;
+        _ownsLeaseExecutor = true;
+      }
+    }
   }
 
   ServerIngestionOomProtectionManager.ServerThrottleState getServerIngestionOomProtectionThrottleState() {
@@ -203,8 +211,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @VisibleForTesting
-  void initInstanceDataDir(File instanceDataDir) {
+  void initInstanceDataDir() {
+    File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     if (!instanceDataDir.exists()) {
+      Preconditions.checkState(!_instanceDataManagerConfig.shouldFailOnMissingInstanceDataDir(),
+          "Instance data dir does not exist: %s (%s=true)", instanceDataDir,
+          Server.CONFIG_OF_INSTANCE_DATA_DIR_FAIL_ON_MISSING);
       Preconditions.checkState(instanceDataDir.mkdirs(), "Failed to create instance data dir: %s", instanceDataDir);
     } else {
       // Clean up the _tmp (consuming segments) dir and empty table data dir
@@ -231,7 +243,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @VisibleForTesting
-  void initInstanceSegmentTarDir(File instanceSegmentTarDir) {
+  void initInstanceSegmentTarDir() {
+    File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
     if (!instanceSegmentTarDir.exists()) {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance segment tar dir: %s",
           instanceSegmentTarDir);
@@ -310,7 +323,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         Thread.currentThread().interrupt();
       }
     }
-    SegmentBuildTimeLeaseExtender.shutdownExecutor();
+    synchronized (HelixInstanceDataManager.class) {
+      if (_ownsLeaseExecutor) {
+        _ownsLeaseExecutor = false;
+        if (--_leaseExecutorUsers == 0) {
+          SegmentBuildTimeLeaseExtender.shutdownExecutor();
+        }
+      }
+    }
     // shutdown logical table metadata cache
     _logicalTableMetadataCache.shutdown();
     LOGGER.info("Helix instance data manager shut down");
@@ -527,7 +547,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         return null;
       }
       try {
-        return segmentDataManager.getSegment().getSegmentMetadata();
+        return detachMappedMetadata(segmentDataManager);
       } finally {
         tableDataManager.releaseSegment(segmentDataManager);
       }
@@ -545,7 +565,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       try {
         List<SegmentMetadata> segmentsMetadata = new ArrayList<>(segmentDataManagers.size());
         for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-          segmentsMetadata.add(segmentDataManager.getSegment().getSegmentMetadata());
+          segmentsMetadata.add(detachMappedMetadata(segmentDataManager));
         }
         return segmentsMetadata;
       } finally {
@@ -554,6 +574,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
+  }
+
+  private static SegmentMetadata detachMappedMetadata(SegmentDataManager segmentDataManager) {
+    SegmentMetadata metadata = segmentDataManager.getSegment().getSegmentMetadata();
+    if (metadata instanceof SegmentMetadataImpl segmentMetadata && segmentMetadata.isMapped()) {
+      return segmentMetadata.detachedCopy();
+    }
+    return metadata;
   }
 
   /// Assemble the path to segment dir directly, when table mgr object is not
