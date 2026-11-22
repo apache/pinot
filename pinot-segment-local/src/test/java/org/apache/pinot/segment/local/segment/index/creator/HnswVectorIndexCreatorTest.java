@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.creator;
 
 import com.google.common.base.Throwables;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -52,6 +53,7 @@ import org.apache.lucene.util.InfoStream;
 import org.apache.lucene.util.StringHelper;
 import org.apache.lucene.util.Version;
 import org.apache.lucene.util.hnsw.HnswGraph;
+import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswCodec;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
@@ -429,6 +431,113 @@ public class HnswVectorIndexCreatorTest {
       try (Directory directory = FSDirectory.open(index.toPath())) {
         assertFalse(DirectoryReader.indexExists(directory), "A failed seal must not commit a partial index");
       }
+    }
+  }
+
+  /// A COSINE index returns the cosine distances of the documents each search returns, the same documents as
+  /// `getDocIds`, and keeps nothing between searches; other distance functions return none.
+  @Test
+  public void testServesCosineDistances()
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "cosine");
+    FileUtils.forceMkdir(indexDir);
+    float[][] vectors = new float[200][8];
+    Random random = new Random(7);
+    for (float[] vector : vectors) {
+      for (int d = 0; d < vector.length; d++) {
+        vector[d] = random.nextFloat() - 0.5f;
+      }
+    }
+    for (String distanceFunction : new String[]{"COSINE", "EUCLIDEAN"}) {
+      Map<String, String> properties = new HashMap<>();
+      properties.put("vectorIndexType", "HNSW");
+      properties.put("vectorDimension", "8");
+      properties.put("vectorDistanceFunction", distanceFunction);
+      properties.put("buildThreads", "4");
+      properties.put("forceMerge", "false");
+      VectorIndexConfig config = new VectorIndexConfig(properties);
+      FileUtils.cleanDirectory(indexDir);
+      try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("baz", indexDir, config)) {
+        for (float[] vector : vectors) {
+          creator.add(vector);
+        }
+        creator.seal();
+      }
+      try (HnswVectorIndexReader reader = new HnswVectorIndexReader("baz", indexDir, vectors.length, config)) {
+        float[] query = vectors[3];
+        MutableRoaringBitmap allowed = new MutableRoaringBitmap();
+        allowed.add(10L, 60L);
+        if (distanceFunction.equals("EUCLIDEAN")) {
+          Assert.assertNull(reader.getCosineDistances(query, 5));
+          Assert.assertNull(reader.getCosineDistances(query, 5, allowed));
+          continue;
+        }
+        Int2FloatMap distances = reader.getCosineDistances(query, 20);
+        Assert.assertEquals(sortedDocIds(distances), reader.getDocIds(query, 20).toArray());
+        assertCosineDistances(distances, vectors, query);
+
+        Int2FloatMap filtered = reader.getCosineDistances(query, 5, allowed);
+        Assert.assertEquals(sortedDocIds(filtered), reader.getDocIds(query, 5, allowed).toArray());
+        for (int docId : filtered.keySet()) {
+          Assert.assertTrue(allowed.contains(docId), "Filtered search returned doc outside the filter: " + docId);
+        }
+        assertCosineDistances(filtered, vectors, query);
+        Assert.assertTrue(reader.getCosineDistances(query, 5, new MutableRoaringBitmap()).isEmpty());
+
+        // Stateless: a later search does not see the documents of an earlier one.
+        Assert.assertEquals(reader.getCosineDistances(query, 3).size(), 3);
+      }
+    }
+  }
+
+  /// The metric persisted in the index decides whether distances are served: a table config changed to another
+  /// function without rebuilding the index must not convert the old scores as cosine scores.
+  @Test
+  public void testServesDistancesByThePersistedMetric()
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "metric");
+    FileUtils.forceMkdir(indexDir);
+    float[][] vectors = {{2, 0}, {0, 1}, {1, 1}, {3, 4}};
+    float[] query = {1, 0};
+    for (String[] builtAndLoaded : new String[][]{{"EUCLIDEAN", "COSINE"}, {"COSINE", "EUCLIDEAN"}}) {
+      FileUtils.cleanDirectory(indexDir);
+      try (HnswVectorIndexCreator creator =
+          new HnswVectorIndexCreator("baz", indexDir, hnswConfig(builtAndLoaded[0]))) {
+        for (float[] vector : vectors) {
+          creator.add(vector);
+        }
+        creator.seal();
+      }
+      try (HnswVectorIndexReader reader =
+          new HnswVectorIndexReader("baz", indexDir, vectors.length, hnswConfig(builtAndLoaded[1]))) {
+        if (builtAndLoaded[0].equals("EUCLIDEAN")) {
+          Assert.assertNull(reader.getCosineDistances(query, 4));
+          Assert.assertNull(reader.getCosineDistances(query, 4, MutableRoaringBitmap.bitmapOf(0, 1)));
+        } else {
+          assertCosineDistances(reader.getCosineDistances(query, 4), vectors, query);
+        }
+      }
+    }
+  }
+
+  private static VectorIndexConfig hnswConfig(String distanceFunction) {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "2");
+    properties.put("vectorDistanceFunction", distanceFunction);
+    return new VectorIndexConfig(properties);
+  }
+
+  private static int[] sortedDocIds(Int2FloatMap distances) {
+    int[] docIds = distances.keySet().toIntArray();
+    Arrays.sort(docIds);
+    return docIds;
+  }
+
+  private static void assertCosineDistances(Int2FloatMap distances, float[][] vectors, float[] query) {
+    for (Int2FloatMap.Entry entry : distances.int2FloatEntrySet()) {
+      Assert.assertEquals(entry.getFloatValue(), VectorFunctions.cosineDistance(vectors[entry.getIntKey()], query),
+          1e-5);
     }
   }
 }

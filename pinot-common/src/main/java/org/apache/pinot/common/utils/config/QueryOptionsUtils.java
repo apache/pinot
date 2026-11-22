@@ -1056,6 +1056,11 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK));
   }
 
+  /// Returns whether `cosineDistance` may reuse approximate distances from a paired vector index search.
+  public static boolean isVectorApproximateDistance(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_APPROXIMATE_DISTANCE));
+  }
+
   @Nullable
   public static Boolean getVectorExactRerank(Map<String, String> queryOptions) {
     String exactRerank = queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK);
