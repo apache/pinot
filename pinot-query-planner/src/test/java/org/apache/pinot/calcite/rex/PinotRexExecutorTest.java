@@ -299,7 +299,8 @@ public class PinotRexExecutorTest {
   public void testNumericToApproximateCastsMatchCalcite(SqlTypeName targetType, String value, boolean exactSource) {
     LiteralRexBuilder builder = new LiteralRexBuilder();
     RelDataType target = builder.getTypeFactory().createSqlType(targetType);
-    RexNode literal = exactSource ? exactLiteral(builder, new BigDecimal(value))
+    RexNode literal = exactSource
+        ? exactLiteral(builder, new BigDecimal(value))
         : builder.makeApproxLiteral(new BigDecimal(value));
     RexNode expression = builder.makeAbstractCast(target, literal, false);
     List<RexNode> input = List.of(expression);
@@ -324,7 +325,7 @@ public class PinotRexExecutorTest {
       RexLiteral actual = (RexLiteral) reduce(new PinotRexExecutor(FAILING_FALLBACK), builder, List.of(expression))
           .get(0);
       assertEquals(Double.doubleToRawLongBits(actual.getValueAs(Double.class)), Double.doubleToRawLongBits(-0.0),
-          "CAST(-1E-50 AS " + targetType + ") must be negative zero");
+          "CAST(" + entry.getValue() + " AS " + targetType + ") must be negative zero");
     }
   }
 
@@ -368,8 +369,9 @@ public class PinotRexExecutorTest {
     LiteralRexBuilder builder = new LiteralRexBuilder();
     RelDataType real = builder.getTypeFactory().createSqlType(SqlTypeName.REAL);
     List<RexNode> casts = new ArrayList<>();
-    for (int i = 0; i < 768; i++) {
-      casts.add(builder.makeAbstractCast(real, builder.makeExactLiteral(new BigDecimal("0.0" + i)), false));
+    casts.add(builder.makeAbstractCast(real, builder.makeExactLiteral(BigDecimal.ZERO), false));
+    for (int i = 1; i < 768; i++) {
+      casts.add(builder.makeAbstractCast(real, builder.makeExactLiteral(BigDecimal.valueOf(i, 3)), false));
     }
     // One reference batch: a compilation per element would dominate the test's run time
     List<RexNode> elements = reduce(CALCITE_EXECUTOR, builder, casts);
@@ -387,7 +389,14 @@ public class PinotRexExecutorTest {
     RexNode fast = timestampCast(builder, SqlTypeName.CHAR, "2026-09-01 12:34:56.123", 3);
     RelDataType timestamp = builder.getTypeFactory().createSqlType(SqlTypeName.TIMESTAMP, 3);
     RexLiteral string = builder.stringLiteral("2026-09-01 12:34:56.123", SqlTypeName.CHAR);
+    RelDataType integer = builder.getTypeFactory().createSqlType(SqlTypeName.INTEGER);
+    RelDataType real = builder.getTypeFactory().createSqlType(SqlTypeName.REAL);
     List<RexNode> unsupported = List.of(
+        builder.makeCall(SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR, builder.makeLiteral("a"),
+            builder.makeLiteral("abc")),
+        builder.makeCall(SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR, builder.makeApproxLiteral(0.1d, real)),
+        builder.makeAbstractCast(real, builder.makeExactLiteral(new BigDecimal("2147483648"), integer), false),
+        builder.makeAbstractCast(real, builder.makeNullLiteral(integer), false),
         builder.makeCall(SqlStdOperatorTable.PLUS, builder.makeExactLiteral(BigDecimal.ONE),
             builder.makeExactLiteral(BigDecimal.TEN)),
         builder.makeAbstractCast(timestamp, string, true),
