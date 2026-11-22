@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan.server;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -47,6 +48,7 @@ import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
@@ -57,6 +59,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter;
@@ -192,6 +195,18 @@ public class ServerPlanRequestUtils {
         segments, null);
   }
 
+  @VisibleForTesting
+  static long localLeafRequestId(long base, int workerId, List<WorkerMetadata> localWorkers) {
+    if (localWorkers.size() > 1 && localWorkers.size() <= 16) {
+      for (int ordinal = 0; ordinal < localWorkers.size(); ordinal++) {
+        if (localWorkers.get(ordinal).getWorkerId() == workerId) {
+          return base + ((long) ordinal << 1);
+        }
+      }
+    }
+    return base;
+  }
+
   /// Converts [PinotQuery] into an [InstanceRequest]. The schema is `null` when the table is not set up on the server.
   private static InstanceRequest compileInstanceRequest(OpChainExecutionContext executionContext, PinotQuery pinotQuery,
       @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType, String tableNameWithType,
@@ -226,6 +241,13 @@ public class ServerPlanRequestUtils {
     // TODO: Revisit if this is still necessary
     long requestId = (executionContext.getRequestId() << 16) + ((long) executionContext.getStageId() << 8) + (
         tableType == TableType.REALTIME ? 1 : 0);
+    // The dispatcher sends only this server's workers. Give concurrently assigned local leaves
+    // separate SSE request IDs for tracing/accounting; bit zero still identifies the table type.
+    String workers = executionContext.getOpChainMetadata().get(QueryOptionKey.LEAF_STAGE_WORKERS_PER_SERVER);
+    if (workers != null && !workers.equals("1")) {
+      requestId = localLeafRequestId(requestId, executionContext.getWorkerId(),
+          executionContext.getStageMetadata().getWorkerMetadataList());
+    }
     instanceRequest.setRequestId(requestId);
     instanceRequest.setCid(executionContext.getCid());
     instanceRequest.setBrokerId(executionContext.getBrokerId());

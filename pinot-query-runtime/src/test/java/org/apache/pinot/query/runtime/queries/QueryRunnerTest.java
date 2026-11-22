@@ -174,6 +174,21 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
+  @Test
+  public void testFusedBroadcastJoinsAcrossServers()
+      throws Exception {
+    // Both dimensions have duplicate join keys. COUNT and SUM detect missing or doubled probe rows.
+    String sql = "SELECT /*+ joinOptions(left_distribution_type='random',right_distribution_type='broadcast') */ "
+        + "b.col3, c.col3, COUNT(*), SUM(a.col3) FROM a JOIN b ON a.col2=b.col2 JOIN c ON a.col3=c.col3 "
+        + "GROUP BY b.col3, c.col3";
+    String fused = "SET fuseBroadcastJoins=true; " + sql;
+    assertEquals(planQuery(fused).getQueryPlan().getQueryStages().size(),
+        planQuery(sql).getQueryPlan().getQueryStages().size() - 1);
+    QueryDispatcher.QueryResult result = queryRunner(fused, false);
+    assertNull(result.getProcessingException());
+    compareRowEquals(result.getResultTable(), queryH2(sql));
+  }
+
   /// The self stats of a node are the node's own value minus its children's. A mailbox send reports its stats from
   /// inside the getNextBlock() call whose time it is still spending, so unless that call is accounted first it
   /// reports less than the input whose call it contains and the subtraction goes negative. A query whose filter

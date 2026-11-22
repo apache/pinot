@@ -1118,6 +1118,9 @@ public class CommonConstants {
         // Query option key used to enable a given set of defaultly disabled rules
         public static final String USE_PLANNER_RULES = "usePlannerRules";
 
+        /// Keep adjacent inner equijoins with broadcast build sides in one multi-stage worker.
+        public static final String FUSE_BROADCAST_JOINS = "fuseBroadcastJoins";
+
         public static final String ALLOW_REVERSE_ORDER = "allowReverseOrder";
         public static final boolean DEFAULT_ALLOW_REVERSE_ORDER = false;
 
@@ -1135,6 +1138,9 @@ public class CommonConstants {
         public static final String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mseMaxInitialResultHolderCapacity";
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
+
+        /// Maximum local workers for a plain randomly distributed OFFLINE scan routed to one server (1–16, default 1).
+        public static final String LEAF_STAGE_WORKERS_PER_SERVER = "leafStageWorkersPerServer";
 
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";

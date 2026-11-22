@@ -23,8 +23,10 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.RelDistribution.Type;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
@@ -35,10 +37,14 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalAsofJoin;
+import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
 /// Special rule for Pinot, this rule is fixed to always insert exchange after JOIN node.
@@ -102,7 +108,13 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       }
       validateDistributionTypes(leftDistributionType, rightDistributionType, isReplicatedTableScan(left),
           isReplicatedTableScan(right), joinInfo, join.getJoinType());
-      newLeft = createExchangeForHashJoin(leftDistributionType, joinInfo.leftKeys, left, prePartitioned);
+      boolean fuseProbe = join.getJoinType() == JoinRelType.INNER && prePartitioned == null
+          && !joinInfo.leftKeys.isEmpty() && joinInfo.isEqui()
+          && leftDistributionType == PinotHintOptions.DistributionType.RANDOM
+          && rightDistributionType == PinotHintOptions.DistributionType.BROADCAST
+          && fusionEnabled(call, joinHintOptions) && isBroadcastJoinOutput(left);
+      newLeft = fuseProbe ? left
+          : createExchangeForHashJoin(leftDistributionType, joinInfo.leftKeys, left, prePartitioned);
       newRight = createExchangeForHashJoin(rightDistributionType, joinInfo.rightKeys, right, prePartitioned);
     }
 
@@ -115,6 +127,39 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), newLeft, newRight, join.getJoinType(),
           join.isSemiJoinDone()));
     }
+  }
+
+  private static boolean fusionEnabled(RelOptRuleCall call, @Nullable Map<String, String> hint) {
+    if (hint != null && hint.containsKey(PinotHintOptions.JoinHintOptions.FUSE_BROADCAST_JOINS)) {
+      return Boolean.parseBoolean(hint.get(PinotHintOptions.JoinHintOptions.FUSE_BROADCAST_JOINS));
+    }
+    Context context = call.getPlanner().getContext();
+    PlannerContext planner = context != null ? context.unwrap(PlannerContext.class) : null;
+    return planner != null && Boolean.parseBoolean(planner.getOptions().get(QueryOptionKey.FUSE_BROADCAST_JOINS));
+  }
+
+  /// A random probe input already assigns each row to one worker. Since every worker receives the entire
+  /// right input of both inner joins, a second random exchange only moves the first join's results.
+  /// Restrict the intervening operators to column projections so stage-sensitive expressions keep their placement.
+  private static boolean isBroadcastJoinOutput(RelNode input) {
+    while (input instanceof Project project) {
+      if (!project.getProjects().stream().allMatch(RexInputRef.class::isInstance)) {
+        return false;
+      }
+      input = PinotRuleUtils.unboxRel(project.getInput());
+    }
+    if (!(input instanceof Join join) || join.getJoinType() != JoinRelType.INNER) {
+      return false;
+    }
+    JoinInfo info = join.analyzeCondition();
+    return info.isEqui() && !info.leftKeys.isEmpty() && isStreamingExchange(join.getLeft(), Type.RANDOM_DISTRIBUTED)
+        && isStreamingExchange(join.getRight(), Type.BROADCAST_DISTRIBUTED);
+  }
+
+  private static boolean isStreamingExchange(RelNode input, Type distribution) {
+    return PinotRuleUtils.unboxRel(input) instanceof PinotLogicalExchange exchange
+        && exchange.getDistribution().getType() == distribution && exchange.getPrePartitioned() == null
+        && exchange.getExchangeType() == PinotRelExchangeType.STREAMING;
   }
 
   private static PinotLogicalExchange createExchangeForLookupJoin(PinotHintOptions.DistributionType distributionType,
