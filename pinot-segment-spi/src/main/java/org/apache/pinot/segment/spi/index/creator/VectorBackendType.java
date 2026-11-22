@@ -42,6 +42,19 @@ public enum VectorBackendType {
   /// - `maxBufferSizeMB` - Lucene RAM buffer size
   /// - `useCompoundFile` - whether to use compound file format
   /// - `mode` - Lucene codec mode (BEST_SPEED or BEST_COMPRESSION)
+  ///
+  /// Immutable segment build settings:
+  ///
+  /// - `buildThreads` - number of part writers (1 to 32, default 1). Each writer has its own Lucene RAM buffer.
+  /// - `parallelBuildMaxDocs` - maximum vectors buffered for the parallel build. The default is the smaller of
+  ///   50,000 and the number of vectors whose float values fit in 64 MiB. Larger segments use a single writer.
+  /// - `forceMerge` - merge to one Lucene segment on seal (default true). Disabling it can reduce build time and
+  ///   increase query latency as searches visit each remaining segment. A part can flush multiple segments.
+  /// - `concurrentMerge` - use heap-backed graph construction with `buildThreads` workers during the final merge
+  ///   when `buildThreads` exceeds 1 and `forceMerge` is true (default false). Thread scheduling can change recall
+  ///   and produce different nearest neighbors across replicas.
+  /// - `mmapGraphOnMerge` - use a single-threaded, mmap-backed final merge. This is the default unless concurrent
+  ///   merging is enabled. Setting this property explicitly to true takes priority over `concurrentMerge`.
   HNSW("Hierarchical Navigable Small World graph (Lucene-based)"),
 
   /// Inverted File with flat (uncompressed) vectors.

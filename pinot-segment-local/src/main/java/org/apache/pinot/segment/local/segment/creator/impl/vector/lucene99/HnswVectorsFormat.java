@@ -41,6 +41,7 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
 
   private final int _maxDimensions;
   private final Lucene99HnswVectorsFormat _delegate;
+  private final Lucene99HnswVectorsFormat _finalMergeDelegate;
   private final int _maxConn;
   private final int _beamWidth;
   private final Path _mmapMergeDirectory;
@@ -59,18 +60,8 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
     this(maxConn, beamWidth, maxDimensions, 1, null, mmapMergeDirectory);
   }
 
-  /// Constructs a format that merges HNSW graphs with `numMergeWorkers` threads from `mergeExec`, so merging several
-  /// segments into one inserts their vectors concurrently instead of on a single thread.
-  ///
-  /// @param numMergeWorkers the number of threads used to merge graphs; 1 merges on the calling thread
-  /// @param mergeExec       the executor that runs the merge workers; required when `numMergeWorkers` > 1
-  public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions, int numMergeWorkers,
-      @Nullable ExecutorService mergeExec) {
-    this(maxConn, beamWidth, maxDimensions, numMergeWorkers, mergeExec, null);
-  }
-
-  /// Constructs a format with both: `numMergeWorkers` merge threads from `mergeExec` for ordinary merges, and an
-  /// optional scratch directory that routes the final forced merge through the mmap writer instead.
+  /// A final forced merge can use the supplied executor for heap-backed graph construction or a scratch
+  /// directory for mmap-backed construction. Ordinary merges use the default Lucene format.
   public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions, int numMergeWorkers,
       @Nullable ExecutorService mergeExec, @Nullable Path mmapMergeDirectory) {
     super("Lucene99HnswVectorsFormat");
@@ -81,8 +72,9 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
               + "; maxDimensions="
               + maxDimensions);
     }
-    _delegate = numMergeWorkers > 1 ? new Lucene99HnswVectorsFormat(maxConn, beamWidth, numMergeWorkers, mergeExec)
-        : new Lucene99HnswVectorsFormat(maxConn, beamWidth);
+    _delegate = new Lucene99HnswVectorsFormat(maxConn, beamWidth);
+    _finalMergeDelegate = numMergeWorkers > 1
+        ? new Lucene99HnswVectorsFormat(maxConn, beamWidth, numMergeWorkers, mergeExec) : _delegate;
     _maxDimensions = maxDimensions;
     _maxConn = maxConn;
     _beamWidth = beamWidth;
@@ -92,9 +84,11 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
   @Override
   public KnnVectorsWriter fieldsWriter(SegmentWriteState state)
       throws IOException {
-    if (_mmapMergeDirectory != null && state.context.context == IOContext.Context.MERGE
-        && state.context.mergeInfo.mergeMaxNumSegments == 1) {
-      return new MmapHnswVectorsWriter(state, _mmapMergeDirectory, _maxConn, _beamWidth);
+    if (state.context.context == IOContext.Context.MERGE && state.context.mergeInfo.mergeMaxNumSegments == 1) {
+      if (_mmapMergeDirectory != null) {
+        return new MmapHnswVectorsWriter(state, _mmapMergeDirectory, _maxConn, _beamWidth);
+      }
+      return _finalMergeDelegate.fieldsWriter(state);
     }
     return _delegate.fieldsWriter(state);
   }

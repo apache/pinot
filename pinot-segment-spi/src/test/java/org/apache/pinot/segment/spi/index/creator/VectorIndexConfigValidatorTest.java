@@ -120,6 +120,7 @@ public class VectorIndexConfigValidatorTest {
   @DataProvider
   public Object[][] invalidHnswBuildProperties() {
     return new Object[][]{
+        {"buildThreads", null, ".*buildThreads must be a valid integer.*"},
         {"buildThreads", "four", ".*buildThreads must be a valid integer.*"},
         {"buildThreads", "0", ".*buildThreads must be a positive integer.*"},
         {"buildThreads", "2000", ".*buildThreads must be <= 32.*"},

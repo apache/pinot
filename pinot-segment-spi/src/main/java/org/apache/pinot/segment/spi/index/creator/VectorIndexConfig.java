@@ -173,12 +173,35 @@ public class VectorIndexConfig extends IndexConfig {
     return value == null ? DEFAULT_STORE_IN_SEGMENT_FILE : Boolean.parseBoolean(value);
   }
 
+  /// Number of part writers used when building an immutable HNSW index.
+  @JsonIgnore
+  public int getHnswBuildThreads() {
+    // Existing table configurations may have been stored before this property was validated.
+    return _properties == null ? 1 : Math.min(VectorIndexConfigValidator.MAX_HNSW_BUILD_THREADS,
+        Math.max(1, Integer.parseInt(_properties.getOrDefault("buildThreads", "1"))));
+  }
+
+  /// Whether to force the immutable HNSW index into one Lucene segment at seal time.
+  @JsonIgnore
+  public boolean isHnswForceMerge() {
+    return _properties == null || Boolean.parseBoolean(_properties.getOrDefault("forceMerge", "true"));
+  }
+
+  /// Whether the final forced merge uses Lucene's concurrent, heap-backed graph construction.
+  /// An explicit mmap request takes priority.
+  @JsonIgnore
+  public boolean isHnswConcurrentMerge() {
+    return _properties != null && Boolean.parseBoolean(_properties.get("concurrentMerge"))
+        && !Boolean.parseBoolean(_properties.get(MMAP_GRAPH_ON_MERGE)) && isHnswForceMerge()
+        && getHnswBuildThreads() > 1;
+  }
+
   /// Whether to use mmap-backed graph construction during the immutable HNSW index's final merge.
-  /// Defaults to true and uses scratch space in the segment build directory. Set to false in the
-  /// `properties` map to use Lucene's heap-backed merge.
+  /// The default uses scratch space in the segment build directory unless concurrent graph construction is requested.
   @JsonIgnore
   public boolean isMmapGraphOnMerge() {
-    return _properties == null || Boolean.parseBoolean(_properties.getOrDefault(MMAP_GRAPH_ON_MERGE, "true"));
+    return _properties == null || (Boolean.parseBoolean(_properties.getOrDefault(MMAP_GRAPH_ON_MERGE, "true"))
+        && !isHnswConcurrentMerge());
   }
 
   /// Resolves the [VectorBackendType] for this config. If `vectorIndexType` is null or empty,

@@ -267,8 +267,8 @@ public final class VectorIndexConfigValidator {
     validatePositiveIntProperty(properties, "maxDimensions", "HNSW maxDimensions");
     validatePositiveDoubleProperty(properties, "maxBufferSizeMB", "HNSW maxBufferSizeMB");
     // Parsed at segment build (commit or reload), where a bad value would fail the build instead of the table config
-    Integer buildThreads = parsePositiveIntProperty(properties, "buildThreads", "HNSW buildThreads");
-    if (buildThreads != null && buildThreads > MAX_HNSW_BUILD_THREADS) {
+    int buildThreads = parsePositiveInt(properties.getOrDefault("buildThreads", "1"), "HNSW buildThreads");
+    if (buildThreads > MAX_HNSW_BUILD_THREADS) {
       throw new IllegalArgumentException(
           "HNSW buildThreads must be <= " + MAX_HNSW_BUILD_THREADS + ", got: " + buildThreads);
     }
@@ -405,9 +405,10 @@ public final class VectorIndexConfigValidator {
 
   private static Integer parsePositiveIntProperty(Map<String, String> properties, String key, String displayName) {
     String value = properties.get(key);
-    if (value == null) {
-      return null;
-    }
+    return value == null ? null : parsePositiveInt(value, displayName);
+  }
+
+  private static int parsePositiveInt(String value, String displayName) {
     try {
       int intValue = Integer.parseInt(value);
       if (intValue <= 0) {

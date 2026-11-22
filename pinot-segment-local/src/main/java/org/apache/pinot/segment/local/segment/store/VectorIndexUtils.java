@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
@@ -334,40 +335,42 @@ public class VectorIndexUtils {
     return getIndexWriterConfig(vectorIndexConfig, 1, null, mmapMergeDirectory);
   }
 
-  /// Same as [#getIndexWriterConfig(VectorIndexConfig)], but merges HNSW graphs with `numMergeWorkers` threads from
-  /// `mergeExec` (see [HnswVectorsFormat]).
-  public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig, int numMergeWorkers,
-      @Nullable ExecutorService mergeExec) {
-    return getIndexWriterConfig(vectorIndexConfig, numMergeWorkers, mergeExec, null);
+  /// Configures the main immutable writer with the final merge mode selected by the table configuration.
+  public static IndexWriterConfig getImmutableIndexWriterConfig(VectorIndexConfig vectorIndexConfig, Path segmentDir,
+      @Nullable ExecutorService mergeExecutor) {
+    return getIndexWriterConfig(vectorIndexConfig, mergeExecutor != null ? vectorIndexConfig.getHnswBuildThreads() : 1,
+        mergeExecutor, vectorIndexConfig.isMmapGraphOnMerge() ? segmentDir : null);
   }
 
-  /// Same as [#getIndexWriterConfig(VectorIndexConfig, int, ExecutorService)], and routes the final forced merge
-  /// through the mmap writer when `mmapMergeDirectory` is set.
-  public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig, int numMergeWorkers,
+  private static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig, int numMergeWorkers,
       @Nullable ExecutorService mergeExec, @Nullable Path mmapMergeDirectory) {
     IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
 
-    double maxBufferSizeMB = Double.parseDouble(vectorIndexConfig.getProperties()
+    Map<String, String> properties = vectorIndexConfig.getProperties();
+    if (properties == null) {
+      properties = Map.of();
+    }
+    double maxBufferSizeMB = Double.parseDouble(properties
         .getOrDefault("maxBufferSizeMB", String.valueOf(IndexWriterConfig.DEFAULT_RAM_BUFFER_SIZE_MB)));
-    boolean commit = Boolean.parseBoolean(vectorIndexConfig.getProperties()
+    boolean commit = Boolean.parseBoolean(properties
         .getOrDefault("commit", String.valueOf(IndexWriterConfig.DEFAULT_COMMIT_ON_CLOSE)));
-    boolean useCompoundFile = Boolean.parseBoolean(vectorIndexConfig.getProperties()
+    boolean useCompoundFile = Boolean.parseBoolean(properties
         .getOrDefault("useCompoundFile", String.valueOf(IndexWriterConfig.DEFAULT_USE_COMPOUND_FILE_SYSTEM)));
     indexWriterConfig.setRAMBufferSizeMB(maxBufferSizeMB);
     indexWriterConfig.setCommitOnClose(commit);
     indexWriterConfig.setUseCompoundFile(useCompoundFile);
 
-    int maxCon = Integer.parseInt(vectorIndexConfig.getProperties()
+    int maxCon = Integer.parseInt(properties
         .getOrDefault("maxCon", String.valueOf(Lucene99HnswVectorsFormat.DEFAULT_MAX_CONN)));
-    int beamWidth = Integer.parseInt(vectorIndexConfig.getProperties()
+    int beamWidth = Integer.parseInt(properties
         .getOrDefault("beamWidth", String.valueOf(Lucene99HnswVectorsFormat.DEFAULT_BEAM_WIDTH)));
-    int maxDimensions = Integer.parseInt(vectorIndexConfig.getProperties()
+    int maxDimensions = Integer.parseInt(properties
         .getOrDefault("maxDimensions", String.valueOf(HnswVectorsFormat.DEFAULT_MAX_DIMENSIONS)));
 
     HnswVectorsFormat knnVectorsFormat =
         new HnswVectorsFormat(maxCon, beamWidth, maxDimensions, numMergeWorkers, mergeExec, mmapMergeDirectory);
 
-    Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(vectorIndexConfig.getProperties()
+    Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(properties
         .getOrDefault("mode", Lucene912Codec.Mode.BEST_SPEED.name()));
     indexWriterConfig.setCodec(new HnswCodec(mode, knnVectorsFormat));
     return indexWriterConfig;

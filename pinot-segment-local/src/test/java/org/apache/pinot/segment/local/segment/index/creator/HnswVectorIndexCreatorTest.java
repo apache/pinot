@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.index.creator;
 
+import com.google.common.base.Throwables;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,18 +29,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.hnsw.HnswGraphProvider;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsWriter;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.document.KnnFloatVectorField;
-import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfos;
-import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.SegmentInfo;
 import org.apache.lucene.index.SegmentReader;
 import org.apache.lucene.index.SegmentWriteState;
@@ -52,6 +53,7 @@ import org.apache.lucene.util.StringHelper;
 import org.apache.lucene.util.Version;
 import org.apache.lucene.util.hnsw.HnswGraph;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswCodec;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
@@ -69,6 +71,7 @@ import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class HnswVectorIndexCreatorTest {
@@ -118,7 +121,28 @@ public class HnswVectorIndexCreatorTest {
     assertTrue(usesHeapWriter(mmapFormat, new IOContext(new MergeInfo(4, 0, false, -1))));
   }
 
-  private static boolean usesHeapWriter(HnswVectorsFormat format, IOContext context)
+  @Test
+  public void testConcurrentMergeWriterSelection()
+      throws IOException {
+    Map<String, String> properties = new HashMap<>(Map.of("vectorDimension", "8", "buildThreads", "2",
+        "concurrentMerge", "true"));
+    IOContext forcedMerge = new IOContext(new MergeInfo(4, 0, false, 1));
+    try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+      for (String mmap : new String[]{null, "false", "true"}) {
+        if (mmap != null) {
+          properties.put(VectorIndexConfig.MMAP_GRAPH_ON_MERGE, mmap);
+        }
+        VectorIndexConfig config = new VectorIndexConfig(properties);
+        boolean expectConcurrent = !"true".equals(mmap);
+        assertEquals(config.isHnswConcurrentMerge(), expectConcurrent);
+        HnswCodec codec = (HnswCodec) VectorIndexUtils.getImmutableIndexWriterConfig(config, INDEX_DIR.toPath(),
+            config.isHnswConcurrentMerge() ? executor : null).getCodec();
+        assertEquals(usesHeapWriter(codec.getKnnVectorsFormatForField("foo"), forcedMerge), expectConcurrent);
+      }
+    }
+  }
+
+  private static boolean usesHeapWriter(KnnVectorsFormat format, IOContext context)
       throws IOException {
     try (ByteBuffersDirectory directory = new ByteBuffersDirectory()) {
       SegmentInfo segmentInfo = new SegmentInfo(directory, Version.LATEST, Version.LATEST, "_0", 4, false, false,
@@ -319,8 +343,8 @@ public class HnswVectorIndexCreatorTest {
     // buildThreads, forceMerge, concurrentMerge, parallelBuildMaxDocs: the last case outgrows the buffer and falls back
     // to one writer
     return new Object[][]{
-        {1, true, false, 50_000}, {4, true, false, 50_000}, {4, true, true, 50_000}, {4, false, false, 50_000},
-        {3, true, false, 100}
+        {1, true, false, 50_000}, {4, true, false, 50_000}, {4, true, true, 50_000}, {16, false, false, 50_000},
+        {3, false, false, 100}
     };
   }
 
@@ -332,6 +356,7 @@ public class HnswVectorIndexCreatorTest {
       throws IOException {
     File indexDir = new File(INDEX_DIR, "parallel");
     FileUtils.forceMkdir(indexDir);
+    Path sentinel = Files.writeString(indexDir.toPath().resolve("bar.hnsw.part0"), "unrelated file");
     Map<String, String> properties = new HashMap<>();
     properties.put("vectorIndexType", "HNSW");
     properties.put("vectorDimension", "8");
@@ -355,61 +380,55 @@ public class HnswVectorIndexCreatorTest {
       }
       creator.seal();
     }
+    assertEquals(Files.readString(sentinel), "unrelated file");
     try (HnswVectorIndexReader reader = new HnswVectorIndexReader("bar", indexDir, numDocs, config)) {
+      int expectedLeaves = forceMerge || numDocs > parallelBuildMaxDocs ? 1 : buildThreads;
+      assertEquals(reader.getIndexDebugInfo().get("luceneSegments"), expectedLeaves);
       for (int docId = 0; docId < numDocs; docId += 37) {
         // k widens the HNSW search beam; with k = 1 the approximate search can miss even an exact match
-        Assert.assertTrue(reader.getDocIds(vectors[docId], 10).contains(docId), "Doc " + docId + " not found");
+        assertTrue(reader.getDocIds(vectors[docId], 10).contains(docId), "Doc " + docId + " not found");
       }
     }
-    String[] leftovers = indexDir.list((dir, name) -> name.contains(".hnsw.part"));
-    Assert.assertEquals(leftovers.length, 0, "Per-thread build directories must be removed");
+    File index = new File(indexDir, "bar" + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    assertEquals(index.listFiles(File::isDirectory).length, 0, "Scratch directories must be removed after seal");
+    assertEquals(indexDir.list().length, 3, "Expected only the index, its doc-id mapping and the sentinel");
   }
 
-  /// A part directory left by a build that crashed before cleaning up must not add its documents to the next build.
-  @Test
-  public void testParallelBuildIgnoresLeftoverPartDirectory()
+  @DataProvider
+  public Object[][] sealFailures() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "sealFailures")
+  public void testFailedParallelSealCleansUp(boolean interrupt)
       throws IOException {
-    File indexDir = new File(INDEX_DIR, "leftover");
-    FileUtils.deleteQuietly(indexDir);
-    FileUtils.forceMkdir(indexDir);
-    Map<String, String> properties = new HashMap<>();
-    properties.put("vectorIndexType", "HNSW");
-    properties.put("vectorDimension", "8");
-    properties.put("buildThreads", "2");
-    VectorIndexConfig config = new VectorIndexConfig(properties);
-    // A committed part from an earlier, crashed build
-    try (Directory staleDirectory = FSDirectory.open(new File(indexDir, "bar.hnsw.part0").toPath());
-        IndexWriter staleWriter = new IndexWriter(staleDirectory, VectorIndexUtils.getIndexWriterConfig(config))) {
-      Random staleRandom = new Random(3);
-      for (int i = 0; i < 50; i++) {
-        float[] vector = new float[8];
-        for (int d = 0; d < 8; d++) {
-          vector[d] = staleRandom.nextFloat();
-        }
-        Document document = new Document();
-        document.add(new KnnFloatVectorField("bar", vector,
-            VectorIndexUtils.toSimilarityFunction(config.getVectorDistanceFunction())));
-        document.add(new StoredField(HnswVectorIndexCreator.VECTOR_INDEX_DOC_ID_COLUMN_NAME, i));
-        staleWriter.addDocument(document);
-      }
-      staleWriter.commit();
-    }
-    int numDocs = 200;
-    Random random = new Random(7);
+    File indexDir = new File(INDEX_DIR, "failed");
+    VectorIndexConfig config = new VectorIndexConfig(Map.of("vectorDimension", "2", "buildThreads", "2",
+        VectorIndexConfig.STORE_IN_SEGMENT_FILE, "true"));
     try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("bar", indexDir, config)) {
-      for (int i = 0; i < numDocs; i++) {
-        float[] vector = new float[8];
-        for (int d = 0; d < 8; d++) {
-          vector[d] = random.nextFloat();
-        }
-        creator.add(vector);
+      creator.add(new float[]{1, 2});
+      creator.add(interrupt ? new float[]{3, 4} : new float[0]);
+      if (interrupt) {
+        Thread.currentThread().interrupt();
       }
-      creator.seal();
+      RuntimeException failure = expectThrows(RuntimeException.class, creator::seal);
+      if (interrupt) {
+        assertTrue(Thread.currentThread().isInterrupted(), "Sealing must preserve cancellation");
+      } else {
+        assertEquals(Throwables.getRootCause(failure).getMessage(), "cannot index an empty vector");
+      }
+    } finally {
+      // Leave the TestNG worker ready for the next invocation.
+      Thread.interrupted();
     }
-    File indexFile = new File(indexDir, "bar" + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
-    try (Directory directory = FSDirectory.open(indexFile.toPath());
-        DirectoryReader reader = DirectoryReader.open(directory)) {
-      Assert.assertEquals(reader.numDocs(), numDocs);
+    File index = new File(indexDir, "bar" + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    assertEquals(indexDir.listFiles(file -> !file.equals(index)).length, 0,
+        "A failed seal must leave neither scratch directories nor a packed index");
+    if (index.exists()) {
+      assertEquals(index.listFiles(File::isDirectory).length, 0, "Scratch directories must be removed on failure");
+      try (Directory directory = FSDirectory.open(index.toPath())) {
+        assertFalse(DirectoryReader.indexExists(directory), "A failed seal must not commit a partial index");
+      }
     }
   }
 }
