@@ -51,6 +51,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -1161,6 +1162,31 @@ public class PinotClientRequestTest {
       assertEquals(wae.getResponse().getStatus(), Response.Status.NOT_FOUND.getStatusCode());
     }
     verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testTimeSeriesAccessDeniedReturnsForbidden() {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+    when(_requestHandler.handleTimeSeriesRequest(any(), any(), any(), any(), any(), any()))
+        .thenThrow(QueryErrorCode.ACCESS_DENIED.asException("Permission denied."));
+    when(request.getQueryString()).thenReturn("query=metric");
+
+    AsyncResponse getResponse = mock(AsyncResponse.class);
+    _pinotClientRequest.processTimeSeriesQueryEngine(getResponse, "promql", request, _httpHeaders);
+    ArgumentCaptor<Response> response = ArgumentCaptor.forClass(Response.class);
+    verify(getResponse).resume(response.capture());
+    assertEquals(response.getValue().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+    PinotBrokerTimeSeriesResponse promResponse = (PinotBrokerTimeSeriesResponse) response.getValue().getEntity();
+    assertEquals(promResponse.getErrorType(), QueryErrorCode.ACCESS_DENIED.getDefaultMessage());
+
+    AsyncResponse postResponse = mock(AsyncResponse.class);
+    _pinotClientRequest.processTimeSeriesQueryEngine(JsonUtils.newObjectNode().put("language", "promql")
+        .put("query", "metric"), postResponse, request, _httpHeaders);
+    verify(postResponse).resume(response.capture());
+    assertEquals(response.getValue().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+    BrokerResponse pinotResponse = (BrokerResponse) response.getValue().getEntity();
+    assertEquals(pinotResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.ACCESS_DENIED.getId());
   }
 
   @Test

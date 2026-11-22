@@ -30,6 +30,7 @@ public class TimeSeriesExecutionContext {
   private final String _language;
   private final TimeBuckets _initialTimeBuckets;
   private final Map<String, List<String>> _planIdToSegmentsMap;
+  private final Map<String, List<String>> _planIdToOptionalSegmentsMap;
   private final Map<String, BlockingQueue<Object>> _exchangeReceiverByPlanId;
   private final long _deadlineMs;
   private final Map<String, String> _metadataMap;
@@ -38,11 +39,20 @@ public class TimeSeriesExecutionContext {
   public TimeSeriesExecutionContext(String language, TimeBuckets initialTimeBuckets, long deadlineMs,
       Map<String, String> metadataMap, Map<String, List<String>> planIdToSegmentsMap,
       Map<String, BlockingQueue<Object>> exchangeReceiverByPlanId) {
+    this(language, initialTimeBuckets, deadlineMs, metadataMap, planIdToSegmentsMap, Map.of(),
+        exchangeReceiverByPlanId);
+  }
+
+  public TimeSeriesExecutionContext(String language, TimeBuckets initialTimeBuckets, long deadlineMs,
+      Map<String, String> metadataMap, Map<String, List<String>> planIdToSegmentsMap,
+      Map<String, List<String>> planIdToOptionalSegmentsMap,
+      Map<String, BlockingQueue<Object>> exchangeReceiverByPlanId) {
     _language = language;
     _initialTimeBuckets = initialTimeBuckets;
     _deadlineMs = deadlineMs;
     _metadataMap = metadataMap;
     _planIdToSegmentsMap = planIdToSegmentsMap;
+    _planIdToOptionalSegmentsMap = planIdToOptionalSegmentsMap;
     _exchangeReceiverByPlanId = exchangeReceiverByPlanId;
     _seriesBuilderFactory = TimeSeriesBuilderFactoryProvider.getSeriesBuilderFactory(language);
   }
@@ -69,6 +79,11 @@ public class TimeSeriesExecutionContext {
 
   public Map<String, List<String>> getPlanIdToSegmentsMap() {
     return _planIdToSegmentsMap;
+  }
+
+  /// Segments of each plan that the server queries if it has them and skips otherwise.
+  public Map<String, List<String>> getPlanIdToOptionalSegmentsMap() {
+    return _planIdToOptionalSegmentsMap;
   }
 
   public Map<String, BlockingQueue<Object>> getExchangeReceiverByPlanId() {

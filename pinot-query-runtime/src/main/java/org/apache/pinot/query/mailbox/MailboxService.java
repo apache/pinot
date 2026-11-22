@@ -32,7 +32,10 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
@@ -42,6 +45,7 @@ import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
+import org.apache.pinot.query.grpc.ReceiverIdentity;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -97,6 +101,10 @@ public class MailboxService {
   /// extra bloating is added by gRPC and protobuf.
   private final int _maxInboundMessageSize;
   private final boolean _grpcSenderBackpressureEnabled;
+  /// Identity the mailbox server checks incoming streams against, or `null` if the instance id is unknown or the check
+  /// is disabled. See [CommonConstants.MultiStageQueryRunner#KEY_OF_REJECT_MISROUTED_REQUESTS].
+  @Nullable
+  private final ReceiverIdentity _receiverIdentity;
 
   private GrpcMailboxServer _grpcMailboxServer;
 
@@ -111,6 +119,15 @@ public class MailboxService {
 
   public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config,
       @Nullable TlsConfig tlsConfig, @Nullable QueryAccessControlFactory accessControlFactory) {
+    this(hostname, port, instanceType, config, tlsConfig, accessControlFactory, null);
+  }
+
+  /// @param instanceId the id of the instance this service belongs to, or `null` if unknown. Senders that know which
+  ///                   instance they mean say so in each stream, and the mailbox server rejects a stream meant for
+  ///                   another instance, see [ReceiverIdentity]. Without an id, it accepts every stream.
+  public MailboxService(String hostname, int port, InstanceType instanceType, PinotConfiguration config,
+      @Nullable TlsConfig tlsConfig, @Nullable QueryAccessControlFactory accessControlFactory,
+      @Nullable String instanceId) {
     _hostname = hostname;
     _port = port;
     _instanceType = instanceType;
@@ -136,6 +153,11 @@ public class MailboxService {
     _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config),
         writeBufferHighWaterMarkBytes, writeBufferLowWaterMarkBytes, keepAliveConfig);
     _accessControlFactory = accessControlFactory;
+    boolean rejectMisroutedRequests = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_REJECT_MISROUTED_REQUESTS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_REJECT_MISROUTED_REQUESTS);
+    _receiverIdentity = instanceId != null && rejectMisroutedRequests
+        ? new ReceiverIdentity(instanceId, hostname + ":" + port) : null;
     registerMailboxClientGauges();
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}, channel {}", hostname, port,
         keepAliveConfig);
@@ -208,6 +230,12 @@ public class MailboxService {
     return _instanceType;
   }
 
+  /// Returns the identity the mailbox server checks incoming streams against, or `null` if there is no check.
+  @Nullable
+  public ReceiverIdentity getReceiverIdentity() {
+    return _receiverIdentity;
+  }
+
   /// Returns a sending mailbox for the given mailbox id. The returned sending mailbox is uninitialized, i.e. it will
   /// not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
   /// data is sent for the first time.
@@ -216,11 +244,19 @@ public class MailboxService {
   //  reach multiple GiB and re-trigger OutOfDirectMemoryError at large fan-outs.
   public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap) {
+    return getSendingMailbox(hostname, port, 0, mailboxId, deadlineMs, statMap);
+  }
+
+  /// Same as [#getSendingMailbox(String, int, String, long, StatMap)], for a receiver whose instance id hash is known
+  /// (0 if unknown). Another instance that the stream reaches through a stale connection rejects it, which makes the
+  /// sending mailbox reset the connection and fail. See [ReceiverIdentity].
+  public SendingMailbox getSendingMailbox(String hostname, int port, long receiverInstanceIdHash, String mailboxId,
+      long deadlineMs, StatMap<MailboxSendOperator.StatKey> statMap) {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
-      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
-          _maxInboundMessageSize, _grpcSenderBackpressureEnabled);
+      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, receiverInstanceIdHash, deadlineMs,
+          statMap, _maxInboundMessageSize, _grpcSenderBackpressureEnabled, this::recordMisroutedRequestRejectedByPeer);
     }
   }
 
@@ -245,6 +281,29 @@ public class MailboxService {
   /// @return false if there is no channel to the address
   public boolean retireChannel(String hostname, int port) {
     return _channelManager.retireChannel(hostname, port);
+  }
+
+  /// Counts a stream this service's mailbox server rejected as meant for another instance.
+  public void recordMisroutedRequestRejected() {
+    meter(MseMeter.MISROUTED_REQUESTS_REJECTED, BrokerMeter.MULTI_STAGE_MISROUTED_REQUESTS_REJECTED);
+  }
+
+  /// Counts a stream this service sent that the receiving instance rejected as meant for another instance.
+  private void recordMisroutedRequestRejectedByPeer() {
+    meter(MseMeter.MISROUTED_REQUESTS_REJECTED_BY_PEER, BrokerMeter.MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER);
+  }
+
+  private void meter(MseMeter serverMeter, BrokerMeter brokerMeter) {
+    switch (_instanceType) {
+      case BROKER:
+        BrokerMetrics.get().addMeteredGlobalValue(brokerMeter, 1L);
+        break;
+      case SERVER:
+        MseMetrics.get().addMeteredGlobalValue(serverMeter, 1L);
+        break;
+      default:
+        break;
+    }
   }
 
   /// Current value of [BrokerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] /
@@ -288,6 +347,13 @@ public class MailboxService {
   @VisibleForTesting
   public long getMailboxServerUsedHeapMemoryBytes() {
     return _grpcMailboxServer != null ? _grpcMailboxServer.usedHeapMemoryBytes() : 0L;
+  }
+
+  /// Returns the receiving mailbox with the given id if it exists, without creating it.
+  @VisibleForTesting
+  @Nullable
+  ReceivingMailbox getReceivingMailboxIfPresent(String mailboxId) {
+    return _receivingMailboxCache.getIfPresent(mailboxId);
   }
 
   /// Releases the receiving mailbox from the cache.

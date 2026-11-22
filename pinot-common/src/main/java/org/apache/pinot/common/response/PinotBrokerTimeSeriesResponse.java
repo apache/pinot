@@ -25,6 +25,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -134,11 +135,16 @@ public class PinotBrokerTimeSeriesResponse {
       metricMap.putAll(anySeries.getTagKeyValuesAsMap());
       for (TimeSeries timeSeries : listOfTimeSeries) {
         Object[][] values = new Object[timeValues.length][];
+        int numSamples = 0;
         for (int i = 0; i < timeValues.length; i++) {
-          Object nullableValue = timeSeries.getDoubleValues()[i];
-          values[i] = new Object[]{timeValues[i], nullableValue == null ? null : nullableValue.toString()};
+          Double sample = timeSeries.getDoubleValues()[i];
+          if (sample != null) {
+            values[numSamples++] = new Object[]{timeValues[i], sample.toString()};
+          }
         }
-        result.add(new PinotBrokerTimeSeriesResponse.Value(metricMap, values));
+        if (numSamples > 0) {
+          result.add(new Value(metricMap, numSamples == values.length ? values : Arrays.copyOf(values, numSamples)));
+        }
       }
     }
     PinotBrokerTimeSeriesResponse.Data data = PinotBrokerTimeSeriesResponse.Data.newMatrix(result);
