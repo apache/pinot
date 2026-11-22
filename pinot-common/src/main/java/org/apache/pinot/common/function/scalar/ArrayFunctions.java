@@ -120,9 +120,13 @@ public class ArrayFunctions {
     while (i < values1.length && j < values2.length) {
       if (values1[i] == values2[j]) {
         indices.add(values1[i]);
+        i++;
+        j++;
+      } else if (values1[i] < values2[j]) {
+        i++;
+      } else {
         j++;
       }
-      i++;
     }
     return indices.toIntArray();
   }
