@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -93,6 +94,58 @@ public interface TextIndexReader extends IndexReader {
   default int getNumMatchingDocs(String searchQuery, @Nullable String optionsString,
       @Nullable QueryScopedCache queryScopedCache) {
     return getNumMatchingDocs(searchQuery, optionsString);
+  }
+
+  /// Returns a relevance score for every document matching the given search query, keyed by Pinot doc id.
+  ///
+  /// Lucene-based readers score with the searcher's similarity (BM25 with `k1 = 1.2`, `b = 0.75` by default).
+  /// Documents that do not match are absent from the returned map. Scores are computed from the statistics of
+  /// this index only (document frequency, average field length), so they are comparable within one segment but
+  /// not across segments.
+  ///
+  /// Lucene readers use the parser and options from [#getDocIds(String, String)]. Field references must resolve
+  /// to the scoring column. Queries whose fields cannot be determined are rejected.
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @return map from Pinot doc id to score, containing only matching documents
+  default Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString) {
+    throw new UnsupportedOperationException(
+        "Relevance scoring is not supported by text index reader: " + getClass().getSimpleName());
+  }
+
+  /// Like [#getDocScores(String, String)], but when `globalStats` is given the similarity uses those corpus
+  /// statistics (document count, average field length, per-term document frequency) instead of this index's own,
+  /// so that scores are comparable across segments. Merge [#getTextScoreStats] over every segment for the same query.
+  /// Lucene readers use local statistics when the supplied result contains no fields. With nonempty statistics,
+  /// scoring fails if required counters are missing or inconsistent with the local index.
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @param globalStats corpus statistics to score with, or `null` to use this index's statistics
+  /// @return map from Pinot doc id to score, containing only matching documents
+  default Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    if (globalStats == null) {
+      return getDocScores(searchQuery, optionsString);
+    }
+    throw new UnsupportedOperationException(
+        "Relevance scoring with global statistics is not supported by text index reader: "
+            + getClass().getSimpleName());
+  }
+
+  /// Returns this index's statistics for the terms of `searchQuery`, parsed and analyzed exactly as
+  /// [#getDocScores(String, String)] parses it: per queried field the collection statistics, and per query term its
+  /// document frequency and total term frequency. Merging the result of every segment gives the statistics of
+  /// the whole corpus, to pass to [#getDocScores(String, String, TextScoreStats)]. Lucene supports term and phrase
+  /// queries, Boolean and boosted combinations, and uncapped constant-score multi-term queries. Index-dependent
+  /// scoring rewrites such as fuzzy or synonym expansion require local scoring.
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  default TextScoreStats getTextScoreStats(String searchQuery, @Nullable String optionsString) {
+    throw new UnsupportedOperationException(
+        "Text score statistics are not supported by text index reader: " + getClass().getSimpleName());
   }
 
   /// Marker method that allows to differentiate between single-column and multi-column text index reader .

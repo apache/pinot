@@ -190,7 +190,8 @@ public class IntermediateResultByteBufferSerDeTest {
       Map.entry(AggregationFunctionType.MINMV, "DOUBLE intermediate result"),
       Map.entry(AggregationFunctionType.MAXMV, "DOUBLE intermediate result"),
       Map.entry(AggregationFunctionType.SUMMV, "DOUBLE intermediate result"),
-      Map.entry(AggregationFunctionType.TIMESERIESAGGREGATE, "time series engine only, which never serializes it")
+      Map.entry(AggregationFunctionType.TIMESERIESAGGREGATE, "time series engine only, which never serializes it"),
+      Map.entry(AggregationFunctionType.TEXTSCORESTATS, "STRING intermediate result")
   );
 
   private static final HistogramAggregationFunction HISTOGRAM = new HistogramAggregationFunction(
