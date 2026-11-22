@@ -19,18 +19,33 @@
 package org.apache.pinot.controller;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_PORT;
+import static org.apache.pinot.controller.ControllerConf.DISABLE_GROOVY;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_INSTANCE_ID;
+import static org.apache.pinot.spi.utils.CommonConstants.Groovy.INGESTION_GROOVY_DISABLED;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONTROLLER_INSTANCE;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -41,6 +56,89 @@ public class ControllerStarterStatelessTest extends ControllerTest {
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     properties.putAll(_configOverride);
+  }
+
+  @Test
+  public void testClusterIngestionGroovyPolicyAtStartup() {
+    record Policy(Map<String, String> settings, boolean disabled) {
+    }
+
+    List<Policy> policies = List.of(
+        new Policy(Map.of(), true),
+        new Policy(Map.of(DISABLE_GROOVY, " FaLsE "), false),
+        new Policy(Map.of(DISABLE_GROOVY, "true"), true),
+        new Policy(Map.of(DISABLE_GROOVY, "invalid"), true),
+        new Policy(Map.of(DISABLE_GROOVY, "${other.flag}"), true),
+        new Policy(Map.of("CONTROLLER.DISABLE.INGESTION.GROOVY", "false"), true),
+        new Policy(Map.of(INGESTION_GROOVY_DISABLED, "false"), false),
+        new Policy(Map.of(INGESTION_GROOVY_DISABLED, "false", DISABLE_GROOVY, "true"), false),
+        new Policy(Map.of(INGESTION_GROOVY_DISABLED, "true", DISABLE_GROOVY, "false"), true),
+        new Policy(Map.of(INGESTION_GROOVY_DISABLED, "invalid", DISABLE_GROOVY, "false"), true),
+        new Policy(Map.of(INGESTION_GROOVY_DISABLED, "", DISABLE_GROOVY, "false"), true));
+    _configOverride.clear();
+    startZk();
+    try {
+      for (int i = 0; i < policies.size(); i++) {
+        Policy policy = policies.get(i);
+        ControllerStarter starter = new ControllerStarter() {
+          @Override
+          protected Map<String, String> getDefaultClusterConfigs() {
+            Map<String, String> configs = super.getDefaultClusterConfigs();
+            configs.putAll(policy.settings());
+            return configs;
+          }
+
+          @Override
+          protected void applyCustomConfigs(ControllerConf config) {
+            config.setProperty(DISABLE_GROOVY, !policy.disabled());
+            config.setProperty(INGESTION_GROOVY_DISABLED, !policy.disabled());
+          }
+        };
+        Map<String, Object> config = getDefaultControllerConfiguration();
+        config.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName() + "Groovy" + i);
+        config.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.HELIX_ONLY.name());
+        config.put(DISABLE_GROOVY, !policy.disabled());
+        config.put(INGESTION_GROOVY_DISABLED, !policy.disabled());
+        config.put("other.flag", "false");
+        runWithHelixMock(() -> starter.init(new PinotConfiguration(config)));
+        assertEquals(starter.getConfig().isDisableIngestionGroovy(), policy.disabled(), policy.toString());
+
+        // Replacing a previous snapshot may remove either or both keys.
+        ClusterConfig snapshot = new ClusterConfig(getHelixClusterName());
+        snapshot.getRecord().setSimpleField(INGESTION_GROOVY_DISABLED, Boolean.toString(!policy.disabled()));
+        starter._clusterConfigChangeHandler.onClusterConfigChange(snapshot, null);
+        assertEquals(starter.getConfig().isDisableIngestionGroovy(), !policy.disabled(), policy.toString());
+        snapshot.getRecord().setSimpleFields(new HashMap<>(policy.settings()));
+        starter._clusterConfigChangeHandler.onClusterConfigChange(snapshot, null);
+        assertEquals(starter.getConfig().isDisableIngestionGroovy(), policy.disabled(), policy.toString());
+      }
+    } finally {
+      TableConfigUtils.setDisableGroovy(false);
+      _controllerPort = 0;
+      stopZk();
+    }
+  }
+
+  @Test
+  public void testMissingClusterConfigCallbackCleansUpController() {
+    ControllerStarter starter = new ControllerStarter();
+    starter._config = new ControllerConf();
+    starter._config.setClusterIngestionGroovyDisabled(false);
+    starter._clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    starter._helixParticipantManager = mock(HelixManager.class);
+    starter._helixControllerManager = mock(HelixManager.class);
+    starter._executorService = mock(ExecutorService.class);
+    starter._metricsRegistry = mock(PinotMetricsRegistry.class);
+    try {
+      expectThrows(IllegalStateException.class, starter::subscribeToClusterConfig);
+      assertTrue(starter.getConfig().isDisableIngestionGroovy());
+      verify(starter._helixParticipantManager).disconnect();
+      verify(starter._helixControllerManager).disconnect();
+      verify(starter._executorService).shutdownNow();
+      verifyNoInteractions(starter._metricsRegistry);
+    } finally {
+      TableConfigUtils.setDisableGroovy(false);
+    }
   }
 
   @Test

@@ -90,6 +90,10 @@ import static java.util.Objects.requireNonNull;
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
 
+  // Under the class lock, co-located servers share the lease executor until the last manager shuts down.
+  private static int _leaseExecutorUsers;
+  private boolean _ownsLeaseExecutor;
+
   private final Map<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
   /// Serializes table creation with the previous owner's entire shutdown, including table-scoped resource cleanup
   /// such as the segment build time lease extender. Acquire it before changing [#_tableDataManagerMap], and release
@@ -169,8 +173,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     initInstanceDataDir();
     initInstanceSegmentTarDir();
 
-    // Initialize segment build time lease extender executor
-    SegmentBuildTimeLeaseExtender.initExecutor();
     // Initialize a semaphore and a fixed thread pool to reload/refresh segments in parallel.
     int maxParallelRefreshThreads = getMaxParallelRefreshThreads();
     Preconditions.checkArgument(maxParallelRefreshThreads > 0,
@@ -195,6 +197,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _errorCache = CacheBuilder.newBuilder().maximumSize(_instanceDataManagerConfig.getErrorCacheSize()).build();
     _recentlyDeletedTables = CacheBuilder.newBuilder()
         .expireAfterWrite(_instanceDataManagerConfig.getDeletedTablesCacheTtlMinutes(), TimeUnit.MINUTES).build();
+    synchronized (HelixInstanceDataManager.class) {
+      if (!_ownsLeaseExecutor) {
+        SegmentBuildTimeLeaseExtender.initExecutor();
+        _leaseExecutorUsers++;
+        _ownsLeaseExecutor = true;
+      }
+    }
   }
 
   ServerIngestionOomProtectionManager.ServerThrottleState getServerIngestionOomProtectionThrottleState() {
@@ -314,7 +323,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         Thread.currentThread().interrupt();
       }
     }
-    SegmentBuildTimeLeaseExtender.shutdownExecutor();
+    synchronized (HelixInstanceDataManager.class) {
+      if (_ownsLeaseExecutor) {
+        _ownsLeaseExecutor = false;
+        if (--_leaseExecutorUsers == 0) {
+          SegmentBuildTimeLeaseExtender.shutdownExecutor();
+        }
+      }
+    }
     // shutdown logical table metadata cache
     _logicalTableMetadataCache.shutdown();
     LOGGER.info("Helix instance data manager shut down");
