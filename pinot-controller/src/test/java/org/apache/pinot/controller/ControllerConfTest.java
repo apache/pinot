@@ -35,6 +35,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.*;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class ControllerConfTest {
@@ -321,7 +322,7 @@ public class ControllerConfTest {
     if (valid) {
       conf.validateSegmentMetadataEntryLimits();
     } else {
-      Assert.expectThrows(IllegalStateException.class, conf::validateSegmentMetadataEntryLimits);
+      expectThrows(IllegalStateException.class, conf::validateSegmentMetadataEntryLimits);
     }
   }
 
@@ -331,7 +332,7 @@ public class ControllerConfTest {
     ControllerConf conf = new ControllerConf();
     conf.setProperty(ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT, 10_000);
 
-    Assert.expectThrows(IllegalStateException.class, conf::validateSegmentMetadataEntryLimits);
+    expectThrows(IllegalStateException.class, conf::validateSegmentMetadataEntryLimits);
   }
 
   @Test
