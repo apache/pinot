@@ -35,6 +35,7 @@ import picocli.CommandLine;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -112,6 +113,23 @@ public class LaunchSparkDataIngestionJobCommandTest {
 
   private static List<String> names(List<String> paths) {
     return paths.stream().map(FilenameUtils::getName).sorted().collect(Collectors.toList());
+  }
+
+  /// The Spark ingestion jar does not link against the thin pinot-all, so a thin distribution is refused.
+  @Test
+  public void testRefusesThinDistribution() {
+    File thin = new File(_tempDir, "thin-" + System.nanoTime());
+    new File(thin, "plugin-libs").mkdirs();
+    assertThrows(UnsupportedOperationException.class,
+        () -> LaunchSparkDataIngestionJobCommand.checkNotThinDistribution(thin.getAbsolutePath()));
+    assertThrows(UnsupportedOperationException.class,
+        () -> LaunchSparkDataIngestionJobCommand.checkNotThinDistribution(thin.toURI().toString()));
+
+    File fat = new File(_tempDir, "fat-" + System.nanoTime());
+    new File(fat, "plugins").mkdirs();
+    LaunchSparkDataIngestionJobCommand.checkNotThinDistribution(fat.getAbsolutePath());
+    // A remote installation is not checked.
+    LaunchSparkDataIngestionJobCommand.checkNotThinDistribution("s3://bucket/pinot");
   }
 
   /// The default excludes the Kafka plugin because its Scala dependencies break on a running Spark.

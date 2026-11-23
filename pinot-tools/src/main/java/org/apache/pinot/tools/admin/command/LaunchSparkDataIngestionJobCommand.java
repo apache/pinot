@@ -164,6 +164,8 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       }
     }
 
+    checkNotThinDistribution(_pinotBaseDir);
+
     Preconditions.checkNotNull(System.getenv(SPARK_HOME),
         "SPARK_HOME environment variable should be set to Spark installation path");
 
@@ -239,6 +241,24 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     Process process = sparkLauncher.launch();
     process.waitFor();
     return true;
+  }
+
+  /// Fails when the Pinot installation has the thin plugin layout (a `plugin-libs/` directory). The
+  /// Spark ingestion jar relocates Jackson and Guava, and links against the relocated copies in the
+  /// `pinot-all` jar of the default distribution. The thin `pinot-all` does not relocate them, so the
+  /// job fails with linkage errors on the executors. A remote base directory is not checked.
+  @VisibleForTesting
+  static void checkNotThinDistribution(String pinotBaseDir) {
+    URI uri = URI.create(pinotBaseDir);
+    if (uri.getScheme() != null && !uri.getScheme().equals("file")) {
+      return;
+    }
+    File baseDir = uri.getScheme() == null ? new File(pinotBaseDir) : new File(uri);
+    if (new File(baseDir, SHARED_PLUGIN_LIBS_DIR).isDirectory()) {
+      throw new UnsupportedOperationException("Spark ingestion is not supported from a Pinot distribution built "
+          + "with the thin-plugins profile (" + baseDir + " has a " + SHARED_PLUGIN_LIBS_DIR + "/ directory). "
+          + "Use a distribution built with the default profile.");
+    }
   }
 
   private void addAppResource(SparkLauncher sparkLauncher, String depsJarDir, List<String> extraClassPath)

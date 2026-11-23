@@ -140,6 +140,11 @@ public class IngestionJobLauncher {
     IngestionJobRunner ingestionJobRunner;
     try {
       ingestionJobRunner = PluginManager.get().createInstance(ingestionJobRunnerClassName);
+    } catch (ClassNotFoundException e) {
+      // The Hadoop and Spark runners ship only in plugins-external/ of the default distribution.
+      throw new RuntimeException("Failed to create IngestionJobRunner instance for class - "
+          + ingestionJobRunnerClassName + ": class not found. Load the plugin that provides it. A Pinot "
+          + "distribution built with the thin-plugins profile does not include the Hadoop and Spark runners.", e);
     } catch (Exception e) {
       throw new RuntimeException(
           "Failed to create IngestionJobRunner instance for class - " + ingestionJobRunnerClassName, e);

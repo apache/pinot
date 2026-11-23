@@ -114,9 +114,33 @@ fi
 # If the same plugin is found in multiple directories, it will only be picked up from the first directory it was found. The directories in $PLUGINS_DIR are traversed by their order.
 #
 # A plugin ships as a thin jar plus a pinot-plugin.classpath file listing the shared-store jars it
-# needs, as distribution-relative paths. Selecting a subset with $PLUGINS_INCLUDE therefore
+# needs, as paths relative to $BASEDIR. Selecting a subset with $PLUGINS_INCLUDE therefore
 # means taking each named plugin's jars *and* the store entries its index names - the store as a
-# whole is not per-plugin, so adding all of it would defeat the selection.
+# whole is not per-plugin, so adding all of it would defeat the selection. The whole store is added
+# only when every built-in plugin is loaded, after the jars of all directories, so that a jar in a
+# custom plugin directory still wins over a store jar with the same classes.
+# Paths may contain spaces: find results are read NUL-delimited.
+
+# Appends one entry to $PLUGINS_CLASSPATH.
+add_to_plugins_classpath() {
+  PLUGINS_CLASSPATH=${PLUGINS_CLASSPATH:+$PLUGINS_CLASSPATH:}$1
+}
+
+# Appends the shared-store jars that the pinot-plugin.classpath index $1 names, once each.
+add_plugin_index() {
+  local PLUGIN_DEP
+  # The index is a classpath fragment: entries separated by ':' and/or newlines. build-classpath
+  # writes no final newline, so the last entry is read when read fails but the variable is set.
+  while IFS= read -r PLUGIN_DEP || [ -n "$PLUGIN_DEP" ] ; do
+    if [ -n "$PLUGIN_DEP" ] && [ -f "$BASEDIR/$PLUGIN_DEP" ] ; then
+      case ":$PLUGINS_CLASSPATH:" in
+        *":$BASEDIR/$PLUGIN_DEP:"*) ;;
+        *) add_to_plugins_classpath "$BASEDIR/$PLUGIN_DEP" ;;
+      esac
+    fi
+  done < <(tr ':' '\n' < "$1")
+}
+
 if [ -z "$PLUGINS_CLASSPATH" ] ; then
   if [ -z "$PLUGINS_DIR" ] ; then
     PLUGINS_DIR="$BASEDIR"/plugins
@@ -128,6 +152,8 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
     fi
   fi
 
+  ALL_BUILT_IN_PLUGINS=false
+  BUILT_IN_PLUGINS_DIR=$(cd "$BASEDIR/plugins" 2>/dev/null && pwd -P)
   export IFS=';'
   for DIR in $PLUGINS_DIR; do
     if [ -d "$DIR" ] ; then
@@ -144,45 +170,35 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
             case "$PLUGIN_NAME" in
               pinot-kafka-2.0|pinot-kafka-3.0) PLUGIN_NAME=pinot-kafka-4.0 ;;
             esac
-            for PLUGIN_JAR_PATH in $(find "$DIR" -path \*/"$PLUGIN_NAME"/\*.jar) ; do
-              if [ -n "$PLUGINS_CLASSPATH" ] ; then
-                PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
-              else
-                PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
-              fi
-            done
-            # Add the shared-store jars this plugin declares. Paths are relative to $BASEDIR.
-            for PLUGIN_INDEX in $(find "$DIR" -path \*/"$PLUGIN_NAME"/pinot-plugin.classpath) ; do
-              # The index is a classpath fragment: entries separated by ':' and/or newlines.
-              for PLUGIN_DEP in $(tr ':' '\n' < "$PLUGIN_INDEX") ; do
-                if [ -n "$PLUGIN_DEP" ] && [ -f "$BASEDIR/$PLUGIN_DEP" ] ; then
-                  case ":$PLUGINS_CLASSPATH:" in
-                    *":$BASEDIR/$PLUGIN_DEP:"*) ;;
-                    *) PLUGINS_CLASSPATH=${PLUGINS_CLASSPATH:+$PLUGINS_CLASSPATH:}$BASEDIR/$PLUGIN_DEP ;;
-                  esac
-                fi
-              done
-            done
+            while IFS= read -r -d '' PLUGIN_JAR_PATH ; do
+              add_to_plugins_classpath "$PLUGIN_JAR_PATH"
+            done < <(find "$DIR" -path \*/"$PLUGIN_NAME"/\*.jar -print0)
+            while IFS= read -r -d '' PLUGIN_INDEX ; do
+              add_plugin_index "$PLUGIN_INDEX"
+            done < <(find "$DIR" -path \*/"$PLUGIN_NAME"/pinot-plugin.classpath -print0)
             export IFS=';'
         done
         unset IFS
       else
-        PLUGIN_JARS=$(find "$DIR" -name \*.jar)
-        for PLUGIN_JAR in $PLUGIN_JARS ; do
-          if [ -n "$PLUGINS_CLASSPATH" ] ; then
-            PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR
-          else
-            PLUGINS_CLASSPATH=$PLUGIN_JAR
-          fi
-        done
-        # No selection was made, so every plugin is loaded and the whole shared store is needed.
-        if [ -d "$BASEDIR"/plugin-libs ] ; then
-          PLUGINS_CLASSPATH=${PLUGINS_CLASSPATH:+$PLUGINS_CLASSPATH:}"$BASEDIR"/plugin-libs/*
+        while IFS= read -r -d '' PLUGIN_JAR ; do
+          add_to_plugins_classpath "$PLUGIN_JAR"
+        done < <(find "$DIR" -name \*.jar -print0)
+        if [ -n "$BUILT_IN_PLUGINS_DIR" ] && [ "$(cd "$DIR" && pwd -P)" = "$BUILT_IN_PLUGINS_DIR" ] ; then
+          ALL_BUILT_IN_PLUGINS=true
+        else
+          # A custom plugin directory: only the store jars that its plugins' indexes name.
+          while IFS= read -r -d '' PLUGIN_INDEX ; do
+            add_plugin_index "$PLUGIN_INDEX"
+          done < <(find "$DIR" -name pinot-plugin.classpath -print0)
         fi
       fi
     fi
+    export IFS=';'
   done
   unset IFS
+  if [ "$ALL_BUILT_IN_PLUGINS" = true ] && [ -d "$BASEDIR"/plugin-libs ] ; then
+    add_to_plugins_classpath "$BASEDIR/plugin-libs/*"
+  fi
 fi
 
 if [ -n "$PLUGINS_CLASSPATH" ] ; then
