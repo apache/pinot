@@ -44,9 +44,28 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 /// At the time of writing, this class is used almost every time we need to read or create data blocks.
 /// The only place where this class is not used is when we need to shuffle data through the network, in which case
 /// we use [SerializedDataBlock].
+///
+/// Thread-safety: a block can be read by several threads at the same time.
+/// [org.apache.pinot.query.runtime.operator.exchange.BroadcastExchange] shares blocks without OBJECT columns by
+/// reference with every destination, so several receivers, and the sender that serializes the block for a remote
+/// mailbox, can read the same instance concurrently. A projected view (see [#project(int[], DataSchema)]) is safe too:
+/// its source rows and its column map never change, and it publishes the rows that it creates through a final field.
 public class RowHeapDataBlock implements MseBlock.Data {
   private final DataSchema _dataSchema;
+  /// The rows of a regular block. For a projected view, the rows that the view reads from, which have more columns
+  /// than the view.
   private final List<Object[]> _rows;
+  /// For a projected view, the column of [#_rows] for each column of this block. Null for a regular block.
+  @Nullable
+  private final int[] _columnMap;
+  /// For a projected view, the projected rows, created on the first call to [#getRows()]. Two threads can create them
+  /// at the same time. Both results are equal, and either one is kept.
+  ///
+  /// The field is not volatile: [ProjectedRows] publishes the rows through a final field, so a thread that reads a
+  /// non-null value also sees the complete list (JLS 17.5). A volatile write is a release store, which waits for every
+  /// store of the new rows to be visible; on ARM that doubled the cost of [#getRows()] for a view.
+  @Nullable
+  private ProjectedRows _projectedRows;
   /// This is a hack we created to support different hash exchange distributions.
   /// We should find a new way to keep this information that is more solid than the current one.
   /// This information is only set in [org.apache.pinot.query.runtime.operator.LeafOperator] and
@@ -76,7 +95,52 @@ public class RowHeapDataBlock implements MseBlock.Data {
       @Nullable AggregationFunction[] aggFunctions) {
     _dataSchema = dataSchema;
     _rows = rows;
+    _columnMap = null;
     _aggFunctions = aggFunctions;
+  }
+
+  @SuppressWarnings("rawtypes")
+  private RowHeapDataBlock(List<Object[]> sourceRows, int[] columnMap, DataSchema dataSchema,
+      @Nullable AggregationFunction[] aggFunctions) {
+    _dataSchema = dataSchema;
+    _rows = sourceRows;
+    _columnMap = columnMap;
+    _aggFunctions = aggFunctions;
+  }
+
+  /// Returns a view of this block that holds only some of its columns.
+  ///
+  /// Column `i` of the view is column `columnMap[i]` of this block, and `projectedSchema` describes the columns of
+  /// the view. The view does not copy the rows: [#asSerialized()] reads this block directly, and [#getRows()] creates
+  /// the projected rows only when someone calls it. So a view that is only serialized, for example to send it to a
+  /// remote mailbox, creates no row.
+  ///
+  /// A view keeps every column of the source rows alive for as long as the view lives, also after [#getRows()]
+  /// creates the projected rows. A local receiver can therefore queue wider rows than with a copy, up to the capacity
+  /// of its mailbox queue. A view can be shared between threads, see the class Javadoc.
+  @SuppressWarnings("rawtypes")
+  public RowHeapDataBlock project(int[] columnMap, DataSchema projectedSchema) {
+    Preconditions.checkArgument(columnMap.length == projectedSchema.size(),
+        "The column map has %s columns, but the projected schema has %s", columnMap.length, projectedSchema.size());
+    int numColumns = _dataSchema.size();
+    int[] sourceColumnMap = new int[columnMap.length];
+    for (int i = 0; i < columnMap.length; i++) {
+      int column = columnMap[i];
+      Preconditions.checkArgument(column >= 0 && column < numColumns, "Column %s is not a column of the block",
+          column);
+      sourceColumnMap[i] = _columnMap != null ? _columnMap[column] : column;
+    }
+    // One aggregation function per column of the view, so that the convention of the last columns being the
+    // aggregation columns holds for the view too.
+    AggregationFunction[] projectedAggFunctions = null;
+    if (_aggFunctions != null) {
+      projectedAggFunctions = new AggregationFunction[columnMap.length];
+      for (int i = 0; i < columnMap.length; i++) {
+        int aggIndex = columnMap[i] + _aggFunctions.length - numColumns;
+        projectedAggFunctions[i] = aggIndex >= 0 ? _aggFunctions[aggIndex] : null;
+      }
+    }
+    return new RowHeapDataBlock(_rows, sourceColumnMap, projectedSchema, projectedAggFunctions);
   }
 
   @Override
@@ -92,7 +156,34 @@ public class RowHeapDataBlock implements MseBlock.Data {
   /// Returns the rows in the block.
   /// The returned list should be considered immutable.
   public List<Object[]> getRows() {
-    return _rows;
+    int[] columnMap = _columnMap;
+    if (columnMap == null) {
+      return _rows;
+    }
+    ProjectedRows projectedRows = _projectedRows;
+    if (projectedRows == null) {
+      List<Object[]> rows = new ArrayList<>(_rows.size());
+      for (Object[] sourceRow : _rows) {
+        Object[] row = new Object[columnMap.length];
+        for (int i = 0; i < columnMap.length; i++) {
+          row[i] = sourceRow[columnMap[i]];
+        }
+        rows.add(row);
+      }
+      projectedRows = new ProjectedRows(rows);
+      _projectedRows = projectedRows;
+    }
+    return projectedRows._rows;
+  }
+
+  /// Holds the projected rows of a view in a final field, so that the rows are safely published when another thread
+  /// reads [#_projectedRows] without synchronization.
+  private static final class ProjectedRows {
+    private final List<Object[]> _rows;
+
+    private ProjectedRows(List<Object[]> rows) {
+      _rows = rows;
+    }
   }
 
   @Deprecated
@@ -136,9 +227,10 @@ public class RowHeapDataBlock implements MseBlock.Data {
   public RowHeapDataBlock copyObjectColumns() {
     ColumnDataType[] storedTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedTypes.length;
-    List<Object[]> copiedRows = new ArrayList<>(_rows.size());
+    List<Object[]> rows = getRows();
+    List<Object[]> copiedRows = new ArrayList<>(rows.size());
     int numCellsProcessed = 0;
-    for (Object[] row : _rows) {
+    for (Object[] row : rows) {
       Object[] copiedRow = row.clone();
       for (int colId = 0; colId < numColumns; colId++) {
         Object value = copiedRow[colId];
@@ -162,6 +254,10 @@ public class RowHeapDataBlock implements MseBlock.Data {
   @Override
   public SerializedDataBlock asSerialized() {
     try {
+      if (_columnMap != null) {
+        return new SerializedDataBlock(
+            DataBlockBuilder.buildFromProjectedRows(_rows, _dataSchema, _aggFunctions, _columnMap));
+      }
       return new SerializedDataBlock(DataBlockBuilder.buildFromRows(_rows, _dataSchema, _aggFunctions));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);

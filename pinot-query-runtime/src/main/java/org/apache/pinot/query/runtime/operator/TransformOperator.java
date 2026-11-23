@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -51,6 +52,10 @@ public class TransformOperator extends MultiStageOperator {
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
+  /// When every projection is a column reference, the input column of each output column. A block is then projected
+  /// as a view instead of being copied row by row. Null otherwise.
+  @Nullable
+  private final int[] _columnMap;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public TransformOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema inputSchema,
@@ -66,6 +71,19 @@ public class TransformOperator extends MultiStageOperator {
           TransformOperandFactory.getTransformOperand(rexExpression, inputSchema, nullHandlingEnabled));
     }
     _resultSchema = node.getDataSchema();
+    _columnMap = toColumnMap(projects);
+  }
+
+  @Nullable
+  private static int[] toColumnMap(List<RexExpression> projects) {
+    int[] columnMap = new int[projects.size()];
+    for (int i = 0; i < columnMap.length; i++) {
+      if (!(projects.get(i) instanceof RexExpression.InputRef)) {
+        return null;
+      }
+      columnMap[i] = ((RexExpression.InputRef) projects.get(i)).getIndex();
+    }
+    return columnMap;
   }
 
   @Override
@@ -103,6 +121,11 @@ public class TransformOperator extends MultiStageOperator {
       return block;
     }
     MseBlock.Data dataBlock = (MseBlock.Data) block;
+    if (_columnMap != null) {
+      // ReferenceOperand returns the input value unchanged, so a view gives the same rows without copying them now.
+      // A remote mailbox serializes the view without creating the rows at all.
+      return dataBlock.asRowHeap().project(_columnMap, _resultSchema);
+    }
     List<Object[]> container = dataBlock.asRowHeap().getRows();
     List<Object[]> resultRows = new ArrayList<>(container.size());
     for (Object[] row : container) {

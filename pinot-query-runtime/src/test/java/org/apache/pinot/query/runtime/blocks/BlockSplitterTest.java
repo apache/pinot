@@ -129,4 +129,16 @@ public class BlockSplitterTest {
       }
     }
   }
+
+  /// A block that fits in one chunk is returned as it is, so a projected view does not create its rows.
+  @Test
+  public void singleChunkKeepsTheBlock() {
+    DataSchema schema = new DataSchema(new String[]{"a", "b"}, new ColumnDataType[]{ColumnDataType.INT,
+        ColumnDataType.INT});
+    RowHeapDataBlock view = new RowHeapDataBlock(List.<Object[]>of(new Object[]{1, 2}), schema)
+        .project(new int[]{1}, new DataSchema(new String[]{"b"}, new ColumnDataType[]{ColumnDataType.INT}));
+    Iterator<? extends MseBlock.Data> splits = BlockSplitter.DEFAULT.split(view, 4 * 1024 * 1024);
+    Assert.assertSame(splits.next(), view);
+    Assert.assertFalse(splits.hasNext());
+  }
 }

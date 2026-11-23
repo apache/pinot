@@ -64,12 +64,13 @@ public interface BlockSplitter {
       int numRowsPerChunk = maxBlockSize / estimatedRowSizeInBytes;
       Preconditions.checkState(numRowsPerChunk > 0, "row size too large for query engine to handle, abort!");
 
-      List<Object[]> rows = block.getRows();
-      int numRows = rows.size();
+      // Count before reading the rows: a projected view creates its rows only when they are read.
+      int numRows = block.getNumRows();
       int numChunks = (numRows + numRowsPerChunk - 1) / numRowsPerChunk;
       if (numChunks == 1) {
         return Iterators.singletonIterator(block);
       }
+      List<Object[]> rows = block.getRows();
       List<MseBlock.Data> blockChunks = new ArrayList<>(numChunks);
       for (int fromIndex = 0; fromIndex < numRows; fromIndex += numRowsPerChunk) {
         int toIndex = Math.min(fromIndex + numRowsPerChunk, numRows);
