@@ -46,14 +46,34 @@ import org.apache.lucene.analysis.util.CharTokenizer;
 /// the configured analyzer to queries as well as to documents, so the term a user searches for is
 /// discarded in exactly the same way.
 ///
-/// This analyzer is the behaviour of Elasticsearch's `char_group` tokenizer over whitespace,
+/// On ASCII input this is the behaviour of Elasticsearch's `char_group` tokenizer over whitespace,
 /// punctuation and symbols plus `lowercase`, of ClickHouse's `splitByNonAlpha`, and of a
 /// `[a-zA-Z0-9]+` pattern tokenizer. It is a good default for logs, URLs, stack traces, and
 /// anything carrying status codes, ports, versions or generated identifiers.
 ///
-/// Token characters are decided by [Character#isLetterOrDigit(int)], so letters and digits outside
-/// ASCII — accented letters, CJK ideographs, Arabic-Indic digits — are kept rather than treated as
-/// separators.
+/// Outside ASCII it is deliberately broader than those: a token character is whatever
+/// [Character#isLetterOrDigit(int)] accepts, so accented letters, CJK ideographs and Arabic-Indic
+/// digits are kept rather than treated as separators. `Café` yields `café`, where a `[a-zA-Z0-9]+`
+/// pattern tokenizer would cut it down to `caf`.
+///
+/// ## Token length
+///
+/// A run of token characters longer than [#MAX_TOKEN_LENGTH] is **split** at that boundary — not
+/// truncated and not dropped — which is the same limit and the same policy as
+/// [org.apache.lucene.analysis.standard.StandardAnalyzer]'s default. Two consequences matter for
+/// very long identifiers. The tail of an oversized run becomes a term in its own right, so a
+/// 257-character identifier is also matched by a term query for its last two characters. And a
+/// prefix, wildcard or fuzzy query longer than [#MAX_TOKEN_LENGTH] can never match, because such a
+/// query is normalized as one term and no indexed term is longer than that.
+///
+/// ## Switching an existing column to this analyzer
+///
+/// A text index records the analyzer it was built with, and the Lucene reader restores that saved
+/// configuration in preference to the current table config. A reload does not rebuild the index
+/// either: the text index handler compares only the index storage format, never the analyzer. So
+/// after a config-only switch from [org.apache.lucene.analysis.core.SimpleAnalyzer], segments built
+/// earlier keep their old tokenization and still miss `200` while newly built segments match it.
+/// Rebuild the text indexes or regenerate those segments for the change to take effect everywhere.
 ///
 /// Select it per column with `luceneAnalyzerClass`, optionally preserving case:
 ///
@@ -68,6 +88,11 @@ import org.apache.lucene.analysis.util.CharTokenizer;
 /// Instances are immutable and safe for concurrent use; per-thread token streams come from
 /// [Analyzer]'s reuse strategy.
 public class AlphanumericAnalyzer extends Analyzer {
+
+  /// The longest run of token characters emitted as a single term; a longer run is split at this
+  /// boundary rather than truncated. This is the default of the [CharTokenizer] factory below, and
+  /// matches [org.apache.lucene.analysis.standard.StandardAnalyzer]'s default token length.
+  public static final int MAX_TOKEN_LENGTH = CharTokenizer.DEFAULT_MAX_WORD_LEN;
 
   private final boolean _caseSensitive;
 

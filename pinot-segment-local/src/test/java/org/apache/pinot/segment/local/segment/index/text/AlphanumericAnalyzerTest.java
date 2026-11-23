@@ -28,6 +28,18 @@ import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.core.SimpleAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.store.ByteBuffersDirectory;
+import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
@@ -157,6 +169,56 @@ public class AlphanumericAnalyzerTest {
     Analyzer resolvedCaseSensitive = TextIndexUtils.getAnalyzer(caseSensitive);
     assertTrue(resolvedCaseSensitive instanceof AlphanumericAnalyzer);
     assertTrue(((AlphanumericAnalyzer) resolvedCaseSensitive).isCaseSensitive());
+  }
+
+  /// A run of token characters longer than the limit is split at it rather than truncated or
+  /// dropped, so an oversized identifier yields a full-length term plus a tail term.
+  @Test
+  public void testTokenLengthBoundary()
+      throws IOException {
+    Analyzer analyzer = new AlphanumericAnalyzer();
+    int max = AlphanumericAnalyzer.MAX_TOKEN_LENGTH;
+
+    assertEquals(tokenize(analyzer, "a".repeat(max)), List.of("a".repeat(max)));
+    assertEquals(tokenize(analyzer, "a".repeat(max + 1)), List.of("a".repeat(max), "a"));
+    assertEquals(tokenize(analyzer, "A".repeat(max) + "BC"), List.of("a".repeat(max), "bc"));
+    assertEquals(tokenize(analyzer, "a".repeat(2 * max)), List.of("a".repeat(max), "a".repeat(max)));
+    // Only an unbroken run is affected: a separator restarts the count.
+    assertEquals(tokenize(analyzer, "a".repeat(max) + " b"), List.of("a".repeat(max), "b"));
+  }
+
+  /// The split is visible to queries. The tail of an oversized identifier is an ordinary term, the
+  /// identifier itself is never one, and a prefix longer than the limit is normalized into a single
+  /// term that no document can carry.
+  @Test
+  public void testLongIdentifierTermAndPrefixSearch()
+      throws Exception {
+    int max = AlphanumericAnalyzer.MAX_TOKEN_LENGTH;
+    String head = "a".repeat(max);
+
+    try (Analyzer analyzer = new AlphanumericAnalyzer(); Directory directory = new ByteBuffersDirectory()) {
+      try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(analyzer))) {
+        Document document = new Document();
+        document.add(new TextField(FIELD, "A".repeat(max) + "BC", Field.Store.NO));
+        writer.addDocument(document);
+      }
+      try (DirectoryReader reader = DirectoryReader.open(directory)) {
+        IndexSearcher searcher = new IndexSearcher(reader);
+        QueryParser parser = new QueryParser(FIELD, analyzer);
+
+        // The head is indexed at exactly the limit and the tail becomes a term of its own, so the
+        // last two characters alone match the document.
+        assertEquals(searcher.count(new TermQuery(new Term(FIELD, head))), 1);
+        assertEquals(searcher.count(new TermQuery(new Term(FIELD, "bc"))), 1);
+        // The whole identifier is never a single term.
+        assertEquals(searcher.count(new TermQuery(new Term(FIELD, head + "bc"))), 0);
+
+        // A prefix within the limit matches; one past it cannot, since no indexed term is longer.
+        assertEquals(searcher.count(parser.parse("A".repeat(max - 1) + "*")), 1);
+        assertEquals(searcher.count(parser.parse("A".repeat(max) + "*")), 1);
+        assertEquals(searcher.count(parser.parse("A".repeat(max + 1) + "*")), 0);
+      }
+    }
   }
 
   /// Reusing one instance across many inputs must not leak state between token streams.
