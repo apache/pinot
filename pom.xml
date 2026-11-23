@@ -182,7 +182,7 @@
     <package.info.phase>generate-sources</package.info.phase>
     <pinot.skip.remote.resources>false</pinot.skip.remote.resources>
 
-    <arrow.version>19.0.0</arrow.version>
+    <arrow.version>20.0.0</arrow.version>
     <avro.version>1.12.2</avro.version>
     <bson.version>5.14.0</bson.version>
     <parquet.version>1.18.2</parquet.version>
