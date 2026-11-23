@@ -93,6 +93,11 @@ public class GenerateArrayFunctionsTest {
     // One element past the limit, so the rejection is the limit and not an incidental overflow.
     assertThrows(IllegalArgumentException.class, () -> ArrayFunctions.generateLongArray(0, 100000, 1));
     assertThrows(IllegalArgumentException.class, () -> ArrayFunctions.generateDoubleArray(0, 1, 0.000001));
+    // Boundary with decimal step snapping: 99,999 steps (100,000 elements) is accepted, 100,000 steps is rejected.
+    assertEquals(ArrayFunctions.generateDoubleArray(0.1, 10000.0, 0.1).length, 100000);
+    assertThrows(IllegalArgumentException.class, () -> ArrayFunctions.generateDoubleArray(0.1, 10000.1, 0.1));
+    assertEquals(ArrayFunctions.generateFloatArray(0.1f, 10000.0f, 0.1f).length, 100000);
+    assertThrows(IllegalArgumentException.class, () -> ArrayFunctions.generateFloatArray(0.1f, 10000.1f, 0.1f));
   }
 
   @Test
@@ -101,6 +106,10 @@ public class GenerateArrayFunctionsTest {
     assertThrows(IllegalArgumentException.class,
         () -> ArrayFunctions.generateLongArray(Long.MIN_VALUE, Long.MAX_VALUE, 1));
     assertThrows(IllegalArgumentException.class, () -> ArrayFunctions.generateLongArray(0, Long.MAX_VALUE, 1));
+    assertThrows(IllegalArgumentException.class,
+        () -> ArrayFunctions.generateDoubleArray(-Double.MAX_VALUE, Double.MAX_VALUE, 1.0));
+    assertThrows(IllegalArgumentException.class,
+        () -> ArrayFunctions.generateFloatArray(-Float.MAX_VALUE, Float.MAX_VALUE, 1.0f));
   }
 
   @Test
@@ -139,18 +148,54 @@ public class GenerateArrayFunctionsTest {
 
   @Test
   public void testFloatingPointStepKeepsInexactEnd() {
-    // (0.3 - 0.1) / 0.1 is 1.9999999999999998, so flooring the step count would drop the end. The single-stage
-    // engine has always kept it, and so does this.
+    // Decimal steps such as 0.1 are not exact in binary floating point, so (end - start) / inc can land slightly
+    // below an integer (e.g. (0.7 - 0.1) / 0.1 == 5.999999999999999). Snapping within ULP tolerance keeps the end.
     assertEquals(ArrayFunctions.generateDoubleArray(0.1, 0.3, 0.1), new double[]{0.1, 0.1 + 0.1, 0.1 + 0.1 * 2});
     assertEquals(ArrayFunctions.generateDoubleArray(0.3, 0.1, -0.1).length, 3);
     assertEquals(ArrayFunctions.generateFloatArray(0.1f, 0.3f, 0.1f).length, 3);
+    assertEquals(ArrayFunctions.generateFloatArray(0.3f, 0.1f, -0.1f).length, 3);
+
+    double[] doubleZeroOneToZeroSeven = ArrayFunctions.generateDoubleArray(0.1, 0.7, 0.1);
+    assertEquals(doubleZeroOneToZeroSeven.length, 7);
+    assertEquals(doubleZeroOneToZeroSeven[6], 0.7, 1e-12);
+    assertEquals(ArrayFunctions.generateDoubleArray(0.7, 0.1, -0.1).length, 7);
+
+    float[] floatZeroOneToZeroSeven = ArrayFunctions.generateFloatArray(0.1f, 0.7f, 0.1f);
+    assertEquals(floatZeroOneToZeroSeven.length, 7);
+    assertEquals(floatZeroOneToZeroSeven[6], 0.7f, 1e-6f);
+    assertEquals(ArrayFunctions.generateFloatArray(0.7f, 0.1f, -0.1f).length, 7);
+
+    // Additional decimal step combinations across positive, negative, tiny, and large magnitudes.
+    assertEquals(ArrayFunctions.generateDoubleArray(0.0, 0.3, 0.1).length, 4);
+    assertEquals(ArrayFunctions.generateDoubleArray(0.0, 0.6, 0.1).length, 7);
+    assertEquals(ArrayFunctions.generateDoubleArray(0.0, 0.7, 0.1).length, 8);
+    assertEquals(ArrayFunctions.generateDoubleArray(0.0, 0.9, 0.3).length, 4);
+    assertEquals(ArrayFunctions.generateDoubleArray(0.0, 0.6, 0.2).length, 4);
+    assertEquals(ArrayFunctions.generateDoubleArray(0.0, 1.0, 0.05).length, 21);
+    assertEquals(ArrayFunctions.generateDoubleArray(-0.7, -0.1, 0.1).length, 7);
+    assertEquals(ArrayFunctions.generateDoubleArray(-0.1, -0.7, -0.1).length, 7);
+    assertEquals(ArrayFunctions.generateDoubleArray(0.0, 1e-10, 1e-11).length, 11);
     assertEquals(ArrayFunctions.generateDoubleArray(1e6 + 0.1, 1e6 + 0.3, 0.1).length, 3);
+    assertEquals(ArrayFunctions.generateDoubleArray(1e6 + 0.1, 1e6 + 0.7, 0.1).length, 7);
+
+    assertEquals(ArrayFunctions.generateFloatArray(0.0f, 0.3f, 0.1f).length, 4);
+    assertEquals(ArrayFunctions.generateFloatArray(0.0f, 0.6f, 0.1f).length, 7);
+    assertEquals(ArrayFunctions.generateFloatArray(0.0f, 0.7f, 0.1f).length, 8);
+    assertEquals(ArrayFunctions.generateFloatArray(0.0f, 0.9f, 0.3f).length, 4);
+    assertEquals(ArrayFunctions.generateFloatArray(0.0f, 0.6f, 0.2f).length, 4);
+    assertEquals(ArrayFunctions.generateFloatArray(0.0f, 1.0f, 0.05f).length, 21);
+    assertEquals(ArrayFunctions.generateFloatArray(-0.7f, -0.1f, 0.1f).length, 7);
+    assertEquals(ArrayFunctions.generateFloatArray(-0.1f, -0.7f, -0.1f).length, 7);
   }
 
   @Test
   public void testFloatingPointEndBetweenStepsIsExcluded() {
     assertEquals(ArrayFunctions.generateDoubleArray(0, 0.95, 0.1).length, 10);
     assertEquals(ArrayFunctions.generateDoubleArray(0, 0.2999, 0.1).length, 3);
+    assertEquals(ArrayFunctions.generateDoubleArray(0.1, 0.6999, 0.1).length, 6);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.999999, 0.1).length, 10);
     assertEquals(ArrayFunctions.generateFloatArray(0f, 0.95f, 0.1f).length, 10);
+    assertEquals(ArrayFunctions.generateFloatArray(0f, 0.2999f, 0.1f).length, 3);
+    assertEquals(ArrayFunctions.generateFloatArray(0.1f, 0.6999f, 0.1f).length, 6);
   }
 }

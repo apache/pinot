@@ -642,21 +642,42 @@ public class ArrayFunctions {
   }
 
   /// Length of the `float` sequence `start, start + inc, ...` bounded by `end`, inclusive. The step count is computed
-  /// in `float` arithmetic, as the single-stage engine always did.
+  /// in `float` arithmetic, as the single-stage engine always did, and snapped to the nearest integer when rounding
+  /// leaves `(end - start) / inc` within ULP tolerance below that integer.
   private static int generatedArrayLength(float start, float end, float inc) {
     checkFloatingPointArguments(start, end, inc);
-    // TODO: decimal steps such as 0.1 are not exact in binary, so this can drop the end; see apache/pinot#19814
-    return checkGeneratedArrayLength((long) ((end - start) / inc + 1) - 1);
+    float rawSteps = (end - start) / inc;
+    if (Float.isFinite(rawSteps) && rawSteps < MAX_GENERATED_ARRAY_LENGTH) {
+      float nearest = (float) Math.rint(rawSteps);
+      if (nearest > rawSteps) {
+        float maxBound = Math.max(Math.abs(start), Math.abs(end));
+        float tolerance = Math.min(0.25f, 3.0f * (Math.ulp(maxBound) / Math.abs(inc) + Math.ulp(nearest)));
+        if (nearest - rawSteps <= tolerance) {
+          return checkGeneratedArrayLength((long) nearest);
+        }
+      }
+    }
+    return checkGeneratedArrayLength((long) rawSteps);
   }
 
-  /// Length of the `double` sequence `start, start + inc, ...` bounded by `end`, inclusive.
+  /// Length of the `double` sequence `start, start + inc, ...` bounded by `end`, inclusive. The step count is snapped
+  /// to the nearest integer when floating-point rounding leaves `(end - start) / inc` within ULP tolerance below that
+  /// integer.
   private static int generatedArrayLength(double start, double end, double inc) {
     checkFloatingPointArguments(start, end, inc);
-    // Adding 1 before truncating matches the length the single-stage engine always computed. It absorbs part of the
-    // rounding error of decimal steps, so 0.1 to 0.3 by 0.1 keeps its end.
-    // TODO: it does not absorb all of it, so 0.1 to 0.7 by 0.1 still drops its end; see apache/pinot#19814
+    double rawSteps = (end - start) / inc;
+    if (Double.isFinite(rawSteps) && rawSteps < MAX_GENERATED_ARRAY_LENGTH) {
+      double nearest = Math.rint(rawSteps);
+      if (nearest > rawSteps) {
+        double maxBound = Math.max(Math.abs(start), Math.abs(end));
+        double tolerance = Math.min(0.25, 3.0 * (Math.ulp(maxBound) / Math.abs(inc) + Math.ulp(nearest)));
+        if (nearest - rawSteps <= tolerance) {
+          return checkGeneratedArrayLength((long) nearest);
+        }
+      }
+    }
     // A span too wide for a long saturates the cast at Long.MAX_VALUE, which the length check below rejects.
-    return checkGeneratedArrayLength((long) ((end - start) / inc + 1) - 1);
+    return checkGeneratedArrayLength((long) rawSteps);
   }
 
   private static void checkFloatingPointArguments(double start, double end, double inc) {
