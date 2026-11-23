@@ -34,6 +34,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.index.NoMergePolicy;
 import org.apache.lucene.index.VectorSimilarityFunction;
@@ -238,8 +239,9 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
 
   private void writePart(Directory directory, List<float[]> vectors, int from, int to)
       throws IOException, InterruptedException {
-    try (IndexWriter writer = new IndexWriter(directory, VectorIndexUtils.getIndexWriterConfig(_vectorIndexConfig)
-        .setMergePolicy(NoMergePolicy.INSTANCE).setCommitOnClose(false))) {
+    IndexWriterConfig config = VectorIndexUtils.getParallelBuildPartWriterConfig(_vectorIndexConfig)
+        .setMergePolicy(NoMergePolicy.INSTANCE).setCommitOnClose(false);
+    try (IndexWriter writer = new IndexWriter(directory, config)) {
       for (int docId = from; docId < to; docId++) {
         if (Thread.currentThread().isInterrupted()) {
           throw new InterruptedException("HNSW part build interrupted");
