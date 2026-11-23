@@ -209,6 +209,10 @@ representation to preserve inheritance and ignored settings. Skipping all valida
 original configs before enabling migration: disabling the flag does not undo saved conversions, and rollback to an
 older reader requires restoring compatible configs first.
 
+Legacy syntax remains accepted during this migration phase. A future release can enforce the canonical format once
+the migration covers the settings being retired and users have had time to convert their configs. Properties without
+a canonical equivalent still need a supported representation.
+
 Use this shape for new table configs:
 
 ```json
