@@ -1,0 +1,9 @@
+# Linkage problems that the default distribution has too. ThinDistributionCheck accepts them.
+# One entry per line, as the check prints it.
+
+# hadoop-common 3.4 protobuf classes against the protobuf-java that wins on the class path.
+missing member: com.google.protobuf.GeneratedMessage$Builder.<init>(Lcom/google/protobuf/GeneratedMessage$BuilderParent;)V
+
+# kafka-clients 4 relocates protobuf but not gRPC in its OpenTelemetry stubs. The gRPC services are
+# never created; in the default distribution io.grpc.protobuf is missing altogether.
+missing member: io.grpc.protobuf.ProtoUtils.marshaller(Lorg/apache/kafka/shaded/com/google/protobuf/Message;)Lio/grpc/MethodDescriptor$Marshaller;

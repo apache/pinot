@@ -57,7 +57,10 @@ jobs:
       matrix:
         java: [ 25 ]
         distribution: [ "temurin" ]
-    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
+        # thin-plugins: the opt-in distribution without plugin fat jars (see the root pom). Its job also runs
+        # ThinDistributionCheck on the assembled distribution.
+        layout: [ "default", "thin-plugins" ]
+    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }} (${{ matrix.layout }})
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Set up JDK ${{ matrix.java }}
@@ -78,5 +81,7 @@ jobs:
             ${{ runner.os }}-maven-
       - name: Quickstart on JDK ${{ matrix.java }}
         timeout-minutes: 120
+        env:
+          PINOT_DIST_LAYOUT: ${{ matrix.layout }}
         run: |
           .github/workflows/scripts/.pinot_quickstart.sh
