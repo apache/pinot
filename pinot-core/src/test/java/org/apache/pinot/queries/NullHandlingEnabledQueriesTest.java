@@ -82,6 +82,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
           .setNoDictionaryColumns(List.of(COLUMN1))
           .setRangeIndexColumns(List.of(COLUMN1))
           .build();
+  private static final TableConfig TABLE_CONFIG_WITH_LEGACY_RANGE_INDEX_COLUMN = getTableConfigWithLegacyRangeIndex();
   private static final int NUM_OF_SEGMENT_COPIES = 4;
   private static final Map<String, String> QUERY_OPTIONS = Map.of("enableNullHandling", "true");
 
@@ -405,6 +406,39 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(
         getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s BETWEEN 5 AND 20", COLUMN1)).get(0)[0],
         (long) 17 * NUM_OF_SEGMENT_COPIES);
+  }
+
+  /// A single-value column gets the legacy range index when the table sets `rangeIndexVersion` to 1, and goes through
+  /// the same partial range scan as a multi-value column.
+  @Test
+  public void testRangeFilterOnSingleValueColumnWithLegacyRangeIndex()
+      throws Exception {
+    initializeRows();
+    for (int i = 0; i < 30; i++) {
+      insertRow(i);
+    }
+    insertRow(null);
+    Schema schema = schemaBuilder().addSingleValueDimension(COLUMN1, DataType.INT).build();
+    setUpSegments(TABLE_CONFIG_WITH_LEGACY_RANGE_INDEX_COLUMN, schema);
+
+    // Rows 5 to 29 hold a value above 4
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s > 4", COLUMN1)).get(0)[0],
+        (long) 25 * NUM_OF_SEGMENT_COPIES);
+    // Rows 0 to 4 hold a value of at most 4, and the null row is UNKNOWN
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (%s > 4)", COLUMN1)).get(0)[0],
+        (long) 5 * NUM_OF_SEGMENT_COPIES);
+    // Rows 5 to 20 hold a value from 5 to 20
+    assertEquals(
+        getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s BETWEEN 5 AND 20", COLUMN1)).get(0)[0],
+        (long) 16 * NUM_OF_SEGMENT_COPIES);
+  }
+
+  private static TableConfig getTableConfigWithLegacyRangeIndex() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setRangeIndexColumns(List.of(COLUMN1))
+        .build();
+    tableConfig.getIndexingConfig().setRangeIndexVersion(1);
+    return tableConfig;
   }
 
   /// A consuming segment reports its null rows through a vector that grows with ingestion and hands out a copy on each
