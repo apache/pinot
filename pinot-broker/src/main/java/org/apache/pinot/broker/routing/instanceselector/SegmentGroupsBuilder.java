@@ -64,30 +64,31 @@ final class SegmentGroupsBuilder {
   // Preserve Set equality regardless of instance iteration order.
   // Mixed hashes reduce collisions without copying or sorting keys.
   // Backing assignment maps must remain unchanged during the rebuild.
-  static final Hash.Strategy<Set<String>> INSTANCE_SET_STRATEGY =
-      new Hash.Strategy<>() {
-        @Override
-        public int hashCode(Set<String> instances) {
-          if (instances == null) {
-            return 0;
-          }
+  @VisibleForTesting
+  static final Hash.Strategy<Set<String>> INSTANCE_SET_STRATEGY = new Hash.Strategy<>() {
 
-          int first = 0;
-          int second = 0;
-          for (String instance : instances) {
-            int hash = instance.hashCode();
-            first += HashCommon.mix(hash);
-            second += HashCommon.mix(hash ^ 0x9e3779b9);
-          }
+    @Override
+    public int hashCode(Set<String> instances) {
+      if (instances == null) {
+        return 0;
+      }
 
-          return HashCommon.mix(first ^ Integer.rotateLeft(second, 16) ^ instances.size());
-        }
+      int first = 0;
+      int second = 0;
+      for (String instance : instances) {
+        int hash = instance.hashCode();
+        first += HashCommon.mix(hash);
+        second += HashCommon.mix(hash ^ 0x9e3779b9);
+      }
 
-        @Override
-        public boolean equals(Set<String> left, Set<String> right) {
-          return left == right || (left != null && right != null && left.equals(right));
-        }
-      };
+      return HashCommon.mix(first ^ Integer.rotateLeft(second, 16) ^ instances.size());
+    }
+
+    @Override
+    public boolean equals(Set<String> left, Set<String> right) {
+      return Objects.equals(left, right);
+    }
+  };
 
   private static final int UNKNOWN_POOL = Integer.MIN_VALUE;
   private static final int NO_GROUP = -1;

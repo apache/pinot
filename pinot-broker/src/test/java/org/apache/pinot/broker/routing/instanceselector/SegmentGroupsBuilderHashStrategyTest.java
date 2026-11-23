@@ -32,6 +32,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 
+
 public class SegmentGroupsBuilderHashStrategyTest {
 
   @Test
@@ -43,8 +44,7 @@ public class SegmentGroupsBuilderHashStrategyTest {
     assertEquals(SegmentGroupsBuilder.INSTANCE_SET_STRATEGY.hashCode(first),
         SegmentGroupsBuilder.INSTANCE_SET_STRATEGY.hashCode(reordered));
 
-    Map<Set<String>, String> map =
-        new Object2ObjectOpenCustomHashMap<>(SegmentGroupsBuilder.INSTANCE_SET_STRATEGY);
+    Map<Set<String>, String> map = new Object2ObjectOpenCustomHashMap<>(SegmentGroupsBuilder.INSTANCE_SET_STRATEGY);
 
     map.put(first, "unavailable");
     assertEquals(map.get(reordered), "unavailable");
@@ -61,8 +61,7 @@ public class SegmentGroupsBuilderHashStrategyTest {
     assertNotEquals(SegmentGroupsBuilder.INSTANCE_SET_STRATEGY.hashCode(first),
         SegmentGroupsBuilder.INSTANCE_SET_STRATEGY.hashCode(second));
 
-    Map<Set<String>, String> map =
-        new Object2ObjectOpenCustomHashMap<>(SegmentGroupsBuilder.INSTANCE_SET_STRATEGY);
+    Map<Set<String>, String> map = new Object2ObjectOpenCustomHashMap<>(SegmentGroupsBuilder.INSTANCE_SET_STRATEGY);
 
     map.put(first, "first");
     map.put(second, "second");
