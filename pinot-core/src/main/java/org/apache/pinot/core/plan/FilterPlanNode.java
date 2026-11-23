@@ -50,12 +50,14 @@ import org.apache.pinot.core.operator.filter.RowLevelSecurityFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
 import org.apache.pinot.core.operator.filter.VectorRadiusFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorSearchDistances;
 import org.apache.pinot.core.operator.filter.VectorSearchMode;
 import org.apache.pinot.core.operator.filter.VectorSearchParams;
 import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.operator.filter.predicate.TextMatchDictIdPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -334,6 +336,17 @@ public class FilterPlanNode implements PlanNode {
               Preconditions.checkState(textIndexReader != null,
                   "Cannot apply TEXT_MATCH on column: %s without text index", column);
 
+              if (textIndexReader.isBuildOnDictionary()) {
+                // Dictionary-based text index: search returns matching dictIds, resolved to docIds by the standard
+                // dictionary-based filter operators (inverted index / scan), exactly like FST/REGEXP_LIKE.
+                TextMatchPredicate textMatchPredicate = (TextMatchPredicate) predicate;
+                predicateEvaluator = TextMatchDictIdPredicateEvaluatorFactory.newPredicateEvaluator(
+                    textMatchPredicate, textIndexReader, dataSource, _queryContext);
+                _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
+                return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource,
+                    numDocs);
+              }
+
               if (textIndexReader.isMultiColumn()) {
                 return new TextMatchFilterOperator(column, textIndexReader, (TextMatchPredicate) predicate, numDocs,
                     _queryContext);
@@ -463,8 +476,12 @@ public class FilterPlanNode implements PlanNode {
             "Cannot apply vectorDistanceThreshold on column: %s -- forward index required for threshold refinement",
             column);
       }
-      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
-          vectorIndexConfig, hasMetadataFilter, _requiredVectorDocIds);
+      VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs,
+          searchParams, forwardIndexReader, vectorIndexConfig, hasMetadataFilter, _requiredVectorDocIds);
+      if (VectorSearchDistances.isEnabled(_queryContext)) {
+        operator.setSearchDistances(VectorSearchDistances.of(_queryContext));
+      }
+      return operator;
     }
 
     // Exact scan fallback: no vector index on this segment

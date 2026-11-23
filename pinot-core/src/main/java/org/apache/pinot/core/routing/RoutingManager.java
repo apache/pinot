@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -38,7 +39,6 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface RoutingManager {
-
   /// Get all enabled server instances in the cluster.
   ///
   /// @return all currently enabled server instances.
@@ -55,6 +55,15 @@ public interface RoutingManager {
     return getEnabledServerInstanceMap();
   }
 
+  /// Returns the minimum revision of the capability across the servers, see [InstanceCapability]. 0 means that at least
+  /// one server does not support the capability. The minimum covers every server with an instance config, including
+  /// the disabled ones, so it never overstates what a routable server supports. Never blocks.
+  ///
+  /// The default implementation returns 0: no capability is supported.
+  default int getMinServerCapabilityRevision(InstanceCapability capability) {
+    return 0;
+  }
+
   /// Returns whether the given table is enabled
   /// @param tableNameWithType Table name with type
   /// @return Whether the given table is enabled
@@ -68,6 +77,13 @@ public interface RoutingManager {
   /// @return the route table.
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
+
+  /// Get the routing table and report required segments whose selected server has since disappeared as unavailable.
+  /// Implementations without this capability fall back to regular routing.
+  @Nullable
+  default RoutingTable getRoutingTableWithMissingServerSegments(BrokerRequest brokerRequest, long requestId) {
+    return getRoutingTable(brokerRequest, requestId);
+  }
 
   /// Get the [RoutingTable] for a specific broker request.
   /// @param brokerRequest the broker request constructed from a query.

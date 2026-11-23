@@ -54,6 +54,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -68,6 +69,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils.ReadinessSnapshot;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -127,6 +129,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
+  private static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS =
+      TimeUnit.MILLISECONDS.toNanos(READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
 
   public static final long DEFAULT_SEGMENT_DOWNLOAD_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10); // 10 minutes
   public static final long SLEEP_INTERVAL_MS = 30000; // 30 seconds sleep interval
@@ -136,6 +140,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   protected Cache<String, StreamMetadataProvider> _streamMetadataProviderCache;
 
+  // Share rejection checks across waiting consumers. Both fields are guarded by _readinessSnapshotLock.
+  private final Object _readinessSnapshotLock = new Object();
+  private ReadinessSnapshot _readinessSnapshot;
+  private long _readinessSnapshotTimeNs;
+
   private final BooleanSupplier _isServerReadyToConsumeData;
   private final BooleanSupplier _isServerReadyToServeQueries;
   private final ServerIngestionOomProtectionManager.ServerThrottleState _serverIngestionOomProtectionThrottleState;
@@ -144,7 +153,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private IngestionDelayTracker _ingestionDelayTracker;
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
-  private BooleanSupplier _isTableReadyToConsumeData;
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private boolean _enforceConsumptionInOrder = false;
 
@@ -235,41 +243,78 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _enforceConsumptionInOrder = isEnforceConsumptionInOrder();
     _streamMetadataProviderCache = getStreamMetadataProviderCache();
 
-    // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
-    BooleanSupplier readyForDedupOrPartialUpsert;
-    if (isDedupEnabled() || isPartialUpsertEnabled()) {
-      readyForDedupOrPartialUpsert = new BooleanSupplier() {
-        volatile boolean _allSegmentsLoaded;
-        long _lastCheckTimeMs;
-
-        @Override
-        public boolean getAsBoolean() {
-          if (_allSegmentsLoaded) {
-            return true;
-          } else {
-            synchronized (this) {
-              if (_allSegmentsLoaded) {
-                return true;
-              }
-              long currentTimeMs = System.currentTimeMillis();
-              if (currentTimeMs - _lastCheckTimeMs <= READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS) {
-                return false;
-              }
-              _lastCheckTimeMs = currentTimeMs;
-              _allSegmentsLoaded = TableStateUtils.isAllSegmentsLoaded(_helixManager, _tableNameWithType);
-              return _allSegmentsLoaded;
-            }
-          }
-        }
-      };
-    } else {
-      readyForDedupOrPartialUpsert = () -> true;
-    }
-    _isTableReadyToConsumeData = () -> readyForDedupOrPartialUpsert.getAsBoolean()
-        && _isServerReadyToConsumeData.getAsBoolean();
     _serverIngestionOomProtectionManager = new ServerIngestionOomProtectionManager(
         () -> getCachedTableConfigAndSchema().getLeft(), () -> isUpsertEnabled() || isDedupEnabled(),
         _serverIngestionOomProtectionThrottleState);
+  }
+
+  /// Checks the assigned history again for each consumer, including partitions added after table initialization.
+  /// The consumer thread polls this supplier before acquiring its permit, so segment loading is never blocked by it.
+  /// TODO: Coordinate history removal (e.g. RESET or manual delete) with an already running consumer. This startup
+  /// check does not prevent later removal from discarding a key's base value before its next partial update.
+  @VisibleForTesting
+  BooleanSupplier createReadyToConsumeDataSupplier(LLCSegmentName llcSegmentName) {
+    if (!requiresHistoryForConsumption()) {
+      return _isServerReadyToConsumeData;
+    }
+    long consumerCreationTimeNs = readinessCheckTimeNs();
+    return () -> {
+      if (!_isServerReadyToConsumeData.getAsBoolean()) {
+        return false;
+      }
+      try {
+        return isReadyToConsume(llcSegmentName, consumerCreationTimeNs);
+      } catch (Exception e) {
+        // Helix and its ZooKeeper client fail with several exception types. The consumer has not read anything yet, so
+        // a failed check only delays it.
+        _logger.warn("Failed to check readiness for segment: {}, will retry", llcSegmentName, e);
+        return false;
+      }
+    };
+  }
+
+  /// Dedup and order-sensitive upsert modes need their assigned history before admitting a consumer.
+  boolean requiresHistoryForConsumption() {
+    return isDedupEnabled()
+        || (_tableUpsertMetadataManager != null
+            && _tableUpsertMetadataManager.getContext().isTableTypeInconsistentDuringConsumption());
+  }
+
+  private boolean isReadyToConsume(LLCSegmentName consumer, long consumerCreationTimeNs) {
+    ReadinessSnapshot snapshot;
+    synchronized (_readinessSnapshotLock) {
+      long nowNs = readinessCheckTimeNs();
+      if (_readinessSnapshot == null
+          || _readinessSnapshotTimeNs - consumerCreationTimeNs < 0
+          || nowNs - _readinessSnapshotTimeNs >= READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS) {
+        // A new consumer must see its own assignment. Record the read's start time, not its completion time.
+        snapshot = TableStateUtils.getReadinessSnapshot(_helixManager, _tableNameWithType,
+            this::isPartitionMetadataInitialized);
+        _readinessSnapshot = snapshot;
+        _readinessSnapshotTimeNs = nowNs;
+        return snapshot.isReadyToConsume(consumer, this::isPartitionMetadataInitialized, true);
+      }
+      snapshot = _readinessSnapshot;
+    }
+    // Local completion can clear a cached rejection immediately, without waiting for the next ZooKeeper poll.
+    // A cached success must never authorize consumption: assignment, current state, or partition metadata may change.
+    return snapshot.isReadyToConsume(consumer, this::isPartitionMetadataInitialized)
+        && TableStateUtils.isReadyToConsume(_helixManager, _tableNameWithType, consumer,
+            this::isPartitionMetadataInitialized);
+  }
+
+  private boolean isPartitionMetadataInitialized(String segmentName) {
+    SegmentDataManager manager = _segmentDataManagerMap.get(segmentName);
+    // Pauseless release publishes completed mutable metadata; ordinary rollover publishes a ready immutable manager
+    // before releasing the permit. Mere immutable presence is insufficient because initial upsert loading registers
+    // the manager before its metadata is populated. Always inspect the currently registered manager.
+    return manager instanceof RealtimeSegmentDataManager realtime && realtime.hasReleasedConsumerSemaphore()
+        || manager instanceof ImmutableSegmentDataManager immutable && immutable.isPartitionMetadataInitialized();
+  }
+
+  @VisibleForTesting
+  long readinessCheckTimeNs() {
+    return System.nanoTime();
   }
 
   @VisibleForTesting
@@ -620,7 +665,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     RealtimeSegmentDataManager realtimeSegmentDataManager =
         createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
             consumerCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
-            _isTableReadyToConsumeData);
+            createReadyToConsumeDataSupplier(llcSegmentName));
     // A segment can finish construction after table shutdown has drained the registered segments. Publish and start
     // it together so shutdown either owns its cleanup or rejects it before any consumer is started.
     // Query threads never take this monitor: they read the segment map lock-free and only take per-segment reference

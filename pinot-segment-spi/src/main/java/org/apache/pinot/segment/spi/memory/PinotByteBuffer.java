@@ -325,6 +325,11 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
+  public ByteBuffer tryViewAsByteBuffer(long offset, int size, ByteOrder byteOrder) {
+    return toDirectByteBuffer(offset, size, byteOrder);
+  }
+
+  @Override
   public ByteBuffer toDirectByteBuffer(long offset, int size, ByteOrder byteOrder) {
     assert offset <= Integer.MAX_VALUE;
     int start = (int) offset;

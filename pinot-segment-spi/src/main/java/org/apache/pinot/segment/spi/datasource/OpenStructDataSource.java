@@ -28,6 +28,7 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 
 
 /// DataSource for an OPEN_STRUCT column. Provides per-key DataSources that can be used for
@@ -133,5 +134,22 @@ public interface OpenStructDataSource extends DataSource {
   @Nullable
   default JsonIndexReader getSparseJsonIndex() {
     return null;
+  }
+
+  /// Returns the sparse JSON index when its postings use the same key as the sparse reader. A dotted key can
+  /// match several paths in a nested blob, so serving it requires knowledge of the physical sparse fields.
+  @Nullable
+  default JsonIndexReader getSparseJsonIndex(String key) {
+    // JSON readers interpret a leading '$' as the root and '[' as an array subscript. OPEN_STRUCT keys are literal.
+    if (key.startsWith("$") || key.indexOf('[') >= 0 || !hasUnambiguousSparseJsonPath(key)) {
+      return null;
+    }
+    return getSparseJsonIndex();
+  }
+
+  /// Whether this key's JSON index path is free of collisions when the sparse fields are flattened.
+  /// Without physical field metadata, only a single path segment is unambiguous.
+  default boolean hasUnambiguousSparseJsonPath(String key) {
+    return key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR) < 0;
   }
 }

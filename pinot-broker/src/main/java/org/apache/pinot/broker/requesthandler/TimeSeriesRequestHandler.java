@@ -34,9 +34,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -75,6 +73,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
+import org.apache.pinot.tsdb.planner.physical.TimeSeriesRoutingCustomizer;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -97,10 +96,19 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       ThreadAccountant threadAccountant,
       MultiClusterRoutingContext multiClusterRoutingContext) {
+    this(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        threadAccountant, multiClusterRoutingContext, TimeSeriesRoutingCustomizer.NO_OP);
+  }
+
+  public TimeSeriesRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, BrokerRoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
+      TimeSeriesRoutingCustomizer routingCustomizer) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext);
     TimeSeriesBuilderFactoryProvider.init(config);
-    _queryEnvironment = new TimeSeriesQueryEnvironment(config, routingManager, tableCache);
+    _queryEnvironment = new TimeSeriesQueryEnvironment(config, routingManager, tableCache, routingCustomizer);
     _queryEnvironment.init(config);
     _queryDispatcher = new TimeSeriesQueryDispatcher();
   }
@@ -161,9 +169,9 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
         timeSeriesBlock = new TimeSeriesBlock(logicalPlanResult.getTimeBuckets(), new HashMap<>());
         return timeSeriesBlock;
       }
-      TimeSeriesDispatchablePlan dispatchablePlan =
-          _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
-      validatePhysicalPlan(httpHeaders, dispatchablePlan);
+      TimeSeriesDispatchablePlan dispatchablePlan = _queryEnvironment.buildPhysicalPlan(timeSeriesRequest,
+          requestContext, logicalPlanResult, tableNames -> tableLevelAccessControlCheck(httpHeaders, tableNames));
+      validatePhysicalPlanColumns(dispatchablePlan);
 
       timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
           timeSeriesRequest.getTimeout().toMillis(), requestContext);
@@ -294,16 +302,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
     if (!authorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
-        Response.Status.FORBIDDEN);
+      throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied. " + authorizationResult.getFailureMessage());
     }
-  }
-
-  private void validatePhysicalPlan(HttpHeaders httpHeaders, TimeSeriesDispatchablePlan dispatchablePlan) {
-    // check authorization for table
-    tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableNames());
-    // validate column names for all LeafTimeSeriesPlanNode in the physical plan
-    validatePhysicalPlanColumns(dispatchablePlan);
   }
 
   private void validatePhysicalPlanColumns(TimeSeriesDispatchablePlan dispatchablePlan) {
@@ -393,8 +393,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
           Actions.Table.QUERY);
       if (!authorizationResult.hasAccess()) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-        throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
-          Response.Status.FORBIDDEN);
+        throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied. " + authorizationResult.getFailureMessage());
       }
     }
   }

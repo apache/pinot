@@ -42,7 +42,8 @@ public class NettyInspector {
   static {
     CHECKS = new CopyOnWriteArrayList<>(
         new Check[] {
-            NettyInspector::checkDirectMemory
+            NettyInspector::checkDirectMemory,
+            NettyInspector::checkUnsafe
         }
     );
     KNOWN_INSTANCES = new CopyOnWriteArrayList<>(new NettyInstance[] {
@@ -112,6 +113,22 @@ public class NettyInspector {
     }
   }
 
+  /// Fails when Netty does not use `sun.misc.Unsafe`.
+  ///
+  /// Netty 4.2 stops using `Unsafe` on JDK 25+ unless the JVM allows it with
+  /// `--sun-misc-unsafe-memory-access=allow`. Setting `tryReflectionSetAccessible` is not enough on those JDKs, so
+  /// [#checkDirectMemory(NettyInstance)] can pass while Netty runs without `Unsafe`. Without it, Netty allocates and
+  /// releases direct memory through slower paths, and `PlatformDependent.allocateMemory` fails.
+  public static CheckResult checkUnsafe(NettyInstance instance) {
+    if (instance.hasUnsafe()) {
+      return CheckResult.SUCCESS;
+    }
+    String message = "sun.misc.Unsafe is not available on the " + instance.getName() + " Netty instance (cause: "
+        + instance.getUnsafeUnavailabilityCause() + "). Netty will use slower direct memory allocation and release. "
+        + "On JDK 24+, start the JVM with --sun-misc-unsafe-memory-access=allow.";
+    return new CheckResult(message, CheckResult.Status.FAIL);
+  }
+
   public interface Check extends Function<NettyInstance, CheckResult> {
     /// Applies the check to the given Netty instance.
     /// @param nettyInstance Netty instance to check
@@ -129,6 +146,15 @@ public class NettyInspector {
     public CheckResult(@Nullable String message, Status status) {
       _message = message;
       _status = status;
+    }
+
+    @Nullable
+    public String getMessage() {
+      return _message;
+    }
+
+    public Status getStatus() {
+      return _status;
     }
 
     public enum Status {

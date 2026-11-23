@@ -119,8 +119,10 @@ public class QueryPlanSerDeUtils {
 
   private static MailboxInfos fromProtoMailboxInfos(ByteString protoMailboxInfos)
       throws InvalidProtocolBufferException {
+    // An older broker leaves the instance id hash out, which reads as 0: unknown
     return new MailboxInfos(Worker.MailboxInfos.parseFrom(protoMailboxInfos).getMailboxInfoList().stream()
-        .map(v -> new MailboxInfo(v.getHostname(), v.getPort(), v.getWorkerIdList())).collect(Collectors.toList()));
+        .map(v -> new MailboxInfo(v.getHostname(), v.getPort(), v.getWorkerIdList(), v.getInstanceIdHash()))
+        .collect(Collectors.toList()));
   }
 
   public static Map<String, String> fromProtoProperties(ByteString protoProperties)
@@ -193,7 +195,8 @@ public class QueryPlanSerDeUtils {
   public static Worker.MailboxInfos toProtoMailboxInfos(List<MailboxInfo> mailboxInfos) {
     List<Worker.MailboxInfo> protoMailboxInfos = mailboxInfos.stream().map(
         v -> Worker.MailboxInfo.newBuilder().setHostname(v.getHostname()).setPort(v.getPort())
-            .addAllWorkerId(v.getWorkerIds()).build()).collect(Collectors.toList());
+            .addAllWorkerId(v.getWorkerIds()).setInstanceIdHash(v.getInstanceIdHash()).build())
+        .collect(Collectors.toList());
     return Worker.MailboxInfos.newBuilder().addAllMailboxInfo(protoMailboxInfos).build();
   }
 

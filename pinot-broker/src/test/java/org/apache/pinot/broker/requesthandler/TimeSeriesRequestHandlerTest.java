@@ -18,17 +18,39 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
+import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
+import org.apache.pinot.tsdb.spi.TimeBuckets;
+import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
+import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
 import org.mockito.Mock;
+import org.mockito.MockedConstruction;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -52,6 +74,44 @@ public class TimeSeriesRequestHandlerTest {
     lenient().when(_tableSchema.hasColumn("colA")).thenReturn(true);
     lenient().when(_tableSchema.hasColumn("colB")).thenReturn(true);
     lenient().when(_tableSchema.hasColumn("colC")).thenReturn(true);
+  }
+
+  @Test
+  public void testAccessDenialsKeepTheirErrorCode() {
+    PinotConfiguration config = new PinotConfiguration(Map.of(
+        PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey(), "test",
+        PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey("test"),
+        SimpleTimeSeriesBuilderFactory.class.getName()));
+    BrokerQueryEventListenerFactory.init(config);
+    AccessControl access = mock(AccessControl.class);
+    AccessControlFactory factory = mock(AccessControlFactory.class);
+    when(factory.create()).thenReturn(access);
+    RequesterIdentity identity = mock(RequesterIdentity.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(access.authorize(identity)).thenReturn(new BasicAuthorizationResultImpl(false, "broker denial"),
+        BasicAuthorizationResultImpl.success());
+    when(access.authorize(headers, TargetType.TABLE, "metrics_REALTIME", Actions.Table.QUERY))
+        .thenReturn(new BasicAuthorizationResultImpl(false, "table denial"));
+
+    try (MockedConstruction<TimeSeriesQueryEnvironment> environments =
+        mockConstruction(TimeSeriesQueryEnvironment.class)) {
+      TimeSeriesRequestHandler handler = new TimeSeriesRequestHandler(config, "broker", new BrokerRequestIdGenerator(),
+          null, factory, null, null, null, null);
+      TimeSeriesQueryEnvironment planner = environments.constructed().get(0);
+      when(planner.buildLogicalPlan(any())).thenReturn(new TimeSeriesLogicalPlanResult(_leafNode,
+          TimeBuckets.ofSeconds(0L, Duration.ofSeconds(1), 2)));
+      when(planner.buildPhysicalPlan(any(), any(), any(), any())).thenAnswer(invocation -> {
+        invocation.<Consumer<List<String>>>getArgument(3).accept(List.of("metrics_REALTIME"));
+        throw new AssertionError("Routing reached after table denial");
+      });
+
+      for (String reason : List.of("broker denial", "table denial")) {
+        QueryException error = expectThrows(QueryException.class, () -> handler.handleTimeSeriesRequest("test", "",
+            Map.of("query", "metric", "start", "0", "end", "2"), mock(RequestContext.class), identity, headers));
+        assertEquals(error.getErrorCode(), QueryErrorCode.ACCESS_DENIED);
+        assertTrue(error.getMessage().contains(reason), error.getMessage());
+      }
+    }
   }
 
   @Test

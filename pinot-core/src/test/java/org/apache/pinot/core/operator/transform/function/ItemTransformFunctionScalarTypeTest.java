@@ -19,19 +19,25 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -100,6 +106,50 @@ public class ItemTransformFunctionScalarTypeTest {
     ItemTransformFunction fn = new ItemTransformFunction();
     fn.init(List.of(_identifierArg, _literalArg), Map.of(COLUMN, _columnContext));
     return fn;
+  }
+
+  @Test
+  public void testPlannedLogicalTypeOverStringSegment() {
+    when(_keyMetadata.getDataType()).thenReturn(DataType.STRING);
+    when(_columnContext.getDataSource()).thenReturn(_openStructDataSource);
+    when(_perKeyBlockValSet.getValueType()).thenReturn(DataType.STRING);
+    when(_perKeyBlockValSet.isSingleValue()).thenReturn(true);
+    when(_projectionBlock.getNumDocs()).thenReturn(1);
+    LiteralTransformFunction target = mock(LiteralTransformFunction.class);
+    when(target.getStringLiteral()).thenReturn("BOOLEAN", "TIMESTAMP");
+
+    ItemTransformFunction flag = new ItemTransformFunction();
+    flag.init(List.of(_identifierArg, _literalArg, target), Map.of(COLUMN, _columnContext));
+    when(_perKeyBlockValSet.getStringValuesSV()).thenReturn(new String[]{"true"});
+    assertEquals(flag.transformToIntValuesSV(_projectionBlock), new int[]{1});
+
+    ItemTransformFunction timestamp = new ItemTransformFunction();
+    timestamp.init(List.of(_identifierArg, _literalArg, target), Map.of(COLUMN, _columnContext));
+    String text = "2024-01-01 00:00:00";
+    when(_perKeyBlockValSet.getStringValuesSV()).thenReturn(new String[]{text});
+    assertEquals(timestamp.transformToLongValuesSV(_projectionBlock), new long[]{Timestamp.valueOf(text).getTime()});
+  }
+
+  @Test
+  public void testMissingKeyUsesPlannedFieldDefaultWithNullHandlingDisabled() {
+    when(_keyMetadata.getDataType()).thenReturn(DataType.STRING);
+    when(_columnContext.getDataSource()).thenReturn(_openStructDataSource);
+    when(_perKeyBlockValSet.getValueType()).thenReturn(DataType.STRING);
+    when(_perKeyBlockValSet.isSingleValue()).thenReturn(true);
+    when(_perKeyBlockValSet.getStringValuesSV()).thenReturn(new String[]{"17", "null"});
+    when(_perKeyBlockValSet.getNullBitmap()).thenReturn(RoaringBitmap.bitmapOf(1));
+    when(_projectionBlock.getNumDocs()).thenReturn(2);
+    LiteralTransformFunction target = mock(LiteralTransformFunction.class);
+    when(target.getStringLiteral()).thenReturn("LONG_ARRAY");
+    Schema schema = new Schema();
+    schema.addField(new ComplexFieldSpec(COLUMN, DataType.OPEN_STRUCT, true,
+        Map.of(KEY, new DimensionFieldSpec(KEY, DataType.LONG, false, -7L))));
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getSchema()).thenReturn(schema);
+
+    ItemTransformFunction fn = new ItemTransformFunction();
+    fn.init(List.of(_identifierArg, _literalArg, target), Map.of(COLUMN, _columnContext), queryContext);
+    assertEquals(fn.transformToLongValuesMV(_projectionBlock), new long[][]{{17}, {-7}});
   }
 
   @Test

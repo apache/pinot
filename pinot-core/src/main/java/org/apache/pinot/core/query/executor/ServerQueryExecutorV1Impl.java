@@ -298,6 +298,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
       return instanceResponse;
     }
+    if (executionInfo == null) {
+      // The table is not set up on the server yet, and all the segments to query are optional
+      executionInfo = EmptyTableExecutionInfo.INSTANCE;
+    }
 
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Processing requestId: {} with segmentsToQuery: {}, optionalSegments: {} and acquiredSegments: {}",

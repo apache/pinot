@@ -154,6 +154,7 @@ public class TaskMetricsEmitterTest {
     timing1.setTaskCount(taskCount1);
     // Add waiting time for null-state subtask to exercise timing metrics emission
     timing1.getSubtaskWaitingTimes().put("subtask2", 3000L);
+    timing1.setQueueStallTimeMs(1000L);
     taskCount2 = new PinotHelixTaskResourceManager.TaskCount();
     taskCount2.addTaskState(TaskPartitionState.TASK_ERROR);
     timing2 = new PinotHelixTaskResourceManager.TaskStatusSummary();
@@ -174,9 +175,9 @@ public class TaskMetricsEmitterTest {
   private void runAndAssertForTaskType1WithTwoTables() {
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    // Expected 33 metrics: 29 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x2 tables)
-    // + MAX_SUBTASK_RUNNING_TIME_MS gauge (x2 tables)
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 33);
+    // Expected 35 metrics: 29 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x2 tables)
+    // + MAX_SUBTASK_RUNNING_TIME_MS gauge (x2 tables) + MAX_SUBTASK_QUEUE_STALL_TIME_MS gauge (x2 tables)
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 35);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
@@ -271,6 +272,16 @@ public class TaskMetricsEmitterTest {
             new YammerMetricName(ControllerMetrics.class,
                 "pinot.controller.maxSubtaskRunningTimeMs.table2_OFFLINE.taskType1"))
         .getMetric()).value(), 5000L);
+
+    // table1's waiting subtask belongs to a job that last made progress 1000ms ago; table2 has nothing waiting
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.maxSubtaskQueueStallTimeMs.table1_OFFLINE.taskType1"))
+        .getMetric()).value(), 1000L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.maxSubtaskQueueStallTimeMs.table2_OFFLINE.taskType1"))
+        .getMetric()).value(), 0L);
   }
 
   @Test
@@ -302,9 +313,10 @@ public class TaskMetricsEmitterTest {
 
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    // Expected at least 22 metrics: 20 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x1 table)
-    // + MAX_SUBTASK_RUNNING_TIME_MS gauge (x1 table). Count may vary based on test execution order.
-    Assert.assertTrue(metricsRegistry.allMetrics().size() >= 22);
+    // Expected at least 23 metrics: 20 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x1 table)
+    // + MAX_SUBTASK_RUNNING_TIME_MS gauge (x1 table) + MAX_SUBTASK_QUEUE_STALL_TIME_MS gauge (x1 table).
+    // Count may vary based on test execution order.
+    Assert.assertTrue(metricsRegistry.allMetrics().size() >= 23);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
