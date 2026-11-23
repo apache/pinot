@@ -37,10 +37,12 @@
 
   How a child module is built. Each step uses its own phase, because the order of executions from
   different plugins in one phase depends on the order in which the poms declare the plugins.
-  1. process-classes: default-jar writes an empty main artifact to target/main/.
-     maven-shade-plugin refuses to run without a main artifact. This step cannot run earlier: at
-     compile, Maven points the main artifact to target/classes.
-  2. generate-test-sources: maven-shade-plugin writes the patched jar to target/patched/.
+  1. process-classes: default-jar writes a main artifact that holds only the Pinot LICENSE, NOTICE
+     and DEPENDENCIES to target/main/. maven-shade-plugin refuses to run without a main artifact.
+     This step cannot run earlier: at compile, Maven points the main artifact to target/classes.
+  2. generate-test-sources: maven-shade-plugin writes the patched jar to target/patched/. The main
+     artifact comes first, so the jar carries the Pinot legal files, with the notices of the bundled
+     code appended to the NOTICE.
   3. process-test-sources: maven-antrun-plugin copies the patched jar over the empty main artifact,
      and unpacks it into target/classes.
   From step 3 on, both places that a reactor build can resolve a sibling module to hold the patched
@@ -95,9 +97,16 @@
               <phase>process-classes</phase>
               <configuration>
                 <outputDirectory>${project.build.directory}/main</outputDirectory>
-                <excludes>
-                  <exclude>**</exclude>
-                </excludes>
+                <!-- Step 3 copies the patched jar here. Without forceCreation, an incremental build
+                     keeps that newer file, and step 2 shades the previous patched jar again. -->
+                <forceCreation>true</forceCreation>
+                <!-- Only the legal files that every Pinot jar carries. The shade step puts this jar
+                     first, so its LICENSE and DEPENDENCIES win over the ones of the original. -->
+                <includes>
+                  <include>META-INF/LICENSE</include>
+                  <include>META-INF/NOTICE</include>
+                  <include>META-INF/DEPENDENCIES</include>
+                </includes>
               </configuration>
             </execution>
           </executions>
@@ -117,6 +126,11 @@
                 <outputFile>${patched.jar}</outputFile>
                 <transformers combine.self="override">
                   <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                  <!-- One NOTICE: the Pinot NOTICE followed by the notices of the original and of the
+                       managed library, as the Apache license requires for bundled code. -->
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+                    <addHeader>false</addHeader>
+                  </transformer>
                   <!-- Without this attribute the JVM ignores META-INF/versions/, which jackson-core uses -->
                   <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                     <manifestEntries>
@@ -159,6 +173,10 @@
                   <unzip src="${patched.jar}" dest="${project.build.outputDirectory}" overwrite="true">
                     <patternset>
                       <exclude name="META-INF/versions/**" />
+                      <!-- target/classes already has the Pinot legal files that step 1 packages. -->
+                      <exclude name="META-INF/LICENSE" />
+                      <exclude name="META-INF/NOTICE" />
+                      <exclude name="META-INF/DEPENDENCIES" />
                     </patternset>
                   </unzip>
                 </target>
