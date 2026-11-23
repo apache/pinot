@@ -29,8 +29,8 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
-import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
@@ -138,7 +138,8 @@ public final class SpoolDeadlockGuard {
   /// pair of receives. It does not lose precision, because an operator defers every receive of one group behind every
   /// receive of the other. A cycle that enters a group through one blocking receive and leaves it through one waiting
   /// receive is also a cycle of that pair of receives.
-  private record Deferral(List<BaseMailboxReceiveNode> waiting, List<BaseMailboxReceiveNode> blocking, String operator) {
+  private record Deferral(List<BaseMailboxReceiveNode> waiting, List<BaseMailboxReceiveNode> blocking,
+                          String operator) {
   }
 
   /// The receives of one subtree inside a stage. The lists are mutable: [Analysis#collect] fills them while it walks
