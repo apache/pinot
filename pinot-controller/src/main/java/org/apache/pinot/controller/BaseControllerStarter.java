@@ -265,6 +265,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     boolean ingestionGroovyDisabled = _config.getProperty(ControllerConf.DISABLE_GROOVY,
         ControllerConf.DEFAULT_DISABLE_GROOVY);
     applyCustomConfigs(_config);
+    _config.validateSegmentMetadataEntryLimits();
     _config.setClusterIngestionGroovyDisabled(ingestionGroovyDisabled);
 
     PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
