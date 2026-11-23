@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -35,11 +36,14 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
@@ -135,11 +139,58 @@ public class StagesTestBase {
       return build(stageId, null, null, null, null, null, false, null, false, false);
     }
 
+    /// Returns a builder whose receive and send nodes use the [PinotRelExchangeType#PIPELINE_BREAKER] exchange type.
+    default ExchangeBuilder asPipelineBreaker() {
+      return (stageId, dataSchema, hints, _, distribution, keys, prePartitioned, collations, sort, sortedOnSender) ->
+          build(stageId, dataSchema, hints, PinotRelExchangeType.PIPELINE_BREAKER, distribution, keys, prePartitioned,
+              collations, sort, sortedOnSender);
+    }
+
     default ExchangeBuilder withDistributionType(RelDistribution.Type distribution) {
       return (stageId, dataSchema, hints, exchangeType, _, keys, prePartitioned, collations, sort, sortedOnSender) ->
           build(stageId, dataSchema, hints, exchangeType, distribution, keys, prePartitioned, collations, sort,
           sortedOnSender);
     }
+  }
+
+  /// Creates a set operation node of the given type over the given inputs, with `all` set to true.
+  public SimpleChildBuilder<SetOpNode> setOp(SetOpNode.SetOpType setOpType,
+      List<SimpleChildBuilder<? extends PlanNode>> inputBuilders) {
+    return (stageId, mySchema, myHints) -> {
+      List<PlanNode> inputs = new ArrayList<>(inputBuilders.size());
+      for (SimpleChildBuilder<? extends PlanNode> inputBuilder : inputBuilders) {
+        inputs.add(inputBuilder.build(stageId));
+      }
+      return new SetOpNode(stageId, mySchema, myHints, inputs, setOpType, true);
+    };
+  }
+
+  /// Creates a filter node with the given condition over the given child.
+  public SimpleChildBuilder<FilterNode> filter(SimpleChildBuilder<? extends PlanNode> childBuilder,
+      RexExpression condition) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      DataSchema schema = mySchema != null ? mySchema : input.getDataSchema();
+      return new FilterNode(stageId, schema, myHints, List.of(input), condition);
+    };
+  }
+
+  /// Creates a sort node that orders by the first column, without a limit.
+  public SimpleChildBuilder<SortNode> sort(SimpleChildBuilder<? extends PlanNode> childBuilder) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      DataSchema schema = mySchema != null ? mySchema : input.getDataSchema();
+      return new SortNode(stageId, schema, myHints, List.of(input), List.of(new RelFieldCollation(0)), -1, 0);
+    };
+  }
+
+  /// Creates a sort node with the given limit and no collations.
+  public SimpleChildBuilder<SortNode> limit(SimpleChildBuilder<? extends PlanNode> childBuilder, int fetch) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      DataSchema schema = mySchema != null ? mySchema : input.getDataSchema();
+      return new SortNode(stageId, schema, myHints, List.of(input), List.of(), fetch, 0);
+    };
   }
 
   /// Creates a table scan node with the given table name.
