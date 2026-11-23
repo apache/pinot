@@ -406,6 +406,10 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(
         getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s BETWEEN 5 AND 20", COLUMN1)).get(0)[0],
         (long) 17 * NUM_OF_SEGMENT_COPIES);
+    // Rows 0 to 4 hold a value below 5. The default value stored for the null row is below 5 as well, so this checks
+    // that the null row is left out of the combined result.
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s < 5", COLUMN1)).get(0)[0],
+        (long) 5 * NUM_OF_SEGMENT_COPIES);
   }
 
   /// A single-value column gets the legacy range index when the table sets `rangeIndexVersion` to 1, and goes through
@@ -431,6 +435,10 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(
         getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s BETWEEN 5 AND 20", COLUMN1)).get(0)[0],
         (long) 16 * NUM_OF_SEGMENT_COPIES);
+    // Rows 0 to 4 hold a value below 5. The default value stored for the null row is below 5 as well, so this checks
+    // that the null row is left out of the combined result.
+    assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE %s < 5", COLUMN1)).get(0)[0],
+        (long) 5 * NUM_OF_SEGMENT_COPIES);
   }
 
   private static TableConfig getTableConfigWithLegacyRangeIndex() {
