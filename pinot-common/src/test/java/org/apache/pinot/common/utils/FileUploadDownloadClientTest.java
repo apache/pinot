@@ -178,6 +178,17 @@ public class FileUploadDownloadClientTest {
   }
 
   @Test
+  public void testGetUpdateSegmentZKMetadataURLEncodesPathOnce()
+      throws URISyntaxException {
+    URI uri = FileUploadDownloadClient.getUpdateSegmentZKMetadataURI(new URI("https://myhost:9443"),
+        "table name+percent%_OFFLINE", "segment name+percent%");
+    Assert.assertEquals(uri.getPath(),
+        "/segments/table name+percent%_OFFLINE/segment name+percent%/metadata");
+    Assert.assertEquals(uri.getRawPath(),
+        "/segments/table%20name%2Bpercent%25_OFFLINE/segment%20name%2Bpercent%25/metadata");
+  }
+
+  @Test
   public void testAuthenticatedServerUploadRequests()
       throws Exception {
     StaticTokenAuthProvider authProvider = new StaticTokenAuthProvider(TEST_AUTH_TOKEN);
