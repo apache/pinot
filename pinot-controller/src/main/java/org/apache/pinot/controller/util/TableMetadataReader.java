@@ -40,7 +40,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.TableStaleSegmentResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
@@ -133,12 +132,11 @@ public class TableMetadataReader {
 
   /// This api takes in list of segments for which we need the metadata.
   /// This calls the server to get the metadata for all segments instead of making a call per segment.
-  /// Fetches at most the default `controller.segment.metadata.max.entry.limit` entries.
+  /// Does not limit the number of entries fetched.
   public JsonNode getSegmentsMetadata(String tableNameWithType, @Nullable List<String> columns,
       @Nullable List<String> segments, int timeoutMs)
       throws InvalidConfigException, IOException {
-    return getSegmentsMetadata(tableNameWithType, columns, segments, timeoutMs,
-        ControllerConf.DEFAULT_SEGMENT_METADATA_MAX_ENTRY_LIMIT);
+    return getSegmentsMetadata(tableNameWithType, columns, segments, timeoutMs, Integer.MAX_VALUE);
   }
 
   /// Same as above, but rejects the request before calling any server when it would fetch more than
