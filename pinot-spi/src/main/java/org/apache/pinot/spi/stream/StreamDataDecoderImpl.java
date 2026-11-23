@@ -34,6 +34,9 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
   public static final String KEY = "__key";
   public static final String HEADER_KEY_PREFIX = "__header$";
   public static final String METADATA_KEY_PREFIX = "__metadata$";
+  /// The whole message value as a single field. Only populated by decoders that support it (JSONMessageDecoder), and
+  /// only when the table reads it, e.g. through a transform such as `payload = "__value"`.
+  public static final String VALUE_KEY = "__value";
   public static final String RECORD_SERIALIZED_VALUE_SIZE_KEY = METADATA_KEY_PREFIX + "recordSerializedValueSize";
 
   private final StreamMessageDecoder _valueDecoder;

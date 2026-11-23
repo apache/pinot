@@ -21,6 +21,8 @@ package org.apache.pinot.plugin.inputformat.json.format;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import java.io.IOException;
@@ -41,6 +43,7 @@ abstract class JacksonPayloadParser implements JsonPayloadParser {
   private final JsonFactory _factory;
   private final ObjectReader _mapReader;
   private final ObjectReader _valueReader;
+  private final ObjectReader _strictTreeReader;
 
   JacksonPayloadParser(JsonFactory factory) {
     this(new ObjectMapper(factory).reader());
@@ -53,6 +56,23 @@ abstract class JacksonPayloadParser implements JsonPayloadParser {
     _factory = reader.getFactory();
     _mapReader = reader.forType(JsonUtils.MAP_TYPE_REFERENCE);
     _valueReader = reader.forType(Object.class);
+    _strictTreeReader = reader.with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS,
+        DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+  }
+
+  @Override
+  public boolean supportsParseValue() {
+    return true;
+  }
+
+  @Override
+  public JsonNode parseValue(byte[] payload, int offset, int length)
+      throws Exception {
+    JsonNode node = _strictTreeReader.readTree(payload, offset, length);
+    if (node == null || node.isMissingNode()) {
+      throw new IllegalArgumentException("Payload is empty");
+    }
+    return node;
   }
 
   @Override

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.json.format;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -67,6 +68,13 @@ class PostgresJsonbPayloadParser extends JacksonPayloadParser {
       throws Exception {
     validate(payload, offset, length);
     return super.parse(payload, offset + 1, length - 1, destination, fields);
+  }
+
+  @Override
+  public JsonNode parseValue(byte[] payload, int offset, int length)
+      throws Exception {
+    validate(payload, offset, length);
+    return super.parseValue(payload, offset + 1, length - 1);
   }
 
   private static void validate(byte[] payload, int offset, int length) {

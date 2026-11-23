@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.json.format;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -69,5 +70,17 @@ public interface JsonPayloadParser {
       @Nullable Set<String> fields)
       throws Exception {
     return false;
+  }
+
+  /// Whether [#parseValue] is supported by this parser.
+  default boolean supportsParseValue() {
+    return false;
+  }
+
+  /// Parses the whole payload as a single JSON value of any type (object, array, string, number, boolean or null).
+  /// Rejects trailing content after the value and empty payloads.
+  default JsonNode parseValue(byte[] payload, int offset, int length)
+      throws Exception {
+    throw new UnsupportedOperationException(getClass().getSimpleName() + " does not support parsing a whole value");
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.json.format;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -39,6 +40,17 @@ class AutoDetectPayloadParser implements JsonPayloadParser {
   public Map<String, Object> parse(byte[] payload, int offset, int length)
       throws Exception {
     return JsonPayloadFormat.detectParser(payload, offset, length).parse(payload, offset, length);
+  }
+
+  @Override
+  public boolean supportsParseValue() {
+    return true;
+  }
+
+  @Override
+  public JsonNode parseValue(byte[] payload, int offset, int length)
+      throws Exception {
+    return JsonPayloadFormat.detectParser(payload, offset, length).parseValue(payload, offset, length);
   }
 
   @Override

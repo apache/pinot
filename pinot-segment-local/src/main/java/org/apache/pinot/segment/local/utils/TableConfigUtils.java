@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -113,6 +114,8 @@ import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherRegistry;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
@@ -137,6 +140,8 @@ public final class TableConfigUtils {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
+  private static final String JSON_MESSAGE_DECODER_CLASS =
+      "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder";
 
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
   private static final String UPSERT_COMPACTION_TASK_TYPE = "UpsertCompactionTask";
@@ -222,6 +227,7 @@ public final class TableConfigUtils {
     validateSegmentAssignmentConfigs(tableConfig);
     validatePartitionColumnConsistency(tableConfig);
     validateIngestionConfig(tableConfig, schema, existingTableConfig);
+    validateStreamValueField(tableConfig, schema);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       validateStreamConfigMaps(tableConfig);
     }
@@ -743,6 +749,89 @@ public final class TableConfigUtils {
         ingestionConfig.getSchemaConformingTransformerConfig();
     if (schemaConformingTransformerConfig != null) {
       SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
+    }
+  }
+
+  /// Validates tables that read the whole stream message value through {@value StreamDataDecoderImpl#VALUE_KEY}.
+  ///
+  /// When an ingestion expression reads it, the JSON decoder emits only that field (plus the key, header and metadata
+  /// fields) instead of one field per top-level key. Everything the table ingests must therefore be derived from it,
+  /// from a header, the key or metadata; anything reading a top-level key directly would silently get null.
+  @VisibleForTesting
+  static void validateStreamValueField(TableConfig tableConfig, Schema schema) {
+    String valueKey = StreamDataDecoderImpl.VALUE_KEY;
+    Preconditions.checkState(!schema.hasColumn(valueKey),
+        "'%s' is reserved for the stream message value and cannot be a schema column", valueKey);
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null) {
+      return;
+    }
+    List<TransformConfig> transformConfigs =
+        ingestionConfig.getTransformConfigs() != null ? ingestionConfig.getTransformConfigs() : List.of();
+    List<AggregationConfig> aggregationConfigs =
+        ingestionConfig.getAggregationConfigs() != null ? ingestionConfig.getAggregationConfigs() : List.of();
+
+    // Inputs of every ingestion expression, keyed by a description used in error messages
+    Map<String, Set<String>> inputsByExpression = new LinkedHashMap<>();
+    for (TransformConfig transformConfig : transformConfigs) {
+      inputsByExpression.put("Transform for column '" + transformConfig.getColumnName() + "'", new HashSet<>(
+          FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()).getArguments()));
+    }
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (fieldSpec.getTransformFunction() != null) {
+        inputsByExpression.put("Schema transform for column '" + fieldSpec.getName() + "'", new HashSet<>(
+            FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec).getArguments()));
+      }
+    }
+    FilterConfig filterConfig = ingestionConfig.getFilterConfig();
+    if (filterConfig != null && filterConfig.getFilterFunction() != null) {
+      inputsByExpression.put("Filter function", new HashSet<>(
+          FunctionEvaluatorFactory.getExpressionEvaluator(filterConfig.getFilterFunction()).getArguments()));
+    }
+    for (AggregationConfig aggregationConfig : aggregationConfigs) {
+      Set<String> columns = new HashSet<>();
+      RequestContextUtils.getExpression(aggregationConfig.getAggregationFunction()).getColumns(columns);
+      inputsByExpression.put("Aggregation for column '" + aggregationConfig.getColumnName() + "'", columns);
+    }
+    if (inputsByExpression.values().stream().noneMatch(inputs -> inputs.contains(valueKey))) {
+      return;
+    }
+
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "'%s' is only available for REALTIME tables", valueKey);
+    Preconditions.checkState(ingestionConfig.getSchemaConformingTransformerConfig() == null,
+        "'%s' cannot be combined with schemaConformingTransformerConfig", valueKey);
+    Preconditions.checkState(ingestionConfig.getComplexTypeConfig() == null,
+        "'%s' cannot be combined with complexTypeConfig", valueKey);
+    for (Map<String, String> streamConfigMap : IngestionConfigUtils.getStreamConfigMaps(tableConfig)) {
+      StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
+      Map<String, String> decoderProperties = streamConfig.getDecoderProperties();
+      Preconditions.checkState(JSON_MESSAGE_DECODER_CLASS.equals(streamConfig.getDecoderClass()),
+          "'%s' is only populated by %s, found decoder: %s", valueKey, JSON_MESSAGE_DECODER_CLASS,
+          streamConfig.getDecoderClass());
+      Preconditions.checkState(!decoderProperties.containsKey(StreamMessageDecoder.RECORD_EXTRACTOR_CONFIG_KEY),
+          "'%s' cannot be combined with a custom record extractor", valueKey);
+      Preconditions.checkState(!"SQLITE_JSONB".equalsIgnoreCase(decoderProperties.get("jsonFormat")),
+          "'%s' is not supported for jsonFormat SQLITE_JSONB", valueKey);
+    }
+
+    Set<String> derivedColumns = new HashSet<>();
+    transformConfigs.forEach(transformConfig -> derivedColumns.add(transformConfig.getColumnName()));
+    schema.getAllFieldSpecs().stream().filter(fieldSpec -> fieldSpec.getTransformFunction() != null)
+        .forEach(fieldSpec -> derivedColumns.add(fieldSpec.getName()));
+    aggregationConfigs.forEach(aggregationConfig -> derivedColumns.add(aggregationConfig.getColumnName()));
+    inputsByExpression.forEach((expression, inputs) -> {
+      for (String input : inputs) {
+        Preconditions.checkState(
+            input.equals(valueKey) || StreamDataDecoderImpl.isSpecialKeyType(input) || derivedColumns.contains(input),
+            "%s reads '%s', which is not ingested when '%s' is read: derive it from '%s' (e.g. jsonPathString) or "
+                + "from a header", expression, input, valueKey, valueKey);
+      }
+    });
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      Preconditions.checkState(fieldSpec.isVirtualColumn() || derivedColumns.contains(fieldSpec.getName()),
+          "Column '%s' cannot be populated when '%s' is read: add a transform deriving it from '%s' or a header",
+          fieldSpec.getName(), valueKey, valueKey);
     }
   }
 

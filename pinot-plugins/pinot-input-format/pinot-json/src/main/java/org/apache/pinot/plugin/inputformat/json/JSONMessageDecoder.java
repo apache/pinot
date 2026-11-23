@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
+import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
@@ -27,7 +28,9 @@ import org.apache.pinot.plugin.inputformat.json.format.JsonPayloadParser;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// An implementation of StreamMessageDecoder to read JSON records from a stream.
@@ -42,6 +45,12 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 /// of the binary signatures. It is opt-in rather than the default because it is still a heuristic over a few
 /// leading bytes, so it may claim a corrupt message that text decoding would have rejected outright.
 /// See [JsonPayloadFormat].
+///
+/// When the table reads the reserved field {@value StreamDataDecoderImpl#VALUE_KEY} (e.g. a transform
+/// `payload = "__value"`), the whole message value is stored in that field as canonical JSON text instead of being
+/// split into one field per top-level key. Any JSON value is accepted (object, array, string, number, boolean or
+/// null); payloads that are not exactly one JSON value (plain text, trailing content, empty) are rejected. Columns are
+/// then derived explicitly from it, so no key in the message can populate a column implicitly.
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String JSON_FORMAT_CONFIG_KEY = "jsonFormat";
 
@@ -58,6 +67,8 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private boolean _usesDefaultRecordExtractor;
   // For AUTO this resolves the concrete format per message; otherwise it is the pinned format's parser.
   private JsonPayloadParser _parser;
+  // Whether the table reads the whole message value instead of individual top-level keys
+  private boolean _readWholeValue;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
@@ -78,6 +89,13 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     // exact default class so a configured extractor or subclass cannot lose custom extraction behavior.
     _usesDefaultRecordExtractor = _jsonRecordExtractor.getClass() == JSONRecordExtractor.class;
     _parser = JsonPayloadFormat.fromConfig(jsonFormat).getParser();
+    _readWholeValue = fieldsToRead != null && fieldsToRead.contains(StreamDataDecoderImpl.VALUE_KEY);
+    if (_readWholeValue) {
+      Preconditions.checkArgument(_usesDefaultRecordExtractor,
+          "'%s' cannot be combined with a custom record extractor", StreamDataDecoderImpl.VALUE_KEY);
+      Preconditions.checkArgument(_parser.supportsParseValue(), "'%s' is not supported for JSON format: %s",
+          StreamDataDecoderImpl.VALUE_KEY, jsonFormat);
+    }
   }
 
   @Override
@@ -88,6 +106,11 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
+      if (_readWholeValue) {
+        String value = JsonUtils.objectToString(_parser.parseValue(payload, offset, length));
+        destination.putValue(StreamDataDecoderImpl.VALUE_KEY, value);
+        return destination;
+      }
       if (_usesDefaultRecordExtractor && _parser.parse(payload, offset, length, destination, _fieldsToRead)) {
         return destination;
       }
