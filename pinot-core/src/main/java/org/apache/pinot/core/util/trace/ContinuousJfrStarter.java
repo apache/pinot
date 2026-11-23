@@ -140,6 +140,9 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
       "preserveRepository", "-XX:FlightRecorderOptions:preserve-repository=true",
       "repositoryMaxTotalSize", "a cleanup of the repository directory outside the JVM");
 
+  /// The suffix that this class adds to the name of a recording when it stops the recording.
+  static final String STOPPED_SUFFIX = "-stopped";
+
   private static final Object GLOBAL_RECORDING_LOCK = new Object();
   /// The recordings that this class runs, by recording name. Several instances in the same JVM share an entry.
   @GuardedBy("GLOBAL_RECORDING_LOCK")
@@ -215,13 +218,18 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   /// Gives back the reference of this instance to its recording, and ignores later config changes. The component that
   /// registered this instance calls this method when it stops. Without it, a component that restarts in the same JVM
   /// (for example in tests) keeps a reference to the recording, and `enabled=false` no longer stops it.
+  ///
+  /// This method never stops the recording, also when it gives back the last reference. The component usually stops
+  /// in a shutdown hook, at the same time as the shutdown hook of JFR, which dumps only the recordings that still run.
+  /// A stop here loses the dump of a recording with `dumpOnExit=true`. A recording without references keeps running
+  /// until the next instance applies a config: that instance takes it, or stops it.
   public void close() {
     synchronized (GLOBAL_RECORDING_LOCK) {
       if (_closed) {
         return;
       }
       _closed = true;
-      releaseRecordingReference();
+      releaseRecordingReference(false);
       _currentConfig = null;
     }
   }
@@ -269,7 +277,8 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
       return false;
     }
     if (!shouldRecord) {
-      releaseRecordingReference();
+      releaseRecordingReference(true);
+      stopUnusedRecordings();
       return true;
     }
     RecordingSpec spec;
@@ -280,9 +289,11 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
       return false;
     }
     if (_recordingName != null && !_recordingName.equals(spec._name)) {
-      releaseRecordingReference();
+      releaseRecordingReference(true);
     }
-    return acquireRecordingReference(spec);
+    boolean acquired = acquireRecordingReference(spec);
+    stopUnusedRecordings();
+    return acquired;
   }
 
   /// Returns whether this instance must record, or null if the instance regex is not valid.
@@ -339,19 +350,33 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     return true;
   }
 
+  /// Gives back the reference of this instance. If it was the last reference and `stopIfUnused` is true, stops the
+  /// recording. Otherwise the recording keeps running without references, until [#stopUnusedRecordings()] stops it or
+  /// an instance takes it.
   @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private void releaseRecordingReference() {
+  private void releaseRecordingReference(boolean stopIfUnused) {
     if (_recordingName == null) {
       return;
     }
     SharedRecording sharedRecording = GLOBAL_RECORDINGS.get(_recordingName);
-    if (sharedRecording._referenceCount > 1) {
-      sharedRecording._referenceCount--;
-    } else {
+    sharedRecording._referenceCount--;
+    if (sharedRecording._referenceCount == 0 && stopIfUnused) {
       stopRecording(_recordingName, sharedRecording._recording);
       GLOBAL_RECORDINGS.remove(_recordingName);
     }
     _recordingName = null;
+  }
+
+  /// Stops the recordings that no instance holds. Only [#close()] leaves such a recording behind.
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private static void stopUnusedRecordings() {
+    GLOBAL_RECORDINGS.entrySet().removeIf(entry -> {
+      if (entry.getValue()._referenceCount > 0) {
+        return false;
+      }
+      stopRecording(entry.getKey(), entry.getValue()._recording);
+      return true;
+    });
   }
 
   /// Applies a new spec to a running recording. JFR can change all the options of a running recording, except the
@@ -429,6 +454,8 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     }
   }
 
+  /// Stops the recording and keeps it as the last stopped recording for its name. The kept recording gets the
+  /// [#STOPPED_SUFFIX], so that `jcmd <pid> JFR.stop name=<name>` finds the running recording, not this one.
   @GuardedBy("GLOBAL_RECORDING_LOCK")
   private static void stopRecording(String recordingName, Recording recording) {
     try {
@@ -436,6 +463,12 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     } catch (IllegalStateException e) {
       // Another tool, for example jcmd, stopped or closed the recording before.
       LOGGER.debug("Continuous JFR recording '{}' was not running", recordingName, e);
+    }
+    try {
+      recording.setName(recordingName + STOPPED_SUFFIX);
+    } catch (IllegalStateException e) {
+      // The recording is closed.
+      LOGGER.debug("Cannot rename continuous JFR recording '{}'", recordingName, e);
     }
     Recording previous = STOPPED_RECORDINGS.put(recordingName, recording);
     if (previous != null) {
@@ -447,6 +480,8 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   private static class SharedRecording {
     private Recording _recording;
     private RecordingSpec _spec;
+    /// The number of instances that hold this recording. It is 0 after [ContinuousJfrStarter#close()] gives back the
+    /// last reference.
     private int _referenceCount = 1;
 
     private SharedRecording(Recording recording, RecordingSpec spec) {

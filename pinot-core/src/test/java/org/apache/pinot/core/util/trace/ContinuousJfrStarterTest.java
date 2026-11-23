@@ -293,16 +293,65 @@ public class ContinuousJfrStarterTest {
   }
 
   @Test
-  public void closedInstanceIgnoresLaterConfigChanges() {
-    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+  public void closeKeepsTheRecordingRunningForTheExitDump() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true", "pinot.jfr.dumpOnExit", "true"));
     Recording recording = _server.getRecording();
 
     _server.close();
-    assertThat(recording.getState()).isEqualTo(RecordingState.STOPPED);
 
-    _server.onChange(ENABLED_CHANGED, Map.of("pinot.jfr.enabled", "true", "pinot.jfr.maxSize", "1GB"));
+    // The shutdown hook of JFR dumps only the recordings that still run.
+    assertThat(recording.getState()).isEqualTo(RecordingState.RUNNING);
     assertThat(_server.isRunning()).isFalse();
     assertThat(_server.getRecording()).isNull();
+  }
+
+  @Test
+  public void closedInstanceIgnoresLaterConfigChanges() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    _server.close();
+
+    _server.onChange(ENABLED_CHANGED, Map.of("pinot.jfr.enabled", "true", "pinot.jfr.maxSize", "1GB"));
+
+    assertThat(_server.isRunning()).isFalse();
+    assertThat(_server.getRecording()).isNull();
+  }
+
+  @Test
+  public void restartedComponentTakesTheRecordingOfTheClosedOne() {
+    Map<String, String> enabled = Map.of("pinot.jfr.enabled", "true");
+    _server.onChange(Set.of(), enabled);
+    Recording recording = _server.getRecording();
+    _server.close();
+
+    ContinuousJfrStarter restarted = new ContinuousJfrStarter(SERVER_ID, List.of());
+    restarted.onChange(Set.of(), enabled);
+
+    assertThat(restarted.getRecording()).isSameAs(recording);
+    assertThat(recording.getState()).isEqualTo(RecordingState.RUNNING);
+  }
+
+  @Test
+  public void nextInstanceThatDoesNotRecordStopsTheRecordingOfTheClosedOne() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    Recording recording = _server.getRecording();
+    _server.close();
+
+    ContinuousJfrStarter restarted = new ContinuousJfrStarter(SERVER_ID, List.of());
+    restarted.onChange(Set.of(), Map.of("pinot.jfr.enabled", "false"));
+
+    assertThat(recording.getState()).isEqualTo(RecordingState.STOPPED);
+    assertThat(ContinuousJfrStarter.getStoppedRecording(ContinuousJfrStarter.DEFAULT_NAME)).isSameAs(recording);
+  }
+
+  @Test
+  public void stoppedRecordingGetsTheStoppedSuffix() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    Recording recording = _server.getRecording();
+
+    _server.onChange(ENABLED_CHANGED, Map.of("pinot.jfr.enabled", "false"));
+
+    // jcmd <pid> JFR.stop name=<name> must find the running recording, not the kept stopped one.
+    assertThat(recording.getName()).isEqualTo(ContinuousJfrStarter.DEFAULT_NAME + ContinuousJfrStarter.STOPPED_SUFFIX);
   }
 
   @Test
