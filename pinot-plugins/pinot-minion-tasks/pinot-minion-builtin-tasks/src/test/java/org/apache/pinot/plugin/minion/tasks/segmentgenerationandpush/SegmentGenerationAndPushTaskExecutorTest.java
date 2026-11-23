@@ -21,7 +21,7 @@ package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 import java.io.File;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -46,8 +46,6 @@ public class SegmentGenerationAndPushTaskExecutorTest {
   public void testGenerateTaskSpec()
       throws Exception {
     ClassLoader classLoader = getClass().getClassLoader();
-    URL resourcesLoc = classLoader.getResource(".");
-    assertNotNull(resourcesLoc);
     URL tableConfigUrl = classLoader.getResource("dummyTable.json");
     assertNotNull(tableConfigUrl);
     String tableConfig = FileUtils.readFileToString(new File(tableConfigUrl.getFile()), StandardCharsets.UTF_8);
@@ -55,7 +53,7 @@ public class SegmentGenerationAndPushTaskExecutorTest {
     Schema schema = new Schema.SchemaBuilder().build();
     FieldUtils.writeField(executor, "_eventObserver", new DefaultMinionEventObserver(), true);
     Map<String, String> configMap = new HashMap<>() {{
-        put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, resourcesLoc + "dummyTable.json");
+        put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, tableConfigUrl.toString());
         put(BatchConfigProperties.INPUT_FORMAT, "");
         put(BatchConfigProperties.RECORD_READER_CLASS, "AReaderClass");
         put(BatchConfigProperties.RECORD_READER_CONFIG_CLASS, "AReaderConfigClass");
@@ -74,17 +72,22 @@ public class SegmentGenerationAndPushTaskExecutorTest {
         put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".propseg2", "valseg2");
         put(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "true");
       }};
-    SegmentGenerationTaskSpec spec = executor.generateTaskSpec(configMap, Paths.get(resourcesLoc.toURI()).toFile());
-    assertEquals(spec.getSequenceId(), 42);
-    assertEquals("file:" + spec.getInputFilePath(), resourcesLoc + "input/dummyTable.json");
-    assertEquals(spec.getRecordReaderSpec().getClassName(), "AReaderClass");
-    assertEquals(spec.getRecordReaderSpec().getConfigClassName(), "AReaderConfigClass");
-    assertEqualsDeep(spec.getRecordReaderSpec().getConfigs(), Map.of("prop1", "value1", "prop.2", "value2"));
-    assertTrue(spec.isFailOnEmptySegment());
-    assertEquals(spec.getSegmentNameGeneratorSpec().getType(), "inputtext");
-    assertEqualsDeep(spec.getSegmentNameGeneratorSpec().getConfigs(),
-        Map.of("prop.seg.1", "valseg1", "propseg2", "valseg2", SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME,
-            "true"));
+    File tempDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
+    try {
+      SegmentGenerationTaskSpec spec = executor.generateTaskSpec(configMap, tempDir);
+      assertEquals(spec.getSequenceId(), 42);
+      assertEquals(spec.getInputFilePath(), new File(tempDir, "input/dummyTable.json").getAbsolutePath());
+      assertEquals(spec.getRecordReaderSpec().getClassName(), "AReaderClass");
+      assertEquals(spec.getRecordReaderSpec().getConfigClassName(), "AReaderConfigClass");
+      assertEqualsDeep(spec.getRecordReaderSpec().getConfigs(), Map.of("prop1", "value1", "prop.2", "value2"));
+      assertTrue(spec.isFailOnEmptySegment());
+      assertEquals(spec.getSegmentNameGeneratorSpec().getType(), "inputtext");
+      assertEqualsDeep(spec.getSegmentNameGeneratorSpec().getConfigs(),
+          Map.of("prop.seg.1", "valseg1", "propseg2", "valseg2",
+              SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME, "true"));
+    } finally {
+      FileUtils.deleteDirectory(tempDir);
+    }
   }
 
   @Test
@@ -104,14 +107,12 @@ public class SegmentGenerationAndPushTaskExecutorTest {
   private void assertAppendUuid(Map<String, String> appendUuidConfigs, String expected)
       throws Exception {
     ClassLoader classLoader = getClass().getClassLoader();
-    URL resourcesLoc = classLoader.getResource(".");
-    assertNotNull(resourcesLoc);
     URL tableConfigUrl = classLoader.getResource("dummyTable.json");
     assertNotNull(tableConfigUrl);
     SegmentGenerationAndPushTaskExecutor executor = new SegmentGenerationAndPushTaskExecutor();
     FieldUtils.writeField(executor, "_eventObserver", new DefaultMinionEventObserver(), true);
     Map<String, String> configMap = new HashMap<>(appendUuidConfigs);
-    configMap.put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, resourcesLoc + "dummyTable.json");
+    configMap.put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, tableConfigUrl.toString());
     configMap.put(BatchConfigProperties.RECORD_READER_CLASS, "AReaderClass");
     configMap.put(BatchConfigProperties.RECORD_READER_CONFIG_CLASS, "AReaderConfigClass");
     configMap.put(BatchConfigProperties.SCHEMA, new Schema.SchemaBuilder().build().toSingleLineJsonString());
@@ -119,8 +120,13 @@ public class SegmentGenerationAndPushTaskExecutorTest {
         FileUtils.readFileToString(new File(tableConfigUrl.getFile()), StandardCharsets.UTF_8));
     configMap.put(BatchConfigProperties.SEQUENCE_ID, "42");
     configMap.put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, "inputFile");
-    SegmentGenerationTaskSpec spec = executor.generateTaskSpec(configMap, Paths.get(resourcesLoc.toURI()).toFile());
-    assertEquals(spec.getSegmentNameGeneratorSpec().getConfigs()
-        .get(SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME), expected);
+    File tempDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
+    try {
+      SegmentGenerationTaskSpec spec = executor.generateTaskSpec(configMap, tempDir);
+      assertEquals(spec.getSegmentNameGeneratorSpec().getConfigs()
+          .get(SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME), expected);
+    } finally {
+      FileUtils.deleteDirectory(tempDir);
+    }
   }
 }
