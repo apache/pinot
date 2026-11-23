@@ -181,7 +181,15 @@
         references at compile time are excluded: it imports classes from pinot-avro, pinot-json,
         pinot-parquet and pinot-minion-builtin-tasks, so those stay. A plugin may only be excluded
         here if pinot-assembly-thin.xml ships it under plugins/, otherwise it disappears from the
-        distribution instead of moving; that is why pinot-compound-metrics stays.
+        distribution instead of moving; that is why pinot-compound-metrics stays. pinot-yammer and
+        pinot-dropwizard stay too: no component starts without a metrics factory, so a launch that
+        selects plugins with PLUGINS_INCLUDE would otherwise have to name one of them.
+
+        The AWS SDK is excluded as well. pinot-tools declares sdk-core and s3 but does not use them,
+        and pinot-s3 and pinot-kinesis load the SDK from plugin-libs/. The shared shade
+        configuration moves the SDK's embedded Jackson to the managed one, so a copy of json-utils
+        in pinot-all would have method signatures that aws-json-protocol in plugin-libs/ does not
+        call.
 
         Declaring these dependencies `provided` in pinot-tools would keep the list next to what it
         describes, but `provided` is not on the runtime classpath, so quickstarts launched from
@@ -241,12 +249,132 @@
               <artifactId>pinot-thrift</artifactId>
             </exclusion>
             <exclusion>
-              <groupId>org.apache.pinot</groupId>
-              <artifactId>pinot-yammer</artifactId>
+              <groupId>software.amazon.awssdk</groupId>
+              <artifactId>*</artifactId>
             </exclusion>
+          </exclusions>
+        </dependency>
+        <!-- Build order only. pinot-assembly-thin.xml requires the jar and the index of every plugin, so
+             each plugin must be built before this module. The plugins above come through pinot-tools;
+             these do not. `provided` without transitive dependencies keeps them out of pinot-all. -->
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-adls</artifactId>
+          <scope>provided</scope>
+          <exclusions>
             <exclusion>
-              <groupId>org.apache.pinot</groupId>
-              <artifactId>pinot-dropwizard</artifactId>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-arrow</artifactId>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-azure</artifactId>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-clp-log</artifactId>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-confluent-json</artifactId>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-confluent-protobuf</artifactId>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-gcs</artifactId>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-hdfs</artifactId>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-segment-uploader-default</artifactId>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-segment-writer-file-based</artifactId>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-timeseries-m3ql</artifactId>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
             </exclusion>
           </exclusions>
         </dependency>

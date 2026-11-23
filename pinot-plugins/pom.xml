@@ -130,14 +130,41 @@
         Thin plugin layout; see the thin-plugins profile in the root pom. A plugin no longer bundles
         its dependencies, so this collects them into target/plugin-libs, from where the
         distribution assembly merges every plugin's into one shared plugin-libs/ store. It also
-        writes pinot-plugin.classpath, the list of store jars this plugin needs, one
-        distribution-relative path per line. The store cannot say which plugin needs which jar,
+        writes pinot-plugin.classpath, the list of store jars this plugin needs, as
+        distribution-relative paths separated by ':' (the launcher also accepts newlines). The
+        separators are set explicitly so that the index is the same on every OS. The store cannot
+        say which plugin needs which jar,
         and the launcher (PLUGINS_INCLUDE) and LaunchSparkDataIngestionJobCommand
         (-pluginsToLoad / -pluginsToExclude) both have to know.
       -->
       <id>thin-plugins</id>
       <build>
         <plugins>
+          <plugin>
+            <!-- copy-dependencies never deletes: without this, a dependency upgrade in an
+                 incremental build leaves the old version in target/plugin-libs, and the assembly
+                 ships both. -->
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-clean-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>clean-plugin-libs</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>clean</goal>
+                </goals>
+                <configuration>
+                  <skip>${plugin.libs.skip}</skip>
+                  <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                  <filesets>
+                    <fileset>
+                      <directory>${project.build.directory}/plugin-libs</directory>
+                    </fileset>
+                  </filesets>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-dependency-plugin</artifactId>
@@ -171,7 +198,8 @@
                   <excludeGroupIds>${plugin.platform.groupIds}</excludeGroupIds>
                   <excludeArtifactIds>${plugin.platform.artifactIds}</excludeArtifactIds>
                   <prefix>plugin-libs</prefix>
-                  <pathSeparator>&#10;</pathSeparator>
+                  <pathSeparator>:</pathSeparator>
+                  <fileSeparator>/</fileSeparator>
                 </configuration>
               </execution>
             </executions>

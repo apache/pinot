@@ -276,6 +276,8 @@
     <hadoop-shaded-protobuf_3_25.version>1.6.0</hadoop-shaded-protobuf_3_25.version>
     <!-- Keep at the version hadoop-common declares; pinot-patched-hadoop-shaded-guava rebuilds it. -->
     <hadoop-shaded-guava.version>1.5.0</hadoop-shaded-guava.version>
+    <!-- Managed only in the thin-plugins profile, see there. -->
+    <threeten-extra.version>1.8.0</threeten-extra.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
     <datasketches-java.version>9.0.0</datasketches-java.version>
     <picocli.version>4.7.7</picocli.version>
@@ -480,6 +482,18 @@
         <shade.guava.prefix>com.google.common</shade.guava.prefix>
         <shade.scala.prefix>org.scala-lang</shade.scala.prefix>
       </properties>
+      <dependencyManagement>
+        <dependencies>
+          <!-- orc-core and google-cloud-storage ask for different versions. In the shared plugin-libs/
+               store both would be on the class path of a launch without a plugin selection.
+               ThinDistributionCheck fails on a store with two versions of one artifact. -->
+          <dependency>
+            <groupId>org.threeten</groupId>
+            <artifactId>threeten-extra</artifactId>
+            <version>${threeten-extra.version}</version>
+          </dependency>
+        </dependencies>
+      </dependencyManagement>
       <build>
         <plugins>
           <plugin>
