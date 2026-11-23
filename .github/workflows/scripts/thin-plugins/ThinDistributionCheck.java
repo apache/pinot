@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassModel;
+import java.lang.classfile.ClassTransform;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.constantpool.FieldRefEntry;
 import java.lang.classfile.constantpool.MemberRefEntry;
@@ -561,6 +562,16 @@ public class ThinDistributionCheck {
       m = ClassFile.of().parse(bytes);
     } catch (IllegalArgumentException e) {
       return null;
+    }
+    // A constant pool can hold class entries that no code uses, for example left behind when a library
+    // relocated its own copy of another one. The JVM never resolves them. Rewrite the class with a new
+    // pool, which keeps only the entries in use, as maven-shade-plugin does for the classes it
+    // relocates. Without this, such an entry is a problem in the thin layout and not in the default one.
+    try {
+      m = ClassFile.of().parse(ClassFile.of(ClassFile.ConstantPoolSharingOption.NEW_POOL,
+          ClassFile.StackMapsOption.DROP_STACK_MAPS).transformClass(m, ClassTransform.ACCEPT_ALL));
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      // Keep the original pool.
     }
     Set<String> fields = new HashSet<>();
     m.fields().forEach(f -> fields.add(f.fieldName().stringValue() + f.fieldType().stringValue()));
