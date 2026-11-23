@@ -61,11 +61,6 @@ abstract class JacksonPayloadParser implements JsonPayloadParser {
   }
 
   @Override
-  public boolean supportsParseValue() {
-    return true;
-  }
-
-  @Override
   public JsonNode parseValue(byte[] payload, int offset, int length)
       throws Exception {
     JsonNode node = _strictTreeReader.readTree(payload, offset, length);

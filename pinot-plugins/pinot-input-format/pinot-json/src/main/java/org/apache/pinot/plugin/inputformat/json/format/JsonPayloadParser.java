@@ -72,11 +72,6 @@ public interface JsonPayloadParser {
     return false;
   }
 
-  /// Whether [#parseValue] is supported by this parser.
-  default boolean supportsParseValue() {
-    return false;
-  }
-
   /// Parses the whole payload as a single JSON value of any type (object, array, string, number, boolean or null).
   /// Rejects trailing content after the value and empty payloads.
   default JsonNode parseValue(byte[] payload, int offset, int length)

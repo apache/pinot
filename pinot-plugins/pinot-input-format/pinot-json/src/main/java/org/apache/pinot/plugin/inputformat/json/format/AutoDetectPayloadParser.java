@@ -43,11 +43,6 @@ class AutoDetectPayloadParser implements JsonPayloadParser {
   }
 
   @Override
-  public boolean supportsParseValue() {
-    return true;
-  }
-
-  @Override
   public JsonNode parseValue(byte[] payload, int offset, int length)
       throws Exception {
     return JsonPayloadFormat.detectParser(payload, offset, length).parseValue(payload, offset, length);

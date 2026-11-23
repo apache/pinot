@@ -88,13 +88,14 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     // Direct parsing implements JSONRecordExtractor's conversion contract and bypasses extract(). Require the
     // exact default class so a configured extractor or subclass cannot lose custom extraction behavior.
     _usesDefaultRecordExtractor = _jsonRecordExtractor.getClass() == JSONRecordExtractor.class;
-    _parser = JsonPayloadFormat.fromConfig(jsonFormat).getParser();
+    JsonPayloadFormat format = JsonPayloadFormat.fromConfig(jsonFormat);
+    _parser = format.getParser();
     _readWholeValue = fieldsToRead != null && fieldsToRead.contains(StreamDataDecoderImpl.VALUE_KEY);
     if (_readWholeValue) {
       Preconditions.checkArgument(_usesDefaultRecordExtractor,
           "'%s' cannot be combined with a custom record extractor", StreamDataDecoderImpl.VALUE_KEY);
-      Preconditions.checkArgument(_parser.supportsParseValue(), "'%s' is not supported for JSON format: %s",
-          StreamDataDecoderImpl.VALUE_KEY, jsonFormat);
+      Preconditions.checkArgument(format != JsonPayloadFormat.SQLITE_JSONB,
+          "'%s' is not supported for jsonFormat SQLITE_JSONB", StreamDataDecoderImpl.VALUE_KEY);
     }
   }
 
