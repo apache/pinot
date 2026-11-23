@@ -1359,13 +1359,33 @@ public abstract class BaseTableDataManager implements TableDataManager {
           SegmentDirectory segmentDirectory =
               initSegmentDirectory(segmentName, zkMetadata.getCrc(), indexLoadingConfig, zkMetadata);
           // We should first try to reuse existing segment directory
-          if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
+          SegmentDirectory reusableDirectory;
+          try {
+            reusableDirectory =
+                getReusableDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig);
+          } catch (Exception e) {
+            closeSegmentDirectoryQuietly(segmentDirectory);
+            throw e;
+          }
+          if (reusableDirectory == segmentDirectory) {
             _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed",
                 segmentName);
             // No reprocessing needed, reuse the same segment
             ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
             addSegment(segment, zkMetadata);
             return;
+          }
+          if (reusableDirectory != null) {
+            if (restoreValidDocIdsOnDiskBitmap) {
+              // The validDocIds bitmap lives only in the local copy, so the reload must carry it over by copying.
+              closeSegmentDirectoryQuietly(reusableDirectory);
+            } else {
+              _logger.info("Reloading segment: {} using the directory already prepared on tier: {}", segmentName,
+                  TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
+              closeSegmentDirectoryQuietly(segmentDirectory);
+              loadReusedDirectory(indexDir, reusableDirectory, indexLoadingConfig, zkMetadata);
+              return;
+            }
           }
           // Create backup directory to handle failure of segment reloading.
           createBackup(indexDir);
@@ -1415,13 +1435,48 @@ public abstract class BaseTableDataManager implements TableDataManager {
         || zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.UPLOADED;
   }
 
-  protected boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
-      SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
+  /// Returns a directory that a reload without download can load as is, or null when the reload must copy the current
+  /// directory out and reprocess it, e.g. to move the segment to another tier.
+  ///
+  /// `currentDirectory` is the segment's directory on its current tier. The default returns it when the segment stays
+  /// on that tier and needs no reprocessing.
+  ///
+  /// Extensions may return another directory, e.g. a copy of the segment that another replica already prepared on the
+  /// target tier. Such a directory must hold the segment with the CRC in `zkMetadata`, be opened for the target tier
+  /// (`zkMetadata.getTier()`), and need no reprocessing for it. The reload then closes `currentDirectory`, loads the
+  /// returned directory, and removes the local copy on the current tier. A table that restores the validDocIds bitmap
+  /// on reload never loads another directory, since the bitmap lives only in the local copy.
+  ///
+  /// Called under the segment lock.
+  @Nullable
+  protected SegmentDirectory getReusableDirectoryForReload(SegmentZKMetadata zkMetadata,
+      @Nullable String currentSegmentTier, SegmentDirectory currentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
-    return !segmentDirectoryLoader.needsTierMigration(segmentZKMetadata.getTier(), currentSegmentTier)
-        && !ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
+    boolean canReuse = !segmentDirectoryLoader.needsTierMigration(zkMetadata.getTier(), currentSegmentTier)
+        && !ImmutableSegmentLoader.needPreprocess(currentDirectory, indexLoadingConfig);
+    return canReuse ? currentDirectory : null;
+  }
+
+  /// Loads a directory other than the current one, returned by [#getReusableDirectoryForReload], in place of the
+  /// segment. The directory serves the segment on its target tier, so the local copy on the current tier is moved to
+  /// the backup directory first. If loading fails, the caller's reload failure recovery restores it; once the segment
+  /// is replaced, it is removed, so that no later load of the segment finds it.
+  private void loadReusedDirectory(File indexDir, SegmentDirectory segmentDirectory,
+      IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata)
+      throws Exception {
+    ImmutableSegment segment;
+    try {
+      createBackup(indexDir);
+      segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig.copyWithSegmentTier(
+          zkMetadata.getTier()));
+    } catch (Exception e) {
+      closeSegmentDirectoryQuietly(segmentDirectory);
+      throw e;
+    }
+    addSegment(segment, zkMetadata);
+    removeBackup(indexDir);
   }
 
   /// \_segmentDataManagerMap is used for fetching segments that need to be queried. If a new segment is created,
@@ -2182,6 +2237,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected SegmentDirectory initSegmentDirectory(String segmentName, long segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
+    SegmentDirectoryLoader segmentDirectoryLoader =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
+    File indexDir =
+        getSegmentDataDir(segmentName, indexLoadingConfig.getSegmentTier(), indexLoadingConfig.getTableConfig());
+    return segmentDirectoryLoader.load(indexDir.toURI(),
+        createSegmentDirectoryLoaderContext(segmentName, segmentCrc, indexLoadingConfig, zkMetadata));
+  }
+
+  /// Creates the context with which [#initSegmentDirectory] loads the segment's directory on the tier of
+  /// `indexLoadingConfig`.
+  protected SegmentDirectoryLoaderContext createSegmentDirectoryLoaderContext(String segmentName, long segmentCrc,
+      IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata) {
     SegmentDirectoryLoaderContext loaderContext = new SegmentDirectoryLoaderContext.Builder()
         .setReadMode(indexLoadingConfig.getReadMode())
         .setTableConfig(indexLoadingConfig.getTableConfig())
@@ -2194,12 +2261,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
         .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
         .build();
-    SegmentDirectoryLoader segmentDirectoryLoader =
-        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
-    File indexDir =
-        getSegmentDataDir(segmentName, indexLoadingConfig.getSegmentTier(), indexLoadingConfig.getTableConfig());
-    return segmentDirectoryLoader.load(indexDir.toURI(), indexLoadingConfig.isMappedSegmentMetadataEnabled()
-        ? loaderContext.withMappedMetadataEnabled() : loaderContext);
+    return indexLoadingConfig.isMappedSegmentMetadataEnabled() ? loaderContext.withMappedMetadataEnabled()
+        : loaderContext;
   }
 
   // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of

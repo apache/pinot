@@ -75,6 +75,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -92,6 +93,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
@@ -464,6 +466,80 @@ public class BaseTableDataManagerTest {
     assertTrue(tierDataDir.exists());
     assertFalse(indexDir.exists());
     assertEquals(new SegmentMetadataImpl(tierDataDir).getTotalDocs(), 5);
+  }
+
+  /// A reload that moves the segment to another tier loads the directory [BaseTableDataManager
+  /// #getReusableDirectoryForReload] returns for that tier, instead of copying the local segment over, and removes the
+  /// local copy on the current tier so that no later load finds it.
+  @Test
+  public void testReloadSegmentNewTierLoadsReusableDirectory()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    long crc = getCRC(indexDir);
+    File preparedDir = new File(new File(TEMP_DIR, "prepared"), SEGMENT_NAME);
+    FileUtils.copyDirectory(indexDir, preparedDir);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(crc);
+    zkMetadata.setTier(TIER_NAME);
+
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, crc));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> createTierIndexLoadingConfig(TIER_TABLE_CONFIG))
+        .when(tableDataManager).fetchIndexLoadingConfig();
+    SegmentDirectory preparedDirectory = loadSegmentDirectory(preparedDir, TIER_NAME);
+    doAnswer(invocation -> {
+      SegmentDirectory reusableDirectory = (SegmentDirectory) invocation.callRealMethod();
+      assertNull(reusableDirectory, "The default must not reuse the current-tier directory across tiers");
+      return preparedDirectory;
+    }).when(tableDataManager).getReusableDirectoryForReload(any(), any(), any(), any());
+
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
+    ImmutableSegment segment = (ImmutableSegment) tableDataManager.getSegmentDataManager(SEGMENT_NAME).getSegment();
+    assertEquals(segment.getTier(), TIER_NAME);
+    assertEquals(segment.getSegmentMetadata().getIndexDir(), preparedDir);
+    assertFalse(indexDir.exists());
+    assertFalse(tableDataManager.getSegmentDataDir(SEGMENT_NAME, TIER_NAME, TIER_TABLE_CONFIG).exists());
+    assertFalse(tableDataManager.getSegmentDataDir(SEGMENT_NAME + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX)
+        .exists());
+    verify(tableDataManager, never()).downloadSegment(any());
+  }
+
+  /// When the directory [BaseTableDataManager#getReusableDirectoryForReload] returns fails to load, the reload fails,
+  /// closes that directory, and restores the local copy on the current tier.
+  @Test
+  public void testReloadSegmentRestoresLocalCopyWhenReusableDirectoryFailsToLoad()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    long crc = getCRC(indexDir);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(crc);
+    zkMetadata.setTier(TIER_NAME);
+
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, crc));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG))
+        .when(tableDataManager).fetchIndexLoadingConfig();
+    SegmentDirectory brokenDirectory = mock(SegmentDirectory.class);
+    when(brokenDirectory.getSegmentMetadata()).thenThrow(new IllegalStateException("broken copy"));
+    doReturn(brokenDirectory).when(tableDataManager).getReusableDirectoryForReload(any(), any(), any(), any());
+
+    expectThrows(IllegalStateException.class, () -> tableDataManager.reloadSegment(SEGMENT_NAME, false, null));
+    verify(brokenDirectory).close();
+    assertTrue(indexDir.exists());
+    assertEquals(getCRC(indexDir), crc);
+    assertFalse(tableDataManager.getSegmentDataDir(SEGMENT_NAME + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX)
+        .exists());
+  }
+
+  private static SegmentDirectory loadSegmentDirectory(File indexDir, String tier)
+      throws Exception {
+    SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(
+        indexDir.toURI(), new SegmentDirectoryLoaderContext.Builder().setTableConfig(DEFAULT_TABLE_CONFIG)
+            .setSchema(SCHEMA).setSegmentName(SEGMENT_NAME).setReadMode(ReadMode.mmap).build());
+    segmentDirectory.setTier(tier);
+    return segmentDirectory;
   }
 
   /// Regression test for https://github.com/apache/pinot/issues/18164: the table-level config passed into reload is
