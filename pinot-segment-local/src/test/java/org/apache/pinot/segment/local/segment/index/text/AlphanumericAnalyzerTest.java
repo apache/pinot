@@ -171,35 +171,36 @@ public class AlphanumericAnalyzerTest {
     assertTrue(((AlphanumericAnalyzer) resolvedCaseSensitive).isCaseSensitive());
   }
 
-  /// A run of token characters longer than the limit is split at it rather than truncated or
-  /// dropped, so an oversized identifier yields a full-length term plus a tail term.
+  /// A long run splits into multiple terms while preserving whole Unicode code points.
   @Test
   public void testTokenLengthBoundary()
       throws IOException {
-    Analyzer analyzer = new AlphanumericAnalyzer();
-    int max = AlphanumericAnalyzer.MAX_TOKEN_LENGTH;
-
-    assertEquals(tokenize(analyzer, "a".repeat(max)), List.of("a".repeat(max)));
-    assertEquals(tokenize(analyzer, "a".repeat(max + 1)), List.of("a".repeat(max), "a"));
-    assertEquals(tokenize(analyzer, "A".repeat(max) + "BC"), List.of("a".repeat(max), "bc"));
-    assertEquals(tokenize(analyzer, "a".repeat(2 * max)), List.of("a".repeat(max), "a".repeat(max)));
-    // Only an unbroken run is affected: a separator restarts the count.
-    assertEquals(tokenize(analyzer, "a".repeat(max) + " b"), List.of("a".repeat(max), "b"));
+    int threshold = AlphanumericAnalyzer.TOKEN_SPLIT_THRESHOLD;
+    try (Analyzer analyzer = new AlphanumericAnalyzer()) {
+      String head = "a".repeat(threshold);
+      assertEquals(tokenize(analyzer, head), List.of(head));
+      assertEquals(tokenize(analyzer, head + "a"), List.of(head, "a"));
+      assertEquals(tokenize(analyzer, "A".repeat(threshold) + "BC"), List.of(head, "bc"));
+      assertEquals(tokenize(analyzer, head + head), List.of(head, head));
+      assertEquals(tokenize(analyzer, head + " b"), List.of(head, "b"));
+      // A supplementary Deseret letter spans the threshold and lowercases as a whole code point.
+      String beforeBoundary = "a".repeat(threshold - 1);
+      assertEquals(tokenize(analyzer, beforeBoundary + "𐐀BC"), List.of(beforeBoundary + "𐐨", "bc"));
+    }
   }
 
-  /// The split is visible to queries. The tail of an oversized identifier is an ordinary term, the
-  /// identifier itself is never one, and a prefix longer than the limit is normalized into a single
-  /// term that no document can carry.
+  /// Queries operate on the emitted terms, including the separate tail of an oversized identifier.
   @Test
-  public void testLongIdentifierTermAndPrefixSearch()
+  public void testLongIdentifierSearch()
       throws Exception {
-    int max = AlphanumericAnalyzer.MAX_TOKEN_LENGTH;
-    String head = "a".repeat(max);
+    int threshold = AlphanumericAnalyzer.TOKEN_SPLIT_THRESHOLD;
+    String head = "A".repeat(threshold);
+    String supplementaryHead = "D".repeat(threshold - 1) + "𐐀";
 
     try (Analyzer analyzer = new AlphanumericAnalyzer(); Directory directory = new ByteBuffersDirectory()) {
       try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(analyzer))) {
         Document document = new Document();
-        document.add(new TextField(FIELD, "A".repeat(max) + "BC", Field.Store.NO));
+        document.add(new TextField(FIELD, head + "BC " + supplementaryHead + "EF", Field.Store.NO));
         writer.addDocument(document);
       }
       try (DirectoryReader reader = DirectoryReader.open(directory)) {
@@ -208,15 +209,22 @@ public class AlphanumericAnalyzerTest {
 
         // The head is indexed at exactly the limit and the tail becomes a term of its own, so the
         // last two characters alone match the document.
-        assertEquals(searcher.count(new TermQuery(new Term(FIELD, head))), 1);
+        String indexedHead = "a".repeat(threshold);
+        assertEquals(searcher.count(new TermQuery(new Term(FIELD, indexedHead))), 1);
         assertEquals(searcher.count(new TermQuery(new Term(FIELD, "bc"))), 1);
         // The whole identifier is never a single term.
-        assertEquals(searcher.count(new TermQuery(new Term(FIELD, head + "bc"))), 0);
+        assertEquals(searcher.count(new TermQuery(new Term(FIELD, indexedHead + "bc"))), 0);
 
-        // A prefix within the limit matches; one past it cannot, since no indexed term is longer.
-        assertEquals(searcher.count(parser.parse("A".repeat(max - 1) + "*")), 1);
-        assertEquals(searcher.count(parser.parse("A".repeat(max) + "*")), 1);
-        assertEquals(searcher.count(parser.parse("A".repeat(max + 1) + "*")), 0);
+        // A literal prefix cannot span a token split.
+        String shorterHead = "A".repeat(threshold - 1);
+        assertEquals(searcher.count(parser.parse(shorterHead + "*")), 1);
+        assertEquals(searcher.count(parser.parse(head + "*")), 1);
+        assertEquals(searcher.count(parser.parse(head + "B*")), 0);
+        assertEquals(searcher.count(parser.parse(supplementaryHead + "*")), 1);
+
+        // Wildcards can match an empty string, and fuzzy matching allows one edit.
+        assertEquals(searcher.count(parser.parse(shorterHead + "*A*")), 1);
+        assertEquals(searcher.count(parser.parse(head + "X~1")), 1);
       }
     }
   }

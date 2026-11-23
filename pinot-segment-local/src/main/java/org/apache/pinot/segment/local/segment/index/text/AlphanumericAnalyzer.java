@@ -28,8 +28,7 @@ import org.apache.lucene.analysis.util.CharTokenizer;
 /// An [Analyzer] that splits on every non-alphanumeric character and, by default, lowercases the
 /// result — so `email_server.rb` yields `email`, `server`, `rb`, and `HTTP2` yields `http2`.
 ///
-/// This fills a gap between the two analyzers Pinot already offers for log and identifier-heavy
-/// text, neither of which tokenizes the way most search engines do:
+/// It is useful for logs and identifier-heavy text where both punctuation and digits matter.
 ///
 /// | Analyzer | `send_email` | `200` | `1YMWWN1N4O` |
 /// |---|---|---|---|
@@ -46,34 +45,29 @@ import org.apache.lucene.analysis.util.CharTokenizer;
 /// the configured analyzer to queries as well as to documents, so the term a user searches for is
 /// discarded in exactly the same way.
 ///
-/// On ASCII input this is the behaviour of Elasticsearch's `char_group` tokenizer over whitespace,
-/// punctuation and symbols plus `lowercase`, of ClickHouse's `splitByNonAlpha`, and of a
-/// `[a-zA-Z0-9]+` pattern tokenizer. It is a good default for logs, URLs, stack traces, and
-/// anything carrying status codes, ports, versions or generated identifiers.
-///
-/// Outside ASCII it is deliberately broader than those: a token character is whatever
-/// [Character#isLetterOrDigit(int)] accepts, so accented letters, CJK ideographs and Arabic-Indic
-/// digits are kept rather than treated as separators. `Café` yields `café`, where a `[a-zA-Z0-9]+`
-/// pattern tokenizer would cut it down to `caf`.
+/// For ASCII runs that fit within the split threshold, token boundaries follow the pattern
+/// `[a-zA-Z0-9]+`. The tokenizer also accepts Unicode code points recognized by
+/// [Character#isLetterOrDigit(int)], including accented letters, CJK ideographs and Arabic-Indic
+/// digits. For example, `Café` yields `café` in the default lowercase mode.
 ///
 /// ## Token length
 ///
-/// A run of token characters longer than [#MAX_TOKEN_LENGTH] is **split** at that boundary — not
-/// truncated and not dropped — which is the same limit and the same policy as
-/// [org.apache.lucene.analysis.standard.StandardAnalyzer]'s default. Two consequences matter for
-/// very long identifiers. The tail of an oversized run becomes a term in its own right, so a
-/// 257-character identifier is also matched by a term query for its last two characters. And a
-/// prefix, wildcard or fuzzy query longer than [#MAX_TOKEN_LENGTH] can never match, because such a
-/// query is normalized as one term and no indexed term is longer than that.
+/// The tokenizer emits a term when it reaches 255 UTF-16 code units, then begins another term if
+/// the run continues. It keeps each code point whole, so a supplementary letter that crosses the
+/// threshold can produce a term of 256 code units. For example, the last two characters of a
+/// 257-character ASCII identifier become a separate searchable term.
 ///
-/// ## Switching an existing column to this analyzer
+/// A literal prefix can match only if a single indexed term starts with it. Wildcard operators
+/// match patterns within each term, and fuzzy queries can match a shorter term within their
+/// permitted edit distance.
 ///
-/// A text index records the analyzer it was built with, and the Lucene reader restores that saved
-/// configuration in preference to the current table config. A reload does not rebuild the index
-/// either: the text index handler compares only the index storage format, never the analyzer. So
-/// after a config-only switch from [org.apache.lucene.analysis.core.SimpleAnalyzer], segments built
-/// earlier keep their old tokenization and still miss `200` while newly built segments match it.
-/// Rebuild the text indexes or regenerate those segments for the change to take effect everywhere.
+/// ## Switching an existing single-column text index to this analyzer
+///
+/// The reader restores the analyzer settings saved in the text index. Changing only the analyzer
+/// in the table configuration leaves existing single-column text indexes in place on reload.
+/// After switching from [org.apache.lucene.analysis.core.SimpleAnalyzer], newly built segments
+/// can match `200` as a term. Rebuild the existing text indexes or regenerate their segments to
+/// make the new tokenization available across the table.
 ///
 /// Select it per column with `luceneAnalyzerClass`, optionally preserving case:
 ///
@@ -89,10 +83,9 @@ import org.apache.lucene.analysis.util.CharTokenizer;
 /// [Analyzer]'s reuse strategy.
 public class AlphanumericAnalyzer extends Analyzer {
 
-  /// The longest run of token characters emitted as a single term; a longer run is split at this
-  /// boundary rather than truncated. This is the default of the [CharTokenizer] factory below, and
-  /// matches [org.apache.lucene.analysis.standard.StandardAnalyzer]'s default token length.
-  public static final int MAX_TOKEN_LENGTH = CharTokenizer.DEFAULT_MAX_WORD_LEN;
+  /// The default [CharTokenizer] split threshold in UTF-16 code units. A supplementary code point
+  /// can carry a term one code unit past it.
+  static final int TOKEN_SPLIT_THRESHOLD = CharTokenizer.DEFAULT_MAX_WORD_LEN;
 
   private final boolean _caseSensitive;
 
@@ -120,10 +113,8 @@ public class AlphanumericAnalyzer extends Analyzer {
     return new TokenStreamComponents(tokenizer, _caseSensitive ? tokenizer : new LowerCaseFilter(tokenizer));
   }
 
-  /// Applies the same case folding to single-token input that [#createComponents(String)] applies
-  /// to documents. Lucene calls this for the terms of multi-term queries — wildcard, prefix, range
-  /// and fuzzy — which are never tokenized, so without it a query such as `HTTP*` would be matched
-  /// against a lowercased index and find nothing.
+  /// Applies the same case handling as document analysis to query text that Lucene normalizes
+  /// without tokenizing. For example, `HTTP*` can match the indexed term `http2` in lowercase mode.
   @Override
   protected TokenStream normalize(String fieldName, TokenStream in) {
     return _caseSensitive ? in : new LowerCaseFilter(in);
