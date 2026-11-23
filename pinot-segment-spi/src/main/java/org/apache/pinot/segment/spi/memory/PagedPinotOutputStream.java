@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.memory;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -41,6 +42,14 @@ import javax.annotation.concurrent.NotThreadSafe;
 /// as one [DataBuffer].
 @NotThreadSafe
 public class PagedPinotOutputStream extends PinotOutputStream {
+  /// [#writeInts] and [#writeFloats] copy at least this many values that go to one page through a typed view of the
+  /// page, and put fewer one at a time. With JMH on JDK 25.0.5, writing into heap and direct pages, the copy at 256
+  /// values was 2 to 11% faster than one value at a time on an Intel Xeon 6973P-C, within 5% either way on an
+  /// AMD EPYC 7763, at most 5% slower on a Neoverse N2, and 8 to 11% slower for ints and 4 to 5% faster for floats on
+  /// an Apple M3 Max.
+  @VisibleForTesting
+  static final int MIN_BULK_WRITE_VALUES = 256;
+
   private final PageAllocator _allocator;
   private final int _pageSize;
   private final ArrayList<ByteBuffer> _pages;
@@ -214,9 +223,9 @@ public class PagedPinotOutputStream extends PinotOutputStream {
   }
 
   /// Puts as many values as fit in the rest of the current page straight into it, then continues on the next page.
-  /// When at least [PrimitiveArrays#MIN_BULK_VALUES] values go to one page, they are copied through a big-endian typed
-  /// view of it; fewer values are put one at a time, since the copy through a view has a fixed cost. The position
-  /// depends on everything written before, so a page boundary can fall inside a value: such a value is written with
+  /// When at least [#MIN_BULK_WRITE_VALUES] values go to one page, they are copied through a big-endian typed view of
+  /// it; fewer values are put one at a time, since the copy through a view has a fixed cost. The position depends on
+  /// everything written before, so a page boundary can fall inside a value: such a value is written with
   /// [#writeInt(int)], which splits it across the two pages.
   @Override
   public void writeInts(int[] values, int offset, int length)
@@ -229,7 +238,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         writeInt(values[i++]);
         continue;
       }
-      if (numValues < PrimitiveArrays.MIN_BULK_VALUES) {
+      if (numValues < MIN_BULK_WRITE_VALUES) {
         int position = _offsetInPage;
         for (int j = i; j < i + numValues; j++, position += Integer.BYTES) {
           _currentPage.putInt(position, values[j]);
@@ -242,7 +251,10 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     }
   }
 
-  /// Same as [#writeInts(int[], int, int)], for longs, with [#writeLong(long)] for a value split across two pages.
+  /// Same as [#writeInts(int[], int, int)], for longs, with [#writeLong(long)] for a value split across two pages,
+  /// except that every value is put one at a time: with JMH on JDK 25.0.5, a copy through a typed view of a heap or
+  /// direct page was slower at every length measured, up to 4096 longs or doubles, on Intel Xeon 6973P-C, AMD EPYC 7763
+  /// and Apple M3 Max machines. On a Neoverse N2 it was slower for longs, and 6 to 20% faster from 1024 doubles up.
   @Override
   public void writeLongs(long[] values, int offset, int length)
       throws IOException {
@@ -254,20 +266,17 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         writeLong(values[i++]);
         continue;
       }
-      if (numValues < PrimitiveArrays.MIN_BULK_VALUES) {
-        int position = _offsetInPage;
-        for (int j = i; j < i + numValues; j++, position += Long.BYTES) {
-          _currentPage.putLong(position, values[j]);
-        }
-      } else {
-        currentPageView().asLongBuffer().put(values, i, numValues);
+      int position = _offsetInPage;
+      for (int j = i; j < i + numValues; j++, position += Long.BYTES) {
+        _currentPage.putLong(position, values[j]);
       }
       i += numValues;
       advance(numValues * Long.BYTES);
     }
   }
 
-  /// Same as [#writeInts(int[], int, int)], for floats written as raw bits.
+  /// Same as [#writeInts(int[], int, int)], for floats written as raw bits, copied through a typed view from
+  /// [#MIN_BULK_WRITE_VALUES] values in one page up.
   @Override
   public void writeFloats(float[] values, int offset, int length)
       throws IOException {
@@ -280,7 +289,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         writeInt(Float.floatToRawIntBits(values[i++]));
         continue;
       }
-      if (numValues < PrimitiveArrays.MIN_BULK_VALUES) {
+      if (numValues < MIN_BULK_WRITE_VALUES) {
         int position = _offsetInPage;
         for (int j = i; j < i + numValues; j++, position += Float.BYTES) {
           _currentPage.putInt(position, Float.floatToRawIntBits(values[j]));
@@ -293,7 +302,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     }
   }
 
-  /// Same as [#writeInts(int[], int, int)], for doubles written as raw bits.
+  /// Same as [#writeLongs(long[], int, int)], for doubles written as raw bits.
   @Override
   public void writeDoubles(double[] values, int offset, int length)
       throws IOException {
@@ -302,17 +311,13 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     while (i < end) {
       int numValues = Math.min(end - i, remainingInPage() / Double.BYTES);
       if (numValues == 0) {
-        // Raw bits, like the typed view (and ByteBuffer#putDouble): writeDouble() would canonicalize NaN.
+        // Raw bits, like ByteBuffer#putDouble: writeDouble() would canonicalize NaN.
         writeLong(Double.doubleToRawLongBits(values[i++]));
         continue;
       }
-      if (numValues < PrimitiveArrays.MIN_BULK_VALUES) {
-        int position = _offsetInPage;
-        for (int j = i; j < i + numValues; j++, position += Double.BYTES) {
-          _currentPage.putLong(position, Double.doubleToRawLongBits(values[j]));
-        }
-      } else {
-        currentPageView().asDoubleBuffer().put(values, i, numValues);
+      int position = _offsetInPage;
+      for (int j = i; j < i + numValues; j++, position += Double.BYTES) {
+        _currentPage.putLong(position, Double.doubleToRawLongBits(values[j]));
       }
       i += numValues;
       advance(numValues * Double.BYTES);

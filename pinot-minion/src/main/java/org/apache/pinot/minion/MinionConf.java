@@ -70,6 +70,14 @@ public class MinionConf extends PinotConfiguration {
     return instanceId != null ? instanceId : getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY);
   }
 
+  @SuppressWarnings("deprecation") // Falls back to the legacy un-prefixed key for backward compatibility
+  public String getDataDir() {
+    String dataDir = getProperty(CommonConstants.Minion.CONFIG_OF_MINION_DATA_DIR);
+    return dataDir != null
+        ? dataDir
+        : getProperty(CommonConstants.Helix.Instance.DATA_DIR_KEY, CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR);
+  }
+
   public int getEndReplaceSegmentsTimeoutMs() {
     return getProperty(END_REPLACE_SEGMENTS_TIMEOUT_MS_KEY, DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS);
   }

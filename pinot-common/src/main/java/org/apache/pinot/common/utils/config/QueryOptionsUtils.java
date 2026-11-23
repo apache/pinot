@@ -1056,6 +1056,11 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK));
   }
 
+  /// Returns whether `cosineDistance` may reuse approximate distances from a paired vector index search.
+  public static boolean isVectorApproximateDistance(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_APPROXIMATE_DISTANCE));
+  }
+
   @Nullable
   public static Boolean getVectorExactRerank(Map<String, String> queryOptions) {
     String exactRerank = queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK);
@@ -1112,6 +1117,14 @@ public class QueryOptionsUtils {
         queryOptions.get(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE));
   }
 
+  /// Returns whether the response must describe the spool decisions of the multi-stage planner. Defaults to `false`.
+  ///
+  /// @throws IllegalArgumentException if the option is set to a value other than `true` or `false`
+  public static boolean isSpoolsFeedback(Map<String, String> queryOptions) {
+    return Boolean.TRUE.equals(checkedParseBooleanNullable(QueryOptionKey.SPOOLS_FEEDBACK,
+        queryOptions.get(QueryOptionKey.SPOOLS_FEEDBACK)));
+  }
+
   @Nullable
   private static Boolean checkedParseBooleanNullable(String optionName, @Nullable String optionValue) {
     if (optionValue == null) {
@@ -1146,5 +1159,11 @@ public class QueryOptionsUtils {
     Integer value =
         uncheckedParseInt(QueryOptionKey.SEALED_IN_LIST_THRESHOLD, threshold != null ? threshold.trim() : null);
     return value != null ? value : defaultValue;
+  }
+
+  /// Returns the [QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY] option, or `defaultValue` when the option is not set.
+  public static boolean isPreferSelectAliasInGroupBy(Map<String, String> options, boolean defaultValue) {
+    String option = options.get(QueryOptionKey.PREFER_SELECT_ALIAS_IN_GROUP_BY);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 }

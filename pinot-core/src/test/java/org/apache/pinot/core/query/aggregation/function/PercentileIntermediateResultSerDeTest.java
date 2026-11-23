@@ -35,6 +35,7 @@ import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
+import org.apache.pinot.segment.spi.memory.PrimitiveArrays;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -108,9 +109,9 @@ public class PercentileIntermediateResultSerDeTest {
         // Fills the exact capacity, then grows past it.
         {new DoubleArrayList(new double[]{1, 2}), sequence(1)},
         {sequence(1000), sequence(3000)},
-        // Both sides of PrimitiveArrays.MIN_BULK_VALUES: read one value at a time, then in bulk.
-        {sequence(7), sequence(63)},
-        {sequence(7), sequence(64)},
+        // Both sides of PrimitiveArrays.MIN_BULK_READ_VALUES: read one value at a time, then in bulk.
+        {sequence(7), sequence(PrimitiveArrays.MIN_BULK_READ_VALUES - 1)},
+        {sequence(7), sequence(PrimitiveArrays.MIN_BULK_READ_VALUES)},
         {sequence(2), new DoubleArrayList(new double[]{Double.longBitsToDouble(0x7ff8_0000_0000_0123L), -0.0})}
     };
   }
@@ -143,9 +144,7 @@ public class PercentileIntermediateResultSerDeTest {
     // A NaN with a payload keeps its raw bits.
     DoubleArrayList specialValues = new DoubleArrayList(
         new double[]{Double.NaN, Double.longBitsToDouble(0x7ff8_0000_0000_0123L), -0.0, Double.NEGATIVE_INFINITY});
-    // Both sides of PrimitiveArrays.MIN_BULK_VALUES (63 and 64) switch from per-value puts to the bulk view.
-    for (DoubleArrayList values : List.of(sequence(0), sequence(1), sequence(63), sequence(64), sequence(1000),
-        sequence(5000), specialValues)) {
+    for (DoubleArrayList values : List.of(sequence(0), sequence(1), sequence(1000), sequence(5000), specialValues)) {
       AggregationFunction.SerializedResult expected = _byteArrayFunction.serializeIntermediateResult(values);
       AggregationFunction.SerializedResult actual = _function.serializeIntermediateResult(values);
 

@@ -176,6 +176,44 @@ public class ObjectSerDeUtils {
     }
   };
 
+  /// Writes the number of values, then the first `numValues` of `values`.
+  private static void serializeLongs(long[] values, int numValues, ByteBuffer buffer) {
+    buffer.putInt(numValues);
+    for (int i = 0; i < numValues; i++) {
+      buffer.putLong(values[i]);
+    }
+  }
+
+  /// Serializes a `long[]` in the format of [#LONG_ARRAY_LIST_SER_DE].
+  public static final SizedObjectSerDe<long[]> LONG_ARRAY_SER_DE = new SizedObjectSerDe<>() {
+
+    @Override
+    public int getSerializedSize(long[] values) {
+      return Math.addExact(Integer.BYTES, Math.multiplyExact(values.length, Long.BYTES));
+    }
+
+    @Override
+    public void serialize(long[] values, ByteBuffer buffer) {
+      serializeLongs(values, values.length, buffer);
+    }
+
+    @Override
+    public void serialize(long[] values, PinotOutputStream output)
+        throws IOException {
+      output.writeInt(values.length);
+      output.writeLongs(values, 0, values.length);
+    }
+
+    @Override
+    public long[] deserialize(ByteBuffer buffer) {
+      int numValues = buffer.getInt();
+      checkRemaining(buffer, numValues, Long.BYTES);
+      long[] values = new long[numValues];
+      PrimitiveArrays.readLongs(buffer, values, 0, numValues);
+      return values;
+    }
+  };
+
   public static final SizedObjectSerDe<LongArrayList> LONG_ARRAY_LIST_SER_DE = new SizedObjectSerDe<>() {
 
     @Override
@@ -185,12 +223,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public void serialize(LongArrayList longArrayList, ByteBuffer buffer) {
-      int size = longArrayList.size();
-      buffer.putInt(size);
-      long[] values = longArrayList.elements();
-      for (int i = 0; i < size; i++) {
-        buffer.putLong(values[i]);
-      }
+      serializeLongs(longArrayList.elements(), longArrayList.size(), buffer);
     }
 
     @Override
@@ -203,11 +236,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public LongArrayList deserialize(ByteBuffer buffer) {
-      int numValues = buffer.getInt();
-      checkRemaining(buffer, numValues, Long.BYTES);
-      long[] values = new long[numValues];
-      PrimitiveArrays.readLongs(buffer, values, 0, numValues);
-      return LongArrayList.wrap(values);
+      return LongArrayList.wrap(LONG_ARRAY_SER_DE.deserialize(buffer));
     }
   };
 
@@ -246,6 +275,44 @@ public class ObjectSerDeUtils {
     }
   };
 
+  /// Writes the number of values, then the first `numValues` of `values`.
+  private static void serializeDoubles(double[] values, int numValues, ByteBuffer buffer) {
+    buffer.putInt(numValues);
+    for (int i = 0; i < numValues; i++) {
+      buffer.putLong(Double.doubleToRawLongBits(values[i]));
+    }
+  }
+
+  /// Serializes a `double[]` in the format of [#DOUBLE_ARRAY_LIST_SER_DE].
+  public static final SizedObjectSerDe<double[]> DOUBLE_ARRAY_SER_DE = new SizedObjectSerDe<>() {
+
+    @Override
+    public int getSerializedSize(double[] values) {
+      return Math.addExact(Integer.BYTES, Math.multiplyExact(values.length, Double.BYTES));
+    }
+
+    @Override
+    public void serialize(double[] values, ByteBuffer buffer) {
+      serializeDoubles(values, values.length, buffer);
+    }
+
+    @Override
+    public void serialize(double[] values, PinotOutputStream output)
+        throws IOException {
+      output.writeInt(values.length);
+      output.writeDoubles(values, 0, values.length);
+    }
+
+    @Override
+    public double[] deserialize(ByteBuffer buffer) {
+      int numValues = buffer.getInt();
+      checkRemaining(buffer, numValues, Double.BYTES);
+      double[] values = new double[numValues];
+      PrimitiveArrays.readDoubles(buffer, values, 0, numValues);
+      return values;
+    }
+  };
+
   public static final SizedObjectSerDe<DoubleArrayList> DOUBLE_ARRAY_LIST_SER_DE = new SizedObjectSerDe<>() {
 
     @Override
@@ -255,12 +322,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public void serialize(DoubleArrayList doubleArrayList, ByteBuffer buffer) {
-      int size = doubleArrayList.size();
-      buffer.putInt(size);
-      double[] values = doubleArrayList.elements();
-      for (int i = 0; i < size; i++) {
-        buffer.putLong(Double.doubleToRawLongBits(values[i]));
-      }
+      serializeDoubles(doubleArrayList.elements(), doubleArrayList.size(), buffer);
     }
 
     @Override
@@ -273,11 +335,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public DoubleArrayList deserialize(ByteBuffer buffer) {
-      int numValues = buffer.getInt();
-      checkRemaining(buffer, numValues, Double.BYTES);
-      double[] values = new double[numValues];
-      PrimitiveArrays.readDoubles(buffer, values, 0, numValues);
-      return DoubleArrayList.wrap(values);
+      return DoubleArrayList.wrap(DOUBLE_ARRAY_SER_DE.deserialize(buffer));
     }
   };
 

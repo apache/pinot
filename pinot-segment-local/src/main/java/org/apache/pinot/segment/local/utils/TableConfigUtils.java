@@ -152,7 +152,7 @@ public final class TableConfigUtils {
       RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE
   );
 
-  private static boolean _disableGroovy;
+  private static volatile boolean _disableGroovy;
 
   private static boolean _enforcePoolBasedAssignment;
 
@@ -528,26 +528,13 @@ public final class TableConfigUtils {
         || CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme);
   }
 
-  /// Returns whether the stored table config is already pauseless and sets `key` to `value` in one of its stream
-  /// configs. This value stays valid, so that updates to an existing table and to its schema keep working.
-  private static boolean hasSamePauselessTimeFlushThreshold(@Nullable TableConfig existingTableConfig, String key,
-      String value) {
-    if (existingTableConfig == null || !PauselessConsumptionUtils.isPauselessEnabled(existingTableConfig)) {
-      return false;
-    }
-    // Pauseless consumption is enabled in the stream ingestion config, so the ingestion config is not null
-    return existingTableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().stream()
-        .anyMatch(streamConfigMap -> value.equals(streamConfigMap.get(key)));
-  }
-
   /// Validates the table's [IngestionConfig] together with the closely related metrics-aggregation config, covering:
   /// - Metrics aggregation (both the `aggregateMetrics` flag and ingestion `aggregationConfigs`), delegated to
   ///   [#validateMetricsAggregation].
   /// - Batch ingestion: each batch config map is well-formed, and a dimension table has batch ingestion configured
   ///   with `REFRESH` segment ingestion type.
   /// - Stream ingestion: streams are declared in only one place, at least one stream is present, and pauseless
-  ///   consumption has a valid `peerSegmentDownloadScheme` and no time flush threshold, except the unchanged value of
-  ///   a stored pauseless table.
+  ///   consumption has a valid `peerSegmentDownloadScheme`.
   /// - Filter config: the filter function is valid and not a disabled Groovy expression.
   /// - Source field configs: no source field is duplicated within the same complex-type phase.
   /// - Enrichment configs: each config is valid.
@@ -621,20 +608,6 @@ public final class TableConfigUtils {
               "Must have a valid peerSegmentDownloadScheme set in validation config for pauseless consumption");
         } else {
           LOGGER.warn("It's not recommended to create pauseless tables with replication 1 for stability reasons.");
-        }
-        // Each replica checks a time flush threshold on its own clock, and a replica that restarts near the end time
-        // extends it. So the replicas of a pauseless segment can stop at different offsets. A replica past the
-        // committed end offset can only download the segment, so if the committer fails before the upload, no replica
-        // has a copy. Reject an explicit time threshold (the default threshold still applies). A stored pauseless
-        // table keeps its unchanged value, so that updates to the table and to its schema keep working.
-        for (Map<String, String> streamConfigMap : streamConfigMaps) {
-          for (String key : List.of(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME,
-              StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX)) {
-            String value = streamConfigMap.get(key);
-            Preconditions.checkState(
-                value == null || hasSamePauselessTimeFlushThreshold(existingTableConfig, key, value),
-                "%s is not supported with pauseless consumption enabled, use a row or size based flush threshold", key);
-          }
         }
       }
     }
@@ -1130,7 +1103,8 @@ public final class TableConfigUtils {
   /// [#validateUpsertAndDedupCommonConfig]), the OFFLINE restrictions (no partial upsert, segment partition config,
   /// comparison or time column), no multi-tier / star-tree, comparison / delete-record / out-of-order columns are
   /// valid, deleted-keys compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and
-  /// delegates to [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
+  /// delegates to [#validateTTLForUpsertConfig], [#validatePartialUpsertStrategies] and
+  /// [#validatePauselessUpsertModes]; rejects MD5 when disabled.
   @VisibleForTesting
   static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
     validateUpsertConfig(tableConfig, schema, null);
@@ -1300,6 +1274,7 @@ public final class TableConfigUtils {
     validateTTLForUpsertConfig(tableConfig, schema);
     validatePartialUpsertStrategies(tableConfig, schema);
     validateConsumptionDuringUpsertRevert(tableConfig);
+    validatePauselessUpsertModes(tableConfig, existingTableConfig);
     Preconditions.checkState(!(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
         "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
   }
@@ -1347,6 +1322,40 @@ public final class TableConfigUtils {
             + "dropOutOfOrderRecord or outOfOrderRecordColumn revert upsert metadata in PROTECTED consistency mode. "
             + "Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS",
         policy != null ? "parallelSegmentConsumptionPolicy " + policy : "allowPartialUpsertConsumptionDuringCommit");
+  }
+
+  /// Rejects partial upsert and out-of-order record handling (`dropOutOfOrderRecord` or `outOfOrderRecordColumn`) on a
+  /// new pauseless table. A pauseless segment is committed before it is built, so a failed build is repaired by
+  /// consuming its offsets again, and for these modes that second pass can produce different rows: a partial upsert
+  /// merge, and whether a record is dropped or marked out of order, depend on the upsert metadata at the time each
+  /// record arrives.
+  ///
+  /// An update is not checked here. One that turns the combination on is a backward compatibility violation (see
+  /// [#validateBackwardCompatibility]), so `force=true` can apply it, and one that keeps it is allowed.
+  @VisibleForTesting
+  static void validatePauselessUpsertModes(TableConfig tableConfig, @Nullable TableConfig existingTableConfig) {
+    if (existingTableConfig != null || !PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      return;
+    }
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    Preconditions.checkState(upsertConfig.getMode() != UpsertConfig.Mode.PARTIAL,
+        "Partial upsert cannot be used with pauseless consumption. If a segment is recovered after a failure, "
+            + "merged values can change. Set upsertConfig.mode to FULL or "
+            + "ingestionConfig.streamIngestionConfig.pauselessConsumptionEnabled to false");
+    Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord() && upsertConfig.getOutOfOrderRecordColumn() == null,
+        "dropOutOfOrderRecord and outOfOrderRecordColumn cannot be used with pauseless consumption. If a segment is "
+            + "recovered after a failure, different records can be dropped or marked out of order. Set "
+            + "upsertConfig.dropOutOfOrderRecord to false or remove upsertConfig.outOfOrderRecordColumn, or set "
+            + "ingestionConfig.streamIngestionConfig.pauselessConsumptionEnabled to false");
+  }
+
+  /// Returns whether the table is pauseless and uses partial upsert, `dropOutOfOrderRecord` or
+  /// `outOfOrderRecordColumn`, see [#validatePauselessUpsertModes].
+  private static boolean hasPauselessUnsafeUpsertMode(TableConfig tableConfig) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    return upsertConfig != null && PauselessConsumptionUtils.isPauselessEnabled(tableConfig) && (
+        upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL || upsertConfig.isDropOutOfOrderRecord()
+            || upsertConfig.getOutOfOrderRecordColumn() != null);
   }
 
   /// Checks if a data type is valid for time-based comparison operations (upsert/dedup).
@@ -1784,7 +1793,9 @@ public final class TableConfigUtils {
 
   /// Validates that critical upsert configuration fields are not changed during table config update.
   /// Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
-  /// deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn.
+  /// deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn, and that the update does not turn on partial
+  /// upsert, dropOutOfOrderRecord or outOfOrderRecordColumn on a pauseless table, by any of those settings or by adding
+  /// the upsert config.
   ///
   /// Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
   /// not validated here — they may be added, removed, or changed on existing tables.
@@ -1794,6 +1805,12 @@ public final class TableConfigUtils {
   /// @param violations list to collect violation messages
   private static void validateUpsertConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
       List<String> violations) {
+    // When one of these upsert settings changes, this adds to that field's violation and says why it is unsafe
+    if (hasPauselessUnsafeUpsertMode(newConfig) && !hasPauselessUnsafeUpsertMode(existingConfig)) {
+      violations.add("pauseless consumption with partial upsert, dropOutOfOrderRecord or outOfOrderRecordColumn "
+          + "(merged values, or which records are dropped or marked out of order, can change when a segment is "
+          + "recovered after a failure)");
+    }
     boolean existingUpsertEnabled = existingConfig.isUpsertEnabled();
     boolean newUpsertEnabled = newConfig.isUpsertEnabled();
 

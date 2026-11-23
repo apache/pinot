@@ -162,6 +162,11 @@ public class UnsafePinotBuffer extends PinotDataBuffer {
   }
 
   @Override
+  public ByteBuffer tryViewAsByteBuffer(long offset, int size, ByteOrder byteOrder) {
+    return toDirectByteBuffer(offset, size, byteOrder);
+  }
+
+  @Override
   public ByteBuffer toDirectByteBuffer(long offset, int size, ByteOrder byteOrder) {
     checkOffset(offset, size);
     return ByteBufferUtil.newDirectByteBuffer(_address + offset, size, this)

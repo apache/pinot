@@ -46,15 +46,18 @@ import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
+import org.apache.pinot.core.operator.filter.RowLevelSecurityFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
 import org.apache.pinot.core.operator.filter.VectorRadiusFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorSearchDistances;
 import org.apache.pinot.core.operator.filter.VectorSearchMode;
 import org.apache.pinot.core.operator.filter.VectorSearchParams;
 import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.operator.filter.predicate.TextMatchDictIdPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -82,6 +85,10 @@ public class FilterPlanNode implements PlanNode {
   private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
   private final FilterContext _filter;
+  /// The row-level security filter to apply before [#_filter], or `null`. Only the main filter of the query applies it:
+  /// the sub-filter of a filtered aggregation is ANDed with the main filter, which already applies it.
+  @Nullable
+  private final FilterContext _rowFilter;
   /// Documents a vector predicate may consider as candidates for this query, or null when the query places no such
   /// restriction. Held by reference; the snapshot is not modified while the plan executes.
   @Nullable
@@ -99,6 +106,7 @@ public class FilterPlanNode implements PlanNode {
     _segmentContext = segmentContext;
     _queryContext = queryContext;
     _filter = filter != null ? filter : _queryContext.getFilter();
+    _rowFilter = filter != null ? null : _queryContext.getRowFilter();
   }
 
   @Override
@@ -116,8 +124,21 @@ public class FilterPlanNode implements PlanNode {
     // Candidate generation and the outer valid-document AND must observe the same document set for this query.
     ImmutableRoaringBitmap outerDocIdsSnapshot = docIdsSnapshot;
 
-    if (_filter != null) {
-      BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
+    BaseFilterOperator filterOperator = _filter != null ? constructPhysicalOperator(_filter, numDocs) : null;
+    if (_rowFilter != null && (filterOperator == null || !filterOperator.isResultEmpty())) {
+      BaseFilterOperator rowFilterOperator = constructRowFilterOperator(numDocs);
+      if (rowFilterOperator.isResultEmpty()) {
+        return EmptyFilterOperator.getInstance();
+      }
+      if (!rowFilterOperator.isResultMatchingAll()) {
+        return new RowLevelSecurityFilterOperator(rowFilterOperator,
+            filterOperator != null ? filterOperator : new MatchAllFilterOperator(numDocs), outerDocIdsSnapshot,
+            _queryContext, numDocs);
+      }
+      // The RLS filter matches every document of the segment, so the user filter runs as without RLS
+    }
+
+    if (filterOperator != null) {
       if (outerDocIdsSnapshot != null) {
         BaseFilterOperator validDocFilter =
             new BitmapBasedFilterOperator(outerDocIdsSnapshot, false, numDocs);
@@ -131,6 +152,15 @@ public class FilterPlanNode implements PlanNode {
     } else {
       return new MatchAllFilterOperator(numDocs);
     }
+  }
+
+  /// Builds the operator of the row-level security filter. Its predicate evaluators are not added to
+  /// [#getPredicateEvaluators()]: that list describes [#_filter], which already holds the RLS predicate.
+  private BaseFilterOperator constructRowFilterOperator(int numDocs) {
+    int numPredicateEvaluators = _predicateEvaluators.size();
+    BaseFilterOperator rowFilterOperator = constructPhysicalOperator(_rowFilter, numDocs);
+    _predicateEvaluators.subList(numPredicateEvaluators, _predicateEvaluators.size()).clear();
+    return rowFilterOperator;
   }
 
   /// Returns a mapping from predicates to their evaluators.
@@ -306,6 +336,17 @@ public class FilterPlanNode implements PlanNode {
               Preconditions.checkState(textIndexReader != null,
                   "Cannot apply TEXT_MATCH on column: %s without text index", column);
 
+              if (textIndexReader.isBuildOnDictionary()) {
+                // Dictionary-based text index: search returns matching dictIds, resolved to docIds by the standard
+                // dictionary-based filter operators (inverted index / scan), exactly like FST/REGEXP_LIKE.
+                TextMatchPredicate textMatchPredicate = (TextMatchPredicate) predicate;
+                predicateEvaluator = TextMatchDictIdPredicateEvaluatorFactory.newPredicateEvaluator(
+                    textMatchPredicate, textIndexReader, dataSource, _queryContext);
+                _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
+                return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource,
+                    numDocs);
+              }
+
               if (textIndexReader.isMultiColumn()) {
                 return new TextMatchFilterOperator(column, textIndexReader, (TextMatchPredicate) predicate, numDocs,
                     _queryContext);
@@ -435,8 +476,12 @@ public class FilterPlanNode implements PlanNode {
             "Cannot apply vectorDistanceThreshold on column: %s -- forward index required for threshold refinement",
             column);
       }
-      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
-          vectorIndexConfig, hasMetadataFilter, _requiredVectorDocIds);
+      VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs,
+          searchParams, forwardIndexReader, vectorIndexConfig, hasMetadataFilter, _requiredVectorDocIds);
+      if (VectorSearchDistances.isEnabled(_queryContext)) {
+        operator.setSearchDistances(VectorSearchDistances.of(_queryContext));
+      }
+      return operator;
     }
 
     // Exact scan fallback: no vector index on this segment

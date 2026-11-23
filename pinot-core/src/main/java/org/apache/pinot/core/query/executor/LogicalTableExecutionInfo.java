@@ -46,6 +46,14 @@ import org.slf4j.LoggerFactory;
 public class LogicalTableExecutionInfo implements TableExecutionInfo {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableExecutionInfo.class);
 
+  /// Creates the execution info of the physical tables of the given request, acquiring the segments to query.
+  ///
+  /// A physical table that is not set up on the server yet is left out when the query has no segment of it the server
+  /// must have (see [SingleTableExecutionInfo#create]). Returns `null` when no physical table is left.
+  ///
+  /// @throws TableNotFoundException when a physical table is not set up on the server and the query has a segment of
+  ///                                it the server must have
+  @Nullable
   public static LogicalTableExecutionInfo create(InstanceDataManager instanceDataManager,
       ServerQueryRequest queryRequest, QueryContext queryContext)
       throws TableNotFoundException {
@@ -56,10 +64,11 @@ public class LogicalTableExecutionInfo implements TableExecutionInfo {
       SingleTableExecutionInfo singleTableExecutionInfo =
           SingleTableExecutionInfo.create(instanceDataManager, tableSegmentsContext.getTableName(),
               tableSegmentsContext.getSegments(), tableSegmentsContext.getOptionalSegments(), queryContext);
-      tableExecutionInfos.add(singleTableExecutionInfo);
+      if (singleTableExecutionInfo != null) {
+        tableExecutionInfos.add(singleTableExecutionInfo);
+      }
     }
-
-    return new LogicalTableExecutionInfo(tableExecutionInfos);
+    return !tableExecutionInfos.isEmpty() ? new LogicalTableExecutionInfo(tableExecutionInfos) : null;
   }
 
   private final List<SingleTableExecutionInfo> _tableExecutionInfos;

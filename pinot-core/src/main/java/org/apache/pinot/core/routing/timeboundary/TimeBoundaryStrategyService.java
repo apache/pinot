@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.routing.timeboundary;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
 
@@ -25,22 +26,22 @@ import java.util.ServiceLoader;
 public class TimeBoundaryStrategyService {
 
   private static volatile TimeBoundaryStrategyService _instance = fromServiceLoader();
-  private final Map<String, TimeBoundaryStrategy> _strategyMap;
+  private final Map<String, ServiceLoader.Provider<TimeBoundaryStrategy>> _strategyProviders;
 
-  private TimeBoundaryStrategyService(Map<String, TimeBoundaryStrategy> strategyMap) {
-    _strategyMap = strategyMap;
+  private TimeBoundaryStrategyService(Map<String, ServiceLoader.Provider<TimeBoundaryStrategy>> strategyProviders) {
+    _strategyProviders = strategyProviders;
   }
 
   public static TimeBoundaryStrategyService fromServiceLoader() {
-    Map<String, TimeBoundaryStrategy> strategyMap = new java.util.HashMap<>();
-    for (TimeBoundaryStrategy strategy : ServiceLoader.load(TimeBoundaryStrategy.class)) {
-      String strategyName = strategy.getName();
-      if (strategyMap.containsKey(strategyName)) {
+    Map<String, ServiceLoader.Provider<TimeBoundaryStrategy>> strategyProviders = new HashMap<>();
+    ServiceLoader.load(TimeBoundaryStrategy.class).stream().forEach(provider -> {
+      String strategyName = provider.get().getName();
+      if (strategyProviders.containsKey(strategyName)) {
         throw new IllegalStateException("Duplicate TimeBoundaryStrategy found: " + strategyName);
       }
-      strategyMap.put(strategyName, strategy);
-    }
-    return new TimeBoundaryStrategyService(strategyMap);
+      strategyProviders.put(strategyName, provider);
+    });
+    return new TimeBoundaryStrategyService(strategyProviders);
   }
 
   /// Returns the singleton instance of the TimeBoundaryStrategyService.
@@ -57,11 +58,12 @@ public class TimeBoundaryStrategyService {
     _instance = service;
   }
 
+  /// Returns a new strategy instance so logical-table-specific initialization is not shared between requests.
   public TimeBoundaryStrategy getTimeBoundaryStrategy(String name) {
-    TimeBoundaryStrategy strategy = _instance._strategyMap.get(name);
-    if (strategy == null) {
+    ServiceLoader.Provider<TimeBoundaryStrategy> provider = _strategyProviders.get(name);
+    if (provider == null) {
       throw new IllegalArgumentException("No TimeBoundaryStrategy found for name: " + name);
     }
-    return strategy;
+    return provider.get();
   }
 }

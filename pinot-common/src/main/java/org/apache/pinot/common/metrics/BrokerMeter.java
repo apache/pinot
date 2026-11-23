@@ -266,6 +266,10 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   ///
   /// For each query with at least one join, this meter is increased as many times as joins in the query.
   public static final BrokerMeter JOIN_COUNT = create("JOIN_COUNT", "queries", true);
+  /// How many times the multi-stage planner made a stage feed one more consumer stage (a spool).
+  public static final BrokerMeter SPOOLS_APPLIED = create("SPOOLS_APPLIED", "spools", true);
+  /// How many spools the multi-stage planner refused because the shared stage could block the query.
+  public static final BrokerMeter SPOOLS_REJECTED_BY_GUARD = create("SPOOLS_REJECTED_BY_GUARD", "spools", true);
   /// How many queries with window functions have been executed.
   ///
   /// For each query with at least one window function, this meter is increased exactly once.
@@ -275,6 +279,16 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   /// For each query with at least one window function, this meter is increased as many times as window functions in the
   /// query.
   public static final BrokerMeter WINDOW_COUNT = create("WINDOW_COUNT", "queries", true);
+  /// How many multi-stage queries group by a name that is both a column and the alias of a different `SELECT`
+  /// expression, as in `SELECT CASE WHEN c = 'a' THEN 'x' ELSE c END AS c, COUNT(*) FROM t GROUP BY c`.
+  ///
+  /// Since Calcite 1.42 (CALCITE-7052) such a name resolves to the column. Before, it resolved to the alias. The query
+  /// can then fail with `Expression '...' is not being grouped` or return different groups. The broker config
+  /// `pinot.broker.multistage.prefer.select.alias.in.group.by` and the query option `preferSelectAliasInGroupBy`
+  /// restore the old resolution. This meter is marked at most once per query, whether that option is set or not, and
+  /// also when the query then fails.
+  public static final BrokerMeter QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN =
+      create("QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN", "queries", true);
 
   public static final BrokerMeter MSE_STAGES_STARTED = create("MSE_STAGES_STARTED", "stages", true);
   public static final BrokerMeter MSE_STAGES_COMPLETED = create("MSE_STAGES_COMPLETED", "stages", true);
@@ -296,6 +310,17 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   /// this counter to detect that condition.
   public static final BrokerMeter MSE_STREAM_STATS_CANCEL_FANOUTS =
       create("MSE_STREAM_STATS_CANCEL_FANOUTS", "broadcasts", true);
+
+  /// Number of mailbox streams this broker rejected because they were addressed to another instance and reached this
+  /// one through a stale connection of the sender.
+  public static final BrokerMeter MULTI_STAGE_MISROUTED_REQUESTS_REJECTED =
+      create("MULTI_STAGE_MISROUTED_REQUESTS_REJECTED", "requests", true);
+
+  /// Number of requests this broker sent (stage plans, cancel and explain requests, and mailbox streams) that the
+  /// receiving instance rejected as addressed to another instance. Each one makes the broker reset its connection to
+  /// that address, at most once a second.
+  public static final BrokerMeter MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER =
+      create("MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER", "requests", true);
 
   /// How many MSE queries have encountered segments with invalid partitions.
   ///

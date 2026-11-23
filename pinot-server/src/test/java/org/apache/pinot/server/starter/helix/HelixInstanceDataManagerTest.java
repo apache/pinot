@@ -22,9 +22,16 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Map;
+import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
+import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -33,9 +40,12 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.INSTANCE_DATA_DI
 import static org.apache.pinot.spi.utils.CommonConstants.Server.INSTANCE_DATA_DIR_FAIL_ON_MISSING;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.INSTANCE_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.INSTANCE_SEGMENT_TAR_DIR;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
@@ -68,6 +78,49 @@ public class HelixInstanceDataManagerTest {
       throws Exception {
     HelixInstanceDataManager manager = new HelixInstanceDataManager();
     FieldUtils.writeField(manager, "_instanceDataManagerConfig", new HelixInstanceDataManagerConfig(config), true);
+    return manager;
+  }
+
+  @Test
+  public void testShuttingDownOneServerPreservesLeaseRenewalForAnother()
+      throws Exception {
+    HelixInstanceDataManager survivor = startDataManager("survivor");
+    try {
+      String table = "leaseOwnerTest_REALTIME";
+      SegmentBuildTimeLeaseExtender extender = SegmentBuildTimeLeaseExtender.getOrCreate(survivor.getInstanceId(),
+          mock(ServerMetrics.class), table);
+      try {
+        extender.addSegment("segment", 120_000L, new LongMsgOffset(0L));
+        Map<?, ?> leases = (Map<?, ?>) FieldUtils.readField(extender, "_segmentToFutureMap", true);
+        Future<?> lease = (Future<?>) leases.get("segment");
+        HelixInstanceDataManager other = startDataManager("other");
+        try {
+          SegmentBuildTimeLeaseExtender.getOrCreate(other.getInstanceId(), mock(ServerMetrics.class), table).shutDown();
+        } finally {
+          other.shutDown();
+        }
+        assertFalse(lease.isCancelled());
+        assertSame(SegmentBuildTimeLeaseExtender.getLeaseExtender(survivor.getInstanceId(), table), extender);
+        extender.addSegment("nextSegment", 120_000L, new LongMsgOffset(1L));
+      } finally {
+        extender.shutDown();
+      }
+    } finally {
+      survivor.shutDown();
+    }
+    assertTrue(SegmentBuildTimeLeaseExtender.isExecutorShutdown());
+  }
+
+  private HelixInstanceDataManager startDataManager(String instanceId)
+      throws Exception {
+    HelixManager helixManager = mock(HelixManager.class);
+    doReturn(mock(ZkHelixPropertyStore.class)).when(helixManager).getHelixPropertyStore();
+    PinotConfiguration config = new PinotConfiguration(Map.of(INSTANCE_ID, instanceId,
+        INSTANCE_DATA_DIR, new File(_testDir, instanceId + "/data").toString(),
+        INSTANCE_SEGMENT_TAR_DIR, new File(_testDir, instanceId + "/tar").toString()));
+    HelixInstanceDataManager manager = new HelixInstanceDataManager();
+    manager.init(config, helixManager, mock(ServerMetrics.class), null, new ServerReloadJobStatusCache(instanceId));
+    manager.start();
     return manager;
   }
 

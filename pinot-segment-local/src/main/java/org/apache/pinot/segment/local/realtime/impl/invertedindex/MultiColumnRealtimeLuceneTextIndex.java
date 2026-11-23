@@ -19,11 +19,14 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import it.unimi.dsi.fastutil.booleans.BooleanList;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
@@ -36,6 +39,8 @@ import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.MultiColumnLuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.readers.text.LuceneDocScoreCollector;
+import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextScoreStatsUtils;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
@@ -43,7 +48,9 @@ import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
+import org.apache.pinot.spi.exception.QueryException;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -233,37 +240,7 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
       RealtimeLuceneDocIdCollector docIDCollector) throws Exception {
     IndexSearcher indexSearcher = null;
     try {
-      // Lucene query parsers are generally stateful and a new instance must be created per query.
-      Constructor<QueryParserBase> queryParserClassConstructor = _queryParserClassConstructor;
-      boolean enablePrefixSuffixMatchingInPhraseQueries = _enablePrefixSuffixMatchingInPhraseQueries;
-      MultiColumnLuceneTextIndexReader.ColumnConfig columnConfig = _perColumnConfigs.get(column);
-      if (columnConfig != null) {
-        if (columnConfig.getQueryParserClassConstructor() != null) {
-          queryParserClassConstructor = columnConfig.getQueryParserClassConstructor();
-        }
-        if (columnConfig.getEnablePrefixSuffixMatchingInPhraseQueries() != null) {
-          enablePrefixSuffixMatchingInPhraseQueries = columnConfig.getEnablePrefixSuffixMatchingInPhraseQueries();
-        }
-      }
-
-      QueryParserBase parser = queryParserClassConstructor.newInstance(column, _analyzer);
-      if (enablePrefixSuffixMatchingInPhraseQueries) {
-        // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
-        // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
-        // Additionally, it does not support wildcards that span across terms.
-        // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
-        // Workaround: Use a custom query parser that correctly implements wildcard searches.
-        parser.setAllowLeadingWildcard(true);
-      }
-      Query query = parser.parse(searchQuery);
-      if (enablePrefixSuffixMatchingInPhraseQueries) {
-        // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
-        // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
-        // Additionally, it does not support wildcards that span across terms.
-        // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
-        // Workaround: Use a custom query parser that correctly implements wildcard searches.
-        query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
-      }
+      Query query = parseQueryWithoutOptions(column, searchQuery);
       indexSearcher = _searcherManager.acquire();
       indexSearcher.search(query, docIDCollector);
       return getPinotDocIds(indexSearcher, docIDCollector.getDocIds());
@@ -277,6 +254,121 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
               _columns, e.getMessage());
         }
       }
+    }
+  }
+
+  @Override
+  public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString) {
+    return getDocScores(column, searchQuery, optionsString, null);
+  }
+
+  @Override
+  public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    // Created here so an interrupted query thread can cancel the search it stops waiting for
+    LuceneDocScoreCollector collector = LuceneDocScoreCollector.forConsumingSegment();
+    return runOnSearcherPool(() -> {
+      Query query = parseQuery(column, searchQuery, optionsString);
+      IndexSearcher acquiredSearcher = _searcherManager.acquire();
+      try {
+        IndexSearcher indexSearcher =
+            LuceneTextScoreStatsUtils.scoringSearcher(acquiredSearcher, query, column, globalStats);
+        return collector.collectScores(indexSearcher, query);
+      } finally {
+        releaseSearcher(acquiredSearcher);
+      }
+    }, "scoring", column, searchQuery, collector::markShouldCancel);
+  }
+
+  @Override
+  public TextScoreStats getTextScoreStats(String column, String searchQuery, @Nullable String optionsString) {
+    return runOnSearcherPool(() -> {
+      Query query = parseQuery(column, searchQuery, optionsString);
+      IndexSearcher indexSearcher = _searcherManager.acquire();
+      try {
+        return LuceneTextScoreStatsUtils.collect(indexSearcher, query, column);
+      } finally {
+        releaseSearcher(indexSearcher);
+      }
+    }, "collecting text score statistics on", column, searchQuery, null);
+  }
+
+  /// Runs a Lucene task on the searcher pool, like getDocIds: avoids interrupting a Lucene search on the query thread
+  /// (see getDocIdsWithOptions).
+  private <T> T runOnSearcherPool(Callable<T> task, String action, String column, String searchQuery,
+      @Nullable Runnable onInterrupt) {
+    Future<T> searchFuture = SEARCHER_POOL.getExecutorService().submit(task);
+    try {
+      return searchFuture.get();
+    } catch (InterruptedException e) {
+      searchFuture.cancel(false);
+      if (onInterrupt != null) {
+        onInterrupt.run();
+      }
+      throw new RuntimeException("TEXT_SCORE interrupted while querying the consuming segment " + _segmentName
+          + " for column " + column + " with search query: " + searchQuery, e);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof QueryException cause) {
+        throw cause;
+      }
+      throw new RuntimeException("Failed while " + action + " the realtime text index for segment " + _segmentName
+          + " for column " + column + " with search query: " + searchQuery, e);
+    }
+  }
+
+  private Query parseQuery(String column, String searchQuery, @Nullable String optionsString)
+      throws Exception {
+    if (optionsString != null && !optionsString.trim().isEmpty()) {
+      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+      if (!options.getOptions().isEmpty()) {
+        return LuceneTextIndexUtils.createQueryParserWithOptions(searchQuery, options, column, _analyzer);
+      }
+    }
+    return parseQueryWithoutOptions(column, searchQuery);
+  }
+
+  /// Parses a query with the column's parser settings, as TEXT_MATCH does without options.
+  private Query parseQueryWithoutOptions(String column, String searchQuery)
+      throws Exception {
+    // Lucene query parsers are generally stateful and a new instance must be created per query.
+    Constructor<QueryParserBase> queryParserClassConstructor = _queryParserClassConstructor;
+    boolean enablePrefixSuffixMatchingInPhraseQueries = _enablePrefixSuffixMatchingInPhraseQueries;
+    MultiColumnLuceneTextIndexReader.ColumnConfig columnConfig = _perColumnConfigs.get(column);
+    if (columnConfig != null) {
+      if (columnConfig.getQueryParserClassConstructor() != null) {
+        queryParserClassConstructor = columnConfig.getQueryParserClassConstructor();
+      }
+      if (columnConfig.getEnablePrefixSuffixMatchingInPhraseQueries() != null) {
+        enablePrefixSuffixMatchingInPhraseQueries = columnConfig.getEnablePrefixSuffixMatchingInPhraseQueries();
+      }
+    }
+
+    QueryParserBase parser = queryParserClassConstructor.newInstance(column, _analyzer);
+    if (enablePrefixSuffixMatchingInPhraseQueries) {
+      // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
+      // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
+      // Additionally, it does not support wildcards that span across terms.
+      // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
+      // Workaround: Use a custom query parser that correctly implements wildcard searches.
+      parser.setAllowLeadingWildcard(true);
+    }
+    Query query = parser.parse(searchQuery);
+    if (enablePrefixSuffixMatchingInPhraseQueries) {
+      // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
+      // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
+      // Additionally, it does not support wildcards that span across terms.
+      // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
+      // Workaround: Use a custom query parser that correctly implements wildcard searches.
+      query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
+    }
+    return query;
+  }
+
+  private void releaseSearcher(IndexSearcher indexSearcher) {
+    try {
+      _searcherManager.release(indexSearcher);
+    } catch (Exception e) {
+      LOGGER.error("Failed while releasing the searcher manager for realtime text index for columns {}", _columns, e);
     }
   }
 

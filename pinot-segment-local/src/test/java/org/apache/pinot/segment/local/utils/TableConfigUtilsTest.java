@@ -1202,46 +1202,6 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void pauselessTimeFlushThresholdTest() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addDateTime("timeColumn", DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .build();
-    for (String key : List.of(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME,
-        StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX)) {
-      TableConfig tableConfig = getTimeFlushThresholdTableConfig(key, "30m", true);
-      IllegalStateException e =
-          expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, schema));
-      assertTrue(e.getMessage().contains(key), e.getMessage());
-
-      // The same config is valid when pauseless consumption is disabled
-      TableConfig nonPauselessTableConfig = getTimeFlushThresholdTableConfig(key, "30m", false);
-      TableConfigUtils.validate(nonPauselessTableConfig, schema);
-
-      // A stored pauseless table keeps its value, which also lets a schema update revalidate it. A changed value, or
-      // enabling pauseless consumption on a table with the key, is rejected.
-      TableConfigUtils.validate(tableConfig, schema, null, tableConfig);
-      TableConfig changedTableConfig = getTimeFlushThresholdTableConfig(key, "5m", true);
-      expectThrows(IllegalStateException.class,
-          () -> TableConfigUtils.validate(changedTableConfig, schema, null, tableConfig));
-      expectThrows(IllegalStateException.class,
-          () -> TableConfigUtils.validate(tableConfig, schema, null, nonPauselessTableConfig));
-    }
-  }
-
-  private TableConfig getTimeFlushThresholdTableConfig(String key, String value, boolean pauselessEnabled) {
-    Map<String, String> streamConfigs = getStreamConfigs();
-    streamConfigs.put(key, value);
-    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
-    streamIngestionConfig.setPauselessConsumptionEnabled(pauselessEnabled);
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setTimeColumnName("timeColumn")
-        .setIngestionConfig(ingestionConfig)
-        .build();
-  }
-
-  @Test
   public void ingestionServerIngestionOomProtectionTest() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
     StreamIngestionConfig streamIngestionConfig =
@@ -2896,6 +2856,81 @@ public class TableConfigUtilsTest {
     } finally {
       consistencyModeListener.reset();
     }
+  }
+
+  @Test
+  public void testValidatePauselessUpsertModes() {
+    UpsertConfig fullUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    UpsertConfig dropOutOfOrderConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    dropOutOfOrderConfig.setDropOutOfOrderRecord(true);
+    UpsertConfig outOfOrderColumnConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    outOfOrderColumnConfig.setOutOfOrderRecordColumn("isOutOfOrder");
+    TableConfig pauselessFull = createTableConfigWithConsumptionPolicy(fullUpsertConfig, null, true);
+    TableConfig pauselessPartial = createTableConfigWithConsumptionPolicy(partialUpsertConfig, null, true);
+    TableConfig pauselessDropOutOfOrder = createTableConfigWithConsumptionPolicy(dropOutOfOrderConfig, null, true);
+    TableConfig partial = createTableConfigWithConsumptionPolicy(partialUpsertConfig, null, false);
+    TableConfig dropOutOfOrder = createTableConfigWithConsumptionPolicy(dropOutOfOrderConfig, null, false);
+    TableConfig pauselessOutOfOrderColumn = createTableConfigWithConsumptionPolicy(outOfOrderColumnConfig, null, true);
+    TableConfig outOfOrderColumn = createTableConfigWithConsumptionPolicy(outOfOrderColumnConfig, null, false);
+
+    // A new pauseless table cannot use partial upsert or dropOutOfOrderRecord
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessPartial, null));
+    assertTrue(e.getMessage().startsWith("Partial upsert cannot be used with pauseless consumption."),
+        e.getMessage());
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, null));
+    assertTrue(e.getMessage().startsWith(
+        "dropOutOfOrderRecord and outOfOrderRecordColumn cannot be used with pauseless consumption."), e.getMessage());
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessOutOfOrderColumn, null));
+    assertTrue(e.getMessage().startsWith(
+        "dropOutOfOrderRecord and outOfOrderRecordColumn cannot be used with pauseless consumption."), e.getMessage());
+    TableConfigUtils.validatePauselessUpsertModes(pauselessFull, null);
+    TableConfigUtils.validatePauselessUpsertModes(partial, null);
+    TableConfigUtils.validatePauselessUpsertModes(dropOutOfOrder, null);
+    TableConfigUtils.validatePauselessUpsertModes(outOfOrderColumn, null);
+
+    // An update is left to the backward compatibility check, so force=true can apply it
+    TableConfigUtils.validatePauselessUpsertModes(pauselessPartial, partial);
+    TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, pauselessFull);
+
+    // An update that turns either combination on is a violation, whether it enables pauseless, changes the upsert
+    // mode or dropOutOfOrderRecord, or adds the upsert config
+    TableConfig pauselessNoUpsert = createTableConfigWithConsumptionPolicy(null, null, true);
+    assertPauselessUpsertViolation(pauselessPartial, partial, true);
+    assertPauselessUpsertViolation(pauselessDropOutOfOrder, dropOutOfOrder, true);
+    assertPauselessUpsertViolation(pauselessPartial, pauselessFull, true);
+    assertPauselessUpsertViolation(pauselessDropOutOfOrder, pauselessFull, true);
+    assertPauselessUpsertViolation(pauselessPartial, pauselessNoUpsert, true);
+    assertPauselessUpsertViolation(pauselessOutOfOrderColumn, outOfOrderColumn, true);
+    assertPauselessUpsertViolation(pauselessOutOfOrderColumn, pauselessFull, true);
+
+    // An update of a table that already has a combination, or that does not turn one on, is not
+    assertPauselessUpsertViolation(pauselessPartial, pauselessPartial, false);
+    assertPauselessUpsertViolation(pauselessDropOutOfOrder, pauselessDropOutOfOrder, false);
+    assertPauselessUpsertViolation(pauselessOutOfOrderColumn, pauselessOutOfOrderColumn, false);
+    assertPauselessUpsertViolation(pauselessFull, pauselessFull, false);
+    assertPauselessUpsertViolation(partial, pauselessPartial, false);
+
+    // The check is part of the upsert validation
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", DataType.STRING)
+        .setPrimaryKeyColumns(List.of("myCol"))
+        .build();
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertConfig(pauselessDropOutOfOrder, schema));
+    assertTrue(e.getMessage().startsWith(
+        "dropOutOfOrderRecord and outOfOrderRecordColumn cannot be used with pauseless consumption."), e.getMessage());
+  }
+
+  private static void assertPauselessUpsertViolation(TableConfig newConfig, TableConfig existingConfig,
+      boolean expected) {
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.stream()
+        .anyMatch(v -> v.startsWith("pauseless consumption with partial upsert, dropOutOfOrderRecord")), expected,
+        violations.toString());
   }
 
   @Test

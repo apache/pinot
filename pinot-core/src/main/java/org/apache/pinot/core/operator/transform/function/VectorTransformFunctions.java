@@ -19,18 +19,33 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.operator.filter.VectorSearchDistances;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 
 
 public class VectorTransformFunctions {
+  /// Implements `cosineDistance(left, right[, defaultValue])`.
+  ///
+  /// With `vectorApproximateDistance=true`, a paired `VECTOR_SIMILARITY` search on the same column and vector
+  /// can supply approximate COSINE distances. The index scores can change both the values and their ordering.
+  /// Documents with missing or non-finite distances use the scalar computation from the forward index.
   public static class CosineDistanceTransformFunction extends VectorDistanceTransformFunction {
     public static final String FUNCTION_NAME = "cosineDistance";
     private Double _defaultValue = null;
+    @Nullable
+    private VectorSearchDistances.Request _distancesRequest;
 
     @Override
     protected void checkArgumentSize(List<TransformFunction> arguments) {
@@ -49,8 +64,83 @@ public class VectorTransformFunctions {
     }
 
     @Override
+    public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+        QueryContext queryContext) {
+      super.init(arguments, columnContextMap, queryContext);
+      if (_leftTransformFunction instanceof IdentifierTransformFunction
+          && _rightTransformFunction instanceof ArrayLiteralTransformFunction) {
+        _distancesRequest = requestIndexDistances((IdentifierTransformFunction) _leftTransformFunction,
+            (ArrayLiteralTransformFunction) _rightTransformFunction, columnContextMap, queryContext);
+      } else if (_rightTransformFunction instanceof IdentifierTransformFunction
+          && _leftTransformFunction instanceof ArrayLiteralTransformFunction) {
+        _distancesRequest = requestIndexDistances((IdentifierTransformFunction) _rightTransformFunction,
+            (ArrayLiteralTransformFunction) _leftTransformFunction, columnContextMap, queryContext);
+      }
+    }
+
+    /// Asks a `VECTOR_SIMILARITY` filter on the column and vector to hand over the distances of its search, when the
+    /// column has a COSINE vector index (whose distances are cosine distances).
+    @Nullable
+    private static VectorSearchDistances.Request requestIndexDistances(IdentifierTransformFunction column,
+        ArrayLiteralTransformFunction vector, Map<String, ColumnContext> columnContextMap, QueryContext queryContext) {
+      if (!VectorSearchDistances.isEnabled(queryContext)) {
+        return null;
+      }
+      ColumnContext columnContext = columnContextMap.get(column.getColumnName());
+      DataSource dataSource = columnContext != null ? columnContext.getDataSource() : null;
+      if (dataSource == null) {
+        return null;
+      }
+      VectorIndexReader vectorIndexReader = dataSource.getVectorIndex();
+      VectorIndexConfig vectorIndexConfig = dataSource.getVectorIndexConfig();
+      if (vectorIndexReader == null || vectorIndexConfig == null
+          || vectorIndexConfig.getVectorDistanceFunction() != VectorIndexConfig.VectorDistanceFunction.COSINE) {
+        return null;
+      }
+      if (!vector.getResultMetadata().getDataType().isNumeric()) {
+        return null;
+      }
+      float[] queryVector = vector.getFloatArrayValue();
+      DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+      // HNSW ingestion can zero-pad a short row. Only reuse scores when every forward-index row has the query width,
+      // so a cached score cannot hide the scalar function's dimension check.
+      if (metadata.getMaxNumValuesPerMVEntry() != queryVector.length
+          || metadata.getNumValues() != (long) metadata.getNumDocs() * queryVector.length) {
+        return null;
+      }
+      return VectorSearchDistances.of(queryContext).request(vectorIndexReader, queryVector);
+    }
+
+    @Override
     public String getName() {
       return FUNCTION_NAME;
+    }
+
+    @Override
+    public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+      Int2FloatMap distances = _distancesRequest != null ? _distancesRequest.getDistances() : null;
+      int[] docIds = distances != null ? valueBlock.getDocIds() : null;
+      if (docIds == null) {
+        return super.transformToDoubleValuesSV(valueBlock);
+      }
+      int length = valueBlock.getNumDocs();
+      initDoubleValuesSV(length);
+      float[][] leftValues = null;
+      float[][] rightValues = null;
+      for (int i = 0; i < length; i++) {
+        float distance = distances.getOrDefault(docIds[i], Float.NaN);
+        if (Float.isFinite(distance)) {
+          _doubleValuesSV[i] = distance;
+        } else {
+          // Fetch the vectors on the first miss. Other hits in this block still use their index scores.
+          if (leftValues == null) {
+            leftValues = _leftTransformFunction.transformToFloatValuesMV(valueBlock);
+            rightValues = _rightTransformFunction.transformToFloatValuesMV(valueBlock);
+          }
+          _doubleValuesSV[i] = computeDistance(leftValues[i], rightValues[i]);
+        }
+      }
+      return _doubleValuesSV;
     }
 
     @Override
