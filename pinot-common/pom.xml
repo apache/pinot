@@ -32,6 +32,12 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <thrift.bin.path>/usr/local/bin/thrift</thrift.bin.path>
+    <!-- The -shaded jar is for projects outside Pinot and is not part of pinot-all, so it relocates its
+         libraries in every build mode, including thin-plugins, like the clients. See shade.jackson.prefix
+         in the root pom. The main jar is not shaded. -->
+    <shade.jackson.prefix>${shade.prefix}.com.fasterxml.jackson</shade.jackson.prefix>
+    <shade.guava.prefix>${shade.prefix}.com.google.common</shade.guava.prefix>
+    <shade.scala.prefix>${shade.prefix}.org.scala-lang</shade.scala.prefix>
   </properties>
 
   <build>
