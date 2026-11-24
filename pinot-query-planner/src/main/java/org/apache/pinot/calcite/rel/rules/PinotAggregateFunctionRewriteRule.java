@@ -49,8 +49,12 @@ import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 /// - MAX(stringType) -> MAXSTRING
 /// - MIN(longType) -> MINLONG
 /// - MAX(longType) -> MAXLONG
-/// - SUM(longType) -> SUMLONG
-/// - SUM(intType) -> SUMINT
+/// - SUM(longType) / SUM0(longType) -> SUMLONG
+/// - SUM(intType) / SUM0(intType) -> SUMINT
+///
+/// When rewriting `SUM0` to `SUMINT`/`SUMLONG` in a context where the rewritten aggregate can return `NULL`
+/// (an empty grouping set, a filtered aggregate, or a nullable operand), the rule wraps the output in
+/// `CASE(IS NOT NULL(sum), sum, 0)` to preserve `SUM0`'s non-null empty-is-zero contract.
 public class PinotAggregateFunctionRewriteRule extends RelOptRule {
   public static final PinotAggregateFunctionRewriteRule INSTANCE =
       new PinotAggregateFunctionRewriteRule(PinotRuleUtils.PINOT_REL_FACTORY, null);
@@ -74,13 +78,15 @@ public class PinotAggregateFunctionRewriteRule extends RelOptRule {
     List<AggregateCall> rewrittenCalls = new ArrayList<>(numCalls);
     boolean[] coalesceToZero = new boolean[numCalls];
     boolean anyCoalesce = false;
+    boolean hasEmptyGroup = aggRel.hasEmptyGroup();
     RelDataTypeFactory typeFactory = aggRel.getCluster().getTypeFactory();
     for (int i = 0; i < numCalls; i++) {
       AggregateCall aggCall = originalCalls.get(i);
-      AggregateCall newCall = maybeRewriteAggCall(aggCall, input, aggRel.getGroupCount(), typeFactory);
+      boolean needsCoalesce = needsSum0NullCoalesce(aggCall, input, hasEmptyGroup);
+      AggregateCall newCall = maybeRewriteAggCall(aggCall, input, aggRel.getGroupCount(), typeFactory, needsCoalesce);
       if (newCall != aggCall) {
         changed = true;
-        if (aggCall.getAggregation().getKind() == SqlKind.SUM0) {
+        if (needsCoalesce) {
           coalesceToZero[i] = true;
           anyCoalesce = true;
         }
@@ -121,9 +127,26 @@ public class PinotAggregateFunctionRewriteRule extends RelOptRule {
     call.transformTo(LogicalProject.create(newAgg, List.of(), projects, aggRel.getRowType(), Set.of()));
   }
 
+  /// Returns whether rewriting a `SUM0` call to `SUMINT`/`SUMLONG` can produce `NULL` and therefore requires a
+  /// `CASE(IS NOT NULL(sum), sum, 0)` wrapper to preserve `SUM0`'s non-null empty-is-zero contract.
+  ///
+  /// When the aggregate has no empty group, no filter, and a non-nullable operand, every emitted group has at least
+  /// one non-null value, so `SUMINT`/`SUMLONG` cannot return `NULL` and no wrapper `Project` is needed (preserving
+  /// `SortAggregate` group-trim matching).
+  private static boolean needsSum0NullCoalesce(AggregateCall call, RelNode input, boolean hasEmptyGroup) {
+    if (call.getAggregation().getKind() != SqlKind.SUM0) {
+      return false;
+    }
+    if (hasEmptyGroup || call.hasFilter()) {
+      return true;
+    }
+    List<Integer> argList = call.getArgList();
+    return !argList.isEmpty() && input.getRowType().getFieldList().get(argList.get(0)).getType().isNullable();
+  }
+
   /// Rewrite aggregation functions to type specific variants based on the operand type.
   private static AggregateCall maybeRewriteAggCall(AggregateCall call, RelNode input, int numGroups,
-      RelDataTypeFactory typeFactory) {
+      RelDataTypeFactory typeFactory, boolean makeNullable) {
     SqlAggFunction aggFunction = call.getAggregation();
     SqlKind aggKind = aggFunction.getKind();
 
@@ -168,8 +191,8 @@ public class PinotAggregateFunctionRewriteRule extends RelOptRule {
       case SUM:
       case SUM0: {
         // SUMINT and SUMLONG return NULL on empty/all-null input when null handling is enabled.
-        // Mark rewritten SUM0 calls as nullable so downstream simplifiers do not fold away the COALESCE wrapper.
-        if (aggKind == SqlKind.SUM0) {
+        // Mark rewritten SUM0 calls as nullable when coalesced so downstream simplifiers do not fold away the wrapper.
+        if (makeNullable) {
           targetType = typeFactory.createTypeWithNullability(targetType, true);
         }
         if (operandType == SqlTypeName.INTEGER) {

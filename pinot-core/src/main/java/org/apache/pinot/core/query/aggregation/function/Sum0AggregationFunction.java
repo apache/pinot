@@ -88,12 +88,15 @@ public class Sum0AggregationFunction extends SumAggregationFunction {
       double[][] valuesArray = blockValSet.getDoubleValuesMV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          int groupKey = groupKeyArray[i];
-          double sum = groupByResultHolder.getDoubleResult(groupKey);
-          for (double value : valuesArray[i]) {
-            sum += value;
+          double[] values = valuesArray[i];
+          if (values.length > 0) {
+            int groupKey = groupKeyArray[i];
+            double sum = groupByResultHolder.getDoubleResult(groupKey);
+            for (double value : values) {
+              sum += value;
+            }
+            groupByResultHolder.setValueForKey(groupKey, sum);
           }
-          groupByResultHolder.setValueForKey(groupKey, sum);
         }
       });
     } else {
@@ -155,6 +158,6 @@ public class Sum0AggregationFunction extends SumAggregationFunction {
 
   @Override
   public Double extractFinalResult(@Nullable Double intermediateResult) {
-    return intermediateResult == null ? DEFAULT_VALUE : intermediateResult;
+    return intermediateResult != null ? intermediateResult : DEFAULT_VALUE;
   }
 }

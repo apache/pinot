@@ -23,6 +23,8 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+
 
 public class AggregationFunctionColumnPairTest {
   private static final String COLUMN = "column";
@@ -122,10 +124,10 @@ public class AggregationFunctionColumnPairTest {
 
   @Test
   public void testGetStoredTypeForSum0() {
-    Assert.assertEquals(AggregationFunctionColumnPair.getStoredType(AggregationFunctionType.SUM0),
+    assertEquals(AggregationFunctionColumnPair.getStoredType(AggregationFunctionType.SUM0),
         AggregationFunctionType.SUM);
     AggregationFunctionColumnPair sum0Pair = new AggregationFunctionColumnPair(AggregationFunctionType.SUM0, COLUMN);
-    Assert.assertEquals(AggregationFunctionColumnPair.resolveToStoredType(sum0Pair),
+    assertEquals(AggregationFunctionColumnPair.resolveToStoredType(sum0Pair),
         new AggregationFunctionColumnPair(AggregationFunctionType.SUM, COLUMN));
   }
 }

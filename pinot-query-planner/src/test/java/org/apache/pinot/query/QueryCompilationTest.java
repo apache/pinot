@@ -2100,6 +2100,30 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "expected rolled-up SUM0 to be rewritten to SUMLONG, got:\n" + unionCountExplain);
     assertTrue(unionCountExplain.contains("CASE(IS NOT NULL($0), $0, 0:BIGINT)"),
         "expected rolled-up SUM0 rewrite to coalesce NULL to 0, got:\n" + unionCountExplain);
+
+    // Non-empty GROUP BY over a non-nullable operand cannot produce NULL for SUMINT/SUMLONG, so no COALESCE
+    // wrapper Project should be inserted and SortAggregate group trim must stay intact.
+    String groupTrimExplain = _queryEnvironment.explainQuery(
+        "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR "
+            + "SELECT /*+ aggOptions(is_enable_group_trim='true') */ a.col1, SUM(a.col3) AS total "
+            + "FROM a GROUP BY a.col1 ORDER BY total DESC LIMIT 10",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(groupTrimExplain.contains("SUMINT("),
+        "expected SUM0 to be rewritten to SUMINT, got:\n" + groupTrimExplain);
+    assertFalse(groupTrimExplain.contains("IS NOT NULL"),
+        "expected no redundant COALESCE wrapper for non-nullable GROUP BY, got:\n" + groupTrimExplain);
+    assertTrue(groupTrimExplain.contains("limit=[10]"),
+        "expected SortAggregate group trim to remain enabled, got:\n" + groupTrimExplain);
+
+    // ROLLUP includes an empty grouping set (), so rewritten SUM0 must still be coalesced to 0.
+    String rollupExplain = _queryEnvironment.explainQuery(
+        "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR "
+            + "SELECT a.col1, SUM(a.col3) FROM a GROUP BY ROLLUP(a.col1)",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(rollupExplain.contains("SUMINT("),
+        "expected ROLLUP SUM0 to be rewritten to SUMINT, got:\n" + rollupExplain);
+    assertTrue(rollupExplain.contains("CASE(IS NOT NULL($1), $1, 0:BIGINT)"),
+        "expected ROLLUP SUM0 rewrite to coalesce NULL to 0 for the empty grouping set, got:\n" + rollupExplain);
   }
 
   private SqlTypeName generateArrayElementType(String arguments) {
