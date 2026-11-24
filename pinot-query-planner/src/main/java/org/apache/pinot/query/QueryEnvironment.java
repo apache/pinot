@@ -763,9 +763,13 @@ public class QueryEnvironment {
   ///
   /// @throws QueryException with [QueryErrorCode#QUERY_VALIDATION] if the query option is not a valid [SpoolMode].
   public SpoolMode getSpoolMode(Map<String, String> options) {
+    return getSpoolMode(options, _envConfig.defaultSpoolMode());
+  }
+
+  public static SpoolMode getSpoolMode(Map<String, String> options, SpoolMode defaultMode) {
     String optionValue = options.get(CommonConstants.Broker.Request.QueryOptionKey.USE_SPOOLS);
     if (optionValue == null) {
-      return _envConfig.defaultSpoolMode();
+      return defaultMode;
     }
     try {
       return SpoolMode.fromString(optionValue);

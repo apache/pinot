@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.query.planner.logical.SpoolMode;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -82,6 +83,39 @@ public class BroadcastJoinStageFusionTest extends QueryEnvironmentTestBase {
     assertEquals(joinsPerStage, expectedJoinsPerStage);
     assertEquals(random, expectedRandom);
     assertEquals(broadcast, expectedBroadcast);
+  }
+
+  @DataProvider
+  public Object[][] sharedBuildSpoolModes() {
+    return new Object[][]{
+        {SpoolMode.AUTO, "SET useSpools=true; SET fuseBroadcastJoins=true; ", "", List.of(1, 1, 1), 1},
+        {SpoolMode.ON, "", ", fuse_broadcast_joins='true'", List.of(1, 1, 1), 1},
+        {SpoolMode.ON, "SET useSpools='auto'; SET fuseBroadcastJoins=true; ", "", List.of(1, 2), 0},
+        {SpoolMode.ON, "SET useSpools=false; SET fuseBroadcastJoins=true; ", "", List.of(1, 2), 0}
+    };
+  }
+
+  @Test(dataProvider = "sharedBuildSpoolModes")
+  public void testSharedBroadcastBuild(SpoolMode brokerMode, String options, String fuseHint,
+      List<Integer> expectedJoinsPerStage, int expectedSharedStages) {
+    QueryEnvironment environment;
+    try (QueryEnvironment.CompiledQuery seed = _queryEnvironment.compile("SELECT 1")) {
+      environment = new QueryEnvironment(QueryEnvironment.configBuilder().from(seed.getPlannerContext().getEnvConfig())
+          .defaultSpoolMode(brokerMode).build());
+    }
+    String hint = "/*+ joinOptions(left_distribution_type='random', right_distribution_type='broadcast'"
+        + fuseHint + ") */ ";
+    String query = options + "SELECT " + hint + "f.col3, b1.col3, r.amount FROM a f JOIN b b1 ON f.col1=b1.col1 "
+        + "JOIN (SELECT " + hint + "d.col1, b2.col3 AS amount FROM c d JOIN b b2 ON d.col1=b2.col1) r "
+        + "ON f.col1=r.col1";
+    try (QueryEnvironment.CompiledQuery compiled = environment.compile(query)) {
+      List<PlanNode> stages = compiled.planQuery(1).getQueryPlan().getQueryStages().stream()
+          .map(stage -> stage.getPlanFragment().getFragmentRoot()).toList();
+      assertEquals(stages.stream().map(BroadcastJoinStageFusionTest::countJoins)
+          .filter(count -> count > 0).sorted().toList(), expectedJoinsPerStage);
+      assertEquals(stages.stream().filter(node -> node instanceof MailboxSendNode send && send.isMultiSend()).count(),
+          expectedSharedStages);
+    }
   }
 
   private static int countJoins(PlanNode node) {

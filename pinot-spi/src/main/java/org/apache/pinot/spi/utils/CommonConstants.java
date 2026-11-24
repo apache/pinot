@@ -1119,6 +1119,7 @@ public class CommonConstants {
         public static final String USE_PLANNER_RULES = "usePlannerRules";
 
         /// Keep adjacent inner equijoins with broadcast build sides in one multi-stage worker.
+        /// Unguarded spooling (`useSpools=on` or `true`) takes precedence and keeps the joins in separate stages.
         public static final String FUSE_BROADCAST_JOINS = "fuseBroadcastJoins";
 
         public static final String ALLOW_REVERSE_ORDER = "allowReverseOrder";

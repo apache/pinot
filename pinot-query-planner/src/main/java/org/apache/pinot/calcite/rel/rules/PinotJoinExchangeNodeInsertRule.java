@@ -44,6 +44,8 @@ import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.planner.logical.SpoolMode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
@@ -130,12 +132,23 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
   }
 
   private static boolean fusionEnabled(RelOptRuleCall call, @Nullable Map<String, String> hint) {
-    if (hint != null && hint.containsKey(PinotHintOptions.JoinHintOptions.FUSE_BROADCAST_JOINS)) {
-      return Boolean.parseBoolean(hint.get(PinotHintOptions.JoinHintOptions.FUSE_BROADCAST_JOINS));
-    }
     Context context = call.getPlanner().getContext();
     PlannerContext planner = context != null ? context.unwrap(PlannerContext.class) : null;
-    return planner != null && Boolean.parseBoolean(planner.getOptions().get(QueryOptionKey.FUSE_BROADCAST_JOINS));
+    if (planner == null) {
+      return false;
+    }
+    String fuse = hint != null ? hint.get(PinotHintOptions.JoinHintOptions.FUSE_BROADCAST_JOINS) : null;
+    if (!Boolean.parseBoolean(fuse != null ? fuse : planner.getOptions().get(QueryOptionKey.FUSE_BROADCAST_JOINS))) {
+      return false;
+    }
+    // An unguarded spool can share a build input with another stage that must finish before the fused join reads it.
+    // Keep the exchange in ON mode. AUTO checks the finished plan before sharing any producer.
+    try {
+      return planner.getSpoolMode() != SpoolMode.ON;
+    } catch (QueryException e) {
+      // Dispatch planning reports an invalid spool option as a query validation error.
+      return false;
+    }
   }
 
   /// A random probe input already assigns each row to one worker. Since every worker receives the entire
