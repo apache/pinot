@@ -119,4 +119,13 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
   }
+
+  @Test
+  public void testGetStoredTypeForSum0() {
+    Assert.assertEquals(AggregationFunctionColumnPair.getStoredType(AggregationFunctionType.SUM0),
+        AggregationFunctionType.SUM);
+    AggregationFunctionColumnPair sum0Pair = new AggregationFunctionColumnPair(AggregationFunctionType.SUM0, COLUMN);
+    Assert.assertEquals(AggregationFunctionColumnPair.resolveToStoredType(sum0Pair),
+        new AggregationFunctionColumnPair(AggregationFunctionType.SUM, COLUMN));
+  }
 }

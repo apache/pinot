@@ -2083,6 +2083,25 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertTrue(explain.contains("ARRAY(7)"), "expected the COALESCE fallback, got:\n" + explain);
   }
 
+  @Test
+  public void testAggregateFunctionRewritePreservesSum0EmptyContract() {
+    String explain = _queryEnvironment.explainQuery(
+        "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR SELECT SUM(a.col3) FROM a",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("SUMINT("), "expected SUM0 to be rewritten to SUMINT, got:\n" + explain);
+    assertTrue(explain.contains("CASE(IS NOT NULL($0), $0, 0:BIGINT)"),
+        "expected rewritten SUM0 to preserve empty-is-zero contract, got:\n" + explain);
+
+    String unionCountExplain = _queryEnvironment.explainQuery(
+        "SET autoRewriteAggregationType=true; EXPLAIN PLAN FOR "
+            + "SELECT COUNT(*) FROM (SELECT col1 FROM a UNION ALL SELECT col1 FROM b) t",
+        RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(unionCountExplain.contains("SUMLONG("),
+        "expected rolled-up SUM0 to be rewritten to SUMLONG, got:\n" + unionCountExplain);
+    assertTrue(unionCountExplain.contains("CASE(IS NOT NULL($0), $0, 0:BIGINT)"),
+        "expected rolled-up SUM0 rewrite to coalesce NULL to 0, got:\n" + unionCountExplain);
+  }
+
   private SqlTypeName generateArrayElementType(String arguments) {
     String query = "SELECT grid.ts FROM UNNEST(generateArray(" + arguments + ")) AS grid(ts)";
     return _queryEnvironment.compile(query).getRelRoot().validatedRowType.getFieldList().get(0).getType()

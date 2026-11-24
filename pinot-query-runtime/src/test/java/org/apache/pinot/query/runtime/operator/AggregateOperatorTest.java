@@ -482,6 +482,26 @@ public class AggregateOperatorTest {
     assertTrue(result.nextBlock().isSuccess());
   }
 
+  /// When `leafReturnFinalResult` is true and a leaf sends `null` for a group (e.g., an older server running
+  /// `SumAggregationFunction` for `SUM0`), `FINAL` must still resolve `null` through `extractFinalResult` so
+  /// `SUM0` returns `0.0` instead of `null`.
+  @Test
+  public void testLeafReturnFinalResultGroupByResolvesNullSum0() {
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(new RexExpression.FunctionCall(DOUBLE, "SUM0", List.of(new RexExpression.InputRef(1))));
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "sum0"}, new ColumnDataType[]{INT, DOUBLE});
+    AggregateOperator result = new AggregateOperator(context,
+        new BlockListMultiStageOperator.Builder(context, resultSchema).addRow(1, null).buildWithEos(),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), List.of(0),
+            AggType.FINAL, true, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{1, 0.0});
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
   @DataProvider
   public Object[][] groupByCases() {
     return new Object[][]{{false}, {true}};

@@ -171,5 +171,65 @@
         "sql": "SELECT bool_col, COALESCE(min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), 0), COALESCE(max(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 10), 0), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col2 > 10), count(string_col) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 WHERE string_col='b' GROUP BY bool_col"
       }
     ]
+  },
+  "sum_case_else_zero_no_match": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "k", "type": "STRING"},
+          {"name": "s", "type": "STRING"},
+          {"name": "v", "type": "LONG"},
+          {"name": "t_ms", "type": "LONG"}
+        ],
+        "inputs": [
+          ["a", "x", 10, 1],
+          ["a", "x", 20, 2],
+          ["b", "y", 30, 1],
+          ["c", "x", 40, 1]
+        ]
+      }
+    },
+    "queries": [
+      {"sql": "SELECT SUM(CASE WHEN s = 'zzz' THEN v ELSE 0 END) FROM {tbl}"},
+      {"sql": "SELECT SUM(CASE WHEN s = 'zzz' THEN v ELSE 0 END) FROM (SELECT s, v, ROW_NUMBER() OVER (PARTITION BY k ORDER BY t_ms DESC) AS rn FROM {tbl}) t WHERE rn = 1"},
+      {"sql": "SELECT s, SUM(CASE WHEN v > 1000 THEN v ELSE 0 END) FROM (SELECT s, v, ROW_NUMBER() OVER (PARTITION BY k ORDER BY t_ms DESC) AS rn FROM {tbl}) t WHERE rn = 1 GROUP BY s"},
+      {"sql": "SELECT SUM(CASE WHEN s = 'zzz' THEN m ELSE 0 END) FROM (SELECT k, s, MAX(v) AS m FROM {tbl} GROUP BY k, s) t"},
+      {"sql": "SET enableNullHandling=false; SELECT SUM(CASE WHEN s = 'zzz' THEN v ELSE 0 END) FROM (SELECT s, v, ROW_NUMBER() OVER (PARTITION BY k ORDER BY t_ms DESC) AS rn FROM {tbl}) t WHERE rn = 1"},
+      {"sql": "SET enableNullHandling=false; SELECT s, SUM(CASE WHEN v > 1000 THEN v ELSE 0 END) FROM (SELECT s, v, ROW_NUMBER() OVER (PARTITION BY k ORDER BY t_ms DESC) AS rn FROM {tbl}) t WHERE rn = 1 GROUP BY s"},
+      {"sql": "SET autoRewriteAggregationType=true; SELECT SUM(CASE WHEN s = 'zzz' THEN v ELSE 0 END) FROM {tbl}"},
+      {"sql": "SET autoRewriteAggregationType=true; SELECT s, SUM(CASE WHEN v > 1000 THEN v ELSE 0 END) FROM (SELECT s, v, ROW_NUMBER() OVER (PARTITION BY k ORDER BY t_ms DESC) AS rn FROM {tbl}) t WHERE rn = 1 GROUP BY s"},
+      {"sql": "SELECT s, SUM(CASE WHEN v > 25 THEN v ELSE 0 END) FROM (SELECT s, v, ROW_NUMBER() OVER (PARTITION BY k ORDER BY t_ms DESC) AS rn FROM {tbl}) t WHERE rn = 1 GROUP BY s"},
+      {"sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ s, SUM(CASE WHEN v > 1000 THEN v ELSE 0 END) FROM {tbl} GROUP BY s"},
+      {"sql": "SELECT SUM(CASE WHEN s = 'zzz' THEN v END) FROM {tbl}"},
+      {"sql": "SELECT s, SUM(CASE WHEN v > 1000 THEN v END) FROM {tbl} GROUP BY s"},
+      {"sql": "SELECT SUM(CASE WHEN s = 'zzz' THEN v ELSE 0 END) FROM {tbl} WHERE k = 'nonexistent'"},
+      {"sql": "SET autoRewriteAggregationType=true; SELECT COUNT(*) FROM (SELECT k FROM {tbl} WHERE k = 'nonexistent' UNION ALL SELECT k FROM {tbl} WHERE k = 'nonexistent') t"}
+    ]
+  },
+  "sum_case_else_zero_nullable_values": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "s", "type": "STRING"},
+          {"name": "v", "type": "LONG"}
+        ],
+        "inputs": [
+          ["x", null],
+          ["x", null],
+          ["y", 10],
+          ["z", null],
+          ["z", 5]
+        ]
+      }
+    },
+    "extraProps": {
+      "enableColumnBasedNullHandling": true
+    },
+    "queries": [
+      {"sql": "SELECT SUM(CASE WHEN s = 'zzz' THEN v ELSE 0 END) FROM {tbl}"},
+      {"sql": "SELECT s, SUM(CASE WHEN s = 'x' THEN v ELSE 0 END) FROM {tbl} GROUP BY s"},
+      {"sql": "SELECT s, SUM(CASE WHEN s = 'z' THEN v ELSE 0 END) FROM {tbl} GROUP BY s"},
+      {"sql": "SELECT s, SUM(CASE WHEN s = 'zzz' THEN v ELSE 0 END) FROM (SELECT s, MAX(v) AS v FROM {tbl} GROUP BY s) t GROUP BY s"}
+    ]
   }
 }

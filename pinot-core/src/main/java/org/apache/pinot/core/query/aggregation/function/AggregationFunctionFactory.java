@@ -222,8 +222,9 @@ public class AggregationFunctionFactory {
           case MAXLONG:
             return new MaxLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUM:
-          case SUM0:
             return new SumAggregationFunction(arguments, nullHandlingEnabled);
+          case SUM0:
+            return new Sum0AggregationFunction(arguments, nullHandlingEnabled);
           case SUMINT:
             return new SumIntAggregationFunction(arguments, nullHandlingEnabled);
           case SUMLONG:

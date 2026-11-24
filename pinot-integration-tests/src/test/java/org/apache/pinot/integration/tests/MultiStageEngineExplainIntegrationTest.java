@@ -194,7 +194,7 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
     // override the broker config
     explainLogical("SELECT SUM(AirlineID) FROM mytable",
         "Execution Plan\n"
-            + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
+            + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, CASE(IS NOT NULL($0), $0, 0:BIGINT))])\n"
             + "  PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
             + "    PinotLogicalExchange(distribution=[hash])\n"
             + "      PinotLogicalAggregate(group=[{}], agg#0=[SUMLONG($11)], agg#1=[COUNT()], aggType=[LEAF])\n"

@@ -413,7 +413,9 @@ public class MultistageGroupByExecutor {
         return _mergeResultHolder.get(groupId)[functionId];
       case FINAL: {
         Object mergedResult = _mergeResultHolder.get(groupId)[functionId];
-        return _leafReturnFinalResult ? mergedResult : aggFunction.extractFinalResult(mergedResult);
+        return _leafReturnFinalResult && mergedResult != null
+            ? mergedResult
+            : aggFunction.extractFinalResult(mergedResult);
       }
       case DIRECT: {
         Object intermediateResult = aggFunction.extractGroupByResult(_aggregateResultHolders[functionId], groupId);
