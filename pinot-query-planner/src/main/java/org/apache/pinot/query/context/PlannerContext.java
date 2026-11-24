@@ -37,6 +37,7 @@ import org.apache.pinot.calcite.rex.SearchSealer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
+import org.apache.pinot.query.planner.logical.SpoolMode;
 import org.apache.pinot.query.validate.Validator;
 
 
@@ -172,6 +173,10 @@ public class PlannerContext implements AutoCloseable, Context {
   /// Returns the query's [SearchSealer], which hides large IN lists from Calcite during optimization.
   public SearchSealer getSearchSealer() {
     return _searchSealer;
+  }
+
+  public SpoolMode getSpoolMode() {
+    return QueryEnvironment.getSpoolMode(_options, _envConfig.defaultSpoolMode());
   }
 
   public boolean isUsePhysicalOptimizer() {
