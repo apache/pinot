@@ -194,7 +194,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
       // Query 10 times to get result from both servers (query should be distributed to both servers in a round-robin
       // fashion, but query more times to be more robust)
       for (int i = 0; i < 10; i++) {
-        if (getCurrentCountStarResultWithoutUpsert(tableName) != expectedCountStarWithoutUpsertResult) {
+        if (getCurrentRawCountStarResult(tableName) != expectedCountStarWithoutUpsertResult) {
           return false;
         }
       }

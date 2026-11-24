@@ -162,7 +162,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getCurrentCountStarResultWithoutUpsert(getTableName()) == getCountStarResultWithoutUpsert();
+        return getCurrentRawCountStarResult(getTableName()) == getCountStarResultWithoutUpsert();
       } catch (Exception e) {
         return null;
       }
@@ -192,7 +192,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     _controllerStarter.getRealtimeSegmentValidationManager().run();
     verifyIdealState(NUM_SEGMENTS);
     assertLatestRowPerClientId();
-    assertEquals(getCurrentCountStarResultWithoutUpsert(getTableName()), getCountStarResultWithoutUpsert());
+    assertEquals(getCurrentRawCountStarResult(getTableName()), getCountStarResultWithoutUpsert());
 
     beforeRestart();
 

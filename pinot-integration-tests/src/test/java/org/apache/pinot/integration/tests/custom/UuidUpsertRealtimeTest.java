@@ -66,7 +66,7 @@ public class UuidUpsertRealtimeTest extends CustomDataQueryClusterIntegrationTes
 
   @Override
   protected void waitForAllDocsLoaded(long timeoutMs) {
-    TestUtils.waitForCondition(() -> getCurrentCountStarResultWithoutUpsert(TABLE_NAME) == UUID_PK_VALUES.size(),
+    TestUtils.waitForCondition(() -> getCurrentRawCountStarResult(TABLE_NAME) == UUID_PK_VALUES.size(),
         100L, timeoutMs, "Failed to load all UUID upsert records", Duration.ofSeconds(5));
   }
 

@@ -574,7 +574,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getCurrentCountStarResultWithoutUpsert(getTableName()) == expectedCount;
+        return getCurrentRawCountStarResult(getTableName()) == expectedCount;
       } catch (Exception e) {
         return null;
       }
@@ -630,7 +630,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        boolean c1 = getCurrentCountStarResultWithoutUpsert(getTableName()) == getCountStarResultWithoutUpsert();
+        boolean c1 = getCurrentRawCountStarResult(getTableName()) == getCountStarResultWithoutUpsert();
         boolean c2 = getCurrentCountStarResult() == getCountStarResult();
         // verify there are no null rows
         boolean c3 =

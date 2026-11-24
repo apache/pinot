@@ -425,7 +425,7 @@ public class VectorUpsertTableTest extends CustomDataQueryClusterIntegrationTest
         // stable across broker requests.
         for (int i = 0; i < 10; i++) {
           ResultSetGroup currentResult = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName);
-          if (getCurrentCountStarResultWithoutUpsert(tableName) != expectedPhysicalDocs
+          if (getCurrentRawCountStarResult(tableName) != expectedPhysicalDocs
               || currentResult.getResultSet(0).getLong(0) != expectedCurrentDocs) {
             return false;
           }

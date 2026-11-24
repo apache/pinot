@@ -997,7 +997,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   ///
   /// @throws IllegalStateException when the broker returns an exception or no result, since a count from part of the
   ///   segments is not the table's count
-  protected long getCurrentCountStarResultWithoutUpsert(String tableName) {
+  protected long getCurrentRawCountStarResult(String tableName) {
     ResultSetGroup resultSetGroup =
         getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)");
     if (!resultSetGroup.getExceptions().isEmpty() || resultSetGroup.getResultSetCount() == 0) {

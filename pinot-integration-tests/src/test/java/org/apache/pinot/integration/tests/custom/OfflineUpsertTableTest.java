@@ -204,7 +204,7 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
     AtomicInteger consecutiveSuccesses = new AtomicInteger();
     TestUtils.waitForCondition(() -> {
       try {
-        if (getCurrentCountStarResultWithoutUpsert(TABLE_NAME) != expectedRawRecords) {
+        if (getCurrentRawCountStarResult(TABLE_NAME) != expectedRawRecords) {
           consecutiveSuccesses.set(0);
           return false;
         }

@@ -371,7 +371,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getCurrentCountStarResultWithoutUpsert(tableName) == expectedDocs;
+        return getCurrentRawCountStarResult(tableName) == expectedDocs;
       } catch (Exception e) {
         return false;
       }
@@ -555,7 +555,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
       throws Exception {
     assertRows(rawRowsQuery(columns, tableNames[ROW_MAJOR]), expectedRows);
     assertRows(rawRowsQuery(columns, tableNames[COLUMN_MAJOR]), expectedRows);
-    assertEquals(getCurrentCountStarResultWithoutUpsert(tableNames[BASELINE]), expectedBaselineRawDocs,
+    assertEquals(getCurrentRawCountStarResult(tableNames[BASELINE]), expectedBaselineRawDocs,
         "Baseline table without commit-time compaction should keep every ingested row");
     assertRowsOnTables(columns, expectedRows, tableNames);
   }
@@ -631,7 +631,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         List.of(103, "Charlie-New", "chess", 2500.0, 1681300004000L, true));
     assertRows(rawRowsQuery(GAME_SCORES_COLUMNS, tables[ROW_MAJOR]), expectedRawRows);
     assertRows(rawRowsQuery(GAME_SCORES_COLUMNS, tables[COLUMN_MAJOR]), expectedRawRows);
-    assertEquals(getCurrentCountStarResultWithoutUpsert(tables[BASELINE]), 15L,
+    assertEquals(getCurrentRawCountStarResult(tables[BASELINE]), 15L,
         "Baseline table without commit-time compaction should keep every ingested row");
 
     cleanupTablesAndSchemas(tables);

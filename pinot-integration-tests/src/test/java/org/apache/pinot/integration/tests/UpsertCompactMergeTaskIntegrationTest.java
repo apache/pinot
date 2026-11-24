@@ -105,7 +105,7 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     setUpTable(getTableName(), kafkaTopicName, null);
 
     // Wait for all documents loaded
-    TestUtils.waitForCondition(() -> getCurrentCountStarResultWithoutUpsert(getTableName()) == 10, 100L, 600_000L,
+    TestUtils.waitForCondition(() -> getCurrentRawCountStarResult(getTableName()) == 10, 100L, 600_000L,
         "Failed to load 10 documents", Duration.ofMillis(600_000L / 10));
     assertRows(gameScoresRowsQuery(getTableName()), GAME_SCORES_WINNERS);
 
@@ -334,7 +334,7 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
 
     // All 10 fixture rows are ingested, and the table serves the latest row per player
-    assertEquals(getCurrentCountStarResultWithoutUpsert(getTableName()), 10,
+    assertEquals(getCurrentRawCountStarResult(getTableName()), 10,
         "Should have all fixture rows in segments");
     assertRows(gameScoresRowsQuery(getTableName()), GAME_SCORES_WINNERS);
   }
