@@ -118,6 +118,19 @@ public class NotDocIdIteratorTest {
   }
 
   @Test
+  public void testCloseBeforeFirstPullDoesNotReadChild() {
+    BlockDocIdIterator child = mock(BlockDocIdIterator.class);
+    NotDocIdIterator iterator = new NotDocIdIterator(child, 10);
+
+    iterator.close();
+    assertEquals(iterator.next(), Constants.EOF);
+    assertEquals(iterator.advance(4), Constants.EOF);
+    verify(child, never()).next();
+    verify(child, never()).advance(4);
+    verify(child).close();
+  }
+
+  @Test
   public void testCloseSkipsExhaustedChild() {
     BlockDocIdIterator child = mock(BlockDocIdIterator.class);
     when(child.next()).thenReturn(0, Constants.EOF);

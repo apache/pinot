@@ -23,6 +23,8 @@ import java.util.OptionalInt;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.dociditerators.NotDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
@@ -35,9 +37,15 @@ import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// [DocIdSetOperator] reports the entries that the filter scans to the scan cost of the query, block by block. A lazy
@@ -87,6 +95,34 @@ public class DocIdSetOperatorScanCostTest {
       assertNull(operator.nextBlock(), "A closed operator returns no more documents");
       operator.close();
       assertEquals(scan._iterator._numCloseCalls, 1, "Closing twice must not close the scan twice");
+    }
+  }
+
+  @Test
+  public void testFailedFirstPullClosesNegatedFilterChildren() {
+    BlockDocIdIterator firstChild = mock(BlockDocIdIterator.class);
+    BlockDocIdIterator secondChild = mock(BlockDocIdIterator.class);
+    RuntimeException readFailure = new IllegalStateException("Cannot read the second scan");
+    RuntimeException closeFailure = new IllegalStateException("Cannot close the first scan");
+    when(firstChild.next()).thenReturn(1);
+    when(secondChild.next()).thenThrow(readFailure);
+    doThrow(closeFailure).when(firstChild).close();
+
+    BlockDocIdSet filter = mock(BlockDocIdSet.class);
+    when(filter.iterator()).thenAnswer(invocation ->
+        new NotDocIdIterator(new OrDocIdIterator(new BlockDocIdIterator[]{firstChild, secondChild}), NUM_DOCS));
+
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      RuntimeException failure = expectThrows(RuntimeException.class, () -> {
+        try (DocIdSetOperator operator = new DocIdSetOperator(new FixedFilterOperator(filter), MAX_DOCS_PER_BLOCK)) {
+          operator.nextBlock();
+        }
+      });
+      assertSame(failure, readFailure);
+      assertEquals(failure.getSuppressed(), new Throwable[]{closeFailure});
+      verify(firstChild).next();
+      verify(firstChild).close();
+      verify(secondChild).close();
     }
   }
 

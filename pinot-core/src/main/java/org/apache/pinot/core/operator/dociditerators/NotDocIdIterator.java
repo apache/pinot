@@ -25,16 +25,17 @@ import org.apache.pinot.segment.spi.Constants;
 /// The iterator performs a linear pass through the underlying child iterator and returns
 /// the complement of the result set.
 public class NotDocIdIterator implements BlockDocIdIterator {
+  private static final int NOT_STARTED = -1;
+
   private final BlockDocIdIterator _childDocIdIterator;
   private final int _numDocs;
   private int _nextDocId;
-  private int _nextNonMatchingDocId;
+  private int _nextNonMatchingDocId = NOT_STARTED;
   private boolean _closed;
 
   public NotDocIdIterator(BlockDocIdIterator childDocIdIterator, int numDocs) {
     _childDocIdIterator = childDocIdIterator;
     _numDocs = numDocs;
-    _nextNonMatchingDocId = childDocIdIterator.next();
   }
 
   @Override
@@ -42,6 +43,7 @@ public class NotDocIdIterator implements BlockDocIdIterator {
     if (_closed) {
       return Constants.EOF;
     }
+    initialize();
     while (_nextDocId < _numDocs && _nextDocId == _nextNonMatchingDocId) {
       _nextDocId++;
       _nextNonMatchingDocId = _childDocIdIterator.next();
@@ -58,11 +60,30 @@ public class NotDocIdIterator implements BlockDocIdIterator {
     if (_closed) {
       return Constants.EOF;
     }
+    initialize();
     _nextDocId = targetDocId;
     if (_nextNonMatchingDocId != Constants.EOF && targetDocId > _nextNonMatchingDocId) {
       _nextNonMatchingDocId = _childDocIdIterator.advance(targetDocId);
     }
     return next();
+  }
+
+  /// Wait until the consumer can close this iterator before pulling from the child.
+  private void initialize() {
+    if (_nextNonMatchingDocId == NOT_STARTED) {
+      try {
+        _nextNonMatchingDocId = _childDocIdIterator.next();
+      } catch (RuntimeException | Error failure) {
+        try {
+          close();
+        } catch (RuntimeException | Error closeFailure) {
+          if (failure != closeFailure) {
+            failure.addSuppressed(closeFailure);
+          }
+        }
+        throw failure;
+      }
+    }
   }
 
   @Override
