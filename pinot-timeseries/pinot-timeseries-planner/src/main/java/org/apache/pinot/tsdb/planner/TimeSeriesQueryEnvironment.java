@@ -107,10 +107,7 @@ public class TimeSeriesQueryEnvironment {
   ///     caller who may not query a table gets its error before a [TimeSeriesRoutingCustomizer] does any work
   public TimeSeriesDispatchablePlan buildPhysicalPlan(RangeTimeSeriesRequest timeSeriesRequest,
       RequestContext requestContext, TimeSeriesLogicalPlanResult logicalPlan, Consumer<List<String>> tableAuthorizer) {
-    // Step-0: Add table type info to the logical plan, and authorize the tables before routing them.
-    logicalPlan = new TimeSeriesLogicalPlanResult(TableScanVisitor.INSTANCE.addTableTypeInfoToPlan(
-      logicalPlan.getPlanNode(), requestContext), logicalPlan.getTimeBuckets());
-    tableAuthorizer.accept(leafTableNames(logicalPlan.getPlanNode()));
+    logicalPlan = resolveAndAuthorizeTables(logicalPlan, requestContext, tableAuthorizer);
     // Step-1: Assign segments to servers for each leaf node.
     TableScanVisitor.Context scanVisitorContext =
         TableScanVisitor.createContext(requestContext.getRequestId(), timeSeriesRequest.getQueryOptions(),
@@ -138,8 +135,16 @@ public class TimeSeriesQueryEnvironment {
         numServersForExchangePlanNode, scanVisitorContext.getTableNames());
   }
 
+  /// Resolves and checks the same physical table names for execution, empty results and EXPLAIN.
+  public TimeSeriesLogicalPlanResult resolveAndAuthorizeTables(TimeSeriesLogicalPlanResult plan,
+      RequestContext requestContext, Consumer<List<String>> tableAuthorizer) {
+    BaseTimeSeriesPlanNode root = TableScanVisitor.INSTANCE.addTableTypeInfoToPlan(plan.getPlanNode(), requestContext);
+    tableAuthorizer.accept(leafTableNames(root));
+    return new TimeSeriesLogicalPlanResult(root, plan.getTimeBuckets());
+  }
+
   /// The distinct tables the plan's leaves scan, in plan order.
-  private static List<String> leafTableNames(BaseTimeSeriesPlanNode planNode) {
+  public static List<String> leafTableNames(BaseTimeSeriesPlanNode planNode) {
     Set<String> tableNames = new LinkedHashSet<>();
     collectLeafTableNames(planNode, tableNames);
     return new ArrayList<>(tableNames);
