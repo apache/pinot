@@ -28,12 +28,8 @@ import org.apache.pinot.common.config.provider.AccessControlUserCache;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
-import org.apache.pinot.spi.config.user.ComponentType;
-import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -71,15 +67,6 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
 
     public BasicAuthAccessControl(AccessControlUserCache userCache) {
       _userCache = userCache;
-    }
-
-    @Override
-    public boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
-      if (targetType == TargetType.CLUSTER && Actions.Cluster.CREATE_USER.equals(action)) {
-        return getPrincipal(httpHeaders).filter(p -> p.hasPermission(RoleType.ADMIN, ComponentType.CONTROLLER))
-            .isPresent();
-      }
-      return super.hasAccess(httpHeaders, targetType, targetId, action);
     }
 
     @Override

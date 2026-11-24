@@ -25,8 +25,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
+import org.apache.pinot.spi.config.user.ComponentType;
+import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,13 +103,21 @@ abstract class BaseBasicAuthAccessControl<P extends BasicAuthPrincipal> implemen
   }
 
   @Override
-  public boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
-    // Basic auth permissions are CRUD access types, not action names. AuthenticationFilter enforces the resolved
-    // AccessType before invoking this fine-grained check, so this overload must only prevent unauthenticated access.
-    // In particular it must not require unrestricted table scope for TargetType.CLUSTER: several table-scoped
-    // endpoints declare a cluster action, and for those the filter already resolved the table name and ran the
-    // table-scoped check above. Endpoints that name no table go through the cluster-wide check above instead.
-    return getPrincipal(httpHeaders).isPresent();
+  public final boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
+    Optional<P> principal = getPrincipal(httpHeaders);
+    if (targetType == TargetType.CLUSTER && Actions.Cluster.CREATE_USER.equals(action)) {
+      return principal.filter(BaseBasicAuthAccessControl::canCreateUser).isPresent();
+    }
+    // AuthenticationFilter already checked CRUD and table scope, including for table requests with cluster actions.
+    return principal.isPresent();
+  }
+
+  private static boolean canCreateUser(BasicAuthPrincipal principal) {
+    if (principal instanceof ZkBasicAuthPrincipal zkPrincipal) {
+      return zkPrincipal.hasPermission(RoleType.ADMIN, ComponentType.CONTROLLER);
+    }
+    // Only the file-backed principal relies solely on the preceding CRUD and table-scope checks.
+    return principal.getClass() == BasicAuthPrincipal.class;
   }
 
   /// Reports whether the principal may act on the given target type at all, without a specific target or action.
