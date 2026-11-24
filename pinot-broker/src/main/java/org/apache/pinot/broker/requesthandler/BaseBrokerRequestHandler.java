@@ -231,16 +231,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler, 
     String query = sql.textValue();
     requestContext.setQuery(query);
 
-    // Parse the query if needed
-    if (sqlNodeAndOptions == null) {
-      try {
+    try {
+      if (sqlNodeAndOptions == null) {
         sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
-      } catch (Exception e) {
-        // Do not log or emit metric here because it is pure user error
-        QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
-        requestContext.setErrorCode(errorCode);
-        return new BrokerResponseNative(errorCode, e.getMessage());
+      } else {
+        RequestUtils.validateClientQueryOptions(sqlNodeAndOptions.getOptions());
       }
+    } catch (Exception e) {
+      // Do not log or emit metric here because it is pure user error
+      QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
+      requestContext.setErrorCode(errorCode);
+      return new BrokerResponseNative(errorCode, e.getMessage());
     }
 
     // check app qps before doing anything
@@ -299,10 +300,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler, 
   /// Validates whether the requester has access to all the tables.
   protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
       RequestContext requestContext, HttpHeaders httpHeaders) {
+    return hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders, false);
+  }
+
+  protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
+      RequestContext requestContext, HttpHeaders httpHeaders, boolean lookupTables) {
     final long startTimeNs = System.nanoTime();
     AccessControl accessControl = _accessControlFactory.create();
 
-    TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
+    TableAuthorizationResult tableAuthorizationResult = lookupTables
+        ? accessControl.authorizeLookupTables(requesterIdentity, tableNames)
+        : accessControl.authorize(requesterIdentity, tableNames);
 
     Set<String> failedTables = tableNames.stream()
         .filter(table -> !accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY))

@@ -28,7 +28,6 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -41,6 +40,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -156,7 +156,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleStageBrokerRequestHandler.class);
   // Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function
   private static final String IN_SUBQUERY = "insubquery";
-  private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
   private static final String IN_ID_SET = "inidset";
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
@@ -506,26 +505,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // A `lookup()` dimension table is not part of the data source, so neither the logical-table check nor the
     // BrokerRequest based check below covers it. Authorize it here, for both branches.
     Set<String> lookupTableNames = compileResult._lookupTableNames;
-    if (!lookupTableNames.isEmpty()) {
-      AuthorizationResult lookupAuthorizationResult =
-          hasTableAccess(requesterIdentity, lookupTableNames, requestContext, httpHeaders);
-      if (!lookupAuthorizationResult.hasAccess()) {
-        throwAccessDeniedError(requestId, query, requestContext, tableName, lookupAuthorizationResult);
-      }
-      if (_enableRowColumnLevelAuth) {
-        // `lookup()` resolves a row by primary key against the dimension table's in-memory data and never evaluates a
-        // filter against that table, so an RLS filter on it cannot be applied. Reject the query instead of returning
-        // rows the principal is not allowed to see.
-        for (String lookupTableName : lookupTableNames) {
-          List<String> rowFilters =
-              accessControl.getRowColFilters(requesterIdentity, lookupTableName).getRLSFilters().orElse(null);
-          if (rowFilters != null && !rowFilters.isEmpty()) {
-            throwAccessDeniedError(requestId, query, requestContext, tableName,
-                new TableAuthorizationResult(Set.of(lookupTableName)));
-          }
-        }
-      }
-    }
+    authorizeLookupTables(lookupTableNames, requestId, query, requestContext, tableName, requesterIdentity, httpHeaders,
+        accessControl);
 
     TableRouteProvider routeProvider;
 
@@ -645,6 +626,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     /// outcome for downstream consumers: SPLIT path, response annotation, and the
     /// `tablesQueried` response field which must tag the user's base table, not the MV.
     MaterializedViewContext materializedViewContext = MaterializedViewContext.empty();
+    String userTableName = tableName;
     /// Capture the user-facing raw table name BEFORE the FULL_REWRITE swap below so the
     /// response's `tablesQueried` field tags the user's base table — not the MV the broker
     /// routed through.  Equals `rawTableName` when no MV swap happens.
@@ -739,6 +721,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Prepare OFFLINE and REALTIME requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
+    Map<Expression, Expression> offlineOverrides =
+        offlineTableName != null ? _tableCache.getExpressionOverrideMap(offlineTableName) : null;
+    Map<Expression, Expression> realtimeOverrides =
+        realtimeTableName != null ? _tableCache.getExpressionOverrideMap(realtimeTableName) : null;
+    // Servers can apply table overrides to the independent row filter even if the broker's WHERE tree differs.
+    if (rlsFiltersApplied.get()
+        && (hasCrossTableOverride(offlineOverrides) || hasCrossTableOverride(realtimeOverrides))) {
+      throwAccessDeniedError(requestId, query, requestContext, userTableName,
+          new BasicAuthorizationResultImpl(false, "Cross-table expression overrides are not allowed with row filters"));
+    }
 
     if (routeInfo.isHybrid()) {
       // Hybrid
@@ -746,7 +738,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
       assert timeBoundaryInfo != null;
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
-      handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      handleExpressionOverride(offlinePinotQuery, offlineOverrides);
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
       // Re-optimize after attaching the time boundary filter so that filter optimizers (e.g. NumericalFilterOptimizer,
       // FlattenAndOrFilterOptimizer, MergeRangeFilterOptimizer) are applied to the time boundary predicate.
@@ -756,7 +748,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       PinotQuery realtimePinotQuery = serverPinotQuery.deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
       attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
-      handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      handleExpressionOverride(realtimePinotQuery, realtimeOverrides);
       handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(realtimePinotQuery, schema);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
@@ -767,10 +759,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else if (routeInfo.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
-      Map<Expression, Expression> expressionOverrideMap = _tableCache.getExpressionOverrideMap(offlineTableName);
-      handleExpressionOverride(serverPinotQuery, expressionOverrideMap);
+      handleExpressionOverride(serverPinotQuery, offlineOverrides);
       handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig);
-      if (expressionOverrideMap != null) {
+      if (offlineOverrides != null) {
         _queryOptimizer.optimize(serverPinotQuery, schema);
       }
       offlineBrokerRequest = serverBrokerRequest;
@@ -780,16 +771,21 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else {
       // REALTIME only
       setTableName(serverBrokerRequest, realtimeTableName);
-      Map<Expression, Expression> expressionOverrideMap = _tableCache.getExpressionOverrideMap(realtimeTableName);
-      handleExpressionOverride(serverPinotQuery, expressionOverrideMap);
+      handleExpressionOverride(serverPinotQuery, realtimeOverrides);
       handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig);
-      if (expressionOverrideMap != null) {
+      if (realtimeOverrides != null) {
         _queryOptimizer.optimize(serverPinotQuery, schema);
       }
       realtimeBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.REALTIME);
       requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableConfig));
+    }
+
+    // These rewrites can introduce expressions that were absent from the user's compiled query.
+    if (offlineOverrides != null || realtimeOverrides != null || materializedViewContext.isFullRewrite()) {
+      authorizeRewrittenLookups(new BrokerRequest[]{offlineBrokerRequest, realtimeBrokerRequest}, lookupTableNames,
+          requestId, query, requestContext, userTableName, requesterIdentity, httpHeaders, accessControl);
     }
 
     // Check if response can be sent without server query evaluation.
@@ -978,7 +974,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       BrokerResponseNative viewSplitResponse = tryExecuteMaterializedViewSplit(requestId, query, sqlNodeAndOptions,
           requesterIdentity, requestContext, brokerRequest, serverPinotQuery, schema, materializedViewContext,
           routeInfo, remainingTimeMs, errorMsgs, numPrunedSegmentsTotal, database, tableName, userRawTableName,
-          rlsFiltersApplied.get(), serverStats, selectedRoutingManager, routeProvider, queryWasLogged);
+          rlsFiltersApplied.get(), serverStats, selectedRoutingManager, routeProvider, queryWasLogged,
+          requests -> authorizeRewrittenLookups(requests, lookupTableNames, requestId, query,
+              requestContext, userTableName, requesterIdentity, httpHeaders, accessControl));
       if (viewSplitResponse != null) {
         return viewSplitResponse;
       }
@@ -1475,6 +1473,43 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       failureMessage = "Reason: " + failureMessage;
     }
     throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
+  }
+
+  private void authorizeLookupTables(Set<String> lookupTableNames, long requestId, String query,
+      RequestContext requestContext, String tableName, @Nullable RequesterIdentity requesterIdentity,
+      @Nullable HttpHeaders httpHeaders, AccessControl accessControl) {
+    if (lookupTableNames.isEmpty()) {
+      return;
+    }
+    AuthorizationResult result = hasTableAccess(requesterIdentity, lookupTableNames, requestContext, httpHeaders, true);
+    if (!result.hasAccess()) {
+      throwAccessDeniedError(requestId, query, requestContext, tableName, result);
+    }
+    if (_enableRowColumnLevelAuth) {
+      // A point lookup cannot apply a row filter on the dimension table.
+      for (String lookupTableName : lookupTableNames) {
+        if (accessControl.hasLookupTableRowFilters(requesterIdentity, lookupTableName)) {
+          throwAccessDeniedError(requestId, query, requestContext, tableName,
+              new TableAuthorizationResult(Set.of(lookupTableName)));
+        }
+      }
+    }
+  }
+
+  private void authorizeRewrittenLookups(BrokerRequest[] requests, Set<String> authorizedLookupTableNames,
+      long requestId, String query, RequestContext requestContext, String tableName,
+      @Nullable RequesterIdentity requesterIdentity, @Nullable HttpHeaders httpHeaders, AccessControl accessControl) {
+    Set<String> lookupTableNames = new HashSet<>();
+    for (BrokerRequest request : requests) {
+      if (request == null) {
+        continue;
+      }
+      PinotQuery rewrittenQuery = request.getPinotQuery();
+      lookupTableNames.addAll(extractLookupTableNames(rewrittenQuery));
+    }
+    lookupTableNames.removeAll(authorizedLookupTableNames);
+    authorizeLookupTables(lookupTableNames, requestId, query, requestContext, tableName, requesterIdentity, httpHeaders,
+        accessControl);
   }
 
   private boolean isDefaultQueryResponseLimitEnabled() {
@@ -2267,7 +2302,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   ///
   /// `lookup()` names its dimension table with a string literal argument instead of the FROM clause, so the table is
   /// absent from the query's data source and has to be collected explicitly for the table-level access checks to see
-  /// it. The server resolves the table name from the literal's string value, including its original case.
+  /// it. Resolve the name the same way as the server, including the physical OFFLINE suffix.
   @VisibleForTesting
   static Set<String> extractLookupTableNames(PinotQuery pinotQuery) {
     Set<String> lookupTableNames = new HashSet<>();
@@ -2304,15 +2339,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     Function functionCall = expression.getFunctionCall();
     List<Expression> operands = functionCall.getOperands();
-    String operator = functionCall.getOperator();
-    if (LOOKUP_FUNCTION.equals(operator) && !operands.isEmpty()) {
-      Literal tableName = operands.get(0).getLiteral();
-      // A non-literal table name is rejected by LookupTransformFunction on the server
-      if (tableName != null) {
-        lookupTableNames.add(new LiteralContext(tableName).getStringValue());
+    switch (RequestUtils.classifyCrossTableFunction(functionCall.getOperator())) {
+      case LOOKUP -> {
+        Literal tableName = operands.isEmpty() ? null : operands.get(0).getLiteral();
+        if (tableName == null) {
+          throw new BadQueryRequestException("LOOKUP requires a literal dimension table name");
+        }
+        String name = new LiteralContext(tableName).getStringValue();
+        lookupTableNames.add(TableNameBuilder.OFFLINE.tableNameWithType(name));
       }
-    } else if (StringUtils.remove(operator, '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
-      pendingQueries.addLast(compilePartitionedSubquery(operands));
+      case IN_PARTITIONED_SUBQUERY -> pendingQueries.addLast(compilePartitionedSubquery(operands));
+      case IN_SUBQUERY -> {
+        // The separately executed broker request authorizes its own tables.
+      }
+      case null -> {
+        // Ordinary functions contribute dependencies from their operands.
+      }
     }
     // Recurse regardless, so that a lookup() nested inside another lookup()'s join value is collected too
     collectLookupTableNames(operands, lookupTableNames, pendingQueries);
@@ -2331,9 +2373,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throw new BadQueryRequestException("Cannot compile partitioned subquery", e);
     }
     // Row-filter options can add predicates during conversion on the server, outside the compiled expression tree.
-    if (!RlsUtils.extractRlsFilters(subquery.getQueryOptions()).isEmpty()) {
-      throw new BadQueryRequestException("Row-filter options are not allowed in partitioned subqueries");
-    }
+    RequestUtils.validateClientQueryOptions(subquery.getQueryOptions());
     return subquery;
   }
 
@@ -2343,8 +2383,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @VisibleForTesting
   static boolean hasCrossTableFunction(PinotQuery pinotQuery) {
     return hasCrossTableFunction(pinotQuery.getSelectList())
-        || hasCrossTableFunction(pinotQuery.getFilterExpression())
-        || hasCrossTableFunction(pinotQuery.getHavingExpression())
+        || RequestUtils.containsCrossTableFunction(pinotQuery.getFilterExpression())
+        || RequestUtils.containsCrossTableFunction(pinotQuery.getHavingExpression())
         || hasCrossTableFunction(pinotQuery.getGroupByList())
         || hasCrossTableFunction(pinotQuery.getOrderByList());
   }
@@ -2352,7 +2392,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static boolean hasCrossTableFunction(@Nullable List<Expression> expressions) {
     if (expressions != null) {
       for (Expression expression : expressions) {
-        if (hasCrossTableFunction(expression)) {
+        if (RequestUtils.containsCrossTableFunction(expression)) {
           return true;
         }
       }
@@ -2360,18 +2400,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return false;
   }
 
-  private static boolean hasCrossTableFunction(@Nullable Expression expression) {
-    if (expression == null || expression.getType() != ExpressionType.FUNCTION) {
-      return false;
-    }
-    Function functionCall = expression.getFunctionCall();
-    // The operator of a compiled call is canonical, see RequestUtils.canonicalizeFunctionName(), but lower-cased with
-    // the default locale, while the server resolves IN_PARTITIONED_SUBQUERY with equalsIgnoreCase(): fold it through
-    // Locale.ROOT so that a dotless ı (U+0131), written in the query or made of the I by a Turkish locale, and a long
-    // ſ (U+017F) are matched as the server matches them, or a server without the row-filter guard would run the
-    // subquery unfiltered behind this broker.
-    String canonicalName = functionCall.getOperator().toUpperCase(Locale.ROOT).toLowerCase(Locale.ROOT);
-    return RequestUtils.isCrossTableFunction(canonicalName) || hasCrossTableFunction(functionCall.getOperands());
+  private static boolean hasCrossTableOverride(@Nullable Map<Expression, Expression> expressionOverrides) {
+    return expressionOverrides != null
+        && expressionOverrides.values().stream().anyMatch(RequestUtils::containsCrossTableFunction);
   }
 
   /// Fixes the column names to the actual column names in the given expression.
@@ -2662,13 +2693,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       MaterializedViewContext materializedViewContext, TableRouteInfo routeInfo, long remainingTimeMs,
       List<QueryProcessingException> errorMsgs, int numPrunedSegmentsTotal, String database,
       String tableName, String userRawTableName, boolean rlsFiltersApplied, ServerStats serverStats,
-      RoutingManager selectedRoutingManager, TableRouteProvider routeProvider, boolean queryWasLogged) {
+      RoutingManager selectedRoutingManager, TableRouteProvider routeProvider, boolean queryWasLogged,
+      Consumer<BrokerRequest[]> authorizeRewrittenLookups) {
     String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
     MaterializedViewSplitDispatcher dispatcher =
         (originalReq, baseQ, baseRoute, baseSch, viewQ, viewTable, viewSch, timeoutMs) ->
             dispatchMaterializedViewSplit(requestId, originalReq, baseQ, baseRoute, baseSch, viewQ, viewTable,
                 viewSch, timeoutMs, serverStats, requestContext, selectedRoutingManager, routeProvider,
-                clientRequestId, query);
+                clientRequestId, query, authorizeRewrittenLookups);
     MaterializedViewSplitExecutionContext splitCtx = MaterializedViewSplitExecutionContext.builder()
         .originalBrokerRequest(brokerRequest)
         .baseServerPinotQuery(serverPinotQuery)
@@ -2724,7 +2756,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       BrokerRequest originalBrokerRequest, PinotQuery baseQueryWithTimeFilter, TableRouteInfo baseRouteInfo,
       Schema baseSchema, PinotQuery viewQueryWithTimeFilter, String viewTableNameWithType, Schema viewSchema,
       long timeoutMs, ServerStats serverStats, RequestContext requestContext, RoutingManager routingManager,
-      TableRouteProvider routeProvider, @Nullable String clientRequestId, String query) throws Exception {
+      TableRouteProvider routeProvider, @Nullable String clientRequestId, String query,
+      Consumer<BrokerRequest[]> authorizeRewrittenLookups) throws Exception {
     /// 1. Optimize and route the base-table side (handles hybrid offline/realtime split).
     _queryOptimizer.optimize(baseQueryWithTimeFilter, baseSchema);
     BrokerRequest baseBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(baseQueryWithTimeFilter);
@@ -2752,6 +2785,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     handleTimestampIndexOverride(viewQueryWithTimeFilter, _tableCache.getTableConfig(viewTableNameWithType));
     _queryOptimizer.optimize(viewQueryWithTimeFilter, viewSchema);
     BrokerRequest viewBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(viewQueryWithTimeFilter);
+    authorizeRewrittenLookups.accept(
+        new BrokerRequest[]{baseOfflineBrokerRequest, baseRealtimeBrokerRequest, viewBrokerRequest});
     TableRouteInfo viewRouteInfo = routeProvider.getTableRouteInfo(viewTableNameWithType, _tableCache, routingManager);
     /// The MV table can disappear between compile (broker MV cache) and execute (route lookup)
     /// — operator dropped it, controller mid-state-transition, etc.  Treat missing-route the

@@ -952,6 +952,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
 
     AtomicReference<List<String>> rowFilters = new AtomicReference<>(List.of("tenant = 'allowed'"));
+    AtomicReference<Set<String>> deniedTables = new AtomicReference<>(Set.of());
     AccessControl accessControl = new AccessControl() {
       @Override
       public AuthorizationResult authorize(RequesterIdentity identity, BrokerRequest request) {
@@ -960,7 +961,9 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
       @Override
       public TableAuthorizationResult authorize(RequesterIdentity identity, Set<String> tables) {
-        return TableAuthorizationResult.success();
+        Set<String> denied = new HashSet<>(tables);
+        denied.retainAll(deniedTables.get());
+        return denied.isEmpty() ? TableAuthorizationResult.success() : new TableAuthorizationResult(denied);
       }
 
       @Override
@@ -1004,6 +1007,16 @@ public class BaseSingleStageBrokerRequestHandlerTest {
       assertTrue(BaseSingleStageBrokerRequestHandler.hasCrossTableFunction(serverRequest.get().getPinotQuery()),
           function);
     }
+
+    // The broker must also check a dimension dependency introduced by a table's expression override.
+    when(tableCache.getExpressionOverrideMap(tableName)).thenReturn(Map.of(RequestUtils.getIdentifierExpression("col1"),
+        CalciteSqlParser.compileToExpression("lookup('dimTable', 'dimValue', 'dimKey', col1)")));
+    deniedTables.set(Set.of("dimTable_OFFLINE"));
+    serverRequest.set(null);
+    WebApplicationException error = expectThrows(WebApplicationException.class,
+        () -> handler.handleRequest("SELECT col1 FROM myTable"));
+    assertEquals(error.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+    assertNull(serverRequest.get());
   }
 
   /// A handler that records the request it would send to the servers instead of sending it.
@@ -2290,31 +2303,34 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Assert.assertEquals(extractLookupTableNames("SELECT col FROM tbl WHERE col > 1"), Set.of());
 
     // Select list, filter, group-by, order-by and having
-    Assert.assertEquals(extractLookupTableNames("SELECT lookup('dimA', 'c', 'pk', col) FROM tbl"), Set.of("dimA"));
+    Assert.assertEquals(extractLookupTableNames("SELECT lookup('dimA', 'c', 'pk', col) FROM tbl"),
+        Set.of("dimA_OFFLINE"));
     Assert.assertEquals(extractLookupTableNames("SELECT col FROM tbl WHERE lookup('dimA', 'c', 'pk', col) = 'x'"),
-        Set.of("dimA"));
+        Set.of("dimA_OFFLINE"));
     Assert.assertEquals(
-        extractLookupTableNames("SELECT COUNT(*) FROM tbl GROUP BY lookup('dimA', 'c', 'pk', col)"), Set.of("dimA"));
+        extractLookupTableNames("SELECT COUNT(*) FROM tbl GROUP BY lookup('dimA', 'c', 'pk', col)"),
+        Set.of("dimA_OFFLINE"));
     Assert.assertEquals(extractLookupTableNames("SELECT col FROM tbl ORDER BY lookup('dimA', 'c', 'pk', col)"),
-        Set.of("dimA"));
+        Set.of("dimA_OFFLINE"));
     Assert.assertEquals(
         extractLookupTableNames("SELECT COUNT(*) FROM tbl GROUP BY col HAVING COUNT(*) > 1 AND MAX(col) > 0"),
         Set.of());
 
     // Wrapped in another function, aliased, and nested inside another lookup's join value
     Assert.assertEquals(extractLookupTableNames("SELECT UPPER(lookup('dimA', 'c', 'pk', col)) AS a FROM tbl"),
-        Set.of("dimA"));
+        Set.of("dimA_OFFLINE"));
     Assert.assertEquals(
         extractLookupTableNames("SELECT lookup('dimA', 'c', 'pk', lookup('dimB', 'c', 'pk', col)) FROM tbl"),
-        Set.of("dimA", "dimB"));
+        Set.of("dimA_OFFLINE", "dimB_OFFLINE"));
 
     // The function name is canonicalized, so casing in the query must not hide the table
-    Assert.assertEquals(extractLookupTableNames("SELECT LOOKUP('dimA', 'c', 'pk', col) FROM tbl"), Set.of("dimA"));
+    Assert.assertEquals(extractLookupTableNames("SELECT LOOKUP('dimA', 'c', 'pk', col) FROM tbl"),
+        Set.of("dimA_OFFLINE"));
 
     // Multiple distinct dimension tables
     Assert.assertEquals(extractLookupTableNames(
             "SELECT lookup('dimA', 'c', 'pk', col) FROM tbl WHERE lookup('dimB', 'c', 'pk', col) = 'x'"),
-        Set.of("dimA", "dimB"));
+        Set.of("dimA_OFFLINE", "dimB_OFFLINE"));
   }
 
   @Test

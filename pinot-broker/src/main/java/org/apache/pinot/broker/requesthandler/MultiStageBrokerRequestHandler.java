@@ -41,6 +41,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -89,6 +90,7 @@ import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
 import org.apache.pinot.query.planner.logical.SpoolMode;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerManager;
@@ -111,9 +113,11 @@ import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -475,16 +479,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             httpHeaders, queryTimer)) {
       validatePhysicalTablesWithMultiClusterRouting(compiledQuery.getTableNames(), compiledQuery.getOptions());
       boolean rlsFiltersApplied = checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery);
+      Predicate<String> lookupRowFilterCheck = _enableRowColumnLevelAuth
+          ? tableName -> _accessControlFactory.create().hasLookupTableRowFilters(requesterIdentity, tableName)
+          : null;
 
       // Apply broker-default query options before branching to EXPLAIN/execute so both paths see the same options.
       applyBrokerDefaultQueryOptions(compiledQuery.getOptions());
       prepareCompiledQueryForPlanning(compiledQuery, requestId, requestContext, httpHeaders);
 
       if (sqlNodeAndOptions.getSqlNode().getKind() == SqlKind.EXPLAIN) {
-        return explain(compiledQuery, requestId, requestContext, queryTimer, idSetSubqueries);
+        return explain(compiledQuery, requestId, requestContext, queryTimer, idSetSubqueries, lookupRowFilterCheck);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
-            rlsFiltersApplied, queryWasLogged, workloadName);
+            rlsFiltersApplied, queryWasLogged, workloadName, lookupRowFilterCheck);
       }
     }
   }
@@ -549,11 +556,57 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
       String combinedFilters =
           rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+      try {
+        RlsFiltersRewriter.compileRowFilter(combinedFilters);
+      } catch (RuntimeException e) {
+        // Do not expose the configured policy or its parse error.
+        throw QueryErrorCode.QUERY_VALIDATION.asException("Cannot apply the row-level security filter");
+      }
       queryOptions.put(RlsUtils.buildRlsFilterKey(tableName), combinedFilters);
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
       applied = true;
     }
     return applied;
+  }
+
+  @VisibleForTesting
+  static void checkLookupJoinRowFilters(@Nullable DispatchableSubPlan plan,
+      @Nullable Predicate<String> lookupRowFilterCheck) {
+    // A broker-only empty plan has already replaced its table scans with empty values.
+    if (plan == null || plan.isAllLeafStagesEmpty() || lookupRowFilterCheck == null) {
+      return;
+    }
+    for (DispatchablePlanFragment fragment : plan.getQueryStageMap().values()) {
+      if (hasRowFilteredLookupJoin(fragment, lookupRowFilterCheck)) {
+        throw new WebApplicationException(
+            "Permission denied. Lookup joins cannot read dimension tables with row filters.",
+            Response.Status.FORBIDDEN);
+      }
+    }
+  }
+
+  /// Lookup joins probe the dimension table without executing the right-side scan. The stage metadata identifies the
+  /// routed table used to construct that scan's server request, including the resolved table spelling.
+  private static boolean hasRowFilteredLookupJoin(DispatchablePlanFragment fragment,
+      Predicate<String> lookupRowFilterCheck) {
+    if (!hasLookupJoin(fragment.getPlanFragment().getFragmentRoot())) {
+      return false;
+    }
+    String tableName = fragment.getTableName();
+    return tableName == null || lookupRowFilterCheck.test(
+        TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(tableName)));
+  }
+
+  private static boolean hasLookupJoin(PlanNode node) {
+    if (node instanceof JoinNode join && join.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP) {
+      return true;
+    }
+    for (PlanNode input : node.getInputs()) {
+      if (hasLookupJoin(input)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
@@ -708,7 +761,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   ///
   /// @param idSetSubqueries the IdSet subqueries that did not run, see [IdSetSubqueryRewriter]
   private BrokerResponse explain(QueryEnvironment.CompiledQuery query, long requestId, RequestContext requestContext,
-      Timer timer, List<String> idSetSubqueries)
+      Timer timer, List<String> idSetSubqueries, @Nullable Predicate<String> lookupRowFilterCheck)
       throws WebApplicationException, QueryException {
     Map<String, String> queryOptions = query.getOptions();
 
@@ -716,11 +769,18 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .orElse(_explainAskingServerDefault);
     @Nullable
     AskingServerStageExplainer.OnServerExplainer fragmentToPlanNode = askServers
-        ? fragment -> requestPhysicalPlan(fragment, requestContext, timer.getRemainingTimeMs(), queryOptions)
+        ? fragment -> {
+          // Skip server requests for a forbidden stage and report the permission error on the request thread.
+          if (lookupRowFilterCheck != null && hasRowFilteredLookupJoin(fragment, lookupRowFilterCheck)) {
+            return List.of();
+          }
+          return requestPhysicalPlan(fragment, requestContext, timer.getRemainingTimeMs(), queryOptions);
+        }
         : null;
 
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.explain(requestId, fragmentToPlanNode), timer);
+    checkLookupJoinRowFilters(queryPlanResult.getQueryPlan(), lookupRowFilterCheck);
     String plan = queryPlanResult.getExplainPlan();
     Map<String, String> extraFields = queryPlanResult.getExtraFields();
     if (!idSetSubqueries.isEmpty()) {
@@ -879,7 +939,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
-      boolean rlsFiltersApplied, boolean queryWasLogged, String workloadName)
+      boolean rlsFiltersApplied, boolean queryWasLogged, String workloadName,
+      @Nullable Predicate<String> lookupRowFilterCheck)
       throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
@@ -921,6 +982,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     if (!tableAuthorizationResult.hasAccess()) {
       throwTableAccessError(tableAuthorizationResult);
     }
+
+    checkLookupJoinRowFilters(dispatchableSubPlan, lookupRowFilterCheck);
 
     // Validate QPS quota
     if (hasExceededQPSQuota(query.getDatabase(), tableNames, requestContext)) {

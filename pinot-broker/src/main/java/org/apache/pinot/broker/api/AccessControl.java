@@ -31,6 +31,7 @@ import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 @InterfaceAudience.Public
@@ -113,6 +114,21 @@ public interface AccessControl extends FineGrainedAccessControl {
         : new TableAuthorizationResult(tables);
   }
 
+
+  /// Authorizes the physical OFFLINE tables read by the single-stage `LOOKUP` function.
+  default TableAuthorizationResult authorizeLookupTables(RequesterIdentity requesterIdentity,
+      Set<String> offlineTableNames) {
+    return authorize(requesterIdentity, offlineTableNames);
+  }
+
+  /// Returns whether a row-level filter applies to the physical OFFLINE target of an authorized `LOOKUP`.
+  default boolean hasLookupTableRowFilters(RequesterIdentity requesterIdentity, String offlineTableName) {
+    String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
+    return getRowColFilters(requesterIdentity, offlineTableName).getRLSFilters()
+        .filter(filters -> !filters.isEmpty()).isPresent()
+        || getRowColFilters(requesterIdentity, rawTableName).getRLSFilters()
+            .filter(filters -> !filters.isEmpty()).isPresent();
+  }
 
   /// Verifies that the requester can delete rows from the table with a SQL `DELETE` statement. The broker calls it
   /// once the requester passed, in this order: [#authorize(RequesterIdentity)], [#authorize(RequesterIdentity, Set)]

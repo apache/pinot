@@ -64,6 +64,7 @@ public class BasicAuthAccessControlTest {
     config.put("principals.admin.password", "verysecret");
     config.put("principals.user.password", "secret");
     config.put("principals.user.tables", "lessImportantStuff,lesserImportantStuff,leastImportantStuff");
+    config.put("principals.user.lessImportantStuff_OFFLINE.rls", "true");
     config.put("principals.deleter.password", "delsecret");
     config.put("principals.deleter.tables", "lessImportantStuff");
     config.put("principals.deleter.permissions", "read,delete");
@@ -71,10 +72,11 @@ public class BasicAuthAccessControlTest {
     config.put("principals.reader.tables", "lessImportantStuff");
     config.put("principals.reader.permissions", "read");
     config.put("principals.excluder.password", "exclsecret");
-    config.put("principals.excluder.excludeTables", "billing");
+    config.put("principals.excluder.excludeTables", "billing,internal_OFFLINE");
     config.put("principals.excluder.permissions", "read,delete");
     config.put("principals.typedDeleter.password", "typedsecret");
     config.put("principals.typedDeleter.tables", "lessImportantStuff_OFFLINE");
+    config.put("principals.typedDeleter.lessImportantStuff.rls", "true");
     config.put("principals.typedDeleter.permissions", "read,delete");
     config.put("principals.star.password", "starsecret");
     config.put("principals.star.permissions", "*");
@@ -274,6 +276,28 @@ public class BasicAuthAccessControlTest {
     assertEquals(authorizationResult.getFailureMessage(), "Authorization Failed for tables: [billing_OFFLINE]");
     Assert.assertTrue(_accessControl.authorize(identity, Set.of("other", "other_OFFLINE")).hasAccess());
     Assert.assertTrue(_accessControl.authorize(identity, _tableNames).hasAccess());
+  }
+
+  @Test
+  public void testLookupAuthorizationUsesBothPolicyNames() {
+    String table = "lessImportantStuff_OFFLINE";
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    Multimap<String, String> headers = ArrayListMultimap.create();
+    identity.setHttpHeaders(headers);
+
+    headers.put(HEADER_AUTHORIZATION, TOKEN_USER);
+    Assert.assertTrue(_accessControl.authorizeLookupTables(identity, Set.of(table)).hasAccess());
+    Assert.assertFalse(_accessControl.authorize(identity, Set.of(table)).hasAccess());
+    Assert.assertTrue(_accessControl.hasLookupTableRowFilters(identity, table));
+
+    headers.replaceValues(HEADER_AUTHORIZATION, List.of(TOKEN_TYPED_DELETER));
+    Assert.assertTrue(_accessControl.authorizeLookupTables(identity, Set.of(table)).hasAccess());
+    Assert.assertTrue(_accessControl.hasLookupTableRowFilters(identity, table));
+
+    headers.replaceValues(HEADER_AUTHORIZATION, List.of(TOKEN_EXCLUDER));
+    assertEquals(_accessControl.authorizeLookupTables(identity, Set.of("billing_OFFLINE", "internal_OFFLINE", table))
+        .getFailedTables(), Set.of("billing_OFFLINE", "internal_OFFLINE"));
+    Assert.assertFalse(_accessControl.hasLookupTableRowFilters(identity, table));
   }
 
   @Test

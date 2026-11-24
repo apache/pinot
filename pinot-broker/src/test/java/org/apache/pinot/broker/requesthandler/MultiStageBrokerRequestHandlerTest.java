@@ -25,7 +25,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
@@ -38,6 +42,8 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -45,9 +51,16 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.PlanFragment;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.JoinNode.JoinStrategy;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
@@ -62,6 +75,7 @@ import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -100,6 +114,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.expectThrows;
 
 
 public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase {
@@ -576,6 +591,40 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     Assert.assertTrue(handler.applyRlsFilters(null, Set.of("empty", "absent", "filtered"), queryOptions));
     assertEquals(queryOptions,
         Map.of(RlsUtils.buildRlsFilterKey("filtered"), "( col1 = 'a' ) AND ( col2 = 'b' )"));
+
+    when(accessControl.getRowColFilters(any(), eq("filtered"))).thenReturn(
+        new TableRowColAccessResultImpl(List.of("lookup('dimension', 'name', 'id', col1) = 'a'")));
+    expectThrows(QueryException.class, () -> handler.applyRlsFilters(null, Set.of("filtered"), new HashMap<>()));
+  }
+
+  @Test
+  public void testLookupJoinRowFilters() {
+    DataSchema schema = new DataSchema(new String[]{"id"}, new ColumnDataType[]{ColumnDataType.INT});
+    TableScanNode fact = new TableScanNode(1, schema, null, List.of(), "fact", List.of("id"));
+    TableScanNode dimension = new TableScanNode(1, schema, null, List.of(), "db.dimension", List.of("id"));
+    ProjectNode projectedDimension = new ProjectNode(1, schema, null, List.of(dimension),
+        List.of(new RexExpression.InputRef(0)));
+    for (PlanNode rightInput : List.of(dimension, projectedDimension)) {
+      DispatchableSubPlan lookupPlan = joinPlan(fact, rightInput, JoinStrategy.LOOKUP);
+      MultiStageBrokerRequestHandler.checkLookupJoinRowFilters(lookupPlan, null);
+      MultiStageBrokerRequestHandler.checkLookupJoinRowFilters(lookupPlan, Set.of("fact_OFFLINE")::contains);
+
+      WebApplicationException denied = expectThrows(WebApplicationException.class,
+          () -> MultiStageBrokerRequestHandler.checkLookupJoinRowFilters(lookupPlan,
+              Set.of("db.Dimension_OFFLINE")::contains));
+      assertEquals(denied.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+    }
+    MultiStageBrokerRequestHandler.checkLookupJoinRowFilters(joinPlan(fact, dimension, JoinStrategy.HASH),
+        Set.of("db.Dimension_OFFLINE")::contains);
+  }
+
+  private static DispatchableSubPlan joinPlan(PlanNode fact, PlanNode dimension, JoinStrategy strategy) {
+    JoinNode join = new JoinNode(1, fact.getDataSchema(), null, List.of(fact, dimension), JoinRelType.SEMI,
+        List.of(0), List.of(0), List.of(), strategy);
+    DispatchablePlanFragment fragment = new DispatchablePlanFragment(new PlanFragment(1, join, List.of()));
+    fragment.setTableName("db.Dimension");
+    return new DispatchableSubPlan(PairList.of(0, "id"), Map.of(1, fragment), Set.of("fact", "db.dimension"), Map.of(),
+        0);
   }
 
   /// The failure detector keeps an instance unhealthy while any retrier returns UNHEALTHY for it. A multi-stage worker

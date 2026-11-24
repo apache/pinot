@@ -75,6 +75,12 @@ public class BasicAuthPrincipal {
     return isTableIncluded(tableName) && isTableNotExcluded(tableName);
   }
 
+  /// Checks both grant names for the same physical OFFLINE table. A denial on either name takes precedence.
+  public boolean hasLookupTable(String offlineTableName) {
+    String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
+    return (isTableIncluded(offlineTableName) || isTableIncluded(rawTableName)) && isTableNotExcluded(offlineTableName);
+  }
+
   /// Returns whether this principal is scoped to every table, i.e. it carries neither an allow-list nor an
   /// exclude-list. Access control implementations use this to decide requests that name no table, so the return value
   /// must satisfy: `true` implies [#hasTable(String)] holds for every table name. A subclass that narrows table scope
