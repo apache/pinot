@@ -134,8 +134,6 @@ public class SegmentWriterUploaderIntegrationTest extends SharedOfflineUploadInt
     Assert.assertEquals(getNumSegments(), 3);
     // check totalDocs in query
     checkTotalDocsInQuery(totalDocs);
-
-    dropOfflineTable(_tableNameWithType);
   }
 
   private int getNumSegments()

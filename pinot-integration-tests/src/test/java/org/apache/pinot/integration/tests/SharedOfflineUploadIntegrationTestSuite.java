@@ -24,6 +24,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.core5.http.HttpStatus;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.integration.tests.custom.CustomDataQueryClusterIntegrationTest;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
@@ -152,7 +153,7 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends CustomData
       throws Throwable {
     Throwable failure = cleanUpTables(null);
     if (failure != null) {
-      recordCleanupFailure(failure);
+      recordCustomSuiteCleanupFailure(failure);
       if (result.getThrowable() != null && result.getThrowable() != failure) {
         result.getThrowable().addSuppressed(failure);
       }
@@ -170,19 +171,17 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends CustomData
       }
     }
     if (failure != null) {
-      recordCleanupFailure(failure);
+      recordCustomSuiteCleanupFailure(failure);
       throw failure;
     }
   }
 
   private Throwable cleanUpTables(Throwable failure) {
     for (String table : List.copyOf(_tables)) {
-      try {
+      failure = cleanUp(failure, () -> {
         removeTable(table);
         _tables.remove(table);
-      } catch (Throwable t) {
-        failure = appendFailure(failure, t);
-      }
+      });
     }
     return failure;
   }
@@ -192,14 +191,12 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends CustomData
     // Preserve the original schema lifetime across upload methods, then isolate the next class.
     if (_tables.isEmpty()) {
       for (String schema : List.copyOf(_schemas)) {
-        try {
+        failure = cleanUp(failure, () -> {
           if (getSharedHelixResourceManager().getSchema(schema) != null) {
             deleteSchema(schema);
           }
           _schemas.remove(schema);
-        } catch (Throwable t) {
-          failure = appendFailure(failure, t);
-        }
+        });
       }
     }
     if (_pinotConnection != null) {
@@ -231,39 +228,9 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends CustomData
     PARTICIPANTS.clear();
     _activeClass = null;
     if (failure != null) {
-      recordCleanupFailure(failure);
+      recordCustomSuiteCleanupFailure(failure);
       throw failure;
     }
-  }
-
-  private static void recordCleanupFailure(Throwable failure) {
-    recordCustomSuiteCleanupFailure(failure);
-  }
-
-  private static Throwable appendFailure(Throwable failure, Throwable next) {
-    if (failure == null) {
-      return next;
-    }
-    if (failure != next) {
-      failure.addSuppressed(next);
-    }
-    return failure;
-  }
-
-  private static Throwable cleanUp(Throwable failure, CleanupAction action) {
-    try {
-      action.run();
-    } catch (Throwable t) {
-      return appendFailure(failure, t);
-    }
-    return failure;
-  }
-
-  /// A cleanup step whose failure must not prevent the remaining steps.
-  @FunctionalInterface
-  private interface CleanupAction {
-    void run()
-        throws Exception;
   }
 
   @Override
@@ -278,8 +245,8 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends CustomData
   private void removeTable(String tableNameWithType)
       throws IOException {
     List<BaseServerStarter> servers = getSharedServerStarters();
-    if (servers.size() != 2) {
-      throw new IllegalStateException("Expected two custom suite servers while cleaning up an offline table");
+    if (servers.isEmpty()) {
+      throw new IllegalStateException("Expected at least one custom suite server while cleaning up an offline table");
     }
     if (getSharedHelixResourceManager().getOfflineTableConfig(tableNameWithType) != null) {
       dropOfflineTable(tableNameWithType);
@@ -294,13 +261,12 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends CustomData
     }, 60_000L, "Failed to remove table data manager for table: " + tableNameWithType);
     waitForEVToDisappear(tableNameWithType);
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    String routingTableUrl = getBrokerBaseApiUrl() + "/debug/routingTable/" + rawTableName;
     TestUtils.waitForCondition(ignored -> {
       try {
-        getDebugInfo("debug/routingTable/" + rawTableName);
+        return sendGetRequestWithStatusCode(routingTableUrl, null).getLeft() == HttpStatus.SC_NOT_FOUND;
+      } catch (IOException e) {
         return false;
-      } catch (Exception e) {
-        String message = e.getMessage();
-        return message != null && message.contains("Got error status code: 404");
       }
     }, 60_000L, "Routing table still exists after dropping offline upload table " + rawTableName);
   }

@@ -26,6 +26,7 @@ import org.testng.annotations.BeforeSuite;
 
 
 /// Fails closed after a shared custom-cluster participant reports a cleanup failure.
+/// Later classes use the same controller, broker, and servers, so partial cleanup can affect their results.
 /// Supports one sequential suite per JVM; concurrent suites in the same JVM are not supported.
 /// Synchronized access protects failure reporting between callbacks.
 public abstract class CustomSuiteHealthCheckedIntegrationTest extends BaseClusterIntegrationTest {

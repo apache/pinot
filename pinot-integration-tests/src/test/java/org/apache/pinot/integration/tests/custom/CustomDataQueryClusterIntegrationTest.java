@@ -245,7 +245,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends CustomSuiteH
     _allocatedKafka = null;
   }
 
-  private static Throwable cleanUp(Throwable failure, CleanupAction action) {
+  protected static Throwable cleanUp(Throwable failure, CleanupAction action) {
     try {
       action.run();
     } catch (Throwable next) {
@@ -258,8 +258,9 @@ public abstract class CustomDataQueryClusterIntegrationTest extends CustomSuiteH
     return failure;
   }
 
+  /// A cleanup step whose failure must not prevent the remaining steps.
   @FunctionalInterface
-  private interface CleanupAction {
+  protected interface CleanupAction {
     void run()
         throws Throwable;
   }

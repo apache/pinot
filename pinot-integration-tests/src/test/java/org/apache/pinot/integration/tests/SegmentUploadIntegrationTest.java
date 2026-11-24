@@ -47,11 +47,9 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -504,12 +502,5 @@ public class SegmentUploadIntegrationTest extends SharedOfflineUploadIntegration
   @Override
   public String getTableName() {
     return DEFAULT_TABLE_NAME + _tableNameSuffix;
-  }
-
-  @AfterMethod
-  public void tearDownTest()
-      throws IOException {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
-    dropOfflineTable(offlineTableName);
   }
 }
