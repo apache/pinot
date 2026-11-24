@@ -182,7 +182,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
     // Tracks ingestion delay of all partitions being served for this table
-    _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this);
+    boolean periodicOffsetLagTrackingEnabled = _instanceDataManagerConfig.getConfig().getProperty(
+        CommonConstants.Server.CONFIG_OF_PERIODIC_OFFSET_LAG_TRACKING_ENABLED,
+        CommonConstants.Server.DEFAULT_PERIODIC_OFFSET_LAG_TRACKING_ENABLED);
+    _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this,
+        periodicOffsetLagTrackingEnabled);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsFile);

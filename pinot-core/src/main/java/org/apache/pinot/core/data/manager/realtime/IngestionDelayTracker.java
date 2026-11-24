@@ -132,6 +132,7 @@ public class IngestionDelayTracker {
   private final BooleanSupplier _isServerReadyToServeQueries;
   private final Cache<String, Boolean> _segmentsToIgnore =
       CacheBuilder.newBuilder().expireAfterAccess(IGNORED_SEGMENT_CACHE_TIME_MINUTES, TimeUnit.MINUTES).build();
+
   // Map to describe the partitions for which the metrics are being reported.
   // This map is accessed by:
   // 1. _ingestionDelayTrackingScheduler thread.
@@ -149,8 +150,9 @@ public class IngestionDelayTracker {
 
   private Clock _clock = Clock.systemUTC();
 
-  protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
+  protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset = new ConcurrentHashMap<>();
   protected volatile ConcurrentHashMap<Integer, Boolean> _partitionsHostedByThisServer = new ConcurrentHashMap<>();
+  protected final boolean _periodicOffsetLagTrackingEnabled;
   // Map of StreamMetadataProvider to fetch upstream latest stream offset (Table can have multiple upstream topics)
   // This map is accessed by:
   // 1. _ingestionDelayTrackingScheduler thread.
@@ -159,21 +161,36 @@ public class IngestionDelayTracker {
       new ConcurrentHashMap<>();
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-      RealtimeTableDataManager realtimeTableDataManager)
-      throws RuntimeException {
-    this(serverMetrics, tableNameWithType, realtimeTableDataManager, METRICS_REMOVAL_INTERVAL_MS,
-        METRICS_TRACKING_INTERVAL_MS, realtimeTableDataManager.getIsServerReadyToServeQueries());
+      RealtimeTableDataManager realtimeTableDataManager) {
+    this(serverMetrics, tableNameWithType, realtimeTableDataManager, true);
   }
 
   @VisibleForTesting
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager, long metricsRemovalIntervalMs, long metricsTrackingIntervalMs,
       BooleanSupplier isServerReadyToServeQueries) {
+    this(serverMetrics, tableNameWithType, realtimeTableDataManager, metricsRemovalIntervalMs,
+        metricsTrackingIntervalMs, isServerReadyToServeQueries, true);
+  }
+
+  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
+      RealtimeTableDataManager realtimeTableDataManager, boolean periodicOffsetLagTrackingEnabled)
+      throws RuntimeException {
+    this(serverMetrics, tableNameWithType, realtimeTableDataManager, METRICS_REMOVAL_INTERVAL_MS,
+        METRICS_TRACKING_INTERVAL_MS, realtimeTableDataManager.getIsServerReadyToServeQueries(),
+        periodicOffsetLagTrackingEnabled);
+  }
+
+  @VisibleForTesting
+  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
+      RealtimeTableDataManager realtimeTableDataManager, long metricsRemovalIntervalMs, long metricsTrackingIntervalMs,
+      BooleanSupplier isServerReadyToServeQueries, boolean periodicOffsetLagTrackingEnabled) {
     _serverMetrics = serverMetrics;
     _tableNameWithType = tableNameWithType;
     _metricName = tableNameWithType;
     _realTimeTableDataManager = realtimeTableDataManager;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
+    _periodicOffsetLagTrackingEnabled = periodicOffsetLagTrackingEnabled;
 
     _metricsRemovalScheduler = Executors.newSingleThreadScheduledExecutor(getThreadFactory(
         "IngestionDelayMetricsRemovalThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
@@ -213,10 +230,6 @@ public class IngestionDelayTracker {
 
       assert streamMetadataProvider != null;
       _streamConfigIndexToStreamMetadataProvider.put(streamConfigIndex, streamMetadataProvider);
-
-      if ((streamMetadataProvider.supportsOffsetLag()) && (_partitionIdToLatestOffset == null)) {
-        _partitionIdToLatestOffset = new ConcurrentHashMap<>();
-      }
     }
   }
 
@@ -282,7 +295,7 @@ public class IngestionDelayTracker {
         continue;
       }
 
-      if (streamMetadataProvider.supportsOffsetLag()) {
+      if (streamMetadataProvider.supportsOffsetLag() && _periodicOffsetLagTrackingEnabled) {
         Set<Integer> streamPartitionIds = streamIndexToStreamPartitionIds.get(streamIndex);
         try {
           Map<Integer, StreamPartitionMsgOffset> streamPartitionIdToLatestOffset =
@@ -364,7 +377,9 @@ public class IngestionDelayTracker {
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
     StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
 
-    if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
+    if (streamMetadataProvider != null
+        && streamMetadataProvider.supportsOffsetLag()
+        && _periodicOffsetLagTrackingEnabled) {
       _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
           () -> getPartitionIngestionOffsetLag(partitionId));
 
@@ -389,7 +404,9 @@ public class IngestionDelayTracker {
     StreamMetadataProvider streamMetadataProvider =
         _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
     // Remove all metrics associated with this partition
-    if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
+    if (streamMetadataProvider != null
+        && streamMetadataProvider.supportsOffsetLag()
+        && _periodicOffsetLagTrackingEnabled) {
       _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
       _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
       _serverMetrics.removePartitionGauge(_metricName, partitionId,
