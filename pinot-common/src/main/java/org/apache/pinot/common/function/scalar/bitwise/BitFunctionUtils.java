@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.common.function.scalar.bitwise;
 
-import java.util.List;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
+import org.apache.calcite.sql.type.SqlSingleOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
@@ -33,6 +34,15 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 ///
 /// This helper is stateless and thread-safe.
 final class BitFunctionUtils {
+  // The scalar functions use the stored integral values of BOOLEAN operands (false = 0, true = 1).
+  // Keep the integer-family checker for existing implicit casts, e.g. from a numeric string.
+  private static final SqlSingleOperandTypeChecker BIT_OPERAND = OperandTypes.INTEGER.or(
+      OperandTypes.typeName(SqlTypeName.BOOLEAN));
+  private static final SqlOperandTypeChecker BIT_OPERAND_PAIR = OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.INTEGER, SqlTypeFamily.INTEGER),
+      OperandTypes.sequence((op, name) -> "'" + name + "(<INTEGER OR BOOLEAN>, <INTEGER OR BOOLEAN>)'",
+          BIT_OPERAND, BIT_OPERAND));
+
   private BitFunctionUtils() {
   }
 
@@ -41,28 +51,24 @@ final class BitFunctionUtils {
   }
 
   static PinotSqlFunction binaryIntegralSqlFunction(String name) {
-    return new PinotSqlFunction(name, opBinding -> widerIntegralType(opBinding, 0, 1),
-        OperandTypes.family(List.of(SqlTypeFamily.INTEGER, SqlTypeFamily.INTEGER)));
+    return new PinotSqlFunction(name, opBinding -> widerIntegralType(opBinding, 0, 1), BIT_OPERAND_PAIR);
   }
 
   static PinotSqlFunction unaryIntegralSqlFunction(String name) {
-    return new PinotSqlFunction(name, opBinding -> sameAsOperand(opBinding, 0),
-        OperandTypes.family(List.of(SqlTypeFamily.INTEGER)));
+    return new PinotSqlFunction(name, opBinding -> sameAsOperand(opBinding, 0), BIT_OPERAND);
   }
 
   static PinotSqlFunction maskSqlFunction(String name) {
     return new PinotSqlFunction(name, opBinding -> createTypeWithOperandNullability(opBinding, SqlTypeName.BIGINT),
-        OperandTypes.family(List.of(SqlTypeFamily.INTEGER)));
+        BIT_OPERAND);
   }
 
   static PinotSqlFunction shiftSqlFunction(String name) {
-    return new PinotSqlFunction(name, opBinding -> sameAsOperand(opBinding, 0),
-        OperandTypes.family(List.of(SqlTypeFamily.INTEGER, SqlTypeFamily.INTEGER)));
+    return new PinotSqlFunction(name, opBinding -> sameAsOperand(opBinding, 0), BIT_OPERAND_PAIR);
   }
 
   static PinotSqlFunction extractSqlFunction(String name) {
-    return new PinotSqlFunction(name, BitFunctionUtils::integerType,
-        OperandTypes.family(List.of(SqlTypeFamily.INTEGER, SqlTypeFamily.INTEGER)));
+    return new PinotSqlFunction(name, BitFunctionUtils::integerType, BIT_OPERAND_PAIR);
   }
 
   static boolean isBitIndexInRange(int bit, int width) {
