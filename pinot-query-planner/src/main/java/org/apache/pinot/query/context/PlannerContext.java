@@ -30,6 +30,9 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.PlannerImpl;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
+import org.apache.calcite.rel.metadata.RelMetadataProvider;
+import org.apache.calcite.rel.metadata.RelMetadataQueryBase;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -37,6 +40,8 @@ import org.apache.pinot.calcite.rex.SearchSealer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
+import org.apache.pinot.query.planner.spi.CostModelProvider;
+import org.apache.pinot.query.planner.spi.QueryOptimizerProvider;
 import org.apache.pinot.query.validate.Validator;
 
 
@@ -62,18 +67,34 @@ public class PlannerContext implements AutoCloseable, Context {
   private final SqlExplainFormat _sqlExplainFormat;
   @Nullable
   private final PhysicalPlannerContext _physicalPlannerContext;
+  @Nullable
+  private final CostModelProvider _costModelProvider;
+  private final List<RelMetadataProvider> _metadataProviders;
+  @Nullable
+  private JaninoRelMetadataProvider _previousThreadMetadataProvider;
+  private boolean _threadMetadataProviderSaved;
   private final SearchSealer _searchSealer;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
-      SqlExplainFormat sqlExplainFormat, @Nullable PhysicalPlannerContext physicalPlannerContext) {
+      SqlExplainFormat sqlExplainFormat, @Nullable PhysicalPlannerContext physicalPlannerContext,
+      @Nullable QueryOptimizerProvider optimizerProvider) {
     _planner = new PlannerImpl(config);
     _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory,
         QueryOptionsUtils.isPreferSelectAliasInGroupBy(options, envConfig.defaultPreferSelectAliasInGroupBy()),
         envConfig.meterGroupByAliasShadowedByColumn());
     _options = options;
     _envConfig = envConfig;
-    _relOptPlanner = new LogicalPlanner(optProgram, this, config.getTraitDefs());
+    _costModelProvider = optimizerProvider == null ? null : optimizerProvider.createCostModelProvider();
+    if (_costModelProvider != null) {
+      _costModelProvider.configure(options);
+    }
+    _metadataProviders = optimizerProvider == null
+        ? List.of()
+        : List.copyOf(optimizerProvider.getMetadataProviders());
+    _relOptPlanner = optimizerProvider == null
+        ? new LogicalPlanner(optProgram, this, config.getTraitDefs())
+        : optimizerProvider.createPlanner(_costModelProvider, this, config.getTraitDefs());
     _relTraitPlanner = new LogicalPlanner(traitProgram, this,
         List.of(RelDistributionTraitDef.INSTANCE));
     _plannerOutput = new HashMap<>();
@@ -92,12 +113,28 @@ public class PlannerContext implements AutoCloseable, Context {
   /// Minimal constructor for use in unit tests. Creates no-op planners backed by an empty HEP program.
   @VisibleForTesting
   PlannerContext(Map<String, String> options, QueryEnvironment.Config envConfig) {
+    this(options, envConfig, null);
+  }
+
+  /// Minimal constructor for use in unit tests, optionally using a cost-based optimizer provider.
+  @VisibleForTesting
+  PlannerContext(Map<String, String> options, QueryEnvironment.Config envConfig,
+      @Nullable QueryOptimizerProvider optimizerProvider) {
     _planner = null;
     _validator = null;
     _options = options;
     _envConfig = envConfig;
     HepProgram emptyProgram = new HepProgramBuilder().build();
-    _relOptPlanner = new LogicalPlanner(emptyProgram, this);
+    _costModelProvider = optimizerProvider == null ? null : optimizerProvider.createCostModelProvider();
+    if (_costModelProvider != null) {
+      _costModelProvider.configure(options);
+    }
+    _metadataProviders = optimizerProvider == null
+        ? List.of()
+        : List.copyOf(optimizerProvider.getMetadataProviders());
+    _relOptPlanner = optimizerProvider == null
+        ? new LogicalPlanner(emptyProgram, this)
+        : optimizerProvider.createPlanner(_costModelProvider, this, List.of());
     _relTraitPlanner = new LogicalPlanner(emptyProgram, this);
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = null;
@@ -122,6 +159,21 @@ public class PlannerContext implements AutoCloseable, Context {
     return _relOptPlanner;
   }
 
+  /// Returns the metadata providers supplied by the active cost-based optimizer,
+  /// or an empty list when the built-in HEP planner is in use. Used by
+  /// [QueryEnvironment] to install statistics providers on the query's [RelOptCluster].
+  public List<RelMetadataProvider> getMetadataProviders() {
+    return _metadataProviders;
+  }
+
+  /// Remembers the value of Calcite's thread-local metadata provider before the query's custom
+  /// metadata providers are installed, so [close] can restore it. Must be called before
+  /// [org.apache.calcite.plan.RelOptCluster#setMetadataProvider] is invoked with the query's providers.
+  public void rememberPreviousThreadMetadataProvider(@Nullable JaninoRelMetadataProvider previous) {
+    _previousThreadMetadataProvider = previous;
+    _threadMetadataProviderSaved = true;
+  }
+
   public LogicalPlanner getRelTraitPlanner() {
     return _relTraitPlanner;
   }
@@ -135,8 +187,9 @@ public class PlannerContext implements AutoCloseable, Context {
   }
 
   /// Unwraps this context. Returns `this` when asked for [PlannerContext] or
-  /// [Context], and delegates to [#_envConfig] when asked for
-  /// [QueryEnvironment.Config] so that existing rules remain compatible.
+  /// [Context], [#_envConfig] when asked for [QueryEnvironment.Config], and
+  /// [#_costModelProvider] when asked for [CostModelProvider] so optimizer
+  /// metadata handlers can read per-query statistics.
   @Override
   @Nullable
   public <C> C unwrap(Class<C> clazz) {
@@ -146,6 +199,9 @@ public class PlannerContext implements AutoCloseable, Context {
     if (clazz.isInstance(_envConfig)) {
       return clazz.cast(_envConfig);
     }
+    if (_costModelProvider != null && clazz.isInstance(_costModelProvider)) {
+      return clazz.cast(_costModelProvider);
+    }
     return null;
   }
 
@@ -153,6 +209,15 @@ public class PlannerContext implements AutoCloseable, Context {
   public void close() {
     if (_planner != null) {
       _planner.close();
+    }
+    if (_threadMetadataProviderSaved) {
+      if (_previousThreadMetadataProvider == null) {
+        RelMetadataQueryBase.THREAD_PROVIDERS.remove();
+      } else {
+        RelMetadataQueryBase.THREAD_PROVIDERS.set(_previousThreadMetadataProvider);
+      }
+      _threadMetadataProviderSaved = false;
+      _previousThreadMetadataProvider = null;
     }
   }
 

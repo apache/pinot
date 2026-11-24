@@ -43,6 +43,10 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.metadata.ChainedRelMetadataProvider;
+import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
+import org.apache.calcite.rel.metadata.RelMetadataProvider;
+import org.apache.calcite.rel.metadata.RelMetadataQueryBase;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.runtime.CalciteContextException;
@@ -86,6 +90,7 @@ import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.SpoolMode;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
+import org.apache.pinot.query.planner.optimizer.QueryOptimizerRegistry;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
@@ -95,6 +100,7 @@ import org.apache.pinot.query.planner.physical.v2.RelToPRelConverter;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.rules.PinotRuleSet;
 import org.apache.pinot.query.planner.spi.Phase;
+import org.apache.pinot.query.planner.spi.QueryOptimizerProvider;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
@@ -242,8 +248,26 @@ public class QueryEnvironment {
           _envConfig.defaultLiteModeLeafStageFanOutAdjustedLimit(), _envConfig.defaultLiteModeEnableJoins(),
           _multiClusterRoutingContext);
     }
+    QueryOptimizerProvider optimizerProvider = resolveQueryOptimizer(options);
     return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
-        sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
+        sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext, optimizerProvider);
+  }
+
+  /// Resolves the optimizer plugin selected by the `queryOptimizer` query option, or returns
+  /// `null` when the option is unset (built-in HEP planner).
+  @Nullable
+  private QueryOptimizerProvider resolveQueryOptimizer(Map<String, String> options) {
+    String name = options.get(QueryOptionKey.QUERY_OPTIMIZER);
+    if (name == null) {
+      return null;
+    }
+    QueryOptimizerProvider provider = _envConfig.getOptimizerRegistry().get(name);
+    if (provider == null) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(
+          "Unknown query optimizer '" + name + "'. Available optimizers: "
+              + _envConfig.getOptimizerRegistry().getNames());
+    }
+    return provider;
   }
 
   /// @deprecated Use [#compile] and then [plan][CompiledQuery#planQuery(long)] the returned query instead
@@ -329,6 +353,9 @@ public class QueryEnvironment {
       RelRoot relRoot = compileQuery(queryNode, plannerContext);
       return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
     } catch (QueryException e) {
+      if (plannerContext != null) {
+        plannerContext.close();
+      }
       throw e;
     } catch (Throwable t) {
       if (plannerContext != null) {
@@ -495,6 +522,18 @@ public class QueryEnvironment {
     try {
       RexBuilder rexBuilder = new RexBuilder(_typeFactory);
       RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
+      List<RelMetadataProvider> metadataProviders = plannerContext.getMetadataProviders();
+      if (!metadataProviders.isEmpty()) {
+        // Save the thread-local metadata provider before overwriting it. It is restored when the
+        // query's PlannerContext is closed, not here: VolcanoPlanner invalidates the cluster's
+        // RelMetadataQuery while optimizing, which re-reads the thread-local.
+        plannerContext.rememberPreviousThreadMetadataProvider(RelMetadataQueryBase.THREAD_PROVIDERS.get());
+        // Chain the optimizer's statistics providers on top of Calcite's defaults and install them
+        // before any metadata is queried (RelOptCluster caches its RelMetadataQuery lazily).
+        List<RelMetadataProvider> providers = new ArrayList<>(metadataProviders);
+        providers.add(DefaultRelMetadataProvider.INSTANCE);
+        cluster.setMetadataProvider(ChainedRelMetadataProvider.of(providers));
+      }
       SearchSealer searchSealer = plannerContext.getSearchSealer();
       SqlToRelConverter converter =
           new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
@@ -819,6 +858,15 @@ public class QueryEnvironment {
     @Value.Default
     default PinotRuleSet getRuleSet() {
       return PinotRuleSet.defaultInstance();
+    }
+
+    /// Registry of cost-based optimizer plugins, keyed by provider name. Defaults to the
+    /// process-wide singleton built from [java.util.ServiceLoader]-discovered
+    /// [org.apache.pinot.query.planner.spi.QueryOptimizerProvider]s, so per-query [Config]
+    /// instances do not repeat discovery work.
+    @Value.Default
+    default QueryOptimizerRegistry getOptimizerRegistry() {
+      return QueryOptimizerRegistry.defaultInstance();
     }
 
     @Value.Default
