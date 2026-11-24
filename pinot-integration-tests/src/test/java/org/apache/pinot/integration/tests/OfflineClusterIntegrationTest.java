@@ -3608,7 +3608,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     assertEquals(response1, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
         + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},"
-        + "\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)\",1,0],[\"COMBINE_GROUP_BY\",2,1],"
+        + "\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC, Carrier ASC],limit:10)\",1,0],[\"COMBINE_GROUP_BY\",2,1],"
         + "[\"PLAN_START(numSegmentsForThisPlan:1)\",-1,-1],"
         + "[\"GROUP_BY(groupKeys:Carrier, aggregations:count(*))\",3,2],[\"PROJECT(Carrier)\",4,3],"
         + "[\"DOC_ID_SET\",5,4],[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",6,5]]}");

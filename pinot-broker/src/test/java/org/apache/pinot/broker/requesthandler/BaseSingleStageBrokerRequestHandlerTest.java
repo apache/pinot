@@ -53,6 +53,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
@@ -1040,9 +1041,10 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
   /// A GROUP BY without ORDER BY is ordered on its group keys before the materialized view rewrite, which sees the
   /// ordering as if the user had written it, and goes to the servers that way; the reduce reads the same query. The
-  /// rewrite reads the options of the query.
+  /// rewrite reads the options of the query. A written ORDER BY gets the group keys it does not order on appended, and
+  /// the servers keep only `LIMIT` groups of it only when it then orders on the group keys alone, without HAVING.
   @Test
-  public void testGroupByWithoutOrderByIsOrderedOnGroupKeys()
+  public void testGroupByIsOrderedOnItsGroupKeys()
       throws Exception {
     String tableName = "baseTable_OFFLINE";
     TableCache tableCache = mock(TableCache.class);
@@ -1111,12 +1113,32 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     assertEquals(querySeenByMaterializedViewRewrite.get().getOrderByList(), orderByKeys);
     assertEquals(serverRequest.get().getPinotQuery().getOrderByList(), orderByKeys);
 
-    // A written ORDER BY is kept
-    String orderedQuery = "SELECT ts, SUM(revenue) FROM baseTable GROUP BY ts ORDER BY SUM(revenue) DESC LIMIT 100";
-    response = (BrokerResponseNative) handler.handleRequest(orderedQuery);
+    // A written ORDER BY keeps its terms, and the group key it does not order on follows them
+    response = (BrokerResponseNative) handler.handleRequest(
+        "SELECT ts, SUM(revenue) FROM baseTable GROUP BY ts ORDER BY SUM(revenue) DESC LIMIT 100");
     assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
-    assertEquals(serverRequest.get().getPinotQuery().getOrderByList(),
-        CalciteSqlParser.compileToPinotQuery(orderedQuery).getOrderByList());
+    List<Expression> completedOrderBy = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ts, SUM(revenue) FROM baseTable GROUP BY ts ORDER BY SUM(revenue) DESC, ts LIMIT 100").getOrderByList();
+    assertEquals(querySeenByMaterializedViewRewrite.get().getOrderByList(), completedOrderBy);
+    assertEquals(serverRequest.get().getPinotQuery().getOrderByList(), completedOrderBy);
+    // Ordered on an aggregate, the servers still keep more than LIMIT groups
+    assertTrue(QueryContextConverterUtils.getQueryContext(serverRequest.get().getPinotQuery()).isUnsafeTrim());
+
+    // With HAVING too, though the completed order is on the group keys alone
+    response = (BrokerResponseNative) handler.handleRequest(
+        "SELECT ts, revenue, COUNT(*) FROM baseTable GROUP BY ts, revenue HAVING COUNT(*) > 1 ORDER BY revenue DESC "
+            + "LIMIT 100");
+    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    assertEquals(serverRequest.get().getPinotQuery().getOrderByList(), CalciteSqlParser.compileToPinotQuery(
+        "SELECT ts, revenue, COUNT(*) FROM baseTable GROUP BY ts, revenue ORDER BY revenue DESC, ts LIMIT 100")
+        .getOrderByList());
+    assertTrue(QueryContextConverterUtils.getQueryContext(serverRequest.get().getPinotQuery()).isUnsafeTrim());
+
+    // Ordered on some of the group keys without HAVING, the completed order is on all of them: LIMIT groups suffice
+    response = (BrokerResponseNative) handler.handleRequest(
+        "SELECT ts, revenue, COUNT(*) FROM baseTable GROUP BY ts, revenue ORDER BY revenue DESC LIMIT 100");
+    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    assertFalse(QueryContextConverterUtils.getQueryContext(serverRequest.get().getPinotQuery()).isUnsafeTrim());
 
     // At this sortAggregateLimitThreshold the servers would not take the sorted combine, so the query goes as written
     response = (BrokerResponseNative) handler.handleRequest(

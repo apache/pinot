@@ -62,6 +62,35 @@ public class OrderByGroupKeysRewriterTest {
     assertEquals(QUERY_REWRITER.rewrite(withoutOptions), expected);
   }
 
+  @Test
+  public void testCompleteOrderBy() {
+    // The group-by expressions the query does not order on follow its own terms, ascending, in the GROUP BY order
+    testQueryRewrite("SELECT col1, col2, SUM(col3) FROM foo GROUP BY col1, col2 ORDER BY SUM(col3) DESC, col1 DESC",
+        "SELECT col1, col2, SUM(col3) FROM foo GROUP BY col1, col2 ORDER BY SUM(col3) DESC, col1 DESC, col2");
+    testQueryRewrite("SELECT col1, col2, SUM(col3) FROM foo GROUP BY col1, col2 ORDER BY col2",
+        "SELECT col1, col2, SUM(col3) FROM foo GROUP BY col1, col2 ORDER BY col2, col1");
+    testQueryRewrite("SELECT col1, SUM(col2) FROM foo GROUP BY col1 ORDER BY SUM(col2) DESC LIMIT 10",
+        "SELECT col1, SUM(col2) FROM foo GROUP BY col1 ORDER BY SUM(col2) DESC, col1 LIMIT 10");
+    // The query's own null ordering stays as written
+    testQueryRewrite("SELECT col1, col2, COUNT(*) FROM foo GROUP BY col1, col2 ORDER BY col1 DESC NULLS FIRST",
+        "SELECT col1, col2, COUNT(*) FROM foo GROUP BY col1, col2 ORDER BY col1 DESC NULLS FIRST, col2");
+    // Neither HAVING nor a LIMIT at or above sortAggregateLimitThreshold keeps the order from being completed
+    testQueryRewrite("SELECT col1, col2, SUM(col3) FROM foo GROUP BY col1, col2 HAVING SUM(col3) > 10 "
+            + "ORDER BY SUM(col3) DESC LIMIT 10",
+        "SELECT col1, col2, SUM(col3) FROM foo GROUP BY col1, col2 HAVING SUM(col3) > 10 "
+            + "ORDER BY SUM(col3) DESC, col1, col2 LIMIT 10");
+    testQueryRewrite("SELECT col1, SUM(col2) FROM foo GROUP BY col1 ORDER BY SUM(col2) DESC LIMIT 10000",
+        "SELECT col1, SUM(col2) FROM foo GROUP BY col1 ORDER BY SUM(col2) DESC, col1 LIMIT 10000");
+    // A group-by expression ordered on through its alias, and one not ordered on
+    testQueryRewrite("SELECT DATETRUNC('DAY', ts) AS day, col1, MAX(col2) FROM foo GROUP BY day, col1 "
+            + "ORDER BY day DESC",
+        "SELECT DATETRUNC('DAY', ts) AS day, col1, MAX(col2) FROM foo GROUP BY day, col1 "
+            + "ORDER BY DATETRUNC('DAY', ts) DESC, col1");
+    testQueryRewrite("SELECT col1, COUNT(*) FROM foo GROUP BY DATETRUNC('DAY', ts), col1 ORDER BY COUNT(*) DESC",
+        "SELECT col1, COUNT(*) FROM foo GROUP BY DATETRUNC('DAY', ts), col1 "
+            + "ORDER BY COUNT(*) DESC, DATETRUNC('DAY', ts), col1");
+  }
+
   private void testQueryRewrite(String original, String expected) {
     assertEquals(QUERY_REWRITER.rewrite(CalciteSqlParser.compileToPinotQuery(original)),
         CalciteSqlParser.compileToPinotQuery(expected));
@@ -69,10 +98,12 @@ public class OrderByGroupKeysRewriterTest {
 
   @Test
   public void testSkipQueryRewrite() {
+    // Already ordered on every group-by expression
     testSkipQueryRewrite("SELECT col1, SUM(col2) FROM foo GROUP BY col1 ORDER BY col1 DESC");
-    testSkipQueryRewrite("SELECT col1, SUM(col2) FROM foo GROUP BY col1 ORDER BY SUM(col2) DESC LIMIT 10");
-    testSkipQueryRewrite("SELECT col1, col2, SUM(col3) FROM foo GROUP BY col1, col2 ORDER BY col2");
+    testSkipQueryRewrite(
+        "SELECT col1, col2, SUM(col3) FROM foo GROUP BY col1, col2 ORDER BY SUM(col3), col2 DESC, col1");
     testSkipQueryRewrite("SELECT col1, col2, SUM(col3) FROM foo GROUP BY ROLLUP(col1, col2)");
+    testSkipQueryRewrite("SELECT col1, col2, SUM(col3) FROM foo GROUP BY ROLLUP(col1, col2) ORDER BY SUM(col3) DESC");
     testSkipQueryRewrite("SELECT col1, col2, SUM(col3) FROM foo GROUP BY CUBE(col1, col2)");
     testSkipQueryRewrite("SELECT col1, col2, SUM(col3) FROM foo GROUP BY GROUPING SETS ((col1, col2), (col1), ())");
     // A GROUP BY without an aggregation compiles into a DISTINCT, which has no GROUP BY
@@ -80,7 +111,7 @@ public class OrderByGroupKeysRewriterTest {
     testSkipQueryRewrite("SELECT DISTINCT col1 FROM foo");
     testSkipQueryRewrite("SELECT SUM(col1) FROM foo");
     testSkipQueryRewrite("SELECT * FROM foo");
-    // The servers would not take the sorted combine
+    // Without an ORDER BY, the servers would not take the sorted combine
     testSkipQueryRewrite("SELECT col1, SUM(col2) FROM foo GROUP BY col1 HAVING SUM(col2) > 10");
     testSkipQueryRewrite("SELECT col1, SUM(col2) FROM foo GROUP BY col1 LIMIT 10000");
     testSkipQueryRewrite(
@@ -102,5 +133,12 @@ public class OrderByGroupKeysRewriterTest {
         .set(1, RequestUtils.getIdentifierExpression("otherTs"));
     assertEquals(pinotQuery.getOrderByList(),
         CalciteSqlParser.compileToPinotQuery(query + " ORDER BY DATETRUNC('DAY', ts)").getOrderByList());
+
+    String ordered = query + " ORDER BY COUNT(*) DESC";
+    pinotQuery = QUERY_REWRITER.rewrite(CalciteSqlParser.compileToPinotQuery(ordered));
+    pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands()
+        .set(1, RequestUtils.getIdentifierExpression("otherTs"));
+    assertEquals(pinotQuery.getOrderByList(),
+        CalciteSqlParser.compileToPinotQuery(ordered + ", DATETRUNC('DAY', ts)").getOrderByList());
   }
 }
