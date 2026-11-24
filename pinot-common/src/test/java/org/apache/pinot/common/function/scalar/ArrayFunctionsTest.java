@@ -31,4 +31,22 @@ public class ArrayFunctionsTest {
 
     Assert.assertEquals(ArrayFunctions.arrayValueConstructor(expected[0], expected[1]), expected);
   }
+
+  @Test
+  public void testIntersectIndices() {
+    // Matches start in the first array
+    Assert.assertEquals(ArrayFunctions.intersectIndices(new int[]{0, 1, 2, 3}, new int[]{1, 2, 3, 4}),
+        new int[]{1, 2, 3});
+    Assert.assertEquals(ArrayFunctions.intersectIndices(new int[]{1, 3}, new int[]{1, 2}), new int[]{1});
+    // Matches start in the second array
+    Assert.assertEquals(ArrayFunctions.intersectIndices(new int[]{0, 3}, new int[]{1, 2, 3}), new int[]{3});
+    Assert.assertEquals(ArrayFunctions.intersectIndices(new int[]{1, 2, 3, 4}, new int[]{0, 1, 2, 3}),
+        new int[]{1, 2, 3});
+    Assert.assertEquals(ArrayFunctions.intersectIndices(new int[]{1, 3}, new int[]{0, 3}), new int[]{3});
+    Assert.assertEquals(ArrayFunctions.intersectIndices(new int[]{2, 5, 9}, new int[]{0, 1, 5, 9}), new int[]{5, 9});
+    // No overlap and empty input
+    Assert.assertEquals(ArrayFunctions.intersectIndices(new int[]{0, 2}, new int[]{1, 3}), new int[0]);
+    Assert.assertEquals(ArrayFunctions.intersectIndices(new int[0], new int[]{1, 3}), new int[0]);
+    Assert.assertEquals(ArrayFunctions.intersectIndices(new int[]{1, 3}, new int[0]), new int[0]);
+  }
 }
