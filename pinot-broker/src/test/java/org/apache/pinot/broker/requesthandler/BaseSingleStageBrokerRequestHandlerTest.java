@@ -53,6 +53,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
@@ -2314,6 +2315,25 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Assert.assertEquals(extractLookupTableNames(
             "SELECT lookup('dimA', 'c', 'pk', col) FROM tbl WHERE lookup('dimB', 'c', 'pk', col) = 'x'"),
         Set.of("dimA", "dimB"));
+  }
+
+  @Test
+  public void testExtractLookupTableNamesFromPartitionedSubquery() {
+    // Use a synthetic expression tree to exercise dependency collection without executing a partitioned query.
+    PinotQuery query = new PinotQuery();
+    Expression column = RequestUtils.getIdentifierExpression("col");
+    Expression subquery = RequestUtils.getFunctionExpression("In_Partitioned_Subquery", column,
+        RequestUtils.getLiteralExpression("SELECT lookup('dimA_OFFLINE', 'c', 'pk', col) FROM tbl"));
+    query.setSelectList(List.of(subquery));
+    Assert.assertEquals(BaseSingleStageBrokerRequestHandler.extractLookupTableNames(query), Set.of("dimA_OFFLINE"));
+
+    subquery.getFunctionCall().setOperands(List.of(column,
+        RequestUtils.getLiteralExpression("SELECT ID_SET(col) FROM tbl")));
+    Assert.assertTrue(BaseSingleStageBrokerRequestHandler.extractLookupTableNames(query).isEmpty());
+
+    subquery.getFunctionCall().setOperands(List.of(column, column));
+    expectThrows(BadQueryRequestException.class,
+        () -> BaseSingleStageBrokerRequestHandler.extractLookupTableNames(query));
   }
 
   private static Set<String> extractLookupTableNames(String sql) {

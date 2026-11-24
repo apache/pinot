@@ -22,7 +22,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.net.URI;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -74,6 +76,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -153,6 +156,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleStageBrokerRequestHandler.class);
   // Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function
   private static final String IN_SUBQUERY = "insubquery";
+  private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
   private static final String IN_ID_SET = "inidset";
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
@@ -1256,10 +1260,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // A `lookup()` dimension table is named by a literal argument rather than by the FROM clause, so it is absent from
     // the data source. Collect it here so that `doHandleRequest` can authorize it alongside the queried table.
-    Set<String> lookupTableNames = extractLookupTableNames(serverPinotQuery);
-    if (serverPinotQuery != pinotQuery) {
-      // For a gapfill query the two differ, and only the stripped one was walked above
-      lookupTableNames.addAll(extractLookupTableNames(pinotQuery));
+    Set<String> lookupTableNames;
+    try {
+      lookupTableNames = extractLookupTableNames(serverPinotQuery);
+      if (serverPinotQuery != pinotQuery) {
+        // For a gapfill query the two differ, and only the stripped one was walked above
+        lookupTableNames.addAll(extractLookupTableNames(pinotQuery));
+      }
+    } catch (BadQueryRequestException e) {
+      requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+      return new CompileResult(new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, e.getMessage()));
     }
 
     try {
@@ -2253,48 +2263,78 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     pinotQuery.setSelectList(newSelections);
   }
 
-  /// Returns the dimension tables read by the `lookup()` calls in the given query.
+  /// Returns the dimension tables read by the `lookup()` calls in the query and its partitioned subqueries.
   ///
   /// `lookup()` names its dimension table with a string literal argument instead of the FROM clause, so the table is
   /// absent from the query's data source and has to be collected explicitly for the table-level access checks to see
-  /// it. The names are returned exactly as written, which is how `LookupTransformFunction` resolves them on the
-  /// server, so the authorized table is always the one actually read.
+  /// it. The server resolves the table name from the literal's string value, including its original case.
   @VisibleForTesting
   static Set<String> extractLookupTableNames(PinotQuery pinotQuery) {
     Set<String> lookupTableNames = new HashSet<>();
-    for (Expression expression : pinotQuery.getSelectList()) {
-      collectLookupTableNames(expression, lookupTableNames);
+    Deque<PinotQuery> pendingQueries = new ArrayDeque<>();
+    pendingQueries.addLast(pinotQuery);
+    while (!pendingQueries.isEmpty()) {
+      PinotQuery query = pendingQueries.removeLast();
+      collectLookupTableNames(query.getSelectList(), lookupTableNames, pendingQueries);
+      collectLookupTableNames(query.getFilterExpression(), lookupTableNames, pendingQueries);
+      collectLookupTableNames(query.getHavingExpression(), lookupTableNames, pendingQueries);
+      collectLookupTableNames(query.getGroupByList(), lookupTableNames, pendingQueries);
+      collectLookupTableNames(query.getOrderByList(), lookupTableNames, pendingQueries);
+      DataSource dataSource = query.getDataSource();
+      if (dataSource != null && dataSource.isSetSubquery()) {
+        pendingQueries.addLast(dataSource.getSubquery());
+      }
     }
-    collectLookupTableNames(pinotQuery.getFilterExpression(), lookupTableNames);
-    collectLookupTableNames(pinotQuery.getHavingExpression(), lookupTableNames);
-    collectLookupTableNames(pinotQuery.getGroupByList(), lookupTableNames);
-    collectLookupTableNames(pinotQuery.getOrderByList(), lookupTableNames);
     return lookupTableNames;
   }
 
-  private static void collectLookupTableNames(@Nullable List<Expression> expressions, Set<String> lookupTableNames) {
+  private static void collectLookupTableNames(@Nullable List<Expression> expressions, Set<String> lookupTableNames,
+      Deque<PinotQuery> pendingQueries) {
     if (expressions != null) {
       for (Expression expression : expressions) {
-        collectLookupTableNames(expression, lookupTableNames);
+        collectLookupTableNames(expression, lookupTableNames, pendingQueries);
       }
     }
   }
 
-  private static void collectLookupTableNames(@Nullable Expression expression, Set<String> lookupTableNames) {
+  private static void collectLookupTableNames(@Nullable Expression expression, Set<String> lookupTableNames,
+      Deque<PinotQuery> pendingQueries) {
     if (expression == null || expression.getType() != ExpressionType.FUNCTION) {
       return;
     }
     Function functionCall = expression.getFunctionCall();
     List<Expression> operands = functionCall.getOperands();
-    if (LOOKUP_FUNCTION.equals(functionCall.getOperator()) && !operands.isEmpty()) {
+    String operator = functionCall.getOperator();
+    if (LOOKUP_FUNCTION.equals(operator) && !operands.isEmpty()) {
       Literal tableName = operands.get(0).getLiteral();
       // A non-literal table name is rejected by LookupTransformFunction on the server
-      if (tableName != null && tableName.isSetStringValue()) {
-        lookupTableNames.add(tableName.getStringValue());
+      if (tableName != null) {
+        lookupTableNames.add(new LiteralContext(tableName).getStringValue());
       }
+    } else if (StringUtils.remove(operator, '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
+      pendingQueries.addLast(compilePartitionedSubquery(operands));
     }
     // Recurse regardless, so that a lookup() nested inside another lookup()'s join value is collected too
-    collectLookupTableNames(operands, lookupTableNames);
+    collectLookupTableNames(operands, lookupTableNames, pendingQueries);
+  }
+
+  private static PinotQuery compilePartitionedSubquery(List<Expression> operands) {
+    Literal sql = operands.size() == 2 ? operands.get(1).getLiteral() : null;
+    if (sql == null || !sql.isSetStringValue()) {
+      throw new BadQueryRequestException("IN_PARTITIONED_SUBQUERY requires a literal SQL subquery");
+    }
+    QueryThreadContext.checkTerminationAndSampleUsage("Partitioned subquery compilation");
+    PinotQuery subquery;
+    try {
+      subquery = CalciteSqlParser.compileToPinotQuery(sql.getStringValue());
+    } catch (RuntimeException e) {
+      throw new BadQueryRequestException("Cannot compile partitioned subquery", e);
+    }
+    // Row-filter options can add predicates during conversion on the server, outside the compiled expression tree.
+    if (!RlsUtils.extractRlsFilters(subquery.getQueryOptions()).isEmpty()) {
+      throw new BadQueryRequestException("Row-filter options are not allowed in partitioned subqueries");
+    }
+    return subquery;
   }
 
   /// Returns whether the query calls a cross-table function anywhere: in the select list, the filter, the having
