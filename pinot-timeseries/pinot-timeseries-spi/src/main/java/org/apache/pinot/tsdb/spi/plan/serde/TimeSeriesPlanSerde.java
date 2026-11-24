@@ -24,8 +24,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
 /// We have implemented a custom serialization/deserialization mechanism for time series plans. This allows users to use
@@ -38,7 +45,16 @@ import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 public class TimeSeriesPlanSerde {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  private static final Map<String, Class<? extends BaseTimeSeriesPlanNode>> PLAN_NODE_TYPES;
+
   static {
+    Set<Class<? extends BaseTimeSeriesPlanNode>> types = new HashSet<>();
+    types.add(LeafTimeSeriesPlanNode.class);
+    for (TimeSeriesPlanNodeProvider provider : ServiceLoader.load(TimeSeriesPlanNodeProvider.class,
+        TimeSeriesPlanSerde.class.getClassLoader())) {
+      types.addAll(provider.getPlanNodeTypes());
+    }
+    PLAN_NODE_TYPES = types.stream().collect(Collectors.toUnmodifiableMap(Class::getName, Function.identity()));
     OBJECT_MAPPER.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
   }
 
@@ -74,17 +90,14 @@ public class TimeSeriesPlanSerde {
       }
       objectNode.putIfAbsent("inputs", OBJECT_MAPPER.createArrayNode());
     }
-    BaseTimeSeriesPlanNode planNode = null;
-    try {
-      String klassName = jsonNode.get("klass").asText();
-      Class<BaseTimeSeriesPlanNode> klass = (Class<BaseTimeSeriesPlanNode>) Class.forName(klassName);
-      planNode = OBJECT_MAPPER.readValue(jsonNode.toString(), klass);
-    } finally {
-      if (planNode != null && inputs instanceof ArrayNode) {
-        ArrayNode childArray = (ArrayNode) inputs;
-        for (JsonNode childJsonNode : childArray) {
-          planNode.addInputNode(create(childJsonNode));
-        }
+    Class<? extends BaseTimeSeriesPlanNode> type = PLAN_NODE_TYPES.get(jsonNode.path("klass").asText());
+    if (type == null) {
+      throw new ClassNotFoundException("Unregistered time-series plan node type");
+    }
+    BaseTimeSeriesPlanNode planNode = OBJECT_MAPPER.treeToValue(jsonNode, type);
+    if (inputs instanceof ArrayNode) {
+      for (JsonNode child : inputs) {
+        planNode.addInputNode(create(child));
       }
     }
     return planNode;

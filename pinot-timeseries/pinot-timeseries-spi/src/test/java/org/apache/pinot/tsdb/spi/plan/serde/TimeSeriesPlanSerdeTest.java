@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.tsdb.spi.plan.serde;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,11 +33,21 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class TimeSeriesPlanSerdeTest {
   private static final int SERIES_LIMIT = 1000;
   private static final Map<String, String> QUERY_OPTIONS = Map.of("numGroupsLimit", "1000");
+
+  @Test
+  public void testRejectUnregisteredNodeType() {
+    ObjectNode unknown = JsonNodeFactory.instance.objectNode().put("klass", Object.class.getName());
+    ObjectNode parent = JsonNodeFactory.instance.objectNode().put("klass", LeafTimeSeriesPlanNode.class.getName());
+    parent.putArray("inputs").add(unknown);
+    expectThrows(ClassNotFoundException.class, () -> TimeSeriesPlanSerde.create(unknown));
+    expectThrows(ClassNotFoundException.class, () -> TimeSeriesPlanSerde.create(parent));
+  }
 
   @Test
   public void testSerdeForScanFilterProjectNode() {
