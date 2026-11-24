@@ -99,7 +99,7 @@ abstract class BaseBasicAuthAccessControl<P extends BasicAuthPrincipal> implemen
   }
 
   @Override
-  public final boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
+  public boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
     // Basic auth permissions are CRUD access types, not action names. AuthenticationFilter enforces the resolved
     // AccessType before invoking this fine-grained check, so this overload must only prevent unauthenticated access.
     // In particular it must not require unrestricted table scope for TargetType.CLUSTER: several table-scoped

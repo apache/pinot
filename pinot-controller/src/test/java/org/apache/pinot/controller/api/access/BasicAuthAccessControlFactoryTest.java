@@ -143,6 +143,16 @@ public class BasicAuthAccessControlFactoryTest {
     assertTrue(accessControl.hasAccess(headers(SCOPED_ADMIN_USER, SCOPED_ADMIN_PASSWORD), TargetType.CLUSTER));
   }
 
+  @Test
+  public void testCreateUserAuthorization()
+      throws Exception {
+    AccessControl zk = createZkAccessControl();
+    HttpHeaders fullUser = headers(FULL_USER, FULL_PASSWORD);
+    assertFalse(zk.hasAccess(fullUser, TargetType.CLUSTER, null, Actions.Cluster.CREATE_USER));
+    assertTrue(zk.hasAccess(headers("admin", FULL_PASSWORD), TargetType.CLUSTER, null, Actions.Cluster.CREATE_USER));
+    assertTrue(createStaticAccessControl().hasAccess(fullUser, TargetType.CLUSTER, null, Actions.Cluster.CREATE_USER));
+  }
+
   @Test(dataProvider = "accessControls")
   public void testBasicAuthWorkflow(AccessControl accessControl) {
     assertFalse(accessControl.protectAnnotatedOnly());
@@ -270,6 +280,8 @@ public class BasicAuthAccessControlFactoryTest {
         user(FULL_USER, FULL_PASSWORD, null,
             List.of(org.apache.pinot.spi.config.user.AccessType.values())),
         user(WILDCARD_USER, WILDCARD_PASSWORD, null, null),
+        new UserConfig("admin", BcryptUtils.encrypt(FULL_PASSWORD), ComponentType.CONTROLLER.name(),
+            RoleType.ADMIN.name(), null, null, null),
         user(SCOPED_ADMIN_USER, SCOPED_ADMIN_PASSWORD, List.of(ALLOWED_TABLE),
             List.of(org.apache.pinot.spi.config.user.AccessType.values())),
         user(EXCLUDED_USER, EXCLUDED_PASSWORD, null, List.of("otherTable"), null),
