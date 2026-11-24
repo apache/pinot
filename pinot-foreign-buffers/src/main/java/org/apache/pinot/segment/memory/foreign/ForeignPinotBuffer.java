@@ -46,9 +46,11 @@ import org.slf4j.LoggerFactory;
 ///
 /// Thread-safety: instances created through [ForeignPinotBufferFactory] use a [shared arena][Arena#ofShared()], so the
 /// buffer may be read, written and closed from any thread. As with every [PinotDataBuffer], closing a buffer while
-/// another thread accesses it is a caller error. Note that closing a shared arena does not fail fast: [#release()]
-/// blocks until all in-flight accesses on this buffer and its views have completed (and the inherited synchronized
-/// [#close()] serialises concurrent close calls on the same instance).
+/// another thread accesses it is a caller error. Closing does not wait for other threads, and it stays memory-safe:
+/// a concurrent read or write on this buffer or its views fails with [IllegalStateException]. If an I/O operation
+/// still uses a [ByteBuffer] from [#toDirectByteBuffer(long, int, ByteOrder)], [#release()] throws
+/// [IllegalStateException] and the memory stays allocated. The inherited synchronized [#close()] serialises
+/// concurrent close calls on the same instance.
 public class ForeignPinotBuffer extends PinotDataBuffer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ForeignPinotBuffer.class);
