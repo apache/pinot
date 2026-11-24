@@ -52,6 +52,14 @@ public class OrderByGroupKeysRewriterTest {
     // OrderByLiteralRemover drops a literal ORDER BY key, so the query compiles without an ORDER BY
     testQueryRewrite("SELECT col1, COUNT(*) FROM foo GROUP BY col1 ORDER BY 'a'",
         "SELECT col1, COUNT(*) FROM foo GROUP BY col1 ORDER BY col1");
+    // A query without options, as one not built by the parser can be, against the default threshold
+    PinotQuery withoutOptions =
+        CalciteSqlParser.compileToPinotQuery("SELECT col1, SUM(col2) FROM foo GROUP BY col1 LIMIT 10");
+    withoutOptions.setQueryOptions(null);
+    PinotQuery expected =
+        CalciteSqlParser.compileToPinotQuery("SELECT col1, SUM(col2) FROM foo GROUP BY col1 ORDER BY col1 LIMIT 10");
+    expected.setQueryOptions(null);
+    assertEquals(QUERY_REWRITER.rewrite(withoutOptions), expected);
   }
 
   private void testQueryRewrite(String original, String expected) {
