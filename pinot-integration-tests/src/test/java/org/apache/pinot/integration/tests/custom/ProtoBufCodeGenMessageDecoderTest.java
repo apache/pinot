@@ -25,6 +25,7 @@ import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
 import java.io.File;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +76,12 @@ public class ProtoBufCodeGenMessageDecoderTest extends CustomDataQueryClusterInt
   private static final String PROTO_DESCRIPTOR_RESOURCE = "sample-samplerecord.desc";
   private static final String PROTO_JAR_RESOURCE = "sample-samplerecord.jar";
   private static final String PROTO_MESSAGE_TYPE = "SampleRecord";
+
+  // The servers run in this JVM and only load codegen jars from the allowed locations
+  static {
+    System.setProperty(ProtoBufCodeGenMessageDecoder.ALLOWED_JAR_LOCATIONS_PROPERTY,
+        new File(URI.create(getJarFileUri())).getParent());
+  }
 
   private static final String COL_NAME = "name";
   private static final String COL_ID = "id";
