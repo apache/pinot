@@ -25,6 +25,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class QueryThreadContextTest {
@@ -65,6 +66,21 @@ public class QueryThreadContextTest {
     }
     assertEquals(closed, List.of("other"));
     // The thread context is removed even when a resource fails to close
+    assertNull(QueryThreadContext.getIfAvailable());
+  }
+
+  @Test
+  public void testCloseCleansUpThreadAfterResourceError() {
+    List<String> closed = new ArrayList<>();
+    QueryThreadContext threadContext = QueryThreadContext.openForSseTest();
+    QueryThreadContext.registerResource(() -> {
+      throw new AssertionError("boom");
+    });
+    QueryThreadContext.registerResource(() -> closed.add("other"));
+    AssertionError error = expectThrows(AssertionError.class, threadContext::close);
+    assertEquals(error.getMessage(), "boom");
+    // The other resources are still closed, and the thread does not keep the context of the finished task
+    assertEquals(closed, List.of("other"));
     assertNull(QueryThreadContext.getIfAvailable());
   }
 

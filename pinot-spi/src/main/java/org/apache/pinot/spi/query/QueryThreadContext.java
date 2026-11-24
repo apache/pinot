@@ -199,24 +199,30 @@ public class QueryThreadContext implements AutoCloseable {
   /// Closes the [QueryThreadContext] and removes it from the thread-local storage and MDC context.
   @Override
   public void close() {
-    closeResources();
-    _accountant.clear();
-    THREAD_LOCAL.remove();
-    LoggerConstants.REQUEST_ID_KEY.unregisterFromMdc();
-    LoggerConstants.CORRELATION_ID_KEY.unregisterFromMdc();
-    LoggerConstants.QUERY_HASH_KEY.unregisterFromMdc();
-    if (_mseWorkerInfo != null) {
-      LoggerConstants.STAGE_ID_KEY.unregisterFromMdc();
-      LoggerConstants.WORKER_ID_KEY.unregisterFromMdc();
-      if (LoggerConstants.UPSTREAM_STAGE_IDS_KEY.isRegistered()) {
-        LoggerConstants.UPSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
-      }
-      if (LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.isRegistered()) {
-        LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+    try {
+      closeResources();
+    } finally {
+      // Runs even when a resource throws an Error, so that a pooled thread never keeps the context of a finished task
+      _accountant.clear();
+      THREAD_LOCAL.remove();
+      LoggerConstants.REQUEST_ID_KEY.unregisterFromMdc();
+      LoggerConstants.CORRELATION_ID_KEY.unregisterFromMdc();
+      LoggerConstants.QUERY_HASH_KEY.unregisterFromMdc();
+      if (_mseWorkerInfo != null) {
+        LoggerConstants.STAGE_ID_KEY.unregisterFromMdc();
+        LoggerConstants.WORKER_ID_KEY.unregisterFromMdc();
+        if (LoggerConstants.UPSTREAM_STAGE_IDS_KEY.isRegistered()) {
+          LoggerConstants.UPSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+        }
+        if (LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.isRegistered()) {
+          LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+        }
       }
     }
   }
 
+  /// Closes every resource that is still registered. A resource that fails to close does not stop the close of the
+  /// others. An [Exception] is logged. The first [Error] is rethrown after every resource is closed.
   private void closeResources() {
     if (_resources == null || _resources.isEmpty()) {
       return;
@@ -224,12 +230,23 @@ public class QueryThreadContext implements AutoCloseable {
     // Copy first so that a resource that unregisters itself in close() does not modify the set while it is iterated
     List<AutoCloseable> resources = new ArrayList<>(_resources);
     _resources = null;
+    LOGGER.debug("Closing {} query resources that their owners did not close", resources.size());
+    Error error = null;
     for (AutoCloseable resource : resources) {
       try {
         resource.close();
       } catch (Exception e) {
         LOGGER.warn("Caught exception while closing query resource: {}", resource, e);
+      } catch (Error e) {
+        if (error == null) {
+          error = e;
+        } else {
+          error.addSuppressed(e);
+        }
       }
+    }
+    if (error != null) {
+      throw error;
     }
   }
 
@@ -285,8 +302,17 @@ public class QueryThreadContext implements AutoCloseable {
   /// Only the current thread may use the resource, or threads that finish before the current thread closes its
   /// [QueryThreadContext]: [#close] can free off-heap memory that another thread is still reading.
   ///
+  /// The `close()` method of the resource must be idempotent. An owner that closes the resource on another thread
+  /// cannot unregister it, so the resource can be closed a second time when the task ends.
+  ///
+  /// The registry keeps a strong reference to the resource. A resource that its owner abandons stays allocated until
+  /// the task ends, not until the garbage collector runs. So a task that abandons the reads of many segments holds
+  /// the reader contexts of all of them until it ends.
+  ///
   /// Does nothing when the resource is `null` or the thread has no [QueryThreadContext]. The resource is then released
-  /// only by its owner, or by the garbage collector.
+  /// only by its owner, or by the garbage collector. This also applies after a nested [#open] on the same thread: the
+  /// close of the inner context removes the thread-local context, and the resources registered after that are not
+  /// tracked.
   public static void registerResource(@Nullable AutoCloseable resource) {
     if (resource == null) {
       return;

@@ -70,6 +70,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     _predicateEvaluator = predicateEvaluator;
     _reader = reader;
     _readerContext = reader.createContext();
+    QueryThreadContext.registerResource(_readerContext);
     _numDocs = numDocs;
     _valueMatcher = getValueMatcher();
     _cardinality = -1;
