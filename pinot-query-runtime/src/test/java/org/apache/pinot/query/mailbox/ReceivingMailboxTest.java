@@ -110,6 +110,33 @@ public class ReceivingMailboxTest {
         "Should not be able to offer after EOS");
   }
 
+  /// The receive operator releases a mailbox that it stops reading only once the sender is done with it. Otherwise the
+  /// sender could look the mailbox up again and create a new one that nobody reads.
+  @Test
+  public void senderFinished() {
+    // The sender sends its EOS
+    ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
+    assertFalse(receivingMailbox.isSenderFinished());
+    assertEquals(receivingMailbox.offer(DATA_BLOCK, List.of(), 10), ReceivingMailbox.ReceivingMailboxStatus.SUCCESS);
+    assertFalse(receivingMailbox.isSenderFinished());
+    assertEquals(receivingMailbox.offer(SuccessMseBlock.INSTANCE, List.of(), 10),
+        ReceivingMailbox.ReceivingMailboxStatus.LAST_BLOCK);
+    assertTrue(receivingMailbox.isSenderFinished());
+
+    // The sender fails
+    receivingMailbox = new ReceivingMailbox("id", 10);
+    receivingMailbox.setErrorBlock(ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, "test"), List.of());
+    assertTrue(receivingMailbox.isSenderFinished());
+
+    // The receiver cancels the mailbox. The sender is finished only once it is told to stop.
+    receivingMailbox = new ReceivingMailbox("id", 10);
+    receivingMailbox.cancel();
+    assertFalse(receivingMailbox.isSenderFinished());
+    assertEquals(receivingMailbox.offer(DATA_BLOCK, List.of(), 10),
+        ReceivingMailbox.ReceivingMailboxStatus.ALREADY_TERMINATED);
+    assertTrue(receivingMailbox.isSenderFinished());
+  }
+
   @Test
   public void shouldReadDataInOrder() {
     ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);

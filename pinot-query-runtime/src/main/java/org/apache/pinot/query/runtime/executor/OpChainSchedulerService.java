@@ -229,7 +229,7 @@ public class OpChainSchedulerService {
       }
     }, MoreExecutors.directExecutor());
 
-    OpChainTask opChainTask = new OpChainTask(listenableFutureTask);
+    OpChainTask opChainTask = new OpChainTask(listenableFutureTask, executionContext);
     try {
       // Use execute() and not submit(): submit() registers its Future with the execution context, and terminating the
       // query would cancel that Future, which drops the op chain if it has not started yet. See OpChainTask.
@@ -353,15 +353,19 @@ public class OpChainSchedulerService {
   ///
   /// `_lock` makes sure that an interrupt reaches the thread only while it runs the op chain, and never the next task
   /// of that thread.
+  ///
+  /// Once done, the task removes itself from the [QueryExecutionContext].
   private static final class OpChainTask extends AbstractFuture<Void> implements Runnable {
     private final Runnable _opChainRunner;
+    private final QueryExecutionContext _executionContext;
     private final Object _lock = new Object();
     @GuardedBy("_lock")
     @Nullable
     private Thread _thread;
 
-    OpChainTask(Runnable opChainRunner) {
+    OpChainTask(Runnable opChainRunner, QueryExecutionContext executionContext) {
       _opChainRunner = opChainRunner;
+      _executionContext = executionContext;
     }
 
     @Override
@@ -389,6 +393,11 @@ public class OpChainSchedulerService {
           _thread.interrupt();
         }
       }
+    }
+
+    @Override
+    protected void afterDone() {
+      _executionContext.removeTask(this);
     }
   }
 

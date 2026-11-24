@@ -22,6 +22,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -79,5 +82,25 @@ public class QueryMultiThreadingUtilsTest {
       }
     }, sum::addAndGet, e -> err[0] = e, exec, System.currentTimeMillis() + 500);
     Assert.assertTrue(err[0] instanceof TimeoutException);
+  }
+
+  /// The results of the tasks can be large, for example the per-segment operators that CombinePlanNode builds. The
+  /// execution context of the query must not keep them once the tasks are done, because it can stay reachable after
+  /// the query ends.
+  @Test
+  public void testRunTasksWithDeadlineDoesNotKeepTasksInExecutionContext() {
+    ExecutorService baseExecutor = Executors.newCachedThreadPool();
+    try (QueryThreadContext threadContext = QueryThreadContext.openForSseTest()) {
+      ExecutorService exec = QueryThreadContext.contextAwareExecutorService(baseExecutor);
+      AtomicInteger sum = new AtomicInteger(0);
+      QueryMultiThreadingUtils.runTasksWithDeadline(5, index -> index, sum::addAndGet, e -> {
+      }, exec, System.currentTimeMillis() + 10_000L);
+      Assert.assertEquals(sum.get(), 10);
+      QueryExecutionContext executionContext = threadContext.getExecutionContext();
+      TestUtils.waitForCondition(aVoid -> executionContext.getNumTasks() == 0, 10L, 10_000L,
+          "The execution context should not keep the tasks that are done");
+    } finally {
+      baseExecutor.shutdownNow();
+    }
   }
 }
