@@ -219,8 +219,9 @@ public class IngestionDelayTracker {
 
       assert streamMetadataProvider != null;
       _streamConfigIndexToStreamMetadataProvider.put(streamConfigIndex, streamMetadataProvider);
-      // A create still running when shutdown() gave up waiting can finish after the providers were closed. Whichever
-      // side removes the entry closes the provider, so it is closed exactly once.
+      // A create still running when shutdown() started has no use for the provider, so close it here rather than
+      // leave it to the queued cleanup. Whichever side removes the entry closes the provider, so it is closed exactly
+      // once.
       if (_shuttingDown) {
         if (_streamConfigIndexToStreamMetadataProvider.remove(streamConfigIndex, streamMetadataProvider)) {
           closeStreamMetadataProvider(streamMetadataProvider);
@@ -677,7 +678,7 @@ public class IngestionDelayTracker {
   /// providers therefore runs on the tracking thread, behind the fetch: removing the partitions' metrics asks each
   /// provider which gauges it registered, and then the providers are closed. This waits a bounded time for it; if the
   /// wait runs out or the caller is interrupted, the cleanup still completes on that thread once the fetch returns.
-  /// The interrupt is left set on the calling thread.
+  /// The interrupt is left set on the calling thread. A repeated call only waits again for that cleanup.
   public void shutdown() {
     _shuttingDown = true;
     // Now that segments can't report metric, destroy metric for this table
@@ -691,8 +692,9 @@ public class IngestionDelayTracker {
     try {
       _ingestionDelayTrackingScheduler.execute(this::cleanUpAfterTracking);
     } catch (RejectedExecutionException e) {
-      // An earlier call already shut the executor down; the cleanup is idempotent
-      cleanUpAfterTracking();
+      // Only an earlier call can have shut the executor down, and that call queued the cleanup first. Running it on
+      // this thread instead could close a provider under the fetch that call is still waiting out.
+      LOGGER.debug("Ingestion delay tracker for table: {} is already shutting down", _tableNameWithType);
     }
     _ingestionDelayTrackingScheduler.shutdown();
     try {
@@ -711,8 +713,11 @@ public class IngestionDelayTracker {
     try {
       if (_isServerReadyToServeQueries.getAsBoolean()) {
         // Remove partitions so their related metrics get uninstalled. Not during server startup, when the tracker
-        // state is not updated.
-        for (Integer partitionId : _ingestionInfoMap.keySet()) {
+        // state is not updated. The tracking task also registers metrics for a hosted partition whose consumer has
+        // not reported anything, so go by the partitions with metrics as well as those with ingestion info.
+        Set<Integer> partitionIds = new HashSet<>(_partitionsTracked.keySet());
+        partitionIds.addAll(_ingestionInfoMap.keySet());
+        for (Integer partitionId : partitionIds) {
           removePartitionId(partitionId);
         }
       }

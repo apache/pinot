@@ -286,6 +286,8 @@ public class IngestionDelayTrackerTest {
     try {
       tracker.shutdown();
       assertTrue(Thread.currentThread().isInterrupted(), "Shutdown must keep the caller's interrupt");
+      // A repeated call finds the cleanup already queued behind the fetch, and must not run it on this thread
+      tracker.shutdown();
     } finally {
       Thread.interrupted();
     }
@@ -296,16 +298,52 @@ public class IngestionDelayTrackerTest {
     assertFalse(closedDuringFetch.get(), "The provider was closed while a fetch was still running on it");
   }
 
+  /// The tracking task also registers gauges for a partition the server hosts whose consumer has not reported
+  /// anything, for example one whose consuming segment is in ERROR. Shutdown removes those too: nothing else does once
+  /// the table is gone, and the offset lag gauge would go on reporting the whole upstream offset as lag.
+  @Test
+  public void testShutdownRemovesGaugesOfPartitionsWithoutIngestionInfo()
+      throws Exception {
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    IngestionDelayTracker tracker = new IngestionDelayTracker(serverMetrics, REALTIME_TABLE_NAME,
+        REALTIME_TABLE_DATA_MANAGER, 60_000, 5, () -> true);
+    StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    when(provider.supportsOffsetLag()).thenReturn(true);
+    when(provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of());
+    tracker._streamConfigIndexToStreamMetadataProvider.put(0, provider);
+    tracker._partitionsHostedByThisServer.put(0, true);
+    // The tracking task registers this gauge last
+    verify(serverMetrics, timeout(10_000)).setOrUpdatePartitionGauge(any(), eq(0),
+        eq(ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS), any());
+
+    tracker.shutdown();
+
+    for (ServerGauge gauge : List.of(ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
+        ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET,
+        ServerGauge.REALTIME_INGESTION_DELAY_MS, ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
+        ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS)) {
+      verify(serverMetrics).removePartitionGauge(any(), eq(0), eq(gauge));
+    }
+    verify(provider).close();
+  }
+
   /// A provider that fails to close with a runtime exception must not make shutdown throw, which would skip stopping
-  /// the table's consumers in the caller.
+  /// the table's consumers in the caller, and must not keep the table's other providers from being closed.
   @Test
   public void testShutdownSurvivesProviderCloseFailure()
       throws Exception {
     IngestionDelayTracker tracker = createTracker();
     StreamMetadataProvider provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider otherProvider = mock(StreamMetadataProvider.class);
     doThrow(new IllegalStateException("KafkaConsumer is not safe for multi-threaded access")).when(provider).close();
+    doThrow(new IllegalStateException("KafkaConsumer is not safe for multi-threaded access")).when(otherProvider)
+        .close();
     tracker._streamConfigIndexToStreamMetadataProvider.put(0, provider);
+    tracker._streamConfigIndexToStreamMetadataProvider.put(1, otherProvider);
     tracker.shutdown();
+    // Whichever provider is closed first fails, and the other one is still closed
+    verify(provider).close();
+    verify(otherProvider).close();
   }
 
   @Test
