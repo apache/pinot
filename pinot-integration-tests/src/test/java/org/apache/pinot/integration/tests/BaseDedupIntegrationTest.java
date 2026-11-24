@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -229,24 +230,24 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testSegmentReload()
       throws Exception {
     String reloadJobId = reloadTableAndValidateResponse(getTableName(), TableType.REALTIME, false);
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return isReloadJobCompleted(reloadJobId);
-      } catch (Exception e) {
-        return false;
-      }
-    }, 1000L, 600_000L, "Reload job " + reloadJobId + " did not finish");
+    // The supplier variant retries a failing status call, logs it and attaches the last error to a timeout
+    TestUtils.waitForCondition(() -> isReloadJobCompleted(reloadJobId), 1000L, 600_000L,
+        "Reload job " + reloadJobId + " did not finish", Duration.ofSeconds(30));
 
-    // Push data again. Dedup drops every re-pushed row, so wait until both tables have consumed them before checking.
+    // Push data again. Dedup drops every re-pushed row, so wait until the table has consumed them before checking.
     pushAvroIntoKafka(_avroFiles);
     waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
-    waitForAllStreamRecordsConsumed(DEDUP_TABLE_WITH_REPLICAS, 600_000L);
     waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(getTableName()), 600_000L);
-    waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(DEDUP_TABLE_WITH_REPLICAS), 600_000L);
-
-    // Validate no change
     assertRows(dedupRowsQuery(getTableName()), DEDUP_SURVIVORS);
-    assertRowsFromEveryReplica(dedupRowsQuery(DEDUP_TABLE_WITH_REPLICAS), DEDUP_SURVIVORS);
+
+    // The replicated table consumes the same topic, so it must drop the re-pushed rows on every replica too. A
+    // subclass that does not create it (see createDedupTableWithReplicas()) skips this check.
+    String replicatedTableName = TableNameBuilder.REALTIME.tableNameWithType(DEDUP_TABLE_WITH_REPLICAS);
+    if (getHelixResourceManager().hasTable(replicatedTableName)) {
+      waitForAllStreamRecordsConsumed(DEDUP_TABLE_WITH_REPLICAS, 600_000L);
+      waitForClusterStateSettled(replicatedTableName, 600_000L);
+      assertRowsFromEveryReplica(dedupRowsQuery(DEDUP_TABLE_WITH_REPLICAS), DEDUP_SURVIVORS);
+    }
   }
 
   //tests the query results when metadataTTL is set with RF>1.
