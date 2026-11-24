@@ -28,7 +28,7 @@ import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
-import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.MergeInfo;
 
 
 /// Extend Lucene 9.5 vector format to support HNSW graph
@@ -38,6 +38,13 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
   /// underlying implementation of [org.apache.lucene.util.hnsw.HnswGraph] which uses a fixed size array to
   /// store the vector values.
   public static final int DEFAULT_MAX_DIMENSIONS = 2048;
+
+  /// Controls where an opt-in parallel build writes graphs for small Lucene segments.
+  public enum SmallSegmentGraphs {
+    DEFAULT,
+    PARALLEL_PART,
+    PARALLEL_FINAL_MERGE
+  }
 
   private final int _maxDimensions;
   private final Lucene99HnswVectorsFormat _delegate;
@@ -64,6 +71,12 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
   /// directory for mmap-backed construction. Ordinary merges use the default Lucene format.
   public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions, int numMergeWorkers,
       @Nullable ExecutorService mergeExec, @Nullable Path mmapMergeDirectory) {
+    this(maxConn, beamWidth, maxDimensions, numMergeWorkers, mergeExec, mmapMergeDirectory, SmallSegmentGraphs.DEFAULT);
+  }
+
+  /// Parallel part writers and final merge writers retain graphs even when Lucene would otherwise skip small segments.
+  public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions, int numMergeWorkers,
+      @Nullable ExecutorService mergeExec, @Nullable Path mmapMergeDirectory, SmallSegmentGraphs smallSegmentGraphs) {
     super("Lucene99HnswVectorsFormat");
     if (maxDimensions <= 0 || maxDimensions > DEFAULT_MAX_DIMENSIONS) {
       throw new IllegalArgumentException(
@@ -72,9 +85,11 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
               + "; maxDimensions="
               + maxDimensions);
     }
-    _delegate = new Lucene99HnswVectorsFormat(maxConn, beamWidth);
-    _finalMergeDelegate = numMergeWorkers > 1
-        ? new Lucene99HnswVectorsFormat(maxConn, beamWidth, numMergeWorkers, mergeExec) : _delegate;
+    int graphThreshold = smallSegmentGraphs == SmallSegmentGraphs.PARALLEL_PART
+        ? 0 : Lucene99HnswVectorsFormat.HNSW_GRAPH_THRESHOLD;
+    _delegate = new Lucene99HnswVectorsFormat(maxConn, beamWidth, graphThreshold);
+    _finalMergeDelegate = numMergeWorkers > 1 || smallSegmentGraphs == SmallSegmentGraphs.PARALLEL_FINAL_MERGE
+        ? new Lucene99HnswVectorsFormat(maxConn, beamWidth, numMergeWorkers, mergeExec, 0) : _delegate;
     _maxDimensions = maxDimensions;
     _maxConn = maxConn;
     _beamWidth = beamWidth;
@@ -84,7 +99,8 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
   @Override
   public KnnVectorsWriter fieldsWriter(SegmentWriteState state)
       throws IOException {
-    if (state.context.context == IOContext.Context.MERGE && state.context.mergeInfo.mergeMaxNumSegments == 1) {
+    MergeInfo mergeInfo = state.context.mergeInfo();
+    if (mergeInfo != null && mergeInfo.mergeMaxNumSegments() == 1) {
       if (_mmapMergeDirectory != null) {
         return new MmapHnswVectorsWriter(state, _mmapMergeDirectory, _maxConn, _beamWidth);
       }

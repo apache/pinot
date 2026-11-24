@@ -40,6 +40,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertTrue;
+
 
 /// Round-trip test: creates a small HNSW index via [HnswVectorIndexCreator] with
 /// `storeInSegmentFile=true`, verifies the combined file is produced, mmaps it, opens a
@@ -93,7 +95,7 @@ public class HnswVectorIndexCombinedTest {
         // Query with the first vector; we expect at least one result
         KnnFloatVectorQuery query = new KnnFloatVectorQuery(COLUMN, vectors[0], 3);
         TopDocs results = searcher.search(query, 3);
-        Assert.assertTrue(results.totalHits.value > 0,
+        assertTrue(results.totalHits.value() > 0,
             "KNN query on buffer-backed directory must return at least one result");
       } finally {
         indexReader.close();

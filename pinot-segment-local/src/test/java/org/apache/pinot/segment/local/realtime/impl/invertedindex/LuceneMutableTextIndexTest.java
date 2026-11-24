@@ -40,6 +40,7 @@ import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.ReferenceManager.RefreshListener;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
+import org.apache.pinot.segment.local.utils.LuceneIndexTestUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -467,7 +468,7 @@ public class LuceneMutableTextIndexTest {
     configureIndex(null, null, null, null);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return _realtimeLuceneTextIndex.getSearcherManager().isSearcherCurrent();
+        return LuceneIndexTestUtils.isSearcherCurrent(_realtimeLuceneTextIndex.getSearcherManager());
       } catch (IOException e) {
         return false;
       }

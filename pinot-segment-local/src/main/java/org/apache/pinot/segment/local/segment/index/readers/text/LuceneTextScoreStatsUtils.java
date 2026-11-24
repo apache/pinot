@@ -132,7 +132,7 @@ public final class LuceneTextScoreStatsUtils {
   private static void requireGlobalStatsSupport(Query query) {
     if (query instanceof BooleanQuery bool) {
       for (BooleanClause clause : bool) {
-        requireGlobalStatsSupport(clause.getQuery());
+        requireGlobalStatsSupport(clause.query());
       }
     } else if (query instanceof BoostQuery boost) {
       requireGlobalStatsSupport(boost.getQuery());
