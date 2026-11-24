@@ -649,9 +649,8 @@ public class ArrayFunctions {
     float rawSteps = (end - start) / inc;
     if (Float.isFinite(rawSteps) && rawSteps < MAX_GENERATED_ARRAY_LENGTH) {
       float nearest = (float) Math.rint(rawSteps);
-      if (nearest > rawSteps) {
-        float maxBound = Math.max(Math.abs(start), Math.abs(end));
-        float tolerance = Math.min(0.25f, 3.0f * (Math.ulp(maxBound) / Math.abs(inc) + Math.ulp(nearest)));
+      if (nearest > rawSteps && Float.isFinite(start + nearest * inc)) {
+        float tolerance = Math.min(0.25f, (Math.ulp(start) + Math.ulp(end) + nearest * Math.ulp(inc)) / Math.abs(inc));
         if (nearest - rawSteps <= tolerance) {
           return checkGeneratedArrayLength((long) nearest);
         }
@@ -668,9 +667,8 @@ public class ArrayFunctions {
     double rawSteps = (end - start) / inc;
     if (Double.isFinite(rawSteps) && rawSteps < MAX_GENERATED_ARRAY_LENGTH) {
       double nearest = Math.rint(rawSteps);
-      if (nearest > rawSteps) {
-        double maxBound = Math.max(Math.abs(start), Math.abs(end));
-        double tolerance = Math.min(0.25, 3.0 * (Math.ulp(maxBound) / Math.abs(inc) + Math.ulp(nearest)));
+      if (nearest > rawSteps && Double.isFinite(start + nearest * inc)) {
+        double tolerance = Math.min(0.25, (Math.ulp(start) + Math.ulp(end) + nearest * Math.ulp(inc)) / Math.abs(inc));
         if (nearest - rawSteps <= tolerance) {
           return checkGeneratedArrayLength((long) nearest);
         }

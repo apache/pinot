@@ -98,6 +98,9 @@ public class GenerateArrayFunctionsTest {
     assertThrows(IllegalArgumentException.class, () -> ArrayFunctions.generateDoubleArray(0.1, 10000.1, 0.1));
     assertEquals(ArrayFunctions.generateFloatArray(0.1f, 10000.0f, 0.1f).length, 100000);
     assertThrows(IllegalArgumentException.class, () -> ArrayFunctions.generateFloatArray(0.1f, 10000.1f, 0.1f));
+    // A genuinely fractional step count near the limit with an integer increment must not snap up past the limit.
+    assertEquals(ArrayFunctions.generateFloatArray(0f, 99999.96f, 1f).length, 100000);
+    assertEquals(ArrayFunctions.generateFloatArray(99999.96f, 0f, -1f).length, 100000);
   }
 
   @Test
@@ -197,5 +200,18 @@ public class GenerateArrayFunctionsTest {
     assertEquals(ArrayFunctions.generateFloatArray(0f, 0.95f, 0.1f).length, 10);
     assertEquals(ArrayFunctions.generateFloatArray(0f, 0.2999f, 0.1f).length, 3);
     assertEquals(ArrayFunctions.generateFloatArray(0.1f, 0.6999f, 0.1f).length, 6);
+
+    // Snapping must not append a non-finite element when start + nearest * inc overflows past MAX_VALUE.
+    double doubleMaxHalfNext = Math.nextUp(Math.nextUp(Double.MAX_VALUE / 2));
+    assertEquals(ArrayFunctions.generateDoubleArray(0, Double.MAX_VALUE, doubleMaxHalfNext),
+        new double[]{0.0, doubleMaxHalfNext});
+    assertEquals(ArrayFunctions.generateDoubleArray(0, -Double.MAX_VALUE, -doubleMaxHalfNext),
+        new double[]{0.0, -doubleMaxHalfNext});
+
+    float floatMaxHalfNext = Math.nextUp(Math.nextUp(Float.MAX_VALUE / 2f));
+    assertEquals(ArrayFunctions.generateFloatArray(0f, Float.MAX_VALUE, floatMaxHalfNext),
+        new float[]{0f, floatMaxHalfNext});
+    assertEquals(ArrayFunctions.generateFloatArray(0f, -Float.MAX_VALUE, -floatMaxHalfNext),
+        new float[]{0f, -floatMaxHalfNext});
   }
 }
