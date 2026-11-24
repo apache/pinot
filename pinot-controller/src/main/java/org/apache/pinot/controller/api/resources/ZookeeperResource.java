@@ -50,15 +50,20 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
+import org.apache.helix.PropertyType;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.introspect.CodehausJacksonIntrospector;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.access.ZkBasicAuthAccessControlFactory;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -79,6 +84,11 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class ZookeeperResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperResource.class);
+  private static final String USER_CONFIGS = "/" + PropertyType.PROPERTYSTORE
+      + ZKMetadataProvider.getPropertyStorePathForUserConfigs();
+  // Helix can also read existing user configs from its legacy fallback property store.
+  private static final String LEGACY_USER_CONFIGS = "/HELIX_PROPERTYSTORE"
+      + ZKMetadataProvider.getPropertyStorePathForUserConfigs();
 
   // Helix uses codehaus.jackson.map.ObjectMapper, hence we can't use pinot JsonUtils here.
   @VisibleForTesting
@@ -93,6 +103,12 @@ public class ZookeeperResource {
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  AccessControlFactory _accessControlFactory;
+
+  @Context
+  HttpHeaders _httpHeaders;
 
   @GET
   @Path("/zk/get")
@@ -140,7 +156,7 @@ public class ZookeeperResource {
 
     path = validateAndNormalizeZKPath(path, true);
 
-    boolean success = _pinotHelixResourceManager.deleteZKPath(path);
+    boolean success = deleteAuthorizedPath(path);
     if (success) {
       return new SuccessResponse("Successfully deleted path: " + path);
     } else {
@@ -188,6 +204,10 @@ public class ZookeeperResource {
           e);
     }
 
+    // Authorize the whole batch before writing its first child.
+    for (ZNRecord znRecord : znRecords) {
+      authorizeUserMetadataWrite(path + "/" + znRecord.getId());
+    }
     for (ZNRecord znRecord : znRecords) {
       String childPath = path + "/" + znRecord.getId();
       try {
@@ -227,6 +247,7 @@ public class ZookeeperResource {
       @Nullable String payload) {
 
     path = validateAndNormalizeZKPath(path, false);
+    authorizeUserMetadataWrite(path);
 
     if (StringUtils.isEmpty(data)) {
       data = payload;
@@ -277,6 +298,7 @@ public class ZookeeperResource {
       int accessOption, String payload) {
 
     path = validateAndNormalizeZKPath(path, false);
+    authorizeUserMetadataWrite(path);
 
     //validate ttl range
     if ((accessOption == AccessOption.PERSISTENT_WITH_TTL
@@ -422,6 +444,59 @@ public class ZookeeperResource {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private boolean deleteAuthorizedPath(String path) {
+    if (canManageUserMetadata()) {
+      return _pinotHelixResourceManager.deleteZKPath(path);
+    }
+    if (path.equals("/")) {
+      throw userMetadataAccessDenied();
+    }
+    // The raw accessor can reach multiple clusters. Check the whole subtree before making any changes.
+    List<String> paths = new ArrayList<>();
+    paths.add(path);
+    for (int i = 0; i < paths.size(); i++) {
+      String node = paths.get(i);
+      if (isUserMetadata(node)) {
+        throw userMetadataAccessDenied();
+      }
+      List<String> children = _pinotHelixResourceManager.getZKChildNames(node);
+      if (children == null) {
+        return false;
+      }
+      for (String child : children) {
+        paths.add(node + "/" + child);
+      }
+    }
+    // Never recursively remove a child that appeared after authorization.
+    for (String node : paths.reversed()) {
+      if (!_pinotHelixResourceManager.deleteZKLeaf(node)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private void authorizeUserMetadataWrite(String path) {
+    if (isUserMetadata(path) && !canManageUserMetadata()) {
+      throw userMetadataAccessDenied();
+    }
+  }
+
+  private boolean canManageUserMetadata() {
+    return !(_accessControlFactory instanceof ZkBasicAuthAccessControlFactory) || _accessControlFactory.create()
+        .hasAccess(_httpHeaders, TargetType.CLUSTER, null, Actions.Cluster.UPDATE_USER);
+  }
+
+  private static ControllerApplicationException userMetadataAccessDenied() {
+    return new ControllerApplicationException(LOGGER, "Permission denied to modify user metadata",
+        Response.Status.FORBIDDEN);
+  }
+
+  private static boolean isUserMetadata(String path) {
+    return path.endsWith(USER_CONFIGS) || path.contains(USER_CONFIGS + "/")
+        || path.endsWith(LEGACY_USER_CONFIGS) || path.contains(LEGACY_USER_CONFIGS + "/");
   }
 
   private String validateAndNormalizeZKPath(String path, boolean shouldExist) {

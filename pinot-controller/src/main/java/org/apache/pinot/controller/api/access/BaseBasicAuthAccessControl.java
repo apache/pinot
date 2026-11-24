@@ -105,14 +105,15 @@ abstract class BaseBasicAuthAccessControl<P extends BasicAuthPrincipal> implemen
   @Override
   public final boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
     Optional<P> principal = getPrincipal(httpHeaders);
-    if (targetType == TargetType.CLUSTER && Actions.Cluster.CREATE_USER.equals(action)) {
-      return principal.filter(BaseBasicAuthAccessControl::canCreateUser).isPresent();
+    if (targetType == TargetType.CLUSTER && (Actions.Cluster.CREATE_USER.equals(action)
+        || Actions.Cluster.UPDATE_USER.equals(action) || Actions.Cluster.DELETE_USER.equals(action))) {
+      return principal.filter(BaseBasicAuthAccessControl::canManageUsers).isPresent();
     }
     // AuthenticationFilter already checked CRUD and table scope, including for table requests with cluster actions.
     return principal.isPresent();
   }
 
-  private static boolean canCreateUser(BasicAuthPrincipal principal) {
+  private static boolean canManageUsers(BasicAuthPrincipal principal) {
     if (principal instanceof ZkBasicAuthPrincipal zkPrincipal) {
       return zkPrincipal.hasPermission(RoleType.ADMIN, ComponentType.CONTROLLER);
     }

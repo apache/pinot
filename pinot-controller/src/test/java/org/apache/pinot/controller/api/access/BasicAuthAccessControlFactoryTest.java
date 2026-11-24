@@ -144,13 +144,18 @@ public class BasicAuthAccessControlFactoryTest {
   }
 
   @Test
-  public void testCreateUserAuthorization()
+  public void testUserMutationAuthorization()
       throws Exception {
     AccessControl zk = createZkAccessControl();
+    AccessControl file = createStaticAccessControl();
     HttpHeaders fullUser = headers(FULL_USER, FULL_PASSWORD);
-    assertFalse(zk.hasAccess(fullUser, TargetType.CLUSTER, null, Actions.Cluster.CREATE_USER));
-    assertTrue(zk.hasAccess(headers("admin", FULL_PASSWORD), TargetType.CLUSTER, null, Actions.Cluster.CREATE_USER));
-    assertTrue(createStaticAccessControl().hasAccess(fullUser, TargetType.CLUSTER, null, Actions.Cluster.CREATE_USER));
+    HttpHeaders admin = headers("admin", FULL_PASSWORD);
+    for (String action : List.of(Actions.Cluster.CREATE_USER, Actions.Cluster.UPDATE_USER,
+        Actions.Cluster.DELETE_USER)) {
+      assertFalse(zk.hasAccess(fullUser, TargetType.CLUSTER, null, action), action);
+      assertTrue(zk.hasAccess(admin, TargetType.CLUSTER, null, action), action);
+      assertTrue(file.hasAccess(fullUser, TargetType.CLUSTER, null, action), action);
+    }
   }
 
   @Test(dataProvider = "accessControls")
