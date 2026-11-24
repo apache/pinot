@@ -43,10 +43,10 @@ import static org.testng.Assert.assertTrue;
 
 /// Guards the fail path of [ClasspathClosureScanner].
 ///
-/// The scanner is the only part of the Java 11 verifier that can go red on a dependency bump, and both of its filters
+/// The scanner is the only part of the runtime verifier that can go red on a dependency bump, and both of its filters
 /// (`isLoadableClassEntry` and `readMajorVersion`) fail _open_ -- an input they do not recognise is treated
 /// as "not a violation". A regression in either therefore produces a permanently green CI job rather than a red one,
-/// which is worse than having no job at all. These tests pin the behaviour that keeps it honest, and need no Java 11
+/// which is worse than having no job at all. These tests pin the behaviour that keeps it honest, and need no older
 /// JVM, so they run in the normal unit test job.
 public class ClasspathClosureScannerTest {
   private static final int JAVA_11_FEATURE_VERSION = 11;

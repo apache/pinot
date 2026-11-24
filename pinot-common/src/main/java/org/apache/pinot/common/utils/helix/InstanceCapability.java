@@ -67,10 +67,6 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 /// clash with a capability of Pinot. Readers need no change: they read every capability that an instance advertises.
 ///
 /// Two capabilities are equal when their names are equal. Instances are immutable and thread-safe.
-///
-/// This class should be a `record`, but `pinot-common` compiles to Java 11 bytecode, and records need Java 16. Until
-/// that changes, it keeps the shape of a record and of an enum: the accessors use the record style (`name()`,
-/// `instanceType()`, `revision()`) instead of getters, and [#values()] and `name()` follow `Enum`.
 public final class InstanceCapability {
   // Declare the constants above this field: it reads them when the class initializes.
   private static final List<InstanceCapability> VALUES = checkUniqueNames(List.of());

@@ -27,7 +27,7 @@
     <version>1.7.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-java11-client-verifier</artifactId>
-  <name>Pinot Java 11 Client Verifier</name>
+  <name>Pinot Client and SPI Runtime Verifier</name>
   <url>https://pinot.apache.org/</url>
   <packaging>jar</packaging>
 
@@ -46,9 +46,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <!-- Load-bearing rather than copied boilerplate: .pinot_java11_client_compat.sh launches
-               this module's own classes on a Java 11 JVM, so its bytecode has to be Java 11 as well.
-               Hard-coded literal so -Djdk.version=21 on the CLI cannot silently bump the level. -->
+          <!-- The harness runs standalone SPI checks on Java 11 and client checks on Java 17. -->
           <release>11</release>
           <source>11</source>
           <target>11</target>
@@ -58,7 +56,7 @@
         <!--
           Writes the resolved runtime closure of this module (the union of the pinot-java-client and
           pinot-jdbc-client closures) to a file, so the CI driver script can hand exactly that
-          classpath to a Java 11 JVM.
+          classpath to a Java 17 JVM.
         -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -82,7 +80,7 @@
 
   <dependencies>
     <!-- The two consumer-facing clients. Depending on both makes this module's runtime closure the
-         union of theirs, which is what gets scanned for bytecode a Java 11 JVM cannot load. -->
+         union of theirs, which is scanned for bytecode a Java 17 JVM cannot load. -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-java-client</artifactId>
@@ -92,10 +90,10 @@
       <artifactId>pinot-jdbc-client</artifactId>
     </dependency>
 
-    <!-- The remaining Java-11-pinned modules. All four already arrive transitively, so declaring
+    <!-- The other modules exercised by the verifier. All four already arrive transitively, so declaring
          them changes nothing about the closure; it is done because the verifier imports them
          directly, and so that dropping one breaks the build instead of silently shrinking coverage.
-         Java11CompatibilityVerifier also asserts at runtime that all six are on the classpath. -->
+         ClientCompatibilityVerifier also asserts at runtime that all six are on the classpath. -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>

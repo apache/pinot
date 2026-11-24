@@ -17,81 +17,83 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-# Verifies that Pinot's Java-11-pinned client and SPI artifacts work on a Java 11 JVM.
-#
-# The build cannot run on Java 11 -- the root pom enforces requireJavaVersion [25,) and Pinot's
-# services have a genuine Java 25 floor. So this is necessarily a two-JDK job: build the artifacts
-# with the build JDK, then run the verifier under Java 11.
-#
-# Environment:
-#   JAVA11_HOME  Optional. Home of the JVM to verify against. Falls back to the
-#                JAVA_HOME_11_<arch> variables that GitHub-hosted runners export.
-#   MVN          Optional. Maven command, defaults to "mvn".
+# Build with JDK 25 and verify the clients on Java 17 and the standalone SPI artifacts on Java 11.
+# JAVA11_HOME and JAVA17_HOME may be set explicitly. GitHub-hosted runner variables are fallbacks.
+set -e
 
-TARGET_JAVA_VERSION=11
 VERIFIER_MODULE="pinot-java11-client-verifier"
-VERIFIER_MAIN_CLASS="org.apache.pinot.java11.Java11CompatibilityVerifier"
-MVN="${MVN:-mvn}"
+VERIFIER_CLASSES="${VERIFIER_MODULE}/target/classes"
+MVN="${MVN:-./mvnw}"
+SPI_MODULES=(pinot-spi pinot-segment-spi pinot-timeseries/pinot-timeseries-spi)
+JAVA11_HOME="${JAVA11_HOME:-${JAVA_HOME_11_X64:-${JAVA_HOME_11_ARM64:-}}}"
+JAVA17_HOME="${JAVA17_HOME:-${JAVA_HOME_17_X64:-${JAVA_HOME_17_ARM64:-}}}"
 
 # Build JDK, for the record.
 java -version
+for jdk_home in "${JAVA11_HOME}" "${JAVA17_HOME}"; do
+  if [ -z "${jdk_home}" ] || [ ! -x "${jdk_home}/bin/java" ]; then
+    echo "Set JAVA11_HOME and JAVA17_HOME to the SPI and client verification runtimes."
+    exit 1
+  fi
+  "${jdk_home}/bin/java" -version
+done
 
-# GitHub-hosted runners export JAVA_HOME_<version>_<arch> for every JDK that setup-java installed.
-# The arch suffix differs between x64 and arm64 runners, so try both rather than assuming.
-if [ -z "${JAVA11_HOME}" ]; then
-  JAVA11_HOME="${JAVA_HOME_11_X64:-${JAVA_HOME_11_ARM64:-}}"
-fi
-if [ -z "${JAVA11_HOME}" ]; then
-  echo "No Java ${TARGET_JAVA_VERSION} JVM found. Set JAVA11_HOME, or install one with actions/setup-java" \
-       "and pass its path through."
-  exit 1
-fi
-
-JAVA11_BIN="${JAVA11_HOME}/bin/java"
-if [ ! -x "${JAVA11_BIN}" ]; then
-  echo "Not an executable JVM launcher: ${JAVA11_BIN}"
-  exit 1
-fi
-"${JAVA11_BIN}" -version || exit 1
-
-# Build the verifier and everything it depends on, which is exactly the six Java-11-pinned modules
-# and the third-party closure underneath them. Linting is covered by the linter job, so skip it here.
+# Build the verifier and the client and SPI artifacts. The extra goal resolves each module's
+# runtime classpath independently using reactor artifacts. Linting runs in a separate job.
 #
 # -Dshade.phase.prop=none matters: pinot-java-client and pinot-jdbc-client each produce a ~150 MB
 # shaded jar, and shadedArtifactAttached=true means those jars never even appear on the runtime
-# classpath this job verifies. Without the flag the job spends minutes building them and then pushes
-# 300 MB into ~/.m2, which actions/cache uploads under a key the other Maven jobs share. Note that
-# -DskipShade=true is not enough: it only deactivates the pinot-jdbc-client profile, while
-# pinot-java-client sets shade.phase.prop=package unconditionally.
-${MVN} clean install -B -ntp -T1C -pl "${VERIFIER_MODULE}" -am \
+# classpath this job verifies. The standard client jar and its dependency classpath suffice here.
+# -DskipShade=true only deactivates the pinot-jdbc-client profile, so both require the phase override.
+"${MVN}" clean package dependency:build-classpath -B -ntp -T1C -pl "${VERIFIER_MODULE}" -am \
+  -DincludeScope=runtime -Dmdep.outputFile=target/spi-runtime-classpath.txt -Dmdep.regenerateFile=true \
   -DskipTests \
   -Dshade.phase.prop=none \
   -Dmaven.javadoc.skip=true \
   -Dlicense.skip=true \
   -Dcheckstyle.skip=true \
-  -Dspotless.check.skip=true || exit 1
+  -Dspotless.check.skip=true
 
-CLASSPATH_FILE="${VERIFIER_MODULE}/target/runtime-classpath.txt"
-if [ ! -s "${CLASSPATH_FILE}" ]; then
-  echo "Expected the build to write the resolved runtime closure to ${CLASSPATH_FILE}"
-  exit 1
-fi
+classpath_from_file() {
+  if [ ! -s "$1" ]; then
+    echo "Expected Maven to write the runtime classpath to $1" >&2
+    return 1
+  fi
+  cat "$1"
+}
 
-VERIFIER_CLASSPATH="${VERIFIER_MODULE}/target/classes:$(cat "${CLASSPATH_FILE}")"
-
-# Tracing off for the run itself: echoing a few hundred jar paths buries the verifier's own output.
+# Tracing off for the runs: echoing hundreds of jar paths would bury the verifier's report.
 set +x
-echo "Running ${VERIFIER_MAIN_CLASS} on Java ${TARGET_JAVA_VERSION} against a closure of" \
-     "$(tr ':' '\n' <<< "${VERIFIER_CLASSPATH}" | wc -l | tr -d ' ') classpath entries"
-
-# No --add-opens or -Dio.netty.tryReflectionSetAccessible here on purpose. Those flags exist in
-# Pinot's own launch scripts for JDK 17+, and adding them would paper over exactly the kind of
-# runtime breakage this job is meant to catch. The verifier asserts it is really running on Java
-# ${TARGET_JAVA_VERSION}, so a mis-wired JDK fails the job instead of passing it vacuously.
-if ! "${JAVA11_BIN}" -cp "${VERIFIER_CLASSPATH}" "${VERIFIER_MAIN_CLASS}" "${TARGET_JAVA_VERSION}"; then
-  # Hosted runners discard the workspace, so dump the closure that was verified while we still can.
-  echo
-  echo "Verification failed. The runtime closure that was verified:"
-  tr ':' '\n' <<< "${VERIFIER_CLASSPATH}"
+CLIENT_CLASSPATH="${VERIFIER_CLASSES}:$(classpath_from_file "${VERIFIER_MODULE}/target/runtime-classpath.txt")"
+echo "Verifying the Java and JDBC clients on Java 17"
+# Arrow's direct buffer access needs java.nio opened for applications using the classpath.
+if ! "${JAVA17_HOME}/bin/java" --add-opens=java.base/java.nio=ALL-UNNAMED -cp "${CLIENT_CLASSPATH}" \
+  org.apache.pinot.java11.ClientCompatibilityVerifier 17; then
+  echo "Client verification failed. The runtime classpath was:"
+  tr ':' '\n' <<< "${CLIENT_CLASSPATH}"
   exit 1
 fi
+
+for module in "${SPI_MODULES[@]}"; do
+  artifact_id="${module##*/}"
+  jars=()
+  for jar in "${module}/target/${artifact_id}-"*.jar; do
+    case "${jar}" in
+      *-sources.jar|*-javadoc.jar|*-tests.jar|*-shaded.jar) continue ;;
+    esac
+    if [ -f "${jar}" ]; then
+      jars+=("${jar}")
+    fi
+  done
+  if [ "${#jars[@]}" -ne 1 ]; then
+    echo "Expected exactly one main jar for ${artifact_id}, found ${#jars[@]}"
+    exit 1
+  fi
+  SPI_CLASSPATH="${VERIFIER_CLASSES}:${jars[0]}:$(classpath_from_file "${module}/target/spi-runtime-classpath.txt")"
+  echo "Verifying ${artifact_id} on Java 11"
+  if ! "${JAVA11_HOME}/bin/java" -cp "${SPI_CLASSPATH}" org.apache.pinot.java11.SpiCompatibilityVerifier "${artifact_id}"; then
+    echo "SPI verification failed. The runtime classpath was:"
+    tr ':' '\n' <<< "${SPI_CLASSPATH}"
+    exit 1
+  fi
+done
