@@ -164,9 +164,10 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public BrokerResponse handleExplainTimeSeriesRequest(String lang, String rawQueryParamString,
-      Map<String, String> queryParams) {
+      Map<String, String> queryParams, RequesterIdentity requesterIdentity, HttpHeaders httpHeaders) {
     if (_timeSeriesRequestHandler != null) {
-      return _timeSeriesRequestHandler.handleExplainTimeSeriesRequest(lang, rawQueryParamString, queryParams);
+      return _timeSeriesRequestHandler.handleExplainTimeSeriesRequest(lang, rawQueryParamString, queryParams,
+          requesterIdentity, httpHeaders);
     }
     throw new QueryException(QueryErrorCode.INTERNAL, "Time series query engine not enabled.");
   }
