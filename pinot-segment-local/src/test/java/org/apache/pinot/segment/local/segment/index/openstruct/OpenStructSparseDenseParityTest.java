@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -51,6 +52,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -94,11 +96,21 @@ public class OpenStructSparseDenseParityTest {
     children.put("tags", new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, true));
     // Declared INT, only populated by testTypeMismatchedValueDroppedFromBothTiers.
     children.put("count", new DimensionFieldSpec("count", FieldSpec.DataType.INT, true));
+    for (Map.Entry<String, DataType> typed : TYPED_KEYS.entrySet()) {
+      children.put(typed.getKey(), new DimensionFieldSpec(typed.getKey(), typed.getValue(), true));
+    }
     return new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true, children);
   }
 
+  private static final Map<String, DataType> TYPED_KEYS = Map.of("iv", DataType.INT, "lv", DataType.LONG,
+      "fv", DataType.FLOAT, "dv", DataType.DOUBLE, "bdv", DataType.BIG_DECIMAL, "bv", DataType.BOOLEAN,
+      "tv", DataType.TIMESTAMP);
+
   private static Map<String, Object> metricsForDoc(int docId) {
     Map<String, Object> m = new HashMap<>();
+    if (docId == 0 || docId == 1) {
+      m.put("bdv", new BigDecimal(docId == 0 ? "9223372036854775809" : "12345678901234567890.1234567890"));
+    }
     if (docId % 3 == 0) {
       m.put("region", docId % 6 == 0 ? "us" : "eu");
     }
@@ -160,6 +172,7 @@ public class OpenStructSparseDenseParityTest {
       OpenStructDataSource denseDs = (OpenStructDataSource) dense.getDataSource(METRICS);
       OpenStructDataSource sparseDs = (OpenStructDataSource) sparse.getDataSource(METRICS);
 
+      assertForwardValuesParity(denseDs, sparseDs, "bdv", DataType.BIG_DECIMAL);
       assertForwardValuesParity(denseDs, sparseDs, "region", FieldSpec.DataType.STRING);
       assertNullBitmapParity(denseDs, sparseDs, "region");
       assertForwardValuesParity(denseDs, sparseDs, "latencyMs", FieldSpec.DataType.LONG);
@@ -231,6 +244,8 @@ public class OpenStructSparseDenseParityTest {
         return fwd.getFloat(docId, ctx);
       case DOUBLE:
         return fwd.getDouble(docId, ctx);
+      case BIG_DECIMAL:
+        return fwd.getBigDecimal(docId, ctx);
       case STRING:
         return fwd.getString(docId, ctx);
       default:
@@ -487,6 +502,63 @@ public class OpenStructSparseDenseParityTest {
     } finally {
       seg1.destroy();
       seg2.destroy();
+    }
+  }
+
+  /// A sparse blob written outside the build (e.g. by an external source) holds values as they arrived, not as the
+  /// build would have converted them. Reading it must give what the dense tier gives for the same raw value: the
+  /// value the build's conversion produces, or absent where the build drops it. Oracle: the same raw values built
+  /// into dense columns, for every declared scalar type and a spread of fitting, lossy and unconvertible values.
+  @Test
+  public void testExternalSparseBlobReadsLikeTheDenseTier()
+      throws Exception {
+    // The decimal converts to INT 1 and LONG 9007199254740993. Parsing it as a double first changes both.
+    Object[] raw = {5, 7L, 1.5, 2.0, -0.0, "7", " 8 ", "1.9", "1e3", "abc", "", true, false, "true", 2,
+        Long.MAX_VALUE, 1.0e20, new BigDecimal("9007199254740993.1"),
+        new BigDecimal("1.000000059604644775390625000001"), "2026-01-01 00:00:00", List.of(1, 2)};
+    List<GenericRow> rows = new ArrayList<>(raw.length);
+    String[] blobs = new String[raw.length];
+    for (int docId = 0; docId < raw.length; docId++) {
+      Map<String, Object> m = new HashMap<>();
+      for (String key : TYPED_KEYS.keySet()) {
+        m.put(key, raw[docId]);
+      }
+      GenericRow row = new GenericRow();
+      row.putValue(METRICS, m);
+      rows.add(row);
+      blobs[docId] = JsonUtils.objectToString(m);
+    }
+    OpenStructIndexConfig denseConfig =
+        new OpenStructIndexConfig(false, null, null, TYPED_KEYS.keySet(), null, null, null, null, null, null, null);
+    ImmutableSegment dense = buildSegment(denseConfig, "dense-typed", rows);
+    try {
+      OpenStructDataSource denseDs = (OpenStructDataSource) dense.getDataSource(METRICS);
+      OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(new FakeStringForwardIndex(blobs),
+          FakeStringForwardIndex.nullVector(blobs), blobs.length);
+      for (Map.Entry<String, DataType> typed : TYPED_KEYS.entrySet()) {
+        String key = typed.getKey();
+        assertTrue(denseDs.isMaterialized(key), key);
+        DataSource denseKey = denseDs.getDataSource(key);
+        SparseKeyDataSource sparseKey =
+            new SparseKeyDataSource(new DimensionFieldSpec(key, typed.getValue(), true), blob, 0);
+        DataType storedType = typed.getValue().getStoredType();
+        ForwardIndexReader<?> denseFwd = denseKey.getForwardIndex();
+        ForwardIndexReader<?> sparseFwd = sparseKey.getForwardIndex();
+        try (ForwardIndexReaderContext denseCtx = denseFwd.createContext();
+            ForwardIndexReaderContext sparseCtx = sparseFwd.createContext()) {
+          for (int docId = 0; docId < raw.length; docId++) {
+            String where = key + " (" + typed.getValue() + ") <- " + raw[docId];
+            boolean denseNull = denseKey.getNullValueVector().isNull(docId);
+            assertEquals(sparseKey.getNullValueVector().isNull(docId), denseNull, where);
+            if (!denseNull) {
+              assertEquals(readValue(sparseKey, sparseFwd, docId, storedType, sparseCtx),
+                  readValue(denseKey, denseFwd, docId, storedType, denseCtx), where);
+            }
+          }
+        }
+      }
+    } finally {
+      dense.destroy();
     }
   }
 

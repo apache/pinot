@@ -316,6 +316,43 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
         "Ordinality filter should never be pushed below the UNNEST operator");
   }
 
+  @DataProvider(name = "unnestOverAggregateProvider")
+  public Object[][] provideUnnestOverAggregateQueries() {
+    return new Object[][]{
+        new Object[]{
+            "SELECT f.col1, u.v FROM (SELECT col1, ARRAY_AGG(col3, 'INT') AS r FROM a GROUP BY col1) f "
+                + "CROSS JOIN UNNEST(f.r) AS u(v)",
+            false
+        },
+        new Object[]{
+            "SELECT f.col1, u.v, u.o FROM (SELECT col1, ARRAY_AGG(col3, 'INT') AS r FROM a GROUP BY col1) f "
+                + "CROSS JOIN UNNEST(f.r) WITH ORDINALITY AS u(v, o) WHERE u.v > 0",
+            true
+        },
+        new Object[]{
+            // The array alias (col1) is also the name of a source column
+            "SELECT f.k, u.v FROM (SELECT a.col1 AS k, ARRAY_AGG(col3, 'INT') AS col1 FROM a GROUP BY a.col1) f "
+                + "CROSS JOIN UNNEST(f.col1) AS u(v)",
+            false
+        }
+    };
+  }
+
+  @Test(dataProvider = "unnestOverAggregateProvider")
+  public void testUnnestOverAggregateOutput(String sql, boolean withOrdinality) {
+    // After optimization the correlate's left input is the aggregate, whose output field is not named after the
+    // subquery alias (r). The correlated reference must still resolve to the aggregate column (index 1).
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1, "Expected exactly one UnnestNode for query: " + sql);
+    UnnestNode unnestNode = unnestNodes.get(0);
+    Assert.assertEquals(unnestNode.getArrayExprs().size(), 1);
+    RexExpression arrayExpr = unnestNode.getArrayExprs().get(0);
+    Assert.assertTrue(arrayExpr instanceof RexExpression.InputRef, "Expected InputRef, got: " + arrayExpr);
+    Assert.assertEquals(((RexExpression.InputRef) arrayExpr).getIndex(), 1);
+    assertOrdinality(unnestNode, withOrdinality);
+  }
+
   private static class AggregateFilterUnnestChain {
     private final FilterNode _filterNode;
     private final UnnestNode _unnestNode;

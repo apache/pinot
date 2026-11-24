@@ -271,6 +271,10 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     for (int i = 0; i < argSize; i++) {
       TransformFunction func = arguments.get(i);
       DataType dataType = func.getResultMetadata().getDataType();
+      // A whole OPEN_STRUCT argument supplies its JSON document through transformToStringValuesSV.
+      if (dataType == DataType.OPEN_STRUCT) {
+        dataType = DataType.STRING;
+      }
       if (_dataType != null) {
         _dataType = getCompatibleType(_dataType, dataType);
       } else {

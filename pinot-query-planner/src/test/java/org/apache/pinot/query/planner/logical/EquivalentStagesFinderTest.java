@@ -414,4 +414,65 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
     GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
     assertEquals(groupedStages.toString(), "[[0], [1], [2, 3]]");
   }
+
+  /// `rand() < 0.1` as a filter condition. `rand()` without arguments is volatile.
+  private static RexExpression randomSample() {
+    RexExpression.FunctionCall rand =
+        new RexExpression.FunctionCall(DataSchema.ColumnDataType.DOUBLE, "rand", List.of());
+    return new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, SqlKind.LESS_THAN.name(),
+        List.of(rand, new RexExpression.Literal(DataSchema.ColumnDataType.DOUBLE, 0.1)));
+  }
+
+  /// Two equal stages that call a volatile function come from two subqueries that must draw their own values, so they
+  /// are not equivalent. The stages above them are not equivalent either.
+  @Test
+  public void stagesThatCallVolatileFunctionsAreNotEquivalent() {
+    when(
+        join(
+            exchange(1, aggregate(exchange(2, filter(tableScan("T1"), randomSample())), List.of())),
+            exchange(3, aggregate(exchange(4, filter(tableScan("T1"), randomSample())), List.of()))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2], [3], [4]]");
+  }
+
+  /// `rand(seed)` is deterministic, so the same equal stages are equivalent.
+  @Test
+  public void stagesThatCallSeededRandAreEquivalent() {
+    RexExpression.FunctionCall seededRand = new RexExpression.FunctionCall(DataSchema.ColumnDataType.DOUBLE, "rand",
+        List.of(new RexExpression.Literal(DataSchema.ColumnDataType.LONG, 42L)));
+    RexExpression threshold = new RexExpression.Literal(DataSchema.ColumnDataType.DOUBLE, 0.1);
+    RexExpression condition = new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN,
+        SqlKind.LESS_THAN.name(), List.of(seededRand, threshold));
+    when(
+        join(
+            exchange(1, aggregate(exchange(2, filter(tableScan("T1"), condition)), List.of())),
+            exchange(3, aggregate(exchange(4, filter(tableScan("T1"), condition)), List.of()))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1, 3], [2, 4]]");
+  }
+
+  /// A volatile call nested inside another expression also makes the stage volatile.
+  @Test
+  public void nestedVolatileCallsAreFound() {
+    RexExpression.FunctionCall rand =
+        new RexExpression.FunctionCall(DataSchema.ColumnDataType.DOUBLE, "rand", List.of());
+    RexExpression nested = new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, SqlKind.AND.name(),
+        List.of(new RexExpression.Literal(DataSchema.ColumnDataType.BOOLEAN, 1),
+            new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, SqlKind.GREATER_THAN.name(),
+                List.of(new RexExpression.FunctionCall(DataSchema.ColumnDataType.DOUBLE, "plus",
+                    List.of(rand, new RexExpression.Literal(DataSchema.ColumnDataType.DOUBLE, 1.0))),
+                    new RexExpression.Literal(DataSchema.ColumnDataType.DOUBLE, 1.5)))));
+    when(
+        join(
+            exchange(1, filter(tableScan("T1"), nested)),
+            exchange(2, filter(tableScan("T1"), nested))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]");
+  }
 }

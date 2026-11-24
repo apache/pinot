@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import javax.annotation.Nullable;
 
 
 public class NonNativePinotDataBuffer extends PinotDataBuffer {
@@ -228,6 +229,12 @@ public class NonNativePinotDataBuffer extends PinotDataBuffer {
   public void readFrom(long offset, File file, long srcOffset, long size)
       throws IOException {
     _nativeBuffer.readFrom(offset, file, srcOffset, size);
+  }
+
+  @Override
+  @Nullable
+  public ByteBuffer tryViewAsByteBuffer(long offset, int size, ByteOrder byteOrder) {
+    return _nativeBuffer.tryViewAsByteBuffer(offset, size, byteOrder);
   }
 
   @Override

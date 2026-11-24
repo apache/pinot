@@ -687,6 +687,35 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
+  public void testBatchReloadRecordsFailureAndContinuesOtherSegments()
+      throws Exception {
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    SegmentDataManager failingSegment = mock(SegmentDataManager.class);
+    SegmentDataManager successfulSegment = mock(SegmentDataManager.class);
+    when(failingSegment.getSegmentName()).thenReturn("failedSegment");
+    when(successfulSegment.getSegmentName()).thenReturn("successfulSegment");
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(DEFAULT_TABLE_CONFIG, SCHEMA);
+    IOException failure = new IOException("reload failed");
+    doThrow(failure).when(tableDataManager).reloadSegment(failingSegment, indexLoadingConfig, false);
+    doAnswer(invocation -> null).when(tableDataManager).reloadSegment(successfulSegment, indexLoadingConfig, false);
+
+    try {
+      RuntimeException exception = expectThrows(RuntimeException.class, () -> tableDataManager.reloadSegments(
+          List.of(failingSegment, successfulSegment), indexLoadingConfig, false, "reloadJob"));
+      assertSame(exception.getCause(), failure);
+      assertTrue(exception.getMessage().contains("1/2"), exception.getMessage());
+      assertTrue(exception.getMessage().contains("failedSegment"), exception.getMessage());
+      verify(tableDataManager).reloadSegment(successfulSegment, indexLoadingConfig, false);
+      verify(tableDataManager._reloadJobStatusCache).recordFailure("reloadJob", "failedSegment", failure);
+      verify(tableDataManager._reloadJobStatusCache, never()).recordFailure(eq("reloadJob"), eq("successfulSegment"),
+          any());
+    } finally {
+      tableDataManager._segmentReloadExecutor.shutdownNow();
+      assertTrue(tableDataManager._segmentReloadExecutor.awaitTermination(5, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
   public void testReloadOnlyIfNeededSkipsUpToDateSegment()
       throws Exception {
     File indexDir = createSegment(SegmentVersion.v3, 5);

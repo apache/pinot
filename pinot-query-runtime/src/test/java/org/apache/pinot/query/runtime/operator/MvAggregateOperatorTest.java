@@ -430,7 +430,7 @@ public class MvAggregateOperatorTest {
     assertEquals(statMap.getLong(AggregateOperator.StatKey.NUM_GROUPS), 2);
   }
 
-  /// The stats are reported under the MV aggregate type, with the aggregate stat keys.
+  /// The stats are reported with the type and the stat keys of the plain aggregate.
   @Test
   public void testStatsType() {
     DataSchema inSchema = new DataSchema(new String[]{"mv"}, new ColumnDataType[]{STRING_ARRAY});

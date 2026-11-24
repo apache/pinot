@@ -661,7 +661,8 @@ public class PinotSegmentRestletResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the server metadata for all table segments",
-      notes = "Get the server metadata for all table segments")
+      notes = "Get the server metadata for all table segments. Rejected when segment replicas x (1 + columns) exceeds "
+          + "maxEntries")
   public String getServerMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
@@ -669,8 +670,22 @@ public class PinotSegmentRestletResource {
       List<String> segments,
       @ApiParam(value = "Columns to include (use '*' to include all)", allowMultiple = true) @QueryParam("columns")
       List<String> columns,
+      @ApiParam(value = "Max entries to fetch: one per segment plus one per (segment, column), replicas included. "
+          + "Defaults to controller.segment.metadata.default.entry.limit, capped by "
+          + "controller.segment.metadata.max.entry.limit")
+      @QueryParam("maxEntries") @Nullable Integer maxEntries,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
+    if (maxEntries == null) {
+      maxEntries = _controllerConf.getSegmentMetadataDefaultEntryLimit();
+    } else {
+      int limit = _controllerConf.getSegmentMetadataMaxEntryLimit();
+      if (maxEntries <= 0 || maxEntries > limit) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("maxEntries must be in (0, %d] (%s), got: %d", limit,
+                ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT, maxEntries), Status.BAD_REQUEST);
+      }
+    }
     String segmentCount = segments.isEmpty() ? "all" : String.valueOf(segments.size());
     LOGGER.info("Received a request to fetch metadata for {} segments for table {}", segmentCount, tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -679,9 +694,10 @@ public class PinotSegmentRestletResource {
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     String segmentsMetadata;
     try {
-      JsonNode segmentsMetadataJson = getSegmentsMetadataFromServer(tableNameWithType, columns, segments);
+      JsonNode segmentsMetadataJson =
+          getSegmentsMetadataFromServer(tableNameWithType, columns, segments, maxEntries);
       segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
-    } catch (InvalidConfigException e) {
+    } catch (InvalidConfigException | IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
     } catch (IOException ioe) {
       throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
@@ -916,13 +932,15 @@ public class PinotSegmentRestletResource {
   /// @param tableNameWithType name of the table along with its type
   /// @param columns name of the columns
   /// @param segments name of the segments to include in metadata
+  /// @param maxEntries max entries to fetch, one per segment plus one per (segment, column), replicas included
   /// @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
-  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, List<String> columns, List<String> segments)
+  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, List<String> columns, List<String> segments,
+      int maxEntries)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader.getSegmentsMetadata(tableNameWithType, columns, segments,
-        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, maxEntries);
   }
 
   @POST

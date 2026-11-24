@@ -18,20 +18,36 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -39,11 +55,15 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class PinotSegmentRestletResourceTest {
@@ -215,6 +235,92 @@ public class PinotSegmentRestletResourceTest {
     assertTrue(result.containsKey("seg0"));
     assertTrue(result.containsKey("seg2"));
     assertTrue(result.containsKey("seg3"));
+  }
+
+  /// 1 segment x 3 replicas without columns is 3 entries. Every case is rejected before any server is contacted.
+  @Test
+  public void testGetServerMetadataEntryLimits()
+      throws Exception {
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setProperty(ControllerConf.SEGMENT_METADATA_DEFAULT_ENTRY_LIMIT, 2);
+    controllerConf.setProperty(ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT, 10);
+    _pinotSegmentRestletResource._controllerConf = controllerConf;
+    when(_pinotHelixResourceManager.getExistingTableNamesWithType(eq("testTable"), any()))
+        .thenReturn(List.of("testTable_OFFLINE"));
+    when(_pinotHelixResourceManager.getServerToSegmentsMap("testTable_OFFLINE"))
+        .thenReturn(Map.of("server0", List.of("seg0"), "server1", List.of("seg0"), "server2", List.of("seg0")));
+
+    // Omitted: the configured default applies
+    assertServerMetadataRejected(null, "above the limit of 2");
+    // Explicit: overrides the default, so a smaller value applies too
+    assertServerMetadataRejected(1, "above the limit of 1");
+    // Explicit: must be positive and at most the configured max
+    assertServerMetadataRejected(0, ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT);
+    assertServerMetadataRejected(11, ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT);
+    verify(_pinotHelixResourceManager, never()).getDataInstanceAdminEndpoints(anySet());
+  }
+
+  /// 1 segment x 3 replicas without columns is 3 entries. An explicit maxEntries above the configured default and
+  /// equal to the configured max is accepted, so the max is inclusive.
+  @Test
+  public void testGetServerMetadataAtMaxEntryLimit()
+      throws Exception {
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setProperty(ControllerConf.SEGMENT_METADATA_DEFAULT_ENTRY_LIMIT, 2);
+    controllerConf.setProperty(ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT, 3);
+    _pinotSegmentRestletResource._controllerConf = controllerConf;
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    _pinotSegmentRestletResource._executor = executor;
+    _pinotSegmentRestletResource._connectionManager = connectionManager;
+    List<HttpServer> httpServers = new ArrayList<>();
+    try {
+      BiMap<String, String> serverToEndpoint = HashBiMap.create();
+      for (String server : List.of("server0", "server1", "server2")) {
+        HttpServer httpServer = startServer("seg0");
+        httpServers.add(httpServer);
+        serverToEndpoint.put(server, "http://localhost:" + httpServer.getAddress().getPort());
+      }
+      when(_pinotHelixResourceManager.getExistingTableNamesWithType(eq("testTable"), any()))
+          .thenReturn(List.of("testTable_OFFLINE"));
+      when(_pinotHelixResourceManager.getServerToSegmentsMap("testTable_OFFLINE"))
+          .thenReturn(Map.of("server0", List.of("seg0"), "server1", List.of("seg0"), "server2", List.of("seg0")));
+      when(_pinotHelixResourceManager.getDataInstanceAdminEndpoints(anySet())).thenReturn(serverToEndpoint);
+
+      String metadata = _pinotSegmentRestletResource.getServerMetadata("testTable", "OFFLINE", List.of(), List.of(),
+          3, mock(HttpHeaders.class));
+
+      assertEquals(JsonUtils.stringToJsonNode(metadata).get("seg0").get("segmentName").asText(), "seg0");
+    } finally {
+      httpServers.forEach(server -> server.stop(0));
+      executor.shutdownNow();
+      connectionManager.close();
+    }
+  }
+
+  /// Starts a fake server whose table-level metadata endpoint returns metadata for the given segment.
+  private static HttpServer startServer(String segment)
+      throws IOException {
+    byte[] body = JsonUtils.objectToString(
+            JsonUtils.newObjectNode().set(segment, JsonUtils.newObjectNode().put("segmentName", segment)))
+        .getBytes(StandardCharsets.UTF_8);
+    HttpServer httpServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    httpServer.createContext("/tables/testTable_OFFLINE/segments/metadata", exchange -> {
+      exchange.sendResponseHeaders(200, body.length);
+      try (OutputStream out = exchange.getResponseBody()) {
+        out.write(body);
+      }
+    });
+    httpServer.start();
+    return httpServer;
+  }
+
+  private void assertServerMetadataRejected(@Nullable Integer maxEntries, String expectedMessage) {
+    ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
+        () -> _pinotSegmentRestletResource.getServerMetadata("testTable", "OFFLINE", List.of(), List.of(), maxEntries,
+            mock(HttpHeaders.class)));
+    assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    assertTrue(e.getMessage().contains(expectedMessage), e.getMessage());
   }
 
   private List<String> getSegmentForPartition(String tableName, int partitionID, int sequenceNumberOffset,

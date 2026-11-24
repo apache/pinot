@@ -21,6 +21,8 @@ package org.apache.pinot.controller.util;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -40,6 +43,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.controller.api.resources.TableStaleSegmentResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -128,11 +132,28 @@ public class TableMetadataReader {
 
   /// This api takes in list of segments for which we need the metadata.
   /// This calls the server to get the metadata for all segments instead of making a call per segment.
+  /// Does not limit the number of entries fetched.
   public JsonNode getSegmentsMetadata(String tableNameWithType, @Nullable List<String> columns,
       @Nullable List<String> segments, int timeoutMs)
       throws InvalidConfigException, IOException {
+    return getSegmentsMetadata(tableNameWithType, columns, segments, timeoutMs, Integer.MAX_VALUE);
+  }
+
+  /// Same as above, but rejects the request before calling any server when it would fetch more than
+  /// `maxEntries` entries: one per segment plus one per (segment, column), replicas included.
+  public JsonNode getSegmentsMetadata(String tableNameWithType, @Nullable List<String> columns,
+      @Nullable List<String> segments, int timeoutMs, int maxEntries)
+      throws InvalidConfigException, IOException {
     Map<String, List<String>> serverToSegs =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    long numSegments = countSegmentReplicas(serverToSegs, segments);
+    int numColumns = getNumColumns(tableNameWithType, columns);
+    long numEntries = numSegments * (1 + numColumns);
+    Preconditions.checkArgument(numEntries <= maxEntries,
+        "Request for table %s would fetch %s metadata entries (%s segments, replicas included, x (1 + %s columns)), "
+            + "above the limit of %s. Serving it could run the controller or servers out of heap memory. Narrow it "
+            + "with 'segments' or 'columns'", tableNameWithType, numEntries, numSegments, numColumns,
+        maxEntries);
     BiMap<String, String> endpoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegs.keySet());
     ServerSegmentMetadataReader reader =
@@ -161,6 +182,34 @@ public class TableMetadataReader {
       node.properties().forEach(entry -> aggregatedNode.set(entry.getKey(), entry.getValue()));
     }
     return aggregatedNode;
+  }
+
+  /// Columns each segment's metadata will include: none requested means segment-level metadata only (0 columns),
+  /// `*` means every schema column.
+  @VisibleForTesting
+  int getNumColumns(String tableNameWithType, @Nullable List<String> columns)
+      throws InvalidConfigException {
+    if (CollectionUtils.isEmpty(columns)) {
+      return 0;
+    }
+    if (!columns.contains("*")) {
+      return columns.size();
+    }
+    Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+    if (schema == null) {
+      throw new InvalidConfigException("Failed to find schema for table: " + tableNameWithType);
+    }
+    return schema.getColumnNames().size();
+  }
+
+  /// Counts every replica of each requested segment (all hosted segments when none are requested).
+  @VisibleForTesting
+  static long countSegmentReplicas(Map<String, List<String>> serverToSegments, @Nullable List<String> segments) {
+    Set<String> requested = CollectionUtils.isEmpty(segments) ? null : new HashSet<>(segments);
+    return serverToSegments.values().stream()
+        .flatMap(List::stream)
+        .filter(segment -> requested == null || requested.contains(segment))
+        .count();
   }
 
   /// This method retrieves the full segment metadata for a given table and segment

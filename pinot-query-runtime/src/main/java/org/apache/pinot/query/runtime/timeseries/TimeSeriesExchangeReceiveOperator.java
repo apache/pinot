@@ -151,6 +151,9 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       Object result = poll(remainingTimeMs);
       if (result == null) {
         // TODO: List host:port of unresponsive servers in the exception message.
+        if (index == 0) {
+          timeBuckets = _timeBuckets;
+        }
         timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
           "Timed out waiting for response. Waited: "
             + remainingTimeMs
@@ -258,6 +261,9 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       Object result = poll(remainingTimeMs);
       // TODO: List host:port of unresponsive servers in the exception message.
       if (result == null) {
+        if (index == 0) {
+          timeBuckets = _timeBuckets;
+        }
         timeoutException = new QueryException(QueryErrorCode.SERVER_NOT_RESPONDING,
             "Timed out waiting for response. Waited: "
                 + remainingTimeMs

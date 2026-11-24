@@ -176,6 +176,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.TEXT_MATCH, TextMatchTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TEXT_SCORE, TextScoreTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.EQUALS, EqualsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.NOT_EQUALS, NotEqualsTransformFunction.class);
@@ -368,7 +369,9 @@ public class TransformFunctionFactory {
               throw new BadQueryRequestException(String.format("Unsupported function: %s", functionName));
             }
           }
-          transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
+          transformFunction = BitwiseTransformFunction.supports(functionInfo, argumentDataTypes)
+              ? new BitwiseTransformFunction(functionInfo.getMethod())
+              : new ScalarTransformFunctionWrapper(functionInfo);
         }
 
         try {

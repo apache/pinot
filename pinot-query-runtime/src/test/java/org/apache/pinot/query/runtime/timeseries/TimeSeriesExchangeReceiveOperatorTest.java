@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
@@ -67,6 +68,21 @@ public class TimeSeriesExchangeReceiveOperatorTest {
     }
     assertThrows(IllegalArgumentException.class, () -> new TimeSeriesExchangeReceiveOperator(blockingQueue,
         deadlineMs, 0, SUM_AGG_INFO, SERIES_BUILDER_FACTORY, null));
+  }
+
+  @Test
+  public void testNoServerResponsePreservesTimeoutAndTimeBuckets() {
+    for (AggInfo aggInfo : new AggInfo[]{SUM_AGG_INFO, null}) {
+      TimeSeriesExchangeReceiveOperator operator = new TimeSeriesExchangeReceiveOperator(new ArrayBlockingQueue<>(1),
+          0L, NUM_SERVERS_QUERIED, aggInfo, SERIES_BUILDER_FACTORY, TIME_BUCKETS);
+
+      TimeSeriesBlock block = operator.nextBlock();
+
+      assertEquals(block.getTimeBuckets(), TIME_BUCKETS);
+      assertTrue(block.getSeriesMap().isEmpty());
+      assertEquals(block.getExceptions().size(), 1);
+      assertEquals(block.getExceptions().get(0).getErrorCode(), QueryErrorCode.SERVER_NOT_RESPONDING);
+    }
   }
 
   @Test

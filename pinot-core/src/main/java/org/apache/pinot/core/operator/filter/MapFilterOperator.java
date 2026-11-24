@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
@@ -39,6 +40,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvide
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -76,8 +78,8 @@ public class MapFilterOperator extends BaseFilterOperator {
     _predicate = predicate;
 
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
-    if (arguments.size() != 2) {
-      throw new IllegalStateException("Expected two arguments (column name and key name), found: " + arguments.size());
+    if (arguments.size() != 2 && arguments.size() != 3) {
+      throw new IllegalStateException("Expected column, key and optional result type, found: " + arguments.size());
     }
 
     _columnName = arguments.get(0).getIdentifier();
@@ -86,13 +88,14 @@ public class MapFilterOperator extends BaseFilterOperator {
     // Try dispatch paths in priority order
     DataSource columnDs = indexSegment.getDataSourceNullable(_columnName);
 
-    BaseFilterOperator perKey = tryPerKeyIndex(columnDs, queryContext, numDocs);
+    String plannedType = arguments.size() == 3 ? arguments.get(2).getLiteral().getStringValue() : null;
+    BaseFilterOperator perKey = tryPerKeyIndex(columnDs, queryContext, numDocs, plannedType);
     if (perKey != null) {
       _delegate = perKey;
       return;
     }
 
-    JsonMatchFilterOperator jsonOp = tryJsonIndex(columnDs, numDocs);
+    JsonMatchFilterOperator jsonOp = plannedType == null ? tryJsonIndex(columnDs, numDocs) : null;
     if (jsonOp != null) {
       _delegate = jsonOp;
       _delegateType = DelegateType.JSON_MATCH;
@@ -104,12 +107,20 @@ public class MapFilterOperator extends BaseFilterOperator {
   }
 
   @Nullable
-  private BaseFilterOperator tryPerKeyIndex(@Nullable DataSource columnDs, QueryContext queryContext, int numDocs) {
+  private BaseFilterOperator tryPerKeyIndex(@Nullable DataSource columnDs, QueryContext queryContext, int numDocs,
+      @Nullable String plannedType) {
     if (!(columnDs instanceof OpenStructDataSource)) {
       return null;
     }
     OpenStructDataSource osDs = (OpenStructDataSource) columnDs;
     DataSource keyDs = osDs.getDataSource(_keyName);
+    if (plannedType != null) {
+      DataSourceMetadata metadata = keyDs.getDataSourceMetadata();
+      if (!ColumnDataType.fromDataType(metadata.getDataType(), metadata.isSingleValue()).name().equals(plannedType)) {
+        // Per-key indexes compare the segment type. The expression scan converts each key to its planned type first.
+        return null;
+      }
+    }
     // Among unmaterialized keys only a sparse virtual source lacks a dictionary; an absent key folds through its
     // single-entry dictionary, which is cheaper on the per-key path than consulting the blob's JSON index
     if (!osDs.isMaterialized(_keyName) && keyDs.getDictionary() == null) {
@@ -163,7 +174,7 @@ public class MapFilterOperator extends BaseFilterOperator {
   @Nullable
   private BaseFilterOperator trySparseJsonIndex(OpenStructDataSource osDs, DataSource sparseKeyDs,
       QueryContext queryContext, int numDocs) {
-    JsonIndexReader jsonIndex = osDs.getSparseJsonIndex();
+    JsonIndexReader jsonIndex = osDs.getSparseJsonIndex(_keyName);
     if (jsonIndex == null || !servesKey(jsonIndex)) {
       return null;
     }

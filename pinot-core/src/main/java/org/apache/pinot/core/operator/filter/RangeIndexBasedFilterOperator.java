@@ -101,10 +101,12 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
     if (partialMatches == null) {
       return matches != null ? BitmapDocIdSet.create(matches, _numDocs) : EmptyDocIdSet.unscanned();
     }
-    // Need to scan the first and last range as they might be partially matched
+    // Need to scan the first and last range as they might be partially matched. Scan without null handling because
+    // BaseColumnFilterOperator applies the null semantics to the combined result, and doing it in the scan as well
+    // wraps the scan result into a doc id set whose iterator is not a ScanBasedDocIdIterator.
     ScanBasedFilterOperator scanBasedFilterOperator =
         new ScanBasedFilterOperator(_queryContext, _predicateEvaluator, _dataSource, _numDocs);
-    BlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getTrues();
+    BlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getNextBlockWithoutNullHandling();
     MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(partialMatches);
     if (matches != null) {
       docIds.or(matches);

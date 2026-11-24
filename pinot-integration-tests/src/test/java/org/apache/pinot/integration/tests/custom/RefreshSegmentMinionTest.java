@@ -360,7 +360,8 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
     waitForServerSegmentDownload(aVoid -> {
       try {
         JsonNode response = postQuery("SELECT " + LONG_COL + " FROM " + TABLE_NAME + " LIMIT 10");
-        return response.get("resultTable").get("dataSchema").get("columnDataTypes").toString().contains("FLOAT");
+        // The result can be absent while the server is still loading refreshed segments.
+        return "FLOAT".equals(response.path("resultTable").path("dataSchema").path("columnDataTypes").path(0).asText());
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

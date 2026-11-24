@@ -665,10 +665,19 @@ public class CommonConstants {
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
     public static final boolean DEFAULT_INFER_PARTITION_HINT = false;
 
-    /// Whether to use spools in multistage query engine by default.
+    /// The default spool mode of the multistage query engine: `off`, `auto` or `on`. `false` and `no` are aliases of
+    /// `off`, and `true` and `yes` are aliases of `on`.
+    ///
+    /// - `off` never shares a stage between consumers.
+    /// - `auto` shares a stage only when the planner can prove that the sharing cannot block the query.
+    /// - `on` shares every equivalent stage that the planner supports, without that safety check.
+    ///
+    /// Only the default planner applies spools. With [Request.QueryOptionKey#USE_PHYSICAL_OPTIMIZER] the mode is
+    /// ignored.
+    ///
     /// This value can always be overridden by [Request.QueryOptionKey#USE_SPOOLS] query option
     public static final String CONFIG_OF_SPOOLS = "pinot.broker.multistage.spools";
-    public static final boolean DEFAULT_OF_SPOOLS = false;
+    public static final String DEFAULT_SPOOLS_MODE = "auto";
 
     /// Whether the multistage query engine prunes unused input (passthrough) columns - notably the unnested source
     /// array - from the UNNEST output by default. This value can always be overridden by the
@@ -1050,7 +1059,12 @@ public class CommonConstants {
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";
+        /// The spool mode for the query: `off`, `auto` or `on` (`false`/`no` and `true`/`yes` are aliases).
+        /// See [Broker#CONFIG_OF_SPOOLS].
         public static final String USE_SPOOLS = "useSpools";
+        /// When true, the broker response carries a `spools` entry in `responseMetadata` that lists each spool the
+        /// planner considered and whether it applied it.
+        public static final String SPOOLS_FEEDBACK = "spoolsFeedback";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
         // When true, the multi-stage planner prunes input (passthrough) columns - notably the unnested source array -
         // from the UNNEST output when they are not referenced downstream, avoiding copying them into every exploded
@@ -1104,6 +1118,10 @@ public class CommonConstants {
         // Query option key used to enable a given set of defaultly disabled rules
         public static final String USE_PLANNER_RULES = "usePlannerRules";
 
+        /// Keep adjacent inner equijoins with broadcast build sides in one multi-stage worker.
+        /// Unguarded spooling (`useSpools=on` or `true`) takes precedence and keeps the joins in separate stages.
+        public static final String FUSE_BROADCAST_JOINS = "fuseBroadcastJoins";
+
         public static final String ALLOW_REVERSE_ORDER = "allowReverseOrder";
         public static final boolean DEFAULT_ALLOW_REVERSE_ORDER = false;
 
@@ -1121,6 +1139,9 @@ public class CommonConstants {
         public static final String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mseMaxInitialResultHolderCapacity";
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
+
+        /// Maximum local workers for a plain randomly distributed OFFLINE scan routed to one server (1–16, default 1).
+        public static final String LEAF_STAGE_WORKERS_PER_SERVER = "leafStageWorkersPerServer";
 
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
@@ -1311,6 +1332,10 @@ public class CommonConstants {
         /// Controls whether HNSW uses a bounded top-K collector queue. Defaults to true.
         /// Setting false uses an unbounded per-query collector and requires vectorEfSearch.
         public static final String VECTOR_USE_BOUNDED_QUEUE = "vectorUseBoundedQueue";
+
+        /// Allows `cosineDistance` to use approximate scores from a paired COSINE vector index search.
+        /// This can change projected values and their ordering. Defaults to false.
+        public static final String VECTOR_APPROXIMATE_DISTANCE = "vectorApproximateDistance";
       }
 
       public static class QueryOptionValue {
@@ -3330,12 +3355,19 @@ public class CommonConstants {
   /// User can config different configuration for query and ingestion (table creation and update) static analyzer.
   /// The all configuration is the default configuration for both query and ingestion static analyzer.
   public static class Groovy {
-    /// Cluster-only switch for ingestion Groovy. Query Groovy remains independently controlled.
+    /// Cluster-wide ingestion policy for controllers, servers and minions.
+    public static final String INGESTION_GROOVY_DISABLED = "pinot.groovy.ingestion.disabled";
+    /// Legacy cluster key used by controllers when the role-neutral key is absent.
     public static final String DISABLE_INGESTION_GROOVY = "controller.disable.ingestion.groovy";
     public static final boolean DEFAULT_DISABLE_INGESTION_GROOVY = true;
     public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.groovy.all.static.analyzer";
     public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.groovy.query.static.analyzer";
     public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
+
+    public static boolean isControllerIngestionGroovyDisabled(Map<String, String> clusterConfigs) {
+      String value = clusterConfigs.get(INGESTION_GROOVY_DISABLED);
+      return isIngestionGroovyDisabled(value != null ? value : clusterConfigs.get(DISABLE_INGESTION_GROOVY));
+    }
 
     /// Only an explicit false enables ingestion Groovy; absent or malformed values fail closed.
     public static boolean isIngestionGroovyDisabled(@Nullable String value) {
