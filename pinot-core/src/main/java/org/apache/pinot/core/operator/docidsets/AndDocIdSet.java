@@ -31,7 +31,9 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RestrictedScanDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.core.util.SortedRangeIntersection;
@@ -55,7 +57,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
   // Keep the scan based BlockDocIdSets to be accessed when collecting query execution stats
   private final AtomicReference<List<BlockDocIdSet>> _scanBasedDocIdSets = new AtomicReference<>();
   private final boolean _cardinalityBasedRankingForScan;
-  private final boolean _restrictionPushdownEnabled;
+  private final AndRestrictionPushdown _restrictionPushdown;
   private List<BlockDocIdSet> _docIdSets;
   private volatile long _numEntriesScannedInFilter;
 
@@ -64,27 +66,39 @@ public final class AndDocIdSet implements BlockDocIdSet {
     this(docIdSets, queryOptions, false);
   }
 
-  /// @param restrictionPushdownEnabled whether the matching document ids may be handed to the composite (AND/OR/NOT)
-  ///                                   children. Resolved once per query from the `andRestrictionPushdown` query
-  ///                                   option and the server default, see `QueryContext`.
+  /// @param restrictionPushdownEnabled `true` for [AndRestrictionPushdown#EAGER], `false` for
+  ///                                   [AndRestrictionPushdown#OFF]
   public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions,
       boolean restrictionPushdownEnabled) {
+    this(docIdSets, queryOptions, AndRestrictionPushdown.of(restrictionPushdownEnabled));
+  }
+
+  /// @param restrictionPushdown how the matching document ids are handed to the other children. Resolved once per
+  ///                            query from the `andRestrictionPushdownMode` query option and the server default, see
+  ///                            `QueryContext#getAndRestrictionPushdown()`. `null` means
+  ///                            [AndRestrictionPushdown#OFF]: a mocked `QueryContext` returns `null` where the
+  ///                            boolean it replaces returned `false`.
+  public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions,
+      @Nullable AndRestrictionPushdown restrictionPushdown) {
     _docIdSets = docIdSets;
     _cardinalityBasedRankingForScan =
         queryOptions != null && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
-    _restrictionPushdownEnabled = restrictionPushdownEnabled;
+    _restrictionPushdown = restrictionPushdown != null ? restrictionPushdown : AndRestrictionPushdown.OFF;
   }
 
   @Override
   public BlockDocIdIterator iterator() {
     List<BlockDocIdSet> docIdSets = _docIdSets;
     Preconditions.checkState(docIdSets != null, "iterator() called on an already consumed AndDocIdSet");
-    return buildIterator(docIdSets);
+    return buildIterator(docIdSets, true);
   }
 
-  /// Builds the iterator over the given children and consumes this DocIdSet. [#applyAnd] passes the children with
-  /// the candidate set prepended, which is why they are not read from `_docIdSets` here.
-  private BlockDocIdIterator buildIterator(List<BlockDocIdSet> docIdSets) {
+  /// Builds the iterator over the given children and consumes this DocIdSet. [#applyAnd] and [#restrictedIterator]
+  /// pass the children with the candidate set prepended, which is why they are not read from `_docIdSets` here.
+  ///
+  /// @param streamingAllowed whether the result may be a lazy iterator under the streaming push-down. [#applyAnd]
+  ///                         materializes its result anyway, so it does not stream.
+  private BlockDocIdIterator buildIterator(List<BlockDocIdSet> docIdSets, boolean streamingAllowed) {
     int numDocIdSets = docIdSets.size();
     // NOTE: Keep the order of BlockDocIdSets to preserve the order decided within FilterOperatorUtils.
     // TODO: Consider deciding the order based on the stats of BlockDocIdIterators
@@ -101,7 +115,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
 
     for (int i = 0; i < numDocIdSets; i++) {
       BlockDocIdSet docIdSet = docIdSets.get(i);
-      if (_restrictionPushdownEnabled && docIdSet.isApplyAndDeferrable()) {
+      if (_restrictionPushdown.isEnabled() && docIdSet.isApplyAndDeferrable()) {
         // NOTE: Do not call iterator() here. That evaluates the whole subtree over the segment, which is exactly what
         //       the push-down below avoids.
         restrictableDocIdSets.add(docIdSet);
@@ -194,6 +208,10 @@ public final class AndDocIdSet implements BlockDocIdSet {
           docIds = mutableDocIds;
         }
       }
+      if (streamingAllowed && shouldStream(docIds, numScanBasedDocIdIterators, numRestrictableDocIdSets)) {
+        return buildStreamingIterator(docIds, scanBasedDocIdIterators, restrictableDocIdSets,
+            remainingDocIdIterators);
+      }
       for (ScanBasedDocIdIterator scanBasedDocIdIterator : scanBasedDocIdIterators) {
         docIds = scanBasedDocIdIterator.applyAnd(docIds);
       }
@@ -231,6 +249,41 @@ public final class AndDocIdSet implements BlockDocIdSet {
       }
       return new AndDocIdIterator(allDocIdIterators);
     }
+  }
+
+  /// Returns whether to evaluate the scan and composite children lazily on `docIds`, the merged index document ids.
+  /// Only under [AndRestrictionPushdown.Strategy#STREAMING], only when there is something to evaluate lazily, and only
+  /// when the query can stop before reading every candidate: when it reads at least as many documents as there are
+  /// candidates, it reads them all, and the eager path is faster for that.
+  private boolean shouldStream(ImmutableRoaringBitmap docIds, int numScanBasedDocIdIterators,
+      int numRestrictableDocIdSets) {
+    return _restrictionPushdown.getStrategy() == AndRestrictionPushdown.Strategy.STREAMING
+        && (numScanBasedDocIdIterators > 0 || numRestrictableDocIdSets > 0)
+        && _restrictionPushdown.getMaxDocsToRead() < docIds.getCardinality();
+  }
+
+  /// Builds the lazy iterator: one [RestrictedScanDocIdIterator] applies the scan children, in order, to each chunk
+  /// of `docIds`; then come the composite children restricted to `docIds`; then the remaining iterators. Every child
+  /// only sees document ids within `docIds`, and no scan is ever driven through [BlockDocIdIterator#advance], which
+  /// would scan forward over documents outside `docIds`.
+  private static BlockDocIdIterator buildStreamingIterator(ImmutableRoaringBitmap docIds,
+      List<ScanBasedDocIdIterator> scanBasedDocIdIterators, List<BlockDocIdSet> restrictableDocIdSets,
+      List<BlockDocIdIterator> remainingDocIdIterators) {
+    List<BlockDocIdIterator> docIdIterators =
+        new ArrayList<>(1 + restrictableDocIdSets.size() + remainingDocIdIterators.size());
+    if (!scanBasedDocIdIterators.isEmpty()) {
+      docIdIterators.add(new RestrictedScanDocIdIterator(docIds.getIntIterator(), scanBasedDocIdIterators));
+    }
+    for (BlockDocIdSet restrictableDocIdSet : restrictableDocIdSets) {
+      docIdIterators.add(restrictableDocIdSet.restrictedIterator(docIds));
+    }
+    for (BlockDocIdIterator remainingDocIdIterator : remainingDocIdIterators) {
+      assert !(remainingDocIdIterator instanceof ScanBasedDocIdIterator)
+          : "A scan must not be driven through advance() under the streaming push-down";
+      docIdIterators.add(remainingDocIdIterator);
+    }
+    return docIdIterators.size() == 1 ? docIdIterators.get(0)
+        : new AndDocIdIterator(docIdIterators.toArray(new BlockDocIdIterator[0]));
   }
 
   @Override
@@ -273,11 +326,34 @@ public final class AndDocIdSet implements BlockDocIdSet {
     List<BlockDocIdSet> docIdSetsWithCandidates = new ArrayList<>(docIdSets.size() + 1);
     docIdSetsWithCandidates.add(RangelessBitmapDocIdSet.create(docIds));
     docIdSetsWithCandidates.addAll(docIdSets);
-    BlockDocIdIterator docIdIterator = buildIterator(docIdSetsWithCandidates);
+    BlockDocIdIterator docIdIterator = buildIterator(docIdSetsWithCandidates, false);
     // buildIterator() returns the merged document ids directly whenever it has no lazy child left, which is the usual
     // case once the candidate set has forced the merge branch
     return docIdIterator instanceof BitmapBasedDocIdIterator ? ((BitmapBasedDocIdIterator) docIdIterator).getDocIds()
         : BlockDocIdSet.collect(docIdIterator);
+  }
+
+  /// Intersects this AND with the candidate set lazily, like [#applyAnd] but through [#buildIterator] with streaming
+  /// allowed. Under [AndRestrictionPushdown.Strategy#STREAMING], the scans are evaluated one chunk at a time; under
+  /// the other strategies, or when the query reads every candidate, the result is the eager one, wrapped in an
+  /// iterator.
+  @Override
+  public BlockDocIdIterator restrictedIterator(ImmutableRoaringBitmap docIds) {
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    Preconditions.checkState(docIdSets != null, "restrictedIterator() called on an already consumed AndDocIdSet");
+    if (docIds.isEmpty()) {
+      // No child is evaluated, so none of them will close its own iterator
+      for (BlockDocIdSet docIdSet : docIdSets) {
+        docIdSet.release();
+      }
+      _scanBasedDocIdSets.set(docIdSets);
+      _docIdSets = null;
+      return EmptyDocIdIterator.getInstance();
+    }
+    List<BlockDocIdSet> docIdSetsWithCandidates = new ArrayList<>(docIdSets.size() + 1);
+    docIdSetsWithCandidates.add(RangelessBitmapDocIdSet.create(docIds));
+    docIdSetsWithCandidates.addAll(docIdSets);
+    return buildIterator(docIdSetsWithCandidates, true);
   }
 
   @Override

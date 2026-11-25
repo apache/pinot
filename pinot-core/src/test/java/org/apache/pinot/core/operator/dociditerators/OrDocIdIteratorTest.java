@@ -23,7 +23,13 @@ import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.expectThrows;
 
 
 public class OrDocIdIteratorTest {
@@ -55,5 +61,24 @@ public class OrDocIdIteratorTest {
     assertEquals(andDocIdIterator.advance(18), 18);
     assertEquals(andDocIdIterator.next(), 19);
     assertEquals(andDocIdIterator.advance(21), Constants.EOF);
+  }
+
+  @Test
+  public void testCloseRemainingChildrenWhenExhaustedChildCloseFails() {
+    BlockDocIdIterator exhausted = mock(BlockDocIdIterator.class);
+    BlockDocIdIterator active = mock(BlockDocIdIterator.class);
+    when(exhausted.next()).thenReturn(Constants.EOF);
+    IllegalStateException exhaustedFailure = new IllegalStateException("exhausted child close failed");
+    IllegalStateException activeFailure = new IllegalStateException("active child close failed");
+    doThrow(exhaustedFailure).when(exhausted).close();
+    doThrow(activeFailure).when(active).close();
+    OrDocIdIterator iterator = new OrDocIdIterator(new BlockDocIdIterator[]{exhausted, active});
+
+    IllegalStateException failure = expectThrows(IllegalStateException.class, iterator::next);
+    assertSame(failure, exhaustedFailure);
+    assertEquals(failure.getSuppressed(), new Throwable[]{activeFailure});
+    iterator.close();
+    verify(exhausted).close();
+    verify(active).close();
   }
 }

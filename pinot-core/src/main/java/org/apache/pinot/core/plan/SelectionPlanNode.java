@@ -26,6 +26,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.DocIdOrderedOperator;
+import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
@@ -71,9 +72,12 @@ public class SelectionPlanNode implements PlanNode {
       // Selection only
       // ie: SELECT ... FROM Table WHERE ... LIMIT 10
       int maxDocsPerCall = Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-      BaseProjectOperator<?> projectOperator =
-          new ProjectPlanNode(_segmentContext, _queryContext, expressions, maxDocsPerCall).run();
-      return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, projectOperator);
+      // The selection closes the DocIdSetOperator when it has its rows, so a lazy filter releases its scan readers
+      ProjectPlanNode projectPlanNode =
+          new ProjectPlanNode(_segmentContext, _queryContext, expressions, maxDocsPerCall);
+      DocIdSetOperator docIdSetOperator = projectPlanNode.createDocIdSetOperator();
+      return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions,
+          projectPlanNode.run(docIdSetOperator), docIdSetOperator);
     }
     int numOrderByExpressions = orderByExpressions.size();
     // Order-by expressions come first; any remaining output expressions are fetched after selection.

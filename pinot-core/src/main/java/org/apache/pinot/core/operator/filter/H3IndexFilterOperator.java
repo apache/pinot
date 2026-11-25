@@ -262,7 +262,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     if (queryContext.getRowFilter() != null) {
       BlockDocIdSet partialMatch =
           new AndDocIdSet(List.of(BitmapDocIdSet.create(partialMatchDocIds, numDocs), expressionDocIdSet),
-              queryContext.getQueryOptions(), queryContext.isAndRestrictionPushdownEnabled());
+              queryContext.getQueryOptions(), queryContext.getAndRestrictionPushdown());
       return new OrDocIdSet(List.of(BitmapDocIdSet.create(fullMatchDocIds, numDocs), partialMatch), numDocs);
     }
     ScanBasedDocIdIterator docIdIterator = (ScanBasedDocIdIterator) expressionDocIdSet.iterator();

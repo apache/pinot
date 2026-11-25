@@ -23,6 +23,10 @@ import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 
@@ -99,5 +103,42 @@ public class NotDocIdIteratorTest {
     assertEquals(notDocIdIterator.next(), 6);
     assertEquals(notDocIdIterator.next(), 7);
     assertEquals(notDocIdIterator.next(), 8);
+  }
+
+  @Test
+  public void testCloseForwardsToChildWhenConsumerStopsEarly() {
+    BlockDocIdIterator child = mock(BlockDocIdIterator.class);
+    when(child.next()).thenReturn(4);
+    NotDocIdIterator iterator = new NotDocIdIterator(child, 10);
+    assertEquals(iterator.next(), 0);
+
+    iterator.close();
+    iterator.close();
+    verify(child).close();
+  }
+
+  @Test
+  public void testCloseBeforeFirstPullDoesNotReadChild() {
+    BlockDocIdIterator child = mock(BlockDocIdIterator.class);
+    NotDocIdIterator iterator = new NotDocIdIterator(child, 10);
+
+    iterator.close();
+    assertEquals(iterator.next(), Constants.EOF);
+    assertEquals(iterator.advance(4), Constants.EOF);
+    verify(child, never()).next();
+    verify(child, never()).advance(4);
+    verify(child).close();
+  }
+
+  @Test
+  public void testCloseSkipsExhaustedChild() {
+    BlockDocIdIterator child = mock(BlockDocIdIterator.class);
+    when(child.next()).thenReturn(0, Constants.EOF);
+    NotDocIdIterator iterator = new NotDocIdIterator(child, 2);
+
+    assertEquals(iterator.next(), 1);
+    assertEquals(iterator.next(), Constants.EOF);
+    iterator.close();
+    verify(child, never()).close();
   }
 }

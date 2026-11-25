@@ -20,10 +20,13 @@ package org.apache.pinot.core.query.request.context.utils;
 
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -41,6 +44,58 @@ public class QueryContextUtils {
   /// Selection-only query at this moment means selection query without order-by.
   public static boolean isSelectionOnlyQuery(QueryContext query) {
     return isSelectionQuery(query) && query.getOrderByExpressions() == null;
+  }
+
+  /// Returns the single WHERE predicate that can stream after the row policy. Decide this from the logical filter
+  /// before segment planning so dictionary pruning cannot make a compound predicate switch evaluation strategies.
+  @Nullable
+  public static FilterContext getRlsStreamingPredicate(QueryContext query) {
+    FilterContext policy = query.getRowFilter();
+    FilterContext filter = query.getFilter();
+    if (policy == null || filter == null || !isSelectionOnlyQuery(query) || query.getLimit() <= 0
+        || (long) query.getLimit() + query.getOffset() >= Integer.MAX_VALUE) {
+      return null;
+    }
+    if (filter.getType() == FilterContext.Type.AND) {
+      List<FilterContext> children = filter.getChildren();
+      // Drop an exact copy of an ordinary column policy that the broker added to WHERE. The RLS bitmap already
+      // restricts the query to rows matching that policy.
+      if (children.size() != 2 || !isOrdinaryComparison(policy)
+          || policy.getPredicate().getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
+        return null;
+      }
+      if (policy.equals(children.getFirst())) {
+        filter = children.get(1);
+      } else if (policy.equals(children.get(1))) {
+        filter = children.getFirst();
+      } else {
+        return null;
+      }
+    }
+    if (!isOrdinaryComparison(filter) || policy.equals(filter)) {
+      return null;
+    }
+    ExpressionContext lhs = filter.getPredicate().getLhs();
+    if (lhs.getType() != ExpressionContext.Type.FUNCTION) {
+      return lhs.getType() == ExpressionContext.Type.IDENTIFIER ? filter : null;
+    }
+    // These predicates may be served by specialized operators depending on the segment's indexes.
+    return switch (lhs.getFunction().getFunctionName()) {
+      case "stdistance", "st_distance", "stcontains", "st_contains", "stwithin", "st_within",
+          ItemTransformFunction.FUNCTION_NAME -> null;
+      default -> filter;
+    };
+  }
+
+  private static boolean isOrdinaryComparison(FilterContext filter) {
+    if (filter.getType() != FilterContext.Type.PREDICATE) {
+      return false;
+    }
+    Predicate predicate = filter.getPredicate();
+    return switch (predicate.getType()) {
+      case EQ, NOT_EQ, IN, NOT_IN, RANGE -> true;
+      default -> false;
+    };
   }
 
   /// Returns `true` if the given query is an aggregation query, `false` otherwise.
