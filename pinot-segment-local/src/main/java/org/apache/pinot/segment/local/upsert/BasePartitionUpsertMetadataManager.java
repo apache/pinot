@@ -373,7 +373,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected boolean isOutOfMetadataTTL(IndexSegment segment) {
-    if (_metadataTTL > 0) {
+    // A consuming segment has no column metadata to read its max comparison value from. It holds the latest records of
+    // the partition, so it is always within TTL.
+    if (_metadataTTL > 0 && !(segment instanceof MutableSegment)) {
       double maxComparisonValue = getMaxComparisonValue(segment);
       return isOutOfMetadataTTL(maxComparisonValue);
     }
