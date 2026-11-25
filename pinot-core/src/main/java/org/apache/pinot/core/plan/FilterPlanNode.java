@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown.Strategy;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapCollection;
@@ -50,6 +51,7 @@ import org.apache.pinot.core.operator.filter.RowLevelSecurityFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
 import org.apache.pinot.core.operator.filter.VectorRadiusFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorSearchDistances;
 import org.apache.pinot.core.operator.filter.VectorSearchMode;
 import org.apache.pinot.core.operator.filter.VectorSearchParams;
 import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
@@ -59,6 +61,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvide
 import org.apache.pinot.core.operator.filter.predicate.TextMatchDictIdPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -122,6 +125,23 @@ public class FilterPlanNode implements PlanNode {
 
     // Candidate generation and the outer valid-document AND must observe the same document set for this query.
     ImmutableRoaringBitmap outerDocIdsSnapshot = docIdsSnapshot;
+
+    if (_rowFilter != null && _queryContext.getAndRestrictionPushdown().getStrategy() == Strategy.STREAMING) {
+      FilterContext streamingPredicate = QueryContextUtils.getRlsStreamingPredicate(_queryContext);
+      if (streamingPredicate != null) {
+        BaseFilterOperator rowFilterOperator = constructRowFilterOperator(numDocs);
+        if (rowFilterOperator.isResultEmpty()) {
+          return EmptyFilterOperator.getInstance();
+        }
+        BaseFilterOperator userFilterOperator = constructPhysicalOperator(streamingPredicate, numDocs);
+        if (userFilterOperator.isResultEmpty()) {
+          return userFilterOperator;
+        }
+        // Retain the same candidate boundary when the policy matches every document in this segment.
+        return new RowLevelSecurityFilterOperator(rowFilterOperator, userFilterOperator, outerDocIdsSnapshot,
+            _queryContext, numDocs);
+      }
+    }
 
     BaseFilterOperator filterOperator = _filter != null ? constructPhysicalOperator(_filter, numDocs) : null;
     if (_rowFilter != null && (filterOperator == null || !filterOperator.isResultEmpty())) {
@@ -475,8 +495,12 @@ public class FilterPlanNode implements PlanNode {
             "Cannot apply vectorDistanceThreshold on column: %s -- forward index required for threshold refinement",
             column);
       }
-      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
-          vectorIndexConfig, hasMetadataFilter, _requiredVectorDocIds);
+      VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs,
+          searchParams, forwardIndexReader, vectorIndexConfig, hasMetadataFilter, _requiredVectorDocIds);
+      if (VectorSearchDistances.isEnabled(_queryContext)) {
+        operator.setSearchDistances(VectorSearchDistances.of(_queryContext));
+      }
+      return operator;
     }
 
     // Exact scan fallback: no vector index on this segment

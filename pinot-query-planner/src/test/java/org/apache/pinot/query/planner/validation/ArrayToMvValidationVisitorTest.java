@@ -147,9 +147,9 @@ public class ArrayToMvValidationVisitorTest {
         false, null, 0);
     validate(node, false);
     validateWithoutMvAggregate(node, false);
-    for (boolean useMvAggregate : new boolean[]{true, false}) {
+    for (boolean planHasMvAggregate : new boolean[]{true, false}) {
       QueryException e = expectThrows(QueryException.class,
-          () -> ArrayToMvValidationVisitor.validate(node, false, useMvAggregate));
+          () -> ArrayToMvValidationVisitor.validate(node, false, planHasMvAggregate));
       assertTrue(e.getMessage().contains("in the intermediate stage"), e.getMessage());
       assertTrue(e.getMessage().contains("Use ARRAY_TO_MV() to group by multi-value column"), e.getMessage());
       assertTrue(e.getMessage().endsWith(ArrayToMvValidationVisitor.SUPPORTED_USES), e.getMessage());

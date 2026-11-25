@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
+import org.apache.pinot.segment.local.utils.LuceneIndexTestUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
@@ -97,7 +98,7 @@ public class RealtimeLuceneTextIndexResourceTrackingTest {
     // Wait for index refresh
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return _textIndex.getSearcherManager().isSearcherCurrent();
+        return LuceneIndexTestUtils.isSearcherCurrent(_textIndex.getSearcherManager());
       } catch (IOException e) {
         return false;
       }
@@ -161,7 +162,7 @@ public class RealtimeLuceneTextIndexResourceTrackingTest {
 
       TestUtils.waitForCondition(aVoid -> {
         try {
-          return largeIndex.getSearcherManager().isSearcherCurrent();
+          return LuceneIndexTestUtils.isSearcherCurrent(largeIndex.getSearcherManager());
         } catch (IOException e) {
           return false;
         }

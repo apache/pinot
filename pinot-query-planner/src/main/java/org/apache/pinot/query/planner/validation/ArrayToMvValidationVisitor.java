@@ -50,10 +50,11 @@ import org.apache.pinot.spi.exception.QueryException;
 
 /// Validates the uses of `ARRAY_TO_MV` that remain in a plan after the planner rules.
 ///
-/// `GROUP BY ARRAY_TO_MV(expr)` is planned as an MV aggregate, which removes the call from the plan. Any other use is
-/// either a supported leaf-stage use, where the leaf translation drops the call and the single-stage engine sees the
-/// multi-value column, or an error. The check is structural: any remaining call in a node that runs in an intermediate
-/// stage is an error, so that no `f(ARRAY_TO_MV(col))` shape reaches an intermediate-stage operator undetected.
+/// `GROUP BY ARRAY_TO_MV(expr)` above the leaf stage is planned as an MV aggregate, which removes the call from the
+/// plan. Any other use is either a supported leaf-stage use, where the leaf translation drops the call and the
+/// single-stage engine sees the multi-value column, or an error. The check is structural: any remaining call in a node
+/// that runs in an intermediate stage is an error, so that no `f(ARRAY_TO_MV(col))` shape reaches an intermediate-stage
+/// operator undetected.
 ///
 /// | Node | Leaf stage | Intermediate stage |
 /// |---|---|---|
@@ -409,15 +410,7 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   }
 
   private static QueryException error(String context) {
-    return new ArrayToMvValidationException(context + ". " + SUPPORTED_USES);
-  }
-
-  /// The [QueryErrorCode#QUERY_PLANNING] error of a plan that uses `ARRAY_TO_MV` where the plan cannot run it. The
-  /// MV aggregate fallback plans such a query again with the MV aggregate.
-  public static class ArrayToMvValidationException extends QueryException {
-    ArrayToMvValidationException(String message) {
-      super(QueryErrorCode.QUERY_PLANNING, message);
-    }
+    return new QueryException(QueryErrorCode.QUERY_PLANNING, context + ". " + SUPPORTED_USES);
   }
 
   private boolean containsArrayToMv(RexExpression expression) {

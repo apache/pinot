@@ -44,13 +44,16 @@ import org.apache.lucene.index.MultiDocValues;
 import org.apache.lucene.index.NumericDocValues;
 import org.apache.lucene.index.StoredFieldVisitor;
 import org.apache.lucene.index.StoredFields;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
+import org.apache.lucene.queryparser.complexPhrase.ComplexPhraseQueryParser;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexBufferReader;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
+import org.apache.pinot.segment.local.segment.index.text.lucene.parsers.BoundedRegexpQueryParser;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -112,23 +115,17 @@ public class TextIndexUtils {
       pinotDocIdValues =
           MultiDocValues.getNumericValues(indexReader, LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME);
     }
-    PinotDocIdVisitor visitor = new PinotDocIdVisitor();
-    StoredFields storedFields = null;
+    StoredPinotDocIdReader storedDocIds = null;
     boolean isIdentityMapping = true;
     for (int luceneDocId = 0; luceneDocId < numDocs; luceneDocId++) {
       int pinotDocId;
       if (pinotDocIdValues != null && pinotDocIdValues.advanceExact(luceneDocId)) {
         pinotDocId = Math.toIntExact(pinotDocIdValues.longValue());
       } else {
-        if (storedFields == null) {
-          storedFields = indexReader.storedFields();
+        if (storedDocIds == null) {
+          storedDocIds = new StoredPinotDocIdReader(indexReader.storedFields());
         }
-        visitor._pinotDocId = Integer.MIN_VALUE;
-        storedFields.document(luceneDocId, visitor);
-        pinotDocId = visitor._pinotDocId;
-        if (pinotDocId == Integer.MIN_VALUE) {
-          throw new IOException("Missing Pinot document id for Lucene document: " + luceneDocId);
-        }
+        pinotDocId = storedDocIds.getPinotDocId(luceneDocId);
       }
       if (mutableToImmutableDocIdMap != null) {
         // Conversion can reorder Pinot rows independently of Lucene's own document order.
@@ -140,9 +137,24 @@ public class TextIndexUtils {
     return isIdentityMapping;
   }
 
-  /// Visits only the stored Pinot document id. Each mapping operation owns its visitor.
-  private static class PinotDocIdVisitor extends StoredFieldVisitor {
+  /// Reads only the stored Pinot document id. Each search thread owns its reader and visitor state.
+  public static final class StoredPinotDocIdReader extends StoredFieldVisitor {
+    private final StoredFields _storedFields;
     private int _pinotDocId;
+
+    public StoredPinotDocIdReader(StoredFields storedFields) {
+      _storedFields = storedFields;
+    }
+
+    public int getPinotDocId(int luceneDocId)
+        throws IOException {
+      _pinotDocId = Integer.MIN_VALUE;
+      _storedFields.document(luceneDocId, this);
+      if (_pinotDocId == Integer.MIN_VALUE) {
+        throw new IOException("Missing Pinot document id for Lucene document: " + luceneDocId);
+      }
+      return _pinotDocId;
+    }
 
     @Override
     public Status needsField(FieldInfo fieldInfo) {
@@ -494,7 +506,12 @@ public class TextIndexUtils {
       String queryParserClassName)
       throws ReflectiveOperationException {
     // Fail-fast if the query parser is specified class is not QueryParseBase class
-    final Class<?> queryParserClass = Class.forName(queryParserClassName);
+    Class<?> queryParserClass = Class.forName(queryParserClassName);
+    if (queryParserClass == QueryParser.class) {
+      queryParserClass = BoundedRegexpQueryParser.class;
+    } else if (queryParserClass == ComplexPhraseQueryParser.class) {
+      queryParserClass = BoundedRegexpQueryParser.ComplexPhrase.class;
+    }
     if (!QueryParserBase.class.isAssignableFrom(queryParserClass)) {
       throw new ReflectiveOperationException(
           "The specified lucene query parser class " + queryParserClassName + " is not assignable from "

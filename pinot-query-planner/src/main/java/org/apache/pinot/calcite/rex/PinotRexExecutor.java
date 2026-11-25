@@ -21,6 +21,7 @@ package org.apache.pinot.calcite.rex;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -43,9 +44,11 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 
 
 /// Reduces string literal casts using bounded, reusable Calcite executables. Each source/target type pair is compiled
-/// with an input reference instead of a literal, so different values share Calcite's conversion code. Other expressions
-/// use the fallback executor. Cached functions are immutable; input values and results stay local to each call, making
-/// this executor thread-safe without sharing RexExecutable's mutable data context.
+/// with an input reference instead of a literal, so different values share Calcite's conversion code. Casts of exact
+/// numeric literals to DOUBLE, FLOAT or REAL are rounded directly. Arrays of approximate literals that already have
+/// their final element type and precision are kept as they are. Other expressions use the fallback executor. Cached
+/// functions are immutable; input values and results stay local to each call, making this executor thread-safe
+/// without sharing RexExecutable's mutable data context.
 public final class PinotRexExecutor implements RexExecutor {
   public static final PinotRexExecutor INSTANCE = new PinotRexExecutor(RexUtil.EXECUTOR);
 
@@ -68,7 +71,8 @@ public final class PinotRexExecutor implements RexExecutor {
     // Calcite treats reduction as all-or-nothing. Delegate the entire batch if any expression is unsupported, so a
     // failure in the fallback cannot leave the batch partially reduced.
     for (RexNode expression : constExps) {
-      if (!isSupportedStringCast(expression)) {
+      if (!isSupportedStringCast(expression) && !isReducedVector(expression)
+          && !isNumericToApproximateCast(expression)) {
         _fallback.reduce(rexBuilder, constExps, reducedValues);
         return;
       }
@@ -76,7 +80,20 @@ public final class PinotRexExecutor implements RexExecutor {
     List<RexNode> literals = new ArrayList<>(constExps.size());
     try {
       for (RexNode expression : constExps) {
-        RexLiteral operand = (RexLiteral) ((RexCall) expression).getOperands().get(0);
+        RexCall call = (RexCall) expression;
+        if (call.getOperator() == SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR) {
+          literals.add(call);
+          continue;
+        }
+        RexLiteral operand = (RexLiteral) call.getOperands().get(0);
+        if (!SqlTypeUtil.isCharacter(operand.getType())) {
+          BigDecimal value = operand.getValueAs(BigDecimal.class);
+          // Calcite uses single precision for REAL and double precision for FLOAT and DOUBLE.
+          double rounded =
+              call.getType().getSqlTypeName() == SqlTypeName.REAL ? value.floatValue() : value.doubleValue();
+          literals.add(rexBuilder.makeLiteral(rounded, call.getType(), true));
+          continue;
+        }
         Object value = null;
         if (!operand.isNull()) {
           Function1<DataContext, Object[]> cast = getCast(rexBuilder, operand.getType(), expression.getType());
@@ -103,6 +120,47 @@ public final class PinotRexExecutor implements RexExecutor {
       RexNode cast = builder.makeAbstractCast(target, builder.makeInputRef(source, 0), false);
       return RexExecutorImpl.getExecutable(builder, List.of(cast), rowType).getFunction();
     });
+  }
+
+  private static boolean isNumericToApproximateCast(RexNode expression) {
+    if (!(expression instanceof RexCall call) || call.getOperator() != SqlStdOperatorTable.CAST
+        || call.getOperands().size() != 1 || !SqlTypeUtil.isApproximateNumeric(call.getType())
+        || !(call.getOperands().get(0) instanceof RexLiteral literal)
+        || !(literal.getValue() instanceof BigDecimal value)) {
+      return false;
+    }
+    RelDataType source = literal.getType();
+    if (SqlTypeUtil.isDecimal(source)) {
+      return true;
+    }
+    if (!SqlTypeName.INT_TYPES.contains(source.getSqlTypeName())) {
+      return false;
+    }
+    // An INTEGER-typed Rex literal can carry a wider value. Let Calcite narrow it to the source width first.
+    long max = SqlTypeUtil.maxValue(source);
+    return value.scale() == 0 && value.compareTo(BigDecimal.valueOf(-max - 1)) >= 0
+        && value.compareTo(BigDecimal.valueOf(max)) <= 0;
+  }
+
+  private static boolean isReducedVector(RexNode expression) {
+    if (!(expression instanceof RexCall call) || call.getOperator() != SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR
+        || call.getType().getSqlTypeName() != SqlTypeName.ARRAY || call.getType().isNullable()
+        || call.getOperands().isEmpty()) {
+      return false;
+    }
+    RelDataType component = call.getType().getComponentType();
+    if (component == null || component.isNullable() || !SqlTypeUtil.isApproximateNumeric(component)) {
+      return false;
+    }
+    // Calcite rebuilds each element at the array's component type and rounds REAL elements to single precision.
+    for (RexNode operand : call.getOperands()) {
+      if (!(operand instanceof RexLiteral literal) || !component.equals(literal.getType())
+          || !(literal.getValue() instanceof Double value) || Double.isNaN(value)
+          || (component.getSqlTypeName() == SqlTypeName.REAL && value.doubleValue() != value.floatValue())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static boolean isSupportedStringCast(RexNode expression) {

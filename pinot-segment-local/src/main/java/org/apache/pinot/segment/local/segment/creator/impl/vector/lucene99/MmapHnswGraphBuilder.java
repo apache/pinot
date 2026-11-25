@@ -21,24 +21,26 @@ package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.SplittableRandom;
 import javax.annotation.Nullable;
 import org.apache.lucene.codecs.KnnVectorsWriter.MergedVectorValues;
 import org.apache.lucene.codecs.hnsw.HnswGraphProvider;
 import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.KnnVectorValues;
 import org.apache.lucene.index.MergeState;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.FixedBitSet;
-import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
+import org.apache.lucene.util.IORunnable;
 import org.apache.lucene.util.hnsw.HnswGraph;
 import org.apache.lucene.util.hnsw.HnswGraphBuilder;
 import org.apache.lucene.util.hnsw.IncrementalHnswGraphMerger;
 import org.apache.lucene.util.hnsw.NeighborArray;
 import org.apache.lucene.util.hnsw.NeighborQueue;
-import org.apache.lucene.util.hnsw.RandomVectorScorer;
 import org.apache.lucene.util.hnsw.RandomVectorScorerSupplier;
+import org.apache.lucene.util.hnsw.UpdateableRandomVectorScorer;
 
 
 /// Serial Lucene 9.12 HNSW merge algorithm using mapped neighbor rows. Reuses Lucene's selection
@@ -47,6 +49,7 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
   private static final int MIN_CACHED_VECTOR_DIMENSION = 256;
 
   private final MmapHnswGraph _graph;
+  private final UpdateableRandomVectorScorer _scorer;
   private final SplittableRandom _random = new SplittableRandom(HnswGraphBuilder.randSeed);
   private final double _levelMultiplier;
   private final FixedBitSet _visited;
@@ -54,13 +57,14 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
   private final NeighborQueue _entryCandidates = new NeighborQueue(1, false);
   private final NeighborQueue _beamCandidates;
 
-  static MmapHnswGraph build(Path scratchDir, FieldInfo fieldInfo, CloseableRandomVectorScorerSupplier scorerSupplier,
-      MergeState mergeState, int maxConn, int beamWidth)
+  static MmapHnswGraph build(Path scratchDir, FieldInfo fieldInfo, RandomVectorScorerSupplier scorerSupplier,
+      KnnVectorValues mergedValues, MergeState mergeState, int maxConn, int beamWidth)
       throws IOException {
-    int count = scorerSupplier.totalVectorCount();
-    MmapHnswGraph graph = MmapHnswGraph.open(scratchDir, count, maxConn);
+    mergeState.checkAborted();
+    MmapHnswGraph graph = MmapHnswGraph.open(scratchDir, mergedValues.size(), maxConn);
     try {
-      new MmapHnswGraphBuilder(graph, fieldInfo, scorerSupplier, maxConn, beamWidth).build(mergeState, count);
+      new MmapHnswGraphBuilder(graph, fieldInfo, scorerSupplier, maxConn, beamWidth, mergeState::checkAborted)
+          .build(mergeState, mergedValues);
       return graph;
     } catch (IOException | RuntimeException | Error e) {
       try {
@@ -72,34 +76,38 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
     }
   }
 
-  private MmapHnswGraphBuilder(MmapHnswGraph graph, FieldInfo fieldInfo,
-      CloseableRandomVectorScorerSupplier scorerSupplier, int maxConn, int beamWidth) {
-    super(fieldInfo, fieldInfo.getVectorDimension() >= MIN_CACHED_VECTOR_DIMENSION
-        ? new ScoreCachingSupplier(scorerSupplier) : scorerSupplier, maxConn, beamWidth);
+  private MmapHnswGraphBuilder(MmapHnswGraph graph, FieldInfo fieldInfo, RandomVectorScorerSupplier scorerSupplier,
+      int maxConn, int beamWidth, IORunnable abortCheck)
+      throws IOException {
+    super(fieldInfo, scorerSupplier, maxConn, beamWidth, abortCheck);
     _graph = graph;
+    UpdateableRandomVectorScorer scorer = scorerSupplier.scorer();
+    _scorer = fieldInfo.getVectorDimension() >= MIN_CACHED_VECTOR_DIMENSION ? new ScoreCachingScorer(scorer) : scorer;
     _levelMultiplier = maxConn == 1 ? 1 : 1 / Math.log(maxConn);
     _visited = new FixedBitSet(graph.maxNodeId() + 1);
     _frontier = new NeighborQueue(beamWidth, true);
     _beamCandidates = new NeighborQueue(beamWidth, false);
   }
 
-  private void build(MergeState mergeState, int count)
+  private void build(MergeState mergeState, KnnVectorValues mergedValues)
       throws IOException {
     for (int i = 0; i < mergeState.liveDocs.length; i++) {
       if (MergedVectorValues.hasVectorValues(mergeState.fieldInfos[i], fieldInfo.name)) {
+        abortCheck.run();
         addReader(mergeState.knnVectorsReaders[i], mergeState.docMaps[i], mergeState.liveDocs[i]);
       }
     }
-    if (initReader != null) {
-      DocIdSetIterator mergedValues = switch (fieldInfo.getVectorEncoding()) {
-        case BYTE -> MergedVectorValues.mergeByteVectorValues(fieldInfo, mergeState);
-        case FLOAT32 -> MergedVectorValues.mergeFloatVectorValues(fieldInfo, mergeState);
-      };
-      initialize(((HnswGraphProvider) initReader).getGraph(fieldInfo.name),
-          getNewOrdMapping(mergedValues, new FixedBitSet(count)));
+    // Lucene 10.6 can reuse several graphs and include a base graph with deletes. The mmap builder
+    // initializes its graph from a single deletion-free source, as it did with Lucene 9.12.
+    GraphReader source = graphReaders.stream().max(Comparator.comparingInt(GraphReader::graphSize)).orElse(null);
+    if (source != null) {
+      graphReaders = List.of(source);
+      int[] ordinalMap = getNewOrdMapping(mergedValues, null)[0];
+      initialize(((HnswGraphProvider) source.reader()).getGraph(fieldInfo.name), ordinalMap);
     }
-    for (int node = 0; node < count; node++) {
+    for (int node = 0; node < mergedValues.size(); node++) {
       if (!_graph.contains(node)) {
+        abortCheck.run();
         insert(node);
       }
     }
@@ -111,6 +119,7 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
     for (int level = source.numLevels() - 1; level >= 0; level--) {
       HnswGraph.NodesIterator nodes = source.getNodesOnLevel(level);
       while (nodes.hasNext()) {
+        abortCheck.run();
         int oldNode = nodes.nextInt();
         int node = ordinalMap[oldNode];
         if (!_graph.contains(node)) {
@@ -124,7 +133,7 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
         for (int oldNeighbor = source.nextNeighbor(); oldNeighbor != DocIdSetIterator.NO_MORE_DOCS;
             oldNeighbor = source.nextNeighbor()) {
           // Scores from the reused graph are computed lazily if this row needs pruning.
-          neighbors.appendAndPrune(ordinalMap[oldNeighbor], Float.NaN, node, scorerSupplier);
+          neighbors.appendAndPrune(ordinalMap[oldNeighbor], Float.NaN, node, _scorer);
         }
       }
     }
@@ -139,16 +148,16 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
       return;
     }
 
-    RandomVectorScorer scorer = scorerSupplier.scorer(node);
+    _scorer.setScoringOrdinal(node);
     int highestLevel = _graph.numLevels() - 1;
     int[] entryPoints = {_graph.entryNode()};
     for (int level = highestLevel; level > nodeLevel; level--) {
-      searchLevel(scorer, level, entryPoints, _entryCandidates, 1, null);
+      searchLevel(level, entryPoints, _entryCandidates, 1, null);
       entryPoints[0] = _entryCandidates.pop();
     }
     NeighborArray[] candidates = new NeighborArray[Math.min(highestLevel, nodeLevel) + 1];
     for (int level = candidates.length - 1; level >= 0; level--) {
-      searchLevel(scorer, level, entryPoints, _beamCandidates, beamWidth, null);
+      searchLevel(level, entryPoints, _beamCandidates, beamWidth, null);
       entryPoints = _beamCandidates.nodes();
       NeighborArray row = new NeighborArray(_beamCandidates.size(), false);
       while (_beamCandidates.size() > 0) {
@@ -178,14 +187,14 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
     MmapHnswNeighborList neighbors = _graph.neighbors(level, node);
     int limit = _graph.neighborLimit(level);
     int[] nodeIds = candidates.nodes();
-    float[] scores = candidates.scores();
     // Add outgoing edges first. A selected neighbor must be closer to this node than to any
     // neighbor already selected.
     int[] chosen = new int[Math.min(limit, candidates.size())];
     int chosenCount = 0;
     for (int i = candidates.size() - 1; i >= 0 && chosenCount < chosen.length; i--) {
-      if (isDiverse(nodeIds[i], scores[i], neighbors)) {
-        neighbors.appendInOrder(nodeIds[i], scores[i]);
+      float score = candidates.getScores(i);
+      if (isDiverse(nodeIds[i], score, neighbors)) {
+        neighbors.appendInOrder(nodeIds[i], score);
         chosen[chosenCount++] = i;
       }
     }
@@ -193,30 +202,29 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
     for (int i = chosenCount - 1; i >= 0; i--) {
       int candidate = chosen[i];
       int neighbor = nodeIds[candidate];
-      _graph.neighbors(level, neighbor).appendAndPrune(node, scores[candidate], neighbor, scorerSupplier);
+      _graph.neighbors(level, neighbor).appendAndPrune(node, candidates.getScores(candidate), neighbor, _scorer);
     }
   }
 
   private boolean isDiverse(int candidate, float score, MmapHnswNeighborList neighbors)
       throws IOException {
-    RandomVectorScorer scorer = scorerSupplier.scorer(candidate);
+    _scorer.setScoringOrdinal(candidate);
     for (int i = 0; i < neighbors.size(); i++) {
-      if (scorer.score(neighbors.node(i)) >= score) {
+      if (_scorer.score(neighbors.node(i)) >= score) {
         return false;
       }
     }
     return true;
   }
 
-  private void searchLevel(RandomVectorScorer scorer, int level, int[] entryPoints, NeighborQueue results, int topK,
-      @Nullable FixedBitSet accept)
+  private void searchLevel(int level, int[] entryPoints, NeighborQueue results, int topK, @Nullable FixedBitSet accept)
       throws IOException {
     _frontier.clear();
     _visited.clear();
     results.clear();
     for (int entry : entryPoints) {
       if (!_visited.getAndSet(entry)) {
-        float score = scorer.score(entry);
+        float score = _scorer.score(entry);
         _frontier.add(entry, score);
         if (accept == null || accept.get(entry)) {
           results.insertWithOverflow(entry, score);
@@ -232,7 +240,7 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
       for (int i = 0; i < neighbors.size(); i++) {
         int neighbor = neighbors.node(i);
         if (!_visited.getAndSet(neighbor)) {
-          float score = scorer.score(neighbor);
+          float score = _scorer.score(neighbor);
           if (score > minimum) {
             _frontier.add(neighbor, score);
             if ((accept == null || accept.get(neighbor)) && results.insertWithOverflow(neighbor, score)
@@ -252,6 +260,7 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
     FixedBitSet spare = new FixedBitSet(_graph.size());
     NeighborQueue nearest = new NeighborQueue(2, false);
     for (int level = 0; level < _graph.numLevels(); level++) {
+      abortCheck.run();
       connected.clear();
       spare.clear();
       List<Component> components = findComponents(level, connected, spare, stack);
@@ -267,9 +276,10 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
       int[] entryPoints = {largest.entry()};
       for (Component component : components) {
         if (component != largest && component.entry() != DocIdSetIterator.NO_MORE_DOCS) {
+          abortCheck.run();
           int entry = component.entry();
-          RandomVectorScorer scorer = scorerSupplier.scorer(entry);
-          searchLevel(scorer, 0, entryPoints, nearest, 2, spare);
+          _scorer.setScoringOrdinal(entry);
+          searchLevel(0, entryPoints, nearest, 2, spare);
           while (nearest.size() > 0) {
             float score = nearest.topScore();
             int candidate = nearest.pop();
@@ -348,57 +358,52 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
 
   /// A bounded cache local to one merge. Searching multiple levels, linking neighbors, and pruning
   /// backlinks can all compare the same pair of vectors. Lucene's similarity functions are symmetric.
-  private static final class ScoreCachingSupplier implements RandomVectorScorerSupplier {
+  private static final class ScoreCachingScorer implements UpdateableRandomVectorScorer {
     private static final int CACHE_BITS = 13;
 
-    private final RandomVectorScorerSupplier _delegate;
+    private final UpdateableRandomVectorScorer _delegate;
     private final long[] _pairs = new long[1 << CACHE_BITS];
     private final float[] _scores = new float[_pairs.length];
+    private int _ordinal;
 
-    ScoreCachingSupplier(RandomVectorScorerSupplier delegate) {
+    ScoreCachingScorer(UpdateableRandomVectorScorer delegate) {
       _delegate = delegate;
     }
 
     @Override
-    public RandomVectorScorer scorer(int ord)
+    public void setScoringOrdinal(int node)
         throws IOException {
-      RandomVectorScorer scorer = _delegate.scorer(ord);
-      return new RandomVectorScorer() {
-        @Override
-        public float score(int node)
-            throws IOException {
-          long pair = (((long) Math.min(ord, node) << Integer.SIZE) | Math.max(ord, node)) + 1;
-          int slot = (int) ((pair * 0x9E3779B97F4A7C15L) >>> (Long.SIZE - CACHE_BITS));
-          if (_pairs[slot] == pair) {
-            return _scores[slot];
-          }
-          float score = scorer.score(node);
-          _pairs[slot] = pair;
-          _scores[slot] = score;
-          return score;
-        }
-
-        @Override
-        public int maxOrd() {
-          return scorer.maxOrd();
-        }
-
-        @Override
-        public int ordToDoc(int ord) {
-          return scorer.ordToDoc(ord);
-        }
-
-        @Override
-        public Bits getAcceptOrds(Bits acceptDocs) {
-          return scorer.getAcceptOrds(acceptDocs);
-        }
-      };
+      _delegate.setScoringOrdinal(node);
+      _ordinal = node;
     }
 
     @Override
-    public RandomVectorScorerSupplier copy()
+    public float score(int node)
         throws IOException {
-      return new ScoreCachingSupplier(_delegate.copy());
+      long pair = (((long) Math.min(_ordinal, node) << Integer.SIZE) | Math.max(_ordinal, node)) + 1;
+      int slot = (int) ((pair * 0x9E3779B97F4A7C15L) >>> (Long.SIZE - CACHE_BITS));
+      if (_pairs[slot] == pair) {
+        return _scores[slot];
+      }
+      float score = _delegate.score(node);
+      _pairs[slot] = pair;
+      _scores[slot] = score;
+      return score;
+    }
+
+    @Override
+    public int maxOrd() {
+      return _delegate.maxOrd();
+    }
+
+    @Override
+    public int ordToDoc(int ord) {
+      return _delegate.ordToDoc(ord);
+    }
+
+    @Override
+    public Bits getAcceptOrds(Bits acceptDocs) {
+      return _delegate.getAcceptOrds(acceptDocs);
     }
   }
 }

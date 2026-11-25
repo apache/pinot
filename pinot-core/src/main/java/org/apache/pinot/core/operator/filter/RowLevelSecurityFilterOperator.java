@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -36,7 +38,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 ///
 /// On its first block, this operator materializes the result of the RLS filter into a bitmap, bounded by the number of
 /// documents that the plan read. It then ANDs that bitmap with the user filter, with the AND restriction push-down on,
-/// so the user filter only evaluates scans and transform functions on the documents that the RLS filter matches. When
+/// so the user filter only evaluates scans and transform functions on the documents that the RLS filter matches. The
+/// push-down is eager, or streaming for a query that can stop at its LIMIT, see
+/// `QueryContext#getAndRestrictionPushdown()`. When
 /// the segment has a valid-document snapshot (upsert), the bitmap is also ANDed with that snapshot.
 ///
 /// The bitmap is materialized once and reused for every later block, for example when a filtered aggregation reads
@@ -59,15 +63,14 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
   @Nullable
   private ImmutableRoaringBitmap _rowFilterDocIds;
 
-  /// @param rowFilterOperator the operator of the RLS filter. It must not be empty or match all documents.
+  /// @param rowFilterOperator the operator of the RLS filter. It must not be known empty.
   /// @param userFilterOperator the operator of the WHERE clause. It must not be empty.
   /// @param validDocIds the valid-document snapshot of the segment, or `null` when the segment has none
   /// @param numDocs the number of documents that the plan read
   public RowLevelSecurityFilterOperator(BaseFilterOperator rowFilterOperator, BaseFilterOperator userFilterOperator,
       @Nullable ImmutableRoaringBitmap validDocIds, QueryContext queryContext, int numDocs) {
     super(numDocs, false);
-    assert !rowFilterOperator.isResultEmpty() && !rowFilterOperator.isResultMatchingAll()
-        && !userFilterOperator.isResultEmpty();
+    assert !rowFilterOperator.isResultEmpty() && !userFilterOperator.isResultEmpty();
     _rowFilterOperator = rowFilterOperator;
     _userFilterOperator = userFilterOperator;
     _validDocIds = validDocIds;
@@ -89,7 +92,13 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
       return rowFilterDocIdSet;
     }
     BlockDocIdSet userFilterDocIdSet = _userFilterOperator.nextBlock().getBlockDocIdSet();
-    return new AndDocIdSet(List.of(rowFilterDocIdSet, userFilterDocIdSet), _queryContext.getQueryOptions(), true);
+    // QueryContext never returns OFF under RLS; keep the RLS invariant even for a context built without a row filter
+    AndRestrictionPushdown restrictionPushdown = _queryContext.getAndRestrictionPushdown();
+    if (restrictionPushdown == null || !restrictionPushdown.isEnabled()) {
+      restrictionPushdown = AndRestrictionPushdown.EAGER;
+    }
+    return new AndDocIdSet(List.of(rowFilterDocIdSet, userFilterDocIdSet), _queryContext.getQueryOptions(),
+        restrictionPushdown);
   }
 
   /// Returns the documents that the RLS filter matches, ANDed with the valid-document snapshot. Materializes them on
@@ -110,10 +119,12 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
           scanCost.addEntriesScannedInFilter(numEntriesScanned);
         }
       }
-      assert docIds != null : "The RLS filter operator must not match all documents";
       // A mutable index can hold documents added after the plan read the number of documents. The rest of the plan
       // does not see them, so neither does the RLS filter.
-      if (!docIds.isEmpty() && docIds.last() >= _numDocs) {
+      if (docIds == null) {
+        Preconditions.checkState(_rowFilterOperator.isResultMatchingAll(), "Missing row filter bitmap");
+        docIds = MutableRoaringBitmap.bitmapOfRange(0, _numDocs);
+      } else if (!docIds.isEmpty() && docIds.last() >= _numDocs) {
         MutableRoaringBitmap bounded = docIds.toMutableRoaringBitmap();
         bounded.remove(_numDocs, Integer.toUnsignedLong(docIds.last()) + 1);
         docIds = bounded;

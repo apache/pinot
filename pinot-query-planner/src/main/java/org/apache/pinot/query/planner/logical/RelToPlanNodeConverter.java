@@ -64,6 +64,7 @@ import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlMatchRecognize;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
@@ -617,6 +618,13 @@ public final class RelToPlanNodeConverter {
     if (expr instanceof RexFieldAccess) {
       RexFieldAccess fieldAccess = (RexFieldAccess) expr;
       if (fieldAccess.getReferenceExpr() instanceof RexCorrelVariable) {
+        // The field index refers to the correlation variable's row type, which is the left input's row type. Prefer
+        // it over the name: the left input's field names need not match the names used in the query, e.g. when the
+        // left input is an aggregate whose output fields are named like agg#0.
+        Integer idx = resolveCorrelFieldByIndex(fieldAccess, leftRowType);
+        if (idx != null) {
+          return idx;
+        }
         String fieldName = fieldAccess.getField().getName();
         List<RelDataTypeField> fields = leftRowType.getFieldList();
         // SQL field names are case-insensitive by default in Calcite, so we use equalsIgnoreCase for matching.
@@ -644,6 +652,23 @@ public final class RelToPlanNodeConverter {
       }
     }
     return null;
+  }
+
+  /// Resolves a correlated field reference by position, as long as the correlation variable's row type still lines
+  /// up with the left input's row type (same field count and the same field type at that position). Returns null
+  /// otherwise, so that the caller can fall back to matching by name.
+  @Nullable
+  private static Integer resolveCorrelFieldByIndex(RexFieldAccess fieldAccess, RelDataType leftRowType) {
+    RelDataType correlRowType = fieldAccess.getReferenceExpr().getType();
+    if (!correlRowType.isStruct() || correlRowType.getFieldCount() != leftRowType.getFieldCount()) {
+      return null;
+    }
+    int index = fieldAccess.getField().getIndex();
+    if (index < 0 || index >= leftRowType.getFieldCount()) {
+      return null;
+    }
+    RelDataType leftFieldType = leftRowType.getFieldList().get(index).getType();
+    return SqlTypeUtil.equalSansNullability(leftFieldType, fieldAccess.getField().getType()) ? index : null;
   }
 
   private ExchangeNode convertLogicalExchange(Exchange node) {

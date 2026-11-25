@@ -350,7 +350,7 @@ public class ControllerTest {
       @Override
       protected Map<String, String> getDefaultClusterConfigs() {
         Map<String, String> configs = super.getDefaultClusterConfigs();
-        configs.put(ControllerConf.DISABLE_GROOVY, "false");
+        configs.put(CommonConstants.Groovy.INGESTION_GROOVY_DISABLED, "false");
         return configs;
       }
     };
@@ -1593,12 +1593,13 @@ public class ControllerTest {
     ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
     ClusterConfig clusterConfig = configAccessor.getClusterConfig(getHelixClusterName());
     if (value == null) {
-      clusterConfig.getRecord().getSimpleFields().remove(ControllerConf.DISABLE_GROOVY);
+      clusterConfig.getRecord().getSimpleFields().remove(CommonConstants.Groovy.INGESTION_GROOVY_DISABLED);
     } else {
-      clusterConfig.getRecord().setSimpleField(ControllerConf.DISABLE_GROOVY, value);
+      clusterConfig.getRecord().setSimpleField(CommonConstants.Groovy.INGESTION_GROOVY_DISABLED, value);
     }
     configAccessor.setClusterConfig(getHelixClusterName(), clusterConfig);
-    boolean disabled = CommonConstants.Groovy.isIngestionGroovyDisabled(value);
+    boolean disabled =
+        CommonConstants.Groovy.isControllerIngestionGroovyDisabled(clusterConfig.getRecord().getSimpleFields());
     TestUtils.waitForCondition(aVoid -> _controllerConfig.isDisableIngestionGroovy() == disabled, 10_000L,
         "Controller did not apply the cluster ingestion Groovy policy");
   }

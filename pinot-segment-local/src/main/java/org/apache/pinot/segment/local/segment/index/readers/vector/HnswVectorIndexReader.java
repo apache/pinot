@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.segment.index.readers.vector;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -29,8 +31,11 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.StoredFields;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
@@ -64,6 +69,8 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   private final ThreadLocal<Integer> _efSearchOverride = new ThreadLocal<>();
   private final ThreadLocal<Boolean> _useRelativeDistanceOverride = new ThreadLocal<>();
   private final ThreadLocal<Boolean> _useBoundedQueueOverride = new ThreadLocal<>();
+  /// Whether the loaded index scores hits using cosine similarity.
+  private final boolean _isCosineIndex;
 
   /// File-backed constructor: opens a [FSDirectory] from the Lucene HNSW index directory
   /// found under `indexDir`.
@@ -74,6 +81,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
+      _isCosineIndex = isCosineIndex(_indexReader, column);
 
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
@@ -102,6 +110,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
       _indexDirectory = HnswVectorIndexBufferReader.createLuceneDirectory(indexBuffer, column);
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
+      _isCosineIndex = isCosineIndex(_indexReader, column);
 
       // Try to extract the mapping from the packed buffer first; build from the Lucene index if absent.
       PinotDataBuffer mappingBuffer = HnswVectorIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
@@ -110,6 +119,18 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
       LOGGER.error("Failed to instantiate buffer-backed HNSW index reader for column {}", column, e);
       throw new RuntimeException(e);
     }
+  }
+
+  /// Whether the loaded index was built with COSINE similarity. The table config can name another function than the
+  /// one persisted in Lucene (changing it does not rebuild the index on reload), so the persisted one decides.
+  private static boolean isCosineIndex(IndexReader indexReader, String column) {
+    for (LeafReaderContext leaf : indexReader.leaves()) {
+      FieldInfo fieldInfo = leaf.reader().getFieldInfos().fieldInfo(column);
+      if (fieldInfo != null && fieldInfo.getVectorDimension() > 0) {
+        return fieldInfo.getVectorSimilarityFunction() == VectorSimilarityFunction.COSINE;
+      }
+    }
+    return false;
   }
 
   /// CASE 1: If IndexLoadingConfig specifies a segment version to load and if it is different then the on-disk version
@@ -258,6 +279,46 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
     return docIds;
   }
 
+  @Nullable
+  @Override
+  public Int2FloatMap getCosineDistances(float[] vector, int topK) {
+    if (!_isCosineIndex) {
+      return null;
+    }
+    try {
+      return toCosineDistances(search(vector, topK, null));
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while searching the HNSW index for column: " + _column, e);
+    }
+  }
+
+  @Nullable
+  @Override
+  public Int2FloatMap getCosineDistances(float[] vector, int topK, ImmutableRoaringBitmap preFilterBitmap) {
+    Preconditions.checkNotNull(preFilterBitmap, "Pre-filter bitmap must not be null for filtered vector search");
+    if (!_isCosineIndex) {
+      return null;
+    }
+    if (preFilterBitmap.isEmpty()) {
+      return new Int2FloatOpenHashMap();
+    }
+    try {
+      return toCosineDistances(search(vector, topK, new RoaringBitmapFilterQuery(preFilterBitmap, _docIdTranslator)));
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "Caught exception while searching the HNSW index with pre-filter for column: " + _column, e);
+    }
+  }
+
+  /// Converts Lucene COSINE scores (`(1 + cos) / 2`) to cosine distances (`1 - cos`), keyed by Pinot doc id.
+  private Int2FloatMap toCosineDistances(TopDocs topDocs) {
+    Int2FloatOpenHashMap distances = new Int2FloatOpenHashMap(topDocs.scoreDocs.length);
+    for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
+      distances.put(_docIdTranslator.getPinotDocId(scoreDoc.doc), 2 - 2 * scoreDoc.score);
+    }
+    return distances;
+  }
+
   /// Lucene docIDs are not same as pinot docIDs. The internal implementation
   /// of Lucene can change the docIds and they are not guaranteed to be the
   /// same as how we expect -- strictly increasing docIDs as the documents
@@ -303,11 +364,12 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
         _buffer =
             PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ true, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
       } else {
+        StoredFields storedFields = indexSearcher.storedFields();
         _buffer =
             PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
         for (int i = 0; i < numDocs; i++) {
           try {
-            Document document = indexSearcher.doc(i);
+            Document document = storedFields.document(i);
             int pinotDocId = Integer.parseInt(document.get(HnswVectorIndexCreator.VECTOR_INDEX_DOC_ID_COLUMN_NAME));
             _buffer.putInt(i * Integer.BYTES, pinotDocId);
           } catch (Exception e) {
@@ -337,10 +399,11 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
         // Mapping absent from combined buffer: build in heap from the Lucene index.
         _buffer = null;
         _borrowedBuffer = false;
+        StoredFields storedFields = indexSearcher.storedFields();
         int[] heapMapping = new int[numDocs];
         for (int i = 0; i < numDocs; i++) {
           try {
-            Document document = indexSearcher.doc(i);
+            Document document = storedFields.document(i);
             heapMapping[i] =
                 Integer.parseInt(document.get(HnswVectorIndexCreator.VECTOR_INDEX_DOC_ID_COLUMN_NAME));
           } catch (Exception e) {

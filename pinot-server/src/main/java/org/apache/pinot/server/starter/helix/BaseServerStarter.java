@@ -74,6 +74,7 @@ import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.config.IngestionGroovyConfigListener;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -200,6 +201,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(new IngestionGroovyConfigListener());
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
@@ -275,8 +278,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
           + DataTableBuilderFactory.DEFAULT_VERSION);
     }
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
-
-    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
 
     // Register configuration change listener for dynamic max clause count updates
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
@@ -842,11 +843,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         TimeUnit.SECONDS);
 
     LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
-    try {
-      _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
-    } catch (Exception e) {
-      LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
-    }
+    subscribeToClusterConfig(instanceDataManager);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottlerSet);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
     ResourceManager resourceManager = _serverInstance.getQueryScheduler().getResourceManager();
@@ -1051,6 +1048,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Relax throttling until the server is ready to serve queries
     return new SegmentOperationsThrottler(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries,
         false, ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_DOWNLOAD_COUNT, "SegmentDownload");
+  }
+
+  @VisibleForTesting
+  void subscribeToClusterConfig(InstanceDataManager instanceDataManager) {
+    // Only the data manager has started. Full server shutdown would also stop the process-wide metrics registry.
+    IngestionGroovyConfigListener.subscribeToClusterConfig(_helixManager, _clusterConfigChangeHandler,
+        _helixMessageCountScheduler::shutdownNow, instanceDataManager::shutDown);
   }
 
   /// Can be overridden to perform operations before server starts serving queries.

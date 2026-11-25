@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.queries;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -35,6 +34,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -110,6 +110,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("fact").build(), "fact_OFFLINE");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("tbl-escape-naming").build(), "tbl-escape-naming_OFFLINE");
@@ -119,6 +120,15 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     factory1.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
     factory1.addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
     factory1.addSegment("tbl-escape-naming_OFFLINE", buildRows("tbl-escape-naming_OFFLINE"));
+    for (int segment = 0; segment < 7; segment++) {
+      // A distinct group per segment makes both lost and duplicated segments visible in the query result.
+      GenericRow row = new GenericRow();
+      row.putValue("col1", "segment-" + segment);
+      row.putValue("col2", "foo");
+      row.putValue("col3", segment % 2 == 0 ? 1 : 42);
+      row.putValue("ts", TimeUnit.DAYS.toMillis(19_000));
+      factory1.addSegment("fact_OFFLINE", List.of(row));
+    }
 
     MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2");
     factory2.registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME");
@@ -133,7 +143,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     // Setting up H2 for validation
     setH2Connection();
     Schema schema = SCHEMA_BUILDER.build();
-    for (String tableName : Arrays.asList("a", "b", "c", "d")) {
+    for (String tableName : List.of("a", "b", "c", "d", "fact")) {
       addTableToH2(tableName, schema);
       addDataToH2(tableName, schema, factory1.buildTableRowsMap().get(tableName));
       addDataToH2(tableName, schema, factory2.buildTableRowsMap().get(tableName));
@@ -172,6 +182,49 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       server.shutDown();
     }
     _mailboxService.shutdown();
+  }
+
+  @Test
+  public void testFusedBroadcastJoinsAcrossServers()
+      throws Exception {
+    // Both dimensions have duplicate join keys. COUNT and SUM detect missing or doubled probe rows.
+    String sql = "SELECT /*+ joinOptions(left_distribution_type='random',right_distribution_type='broadcast') */ "
+        + "b.col3, c.col3, COUNT(*), SUM(a.col3) FROM a JOIN b ON a.col2=b.col2 JOIN c ON a.col3=c.col3 "
+        + "GROUP BY b.col3, c.col3";
+    String fused = "SET fuseBroadcastJoins=true; " + sql;
+    assertEquals(planQuery(fused).getQueryPlan().getQueryStages().size(),
+        planQuery(sql).getQueryPlan().getQueryStages().size() - 1);
+    QueryDispatcher.QueryResult result = queryRunner(fused, false);
+    assertNull(result.getProcessingException());
+    compareRowEquals(result.getResultTable(), queryH2(sql));
+  }
+
+  @Test
+  public void testOfflineLeafFanoutWithBroadcastJoins()
+      throws Exception {
+    String sql = "SELECT /*+ joinOptions(left_distribution_type='random',right_distribution_type='broadcast') */ "
+        + "f.col1, COUNT(*), SUM(f.col3) FROM fact f JOIN b ON f.col2=b.col2 JOIN c ON f.col3=c.col3 "
+        + "GROUP BY f.col1";
+    List<Object[]> expected = queryH2(sql);
+    assertEquals(expected.size(), 7);
+    for (int requestedWorkers : List.of(1, 4, 16)) {
+      for (boolean fusion : List.of(false, true)) {
+        String query = "SET leafStageWorkersPerServer=" + requestedWorkers + "; SET fuseBroadcastJoins=" + fusion
+            + "; " + sql;
+        QueryDispatcher.QueryResult result = queryRunner(query, true);
+        assertNull(result.getProcessingException());
+        compareRowEquals(result.getResultTable(), expected);
+
+        // The send's parallelism is the sum reported by the workers that actually ran this leaf stage.
+        JsonNode sendStats = result.getQueryStats().stream()
+            .filter(stage -> stage != null && !stage.isEmpty()
+                && stage.getOperatorType(0) == MultiStageOperator.Type.LEAF)
+            .filter(stage -> "fact".equals(
+                TableNameBuilder.extractRawTableName(stage.getOperatorStats(0).asJson().path("table").asText())))
+            .findFirst().orElseThrow().getLastOperatorStats().asJson();
+        assertEquals(sendStats.path("parallelism").asInt(), Math.min(requestedWorkers, 7), query);
+      }
+    }
   }
 
   /// The self stats of a node are the node's own value minus its children's. A mailbox send reports its stats from

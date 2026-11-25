@@ -1,6 +1,6 @@
 {
   "mv_aggregate": {
-    "comment": "GROUP BY ARRAY_TO_MV(col) plans as an MV aggregate when the query fails without it. Above a join it runs as MvAggregateOperator. An aggregate that runs whole in the leaf stage keeps the plain aggregate. The cases on a scan that test the MV aggregate use the hint is_skip_leaf_stage_group_by: with it, the plan without the MV aggregate fails, and the MV aggregate, which ignores the hint, runs inside the leaf stage. The expected rows follow single-stage engine semantics: one group per element, a repeated element counts once per copy, two MV keys give the cartesian product, a null array forms one null group, and an empty array contributes to no group. This test setup reads the input [] of row k=4 back as a null array, so it forms the null group. A real empty array comes from filterMv (row k=5 for v > 1). The physical optimizer does not support the MV aggregate, so every case sets ignoreV2Optimizer.",
+    "comment": "GROUP BY ARRAY_TO_MV(col) plans as an MV aggregate when the aggregate cannot run in the leaf stage. Above a join it runs as MvAggregateOperator. An aggregate that reads a table scan keeps the plain aggregate, which the leaf stage runs in the single-stage engine. The cases on a scan that test the MV aggregate use the hint is_skip_leaf_stage_group_by: with it, the plain aggregate runs above the leaf stage, so the planner plans the MV aggregate, which ignores the hint and runs inside the leaf stage. The expected rows follow single-stage engine semantics: one group per element, a repeated element counts once per copy, two MV keys give the cartesian product, a null array forms one null group, and an empty array contributes to no group. This test setup reads the input [] of row k=4 back as a null array, so it forms the null group. A real empty array comes from filterMv (row k=5 for v > 1). The physical optimizer does not support the MV aggregate, so every case sets ignoreV2Optimizer.",
     "tables": {
       "tbl": {
         "schema": [
@@ -223,7 +223,7 @@
         "ignoreV2Optimizer": true
       },
       {
-        "description": "The planner plans the MV aggregate above a self-join because the query fails without it",
+        "description": "The planner plans the MV aggregate above a self-join, where the aggregate cannot run in the leaf stage",
         "sql": "SELECT ARRAY_TO_MV(t1.strMv), COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k GROUP BY ARRAY_TO_MV(t1.strMv)",
         "outputs": [["a", 3], ["b", 2], ["c", 1], [null, 1]],
         "ignoreV2Optimizer": true
@@ -299,7 +299,7 @@
     ]
   },
   "mv_aggregate_null_handling": {
-    "comment": "With column-based null handling the MV column is nullable. A null row forms one null group, as in the single-stage engine. CROSS JOIN UNNEST differs here: it drops the null row. In a query that plans without the MV aggregate, ARRAY_TO_MV has the NOT NULL type that it had before the MV aggregate, so Calcite removes COALESCE and folds IS NULL checks around it, as before. In the plan with the MV aggregate, ARRAY_TO_MV is nullable when its array is nullable, so the planner keeps them. There, COALESCE around an ARRAY_TO_MV group key nests ARRAY_TO_MV in another expression, which is not supported.",
+    "comment": "With column-based null handling the MV column is nullable. A null row forms one null group, as in the single-stage engine. CROSS JOIN UNNEST differs here: it drops the null row. ARRAY_TO_MV is nullable when its array is nullable, so Calcite keeps COALESCE and IS NULL checks around it. The leaf stage cannot run COALESCE on a multi-value column. Above the leaf stage, COALESCE around an ARRAY_TO_MV group key nests ARRAY_TO_MV in another expression, which is not supported.",
     "extraProps": {
       "enableColumnBasedNullHandling": true
     },

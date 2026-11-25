@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
+import java.util.List;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
@@ -25,6 +26,8 @@ import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RestrictedNotDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RestrictedScanDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
@@ -111,6 +114,40 @@ public interface BlockDocIdSet {
         new BlockDocIdIterator[]{new RangelessBitmapDocIdIterator(docIds), docIdIterator}));
   }
 
+  /// Returns an iterator over the document ids matching this DocIdSet that are also in `docIds`: the lazy counterpart
+  /// of [#applyAnd]. A scan is only evaluated on the candidate documents that the consumer pulls, one chunk at a time,
+  /// so a consumer that stops early only pays for what it read. Index lookups stay eager: they are cheap.
+  ///
+  /// `docIds` is never modified. Like [#applyAnd], this method consumes the DocIdSet: call it at most once, and never
+  /// together with [#iterator] or [#applyAnd]. [#getNumEntriesScannedInFilter] stays valid and grows as the returned
+  /// iterator is read.
+  ///
+  /// The returned iterator closes what it holds when it reaches its end. It never evaluates a scan on a document
+  /// outside `docIds`.
+  default BlockDocIdIterator restrictedIterator(ImmutableRoaringBitmap docIds) {
+    if (docIds.isEmpty()) {
+      // Nothing is evaluated, so the iterator will not close itself
+      release();
+      return EmptyDocIdIterator.getInstance();
+    }
+    BlockDocIdIterator docIdIterator = iterator();
+    if (docIdIterator instanceof ScanBasedDocIdIterator) {
+      return new RestrictedScanDocIdIterator(docIds.getIntIterator(), List.of((ScanBasedDocIdIterator) docIdIterator));
+    }
+    if (docIdIterator instanceof BitmapBasedDocIdIterator) {
+      return new RangelessBitmapDocIdIterator(
+          ImmutableRoaringBitmap.and(((BitmapBasedDocIdIterator) docIdIterator).getDocIds(), docIds));
+    }
+    if (docIdIterator instanceof SortedDocIdIterator) {
+      MutableRoaringBitmap matchingDocIds =
+          RoaringBitmapUtils.fromInclusiveRanges(((SortedDocIdIterator) docIdIterator).getDocIdRanges());
+      matchingDocIds.and(docIds);
+      return new RangelessBitmapDocIdIterator(matchingDocIds);
+    }
+    // Generic fallback: drive the iterator from the candidate set so that it is only asked about candidate documents
+    return new AndDocIdIterator(new BlockDocIdIterator[]{new RangelessBitmapDocIdIterator(docIds), docIdIterator});
+  }
+
   /// Releases a DocIdSet that will not be evaluated, e.g. an OR branch a short-circuit skipped past.
   ///
   /// Scan-based DocIdSets build their iterator in the constructor, and that iterator holds a
@@ -138,7 +175,8 @@ public interface BlockDocIdSet {
     // NOTE: AND and OR DocIdIterator might contain scan-based DocIdIterator
     // TODO: This scan is not counted in the execution stats
     if (docIdIterator instanceof ScanBasedDocIdIterator || docIdIterator instanceof AndDocIdIterator
-        || docIdIterator instanceof OrDocIdIterator) {
+        || docIdIterator instanceof OrDocIdIterator || docIdIterator instanceof RestrictedScanDocIdIterator
+        || docIdIterator instanceof RestrictedNotDocIdIterator) {
       return RangelessBitmapDocIdSet.create(collect(docIdIterator));
     }
 

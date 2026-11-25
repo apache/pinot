@@ -25,48 +25,61 @@ import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.KnnFieldVectorsWriter;
 import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.hnsw.FlatVectorScorerUtil;
+import org.apache.lucene.codecs.hnsw.FlatVectorsReader;
 import org.apache.lucene.codecs.hnsw.FlatVectorsWriter;
 import org.apache.lucene.codecs.lucene99.Lucene99FlatVectorsFormat;
+import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsReader;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexFileNames;
+import org.apache.lucene.index.KnnVectorValues;
 import org.apache.lucene.index.MergeState;
+import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.index.Sorter;
 import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.store.DataAccessHint;
+import org.apache.lucene.store.FileDataHint;
+import org.apache.lucene.store.FileTypeHint;
 import org.apache.lucene.store.IndexOutput;
+import org.apache.lucene.util.IORunnable;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.RamUsageEstimator;
-import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
 import org.apache.lucene.util.hnsw.HnswGraph;
 import org.apache.lucene.util.hnsw.HnswGraph.NodesIterator;
+import org.apache.lucene.util.hnsw.RandomVectorScorerSupplier;
 import org.apache.lucene.util.packed.DirectMonotonicWriter;
 
 
 /// Writes a final merge in the Lucene99 HNSW format using temporary mmap storage for graph construction.
 /// Each instance belongs to one Lucene merge thread. Vector values are written by Lucene's flat vector writer.
 final class MmapHnswVectorsWriter extends KnnVectorsWriter {
-  // Match Lucene 9.12's Lucene99HnswVectorsFormat (version 0), which remains the reader.
+  // Store delta-encoded neighbors using the version 0 layout supported by the Lucene99 reader.
   private static final String META_CODEC_NAME = "Lucene99HnswVectorsFormatMeta";
   private static final String INDEX_CODEC_NAME = "Lucene99HnswVectorsFormatIndex";
-  private static final int FORMAT_VERSION = 0;
+  private static final int FORMAT_VERSION = Lucene99HnswVectorsFormat.VERSION_START;
   private static final int DIRECT_MONOTONIC_BLOCK_SHIFT = 16;
   private static final long SHALLOW_SIZE = RamUsageEstimator.shallowSizeOfInstance(MmapHnswVectorsWriter.class);
 
   private final Path _scratchDirectory;
   private final int _maxConn;
   private final int _beamWidth;
-  private final FlatVectorsWriter _flatWriter;
+  private final SegmentWriteState _writeState;
+  private final Lucene99FlatVectorsFormat _flatFormat;
   private final IndexOutput _meta;
   private final IndexOutput _index;
+
+  private FlatVectorsWriter _flatWriter;
+  private FlatVectorsReader _flatReader;
 
   MmapHnswVectorsWriter(SegmentWriteState state, Path scratchDirectory, int maxConn, int beamWidth)
       throws IOException {
     _scratchDirectory = scratchDirectory;
     _maxConn = maxConn;
     _beamWidth = beamWidth;
-    FlatVectorsWriter flatWriter = new Lucene99FlatVectorsFormat(FlatVectorScorerUtil.getLucene99FlatVectorsScorer())
-        .fieldsWriter(state);
+    _writeState = state;
+    _flatFormat = new Lucene99FlatVectorsFormat(FlatVectorScorerUtil.getLucene99FlatVectorsScorer());
+    FlatVectorsWriter flatWriter = _flatFormat.fieldsWriter(state);
     IndexOutput meta = null;
     IndexOutput index = null;
     boolean success = false;
@@ -100,23 +113,54 @@ final class MmapHnswVectorsWriter extends KnnVectorsWriter {
   }
 
   @Override
-  public void mergeOneField(FieldInfo field, MergeState mergeState)
+  public IORunnable mergeOneField(FieldInfo field, MergeState mergeState)
       throws IOException {
-    try (CloseableRandomVectorScorerSupplier scorers = _flatWriter.mergeOneFieldToIndex(field, mergeState)) {
-      int count = scorers.totalVectorCount();
-      long offset = _index.getFilePointer();
-      if (count == 0) {
-        writeFieldMeta(field, offset, 0, 0);
-        _meta.writeVInt(0);
-        return;
+    _flatWriter.mergeOneFlatVectorField(field, mergeState);
+    return () -> buildMergedGraph(field, mergeState);
+  }
+
+  private void buildMergedGraph(FieldInfo field, MergeState mergeState)
+      throws IOException {
+    mergeState.checkAborted();
+    // Lucene runs the graph callbacks after all flat fields have been merged.
+    if (_flatReader == null) {
+      finishFlatWriter();
+      SegmentReadState readState = new SegmentReadState(_writeState.directory, _writeState.segmentInfo,
+          _writeState.fieldInfos,
+          _writeState.context.union(FileTypeHint.DATA, FileDataHint.KNN_VECTORS, DataAccessHint.RANDOM),
+          _writeState.segmentSuffix);
+      _flatReader = _flatFormat.fieldsReader(readState);
+    }
+    KnnVectorValues vectors = switch (field.getVectorEncoding()) {
+      case BYTE -> _flatReader.getByteVectorValues(field.name);
+      case FLOAT32 -> _flatReader.getFloatVectorValues(field.name);
+    };
+    int count = vectors == null ? 0 : vectors.size();
+    long offset = _index.getFilePointer();
+    if (count == 0) {
+      writeFieldMeta(field, offset, 0, 0);
+      _meta.writeVInt(0);
+      return;
+    }
+    RandomVectorScorerSupplier scorers =
+        _flatReader.getFlatVectorScorer(field.name).getRandomVectorScorerSupplier(field.getVectorSimilarityFunction(),
+            vectors);
+    try (MmapHnswGraph graph =
+        MmapHnswGraphBuilder.build(_scratchDirectory, field, scorers, vectors, mergeState, _maxConn, _beamWidth)) {
+      if (graph.size() != count) {
+        throw new IOException("Expected " + count + " HNSW nodes for " + field.name + ", got " + graph.size());
       }
-      try (MmapHnswGraph graph =
-          MmapHnswGraphBuilder.build(_scratchDirectory, field, scorers, mergeState, _maxConn, _beamWidth)) {
-        if (graph.size() != count) {
-          throw new IOException("Expected " + count + " HNSW nodes for " + field.name + ", got " + graph.size());
-        }
-        writeGraph(field, offset, graph);
-      }
+      writeGraph(field, offset, graph);
+    }
+  }
+
+  private void finishFlatWriter()
+      throws IOException {
+    if (_flatWriter != null) {
+      _flatWriter.finish();
+      FlatVectorsWriter writer = _flatWriter;
+      _flatWriter = null;
+      writer.close();
     }
   }
 
@@ -130,7 +174,12 @@ final class MmapHnswVectorsWriter extends KnnVectorsWriter {
     long totalNodes = 0;
     for (int level = 0; level < levels; level++) {
       // Level zero includes all vector ordinals. Higher levels are stored in ascending ordinal order.
-      int[] nodes = level == 0 ? null : NodesIterator.getSortedNodes(graph.getNodesOnLevel(level));
+      int[] nodes = null;
+      if (level > 0) {
+        NodesIterator sortedNodes = graph.getSortedNodes(level);
+        nodes = new int[sortedNodes.size()];
+        sortedNodes.consume(nodes);
+      }
       nodesByLevel[level] = nodes;
       int nodesOnLevel = nodes == null ? count : nodes.length;
       int[] lengths = new int[nodesOnLevel];
@@ -210,7 +259,7 @@ final class MmapHnswVectorsWriter extends KnnVectorsWriter {
   @Override
   public void finish()
       throws IOException {
-    _flatWriter.finish();
+    finishFlatWriter();
     _meta.writeInt(-1);
     CodecUtil.writeFooter(_meta);
     CodecUtil.writeFooter(_index);
@@ -218,12 +267,12 @@ final class MmapHnswVectorsWriter extends KnnVectorsWriter {
 
   @Override
   public long ramBytesUsed() {
-    return SHALLOW_SIZE + _flatWriter.ramBytesUsed();
+    return SHALLOW_SIZE + (_flatWriter == null ? 0 : _flatWriter.ramBytesUsed());
   }
 
   @Override
   public void close()
       throws IOException {
-    IOUtils.close(_meta, _index, _flatWriter);
+    IOUtils.close(_meta, _index, _flatWriter, _flatReader);
   }
 }

@@ -23,11 +23,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexNotFoundException;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.Version;
+import org.testng.SkipException;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -57,9 +61,17 @@ public class LuceneIndexCompatibilityUtilsTest {
   @Test
   public void testNewerFormatsIncludingOlderCreationVersion()
       throws IOException {
+    if (Version.LATEST.major != 9) {
+      throw new SkipException("Lucene 10 fixtures exercise newer-format detection on Lucene 9 only");
+    }
     for (String name : new String[]{"text", "multi", "hnsw", "created9", "created9-unknowncodec"}) {
       assertTrue(LuceneIndexCompatibilityUtils.isIncompatible(new File(_fixtures, name)), name);
     }
+  }
+
+  @Test
+  public void testCurrentRuntimeIndexIsCompatible()
+      throws IOException {
     try (Directory directory = new ByteBuffersDirectory()) {
       try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig())) {
         writer.commit();
@@ -76,7 +88,15 @@ public class LuceneIndexCompatibilityUtilsTest {
     byte[] bytes = Files.readAllBytes(commit.toPath());
     bytes[bytes.length - 1] ^= 1;
     Files.write(commit.toPath(), bytes);
-    assertThrows(CorruptIndexException.class, () -> LuceneIndexCompatibilityUtils.isIncompatible(directory));
+    if (Version.LATEST.major == 9) {
+      assertThrows(CorruptIndexException.class, () -> LuceneIndexCompatibilityUtils.isIncompatible(directory));
+    } else {
+      // Current-writer commits take the metadata-only fast path; their real reader still reports corruption.
+      assertFalse(LuceneIndexCompatibilityUtils.isIncompatible(directory));
+      try (Directory lucene = FSDirectory.open(directory.toPath())) {
+        assertThrows(CorruptIndexException.class, () -> DirectoryReader.open(lucene));
+      }
+    }
   }
 
   @Test
@@ -91,6 +111,13 @@ public class LuceneIndexCompatibilityUtilsTest {
     File[] compoundFiles = directory.listFiles((parent, name) -> name.endsWith(".cfs"));
     assertTrue(compoundFiles != null && compoundFiles.length == 1);
     Files.delete(compoundFiles[0].toPath());
-    assertThrows(IOException.class, () -> LuceneIndexCompatibilityUtils.isIncompatible(directory));
+    if (Version.LATEST.major == 9) {
+      assertThrows(IOException.class, () -> LuceneIndexCompatibilityUtils.isIncompatible(directory));
+    } else {
+      assertFalse(LuceneIndexCompatibilityUtils.isIncompatible(directory));
+      try (Directory lucene = FSDirectory.open(directory.toPath())) {
+        assertThrows(IOException.class, () -> DirectoryReader.open(lucene));
+      }
+    }
   }
 }

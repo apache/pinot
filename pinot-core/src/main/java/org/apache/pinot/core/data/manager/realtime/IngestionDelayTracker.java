@@ -21,7 +21,6 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -30,7 +29,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -120,6 +121,8 @@ public class IngestionDelayTracker {
   private static final long PARTITION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
   // Delay scheduled executor service for this amount of time after starting service
   private static final int INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS = 100;
+  // Bounds how long table shutdown waits for an in-flight upstream offset fetch to stop
+  private static final long TRACKING_SHUTDOWN_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(10);
   // Cache expire time for ignored segment if there is no update from the segment.
   private static final int IGNORED_SEGMENT_CACHE_TIME_MINUTES = 10;
   // Timeout after 5 seconds while fetching the latest stream offset.
@@ -146,8 +149,11 @@ public class IngestionDelayTracker {
   private final Map<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
   private final ScheduledExecutorService _metricsRemovalScheduler;
   private final ScheduledExecutorService _ingestionDelayTrackingScheduler;
+  private final ScheduledFuture<?> _ingestionDelayTrackingFuture;
 
   private Clock _clock = Clock.systemUTC();
+  // Set when the table is shutting down, so the fetch that shutdown interrupts is not reported as an error
+  private volatile boolean _shuttingDown;
 
   protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
   protected volatile ConcurrentHashMap<Integer, Boolean> _partitionsHostedByThisServer = new ConcurrentHashMap<>();
@@ -186,7 +192,7 @@ public class IngestionDelayTracker {
     _ingestionDelayTrackingScheduler = Executors.newSingleThreadScheduledExecutor(
         getThreadFactory("IngestionDelayTrackingThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
     // schedule periodically to update latest upstream offset or create metrics for newly added partitions.
-    _ingestionDelayTrackingScheduler.scheduleWithFixedDelay(this::trackIngestionDelay,
+    _ingestionDelayTrackingFuture = _ingestionDelayTrackingScheduler.scheduleWithFixedDelay(this::trackIngestionDelay,
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, metricsTrackingIntervalMs, TimeUnit.MILLISECONDS);
   }
 
@@ -213,6 +219,15 @@ public class IngestionDelayTracker {
 
       assert streamMetadataProvider != null;
       _streamConfigIndexToStreamMetadataProvider.put(streamConfigIndex, streamMetadataProvider);
+      // A create still running when shutdown() started has no use for the provider, so close it here rather than
+      // leave it to the queued cleanup. Whichever side removes the entry closes the provider, so it is closed exactly
+      // once.
+      if (_shuttingDown) {
+        if (_streamConfigIndexToStreamMetadataProvider.remove(streamConfigIndex, streamMetadataProvider)) {
+          closeStreamMetadataProvider(streamMetadataProvider);
+        }
+        return;
+      }
 
       if ((streamMetadataProvider.supportsOffsetLag()) && (_partitionIdToLatestOffset == null)) {
         _partitionIdToLatestOffset = new ConcurrentHashMap<>();
@@ -300,6 +315,11 @@ public class IngestionDelayTracker {
             _partitionIdToLatestOffset.putAll(streamPartitionIdToLatestOffset);
           }
         } catch (Exception e) {
+          if (_shuttingDown) {
+            // Shutdown interrupts the in-flight fetch on purpose; a routine table delete is not a fetch error
+            LOGGER.debug("Stopped fetching latest stream offsets for partitions: {} on shutdown", streamPartitionIds);
+            return;
+          }
           _serverMetrics.addMeteredTableValue(_realTimeTableDataManager.getTableName(),
               ServerMeter.INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS, 1);
           LOGGER.error("Failed to update latest stream offsets for partitions: {}", streamPartitionIds, e);
@@ -642,28 +662,73 @@ public class IngestionDelayTracker {
     return ((LongMsgOffset) latestOffset).getOffset();
   }
 
-  /// We use this method to clean up when a table is being removed. No updates are expected at this time as all
-  /// RealtimeSegmentManagers should be down now.
+  private static void closeStreamMetadataProvider(StreamMetadataProvider streamMetadataProvider) {
+    try {
+      streamMetadataProvider.close();
+    } catch (Exception e) {
+      LOGGER.error("Failed to close streamMetadataProvider", e);
+    }
+  }
+
+  /// We use this method to clean up when a table is being removed. It does not throw, so the caller can go on to stop
+  /// the table's consumers.
+  ///
+  /// The tracking task may be inside a fetch on a stream metadata provider, and a stream consumer such as Kafka's is
+  /// not safe for concurrent use, so a provider is closed only after that fetch returns. The cleanup that needs the
+  /// providers therefore runs on the tracking thread, behind the fetch: removing the partitions' metrics asks each
+  /// provider which gauges it registered, and then the providers are closed. This waits a bounded time for it; if the
+  /// wait runs out or the caller is interrupted, the cleanup still completes on that thread once the fetch returns.
+  /// The interrupt is left set on the calling thread. A repeated call only waits again for that cleanup.
   public void shutdown() {
+    _shuttingDown = true;
     // Now that segments can't report metric, destroy metric for this table
     _metricsRemovalScheduler.shutdown(); // ScheduledExecutor is installed in constructor so must always be cancelled
-    if (_ingestionDelayTrackingScheduler != null) {
-      _ingestionDelayTrackingScheduler.shutdown();
-    }
-    for (StreamMetadataProvider streamMetadataProvider : _streamConfigIndexToStreamMetadataProvider.values()) {
-      try {
-        streamMetadataProvider.close();
-      } catch (IOException e) {
-        LOGGER.error("Failed to close streamMetadataProvider", e);
-      }
-    }
-    if (!_isServerReadyToServeQueries.getAsBoolean()) {
-      // Do not update the tracker state during server startup period
+    if (_ingestionDelayTrackingScheduler == null) {
+      cleanUpAfterTracking();
       return;
     }
-    // Remove partitions so their related metrics get uninstalled.
-    for (Integer partitionId : _ingestionInfoMap.keySet()) {
-      removePartitionId(partitionId);
+    // Interrupt a fetch in flight and stop scheduling new ones, but keep the executor open for the cleanup below
+    _ingestionDelayTrackingFuture.cancel(true);
+    try {
+      _ingestionDelayTrackingScheduler.execute(this::cleanUpAfterTracking);
+    } catch (RejectedExecutionException e) {
+      // Only an earlier call can have shut the executor down, and that call queued the cleanup first. Running it on
+      // this thread instead could close a provider under the fetch that call is still waiting out.
+      LOGGER.debug("Ingestion delay tracker for table: {} is already shutting down", _tableNameWithType);
+    }
+    _ingestionDelayTrackingScheduler.shutdown();
+    try {
+      if (!_ingestionDelayTrackingScheduler.awaitTermination(TRACKING_SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        LOGGER.warn("Ingestion delay tracking task for table: {} did not stop within {}ms; its cleanup completes once "
+            + "it does", _tableNameWithType, TRACKING_SHUTDOWN_TIMEOUT_MS);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  /// Removes the metrics of all tracked partitions, then closes the stream metadata providers. Metrics go first
+  /// because removing them looks the partition's provider up; the providers are closed even when that fails.
+  private void cleanUpAfterTracking() {
+    try {
+      if (_isServerReadyToServeQueries.getAsBoolean()) {
+        // Remove partitions so their related metrics get uninstalled. Not during server startup, when the tracker
+        // state is not updated. The tracking task also registers metrics for a hosted partition whose consumer has
+        // not reported anything, so go by the partitions with metrics as well as those with ingestion info.
+        Set<Integer> partitionIds = new HashSet<>(_partitionsTracked.keySet());
+        partitionIds.addAll(_ingestionInfoMap.keySet());
+        for (Integer partitionId : partitionIds) {
+          removePartitionId(partitionId);
+        }
+      }
+    } catch (RuntimeException e) {
+      LOGGER.error("Failed to remove the ingestion metrics of table: {}", _tableNameWithType, e);
+    } finally {
+      for (Map.Entry<Integer, StreamMetadataProvider> entry : _streamConfigIndexToStreamMetadataProvider.entrySet()) {
+        if (_streamConfigIndexToStreamMetadataProvider.remove(entry.getKey(), entry.getValue())) {
+          closeStreamMetadataProvider(entry.getValue());
+        }
+      }
     }
   }
 }

@@ -41,6 +41,8 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final int _numDocs;
   private final ValueMatcher _valueMatcher;
   private final int[] _batch;
+  // Allocated on the first matchDocIds call with a chunk that is larger than the batch size
+  private int[] _matchBatch;
   private int _firstMismatch;
   private int _cursor;
   private final int _cardinality;
@@ -140,6 +142,33 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     close();
     return result.get();
+  }
+
+  /// The value matchers read the values into buffers of the batch size of this iterator, so a chunk that is larger is
+  /// matched one batch at a time.
+  @Override
+  public int matchDocIds(int[] docIds, int limit) {
+    _numEntriesScanned += limit;
+    int batchSize = _batch.length;
+    if (limit <= batchSize) {
+      // matchValues already compacts the matching document ids to the front of the array
+      return _valueMatcher.matchValues(limit, docIds);
+    }
+    int[] batch = _matchBatch;
+    if (batch == null) {
+      batch = new int[batchSize];
+      _matchBatch = batch;
+    }
+    int numMatchingDocIds = 0;
+    for (int start = 0; start < limit; start += batchSize) {
+      int length = Math.min(batchSize, limit - start);
+      System.arraycopy(docIds, start, batch, 0, length);
+      int numMatchingInBatch = _valueMatcher.matchValues(length, batch);
+      // The matching document ids never move past the batch that is read next, because numMatchingDocIds <= start
+      System.arraycopy(batch, 0, docIds, numMatchingDocIds, numMatchingInBatch);
+      numMatchingDocIds += numMatchingInBatch;
+    }
+    return numMatchingDocIds;
   }
 
   @Override

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +65,8 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
 
   private int _blockEndDocId = 0;
   private PeekableIntIterator _docIdIterator;
+  @Nullable
+  private RestrictedProjection _restrictedProjection;
 
   // NOTE: Number of entries scanned is not accurate because we might need to scan multiple columns in order to solve
   //       the expression, but we only track the number of entries scanned for the resolved expression.
@@ -151,6 +154,92 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
         processProjectionBlock(projectionBlock, matchingDocIds);
       }
       return matchingDocIds;
+    }
+  }
+
+  /// Evaluates a candidate batch without consuming this iterator. The built-in projection keeps its reader contexts
+  /// across batches. Both paths use the iterator's own document id buffer.
+  @Override
+  public int matchDocIds(int[] docIds, int limit) {
+    if (limit == 0) {
+      return 0;
+    }
+    RoaringBitmap matchingDocIds = new RoaringBitmap();
+    if (ProjectionOperatorUtils.isDefaultImplementation()) {
+      processRestrictedBatch(docIds, limit, matchingDocIds);
+    } else {
+      processBatchWithCustomProjection(docIds, limit, matchingDocIds);
+    }
+    // The matching document ids are a subset of the input, so they fit in the array.
+    int numMatchingDocIds = 0;
+    PeekableIntIterator matchingDocIdIterator = matchingDocIds.getIntIterator();
+    while (matchingDocIdIterator.hasNext()) {
+      docIds[numMatchingDocIds++] = matchingDocIdIterator.next();
+    }
+    return numMatchingDocIds;
+  }
+
+  private void processRestrictedBatch(int[] docIds, int limit, RoaringBitmap matchingDocIds) {
+    RestrictedProjection restrictedProjection = _restrictedProjection;
+    if (restrictedProjection == null) {
+      CandidateDocIdSetOperator docIdSource = new CandidateDocIdSetOperator();
+      restrictedProjection =
+          new RestrictedProjection(docIdSource, new ProjectionOperator(_dataSourceMap, docIdSource, _queryContext));
+      _restrictedProjection = restrictedProjection;
+    }
+    // The projection owns this block until the next pull. Keep its doc ids separate from the caller's compaction.
+    System.arraycopy(docIds, 0, _docIdBuffer, 0, limit);
+    restrictedProjection.docIdSource().setDocIds(_docIdBuffer, limit);
+    processProjectionBlock(restrictedProjection.operator().nextBlock(), matchingDocIds);
+  }
+
+  private void processBatchWithCustomProjection(int[] docIds, int limit, RoaringBitmap matchingDocIds) {
+    // Custom projections can pull ahead, so give them the entire batch and drain it before compacting the caller's ids.
+    try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
+        new BitmapDocIdSetOperator(new ArrayIntIterator(docIds, limit), _docIdBuffer,
+            DocIdOrderedOperator.DocIdOrder.ASC), _queryContext)) {
+      ProjectionBlock projectionBlock;
+      while ((projectionBlock = projectionOperator.nextBlock()) != null) {
+        processProjectionBlock(projectionBlock, matchingDocIds);
+      }
+    }
+  }
+
+  @Override
+  public void close() {
+    RestrictedProjection restrictedProjection = _restrictedProjection;
+    if (restrictedProjection != null) {
+      _restrictedProjection = null;
+      restrictedProjection.operator().close();
+    }
+  }
+
+  /// Iterates over the first `length` values of an array.
+  private static final class ArrayIntIterator implements IntIterator {
+    private final int[] _values;
+    private final int _length;
+    private int _index;
+
+    private ArrayIntIterator(int[] values, int length) {
+      _values = values;
+      _length = length;
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _index < _length;
+    }
+
+    @Override
+    public int next() {
+      return _values[_index++];
+    }
+
+    @Override
+    public IntIterator clone() {
+      ArrayIntIterator clone = new ArrayIntIterator(_values, _length);
+      clone._index = _index;
+      return clone;
     }
   }
 
@@ -424,6 +513,51 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public long getNumEntriesScanned() {
     return _numEntriesScanned;
+  }
+
+  private record RestrictedProjection(CandidateDocIdSetOperator docIdSource, ProjectionOperator operator) {
+  }
+
+  /// Presents one candidate batch to the built-in projection. A new batch must be staged before each pull.
+  private static final class CandidateDocIdSetOperator extends BaseDocIdSetOperator {
+    private static final String EXPLAIN_NAME = "DOC_ID_SET_RESTRICTED";
+
+    @Nullable
+    private DocIdSetBlock _docIdSetBlock;
+
+    void setDocIds(int[] docIds, int length) {
+      _docIdSetBlock = new DocIdSetBlock(docIds, length);
+    }
+
+    @Override
+    protected DocIdSetBlock getNextBlock() {
+      DocIdSetBlock docIdSetBlock = Preconditions.checkNotNull(_docIdSetBlock, "No candidate batch was staged");
+      _docIdSetBlock = null;
+      return docIdSetBlock;
+    }
+
+    @Override
+    public String toExplainString() {
+      return EXPLAIN_NAME;
+    }
+
+    @Override
+    public List<Operator> getChildOperators() {
+      return List.of();
+    }
+
+    @Override
+    public boolean isCompatibleWith(DocIdOrder order) {
+      return order == DocIdOrder.ASC;
+    }
+
+    @Override
+    public BaseDocIdSetOperator withOrder(DocIdOrder order) {
+      if (isCompatibleWith(order)) {
+        return this;
+      }
+      throw new UnsupportedOperationException(EXPLAIN_NAME + " doesn't support descending order");
+    }
   }
 
   /// NOTE: This operator contains only one block.

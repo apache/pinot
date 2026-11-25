@@ -223,6 +223,8 @@
                 <include>org/apache/pinot/integration/tests/N*Test.java</include>
                 <include>org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</include>
                 <include>org/apache/pinot/integration/tests/legacy/*Test.java</include>
+                <!-- This class starts its own cluster and is excluded from LogicalTableSuite. -->
+                <include>org/apache/pinot/integration/tests/logicaltable/KafkaPartitionSubsetChaosIntegrationTest.java</include>
               </includes>
               <excludes>
                 <exclude>org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
@@ -291,11 +293,6 @@
                 <include>org/apache/pinot/integration/tests/P*Test.java</include>
                 <include>org/apache/pinot/integration/tests/Q*Test.java</include>
                 <include>org/apache/pinot/integration/tests/R*Test.java</include>
-                <!--
-                  In the logicaltable package but not a BaseLogicalTableIntegrationTest subclass: it runs its own
-                  cluster, so LogicalTableSuite below excludes it and it runs here instead.
-                -->
-                <include>org/apache/pinot/integration/tests/logicaltable/KafkaPartitionSubsetChaosIntegrationTest.java</include>
               </includes>
               <excludes>
                 <exclude>org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</exclude>
@@ -358,6 +355,8 @@
                 <include>org/apache/pinot/server/realtime/**</include>
               </includes>
               <excludes>
+                <exclude>org/apache/pinot/integration/tests/SegmentUploadIntegrationTest.java</exclude>
+                <exclude>org/apache/pinot/integration/tests/SegmentWriterUploaderIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
               </excludes>

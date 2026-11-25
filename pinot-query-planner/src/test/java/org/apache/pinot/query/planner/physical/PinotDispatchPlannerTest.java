@@ -122,6 +122,46 @@ public class PinotDispatchPlannerTest extends QueryEnvironmentTestBase {
     }
   }
 
+  /// Both arms join the scans of a and b with the sides swapped. `on` shares both scans between the two joins. Each
+  /// join then reads, as its build input, the spool that feeds the probe input of the other one, which is a circular
+  /// wait. `auto` can share one of the scans, which is safe, but must refuse the second one.
+  @Test
+  public void testAutoSpoolsRejectCircularWaitBetweenJoins() {
+    String query = "SELECT COUNT(*) FROM a JOIN b ON a.col1 = b.col1 "
+        + "UNION ALL SELECT COUNT(*) FROM b JOIN a ON b.col1 = a.col1";
+    assertEquals(countMultiReceiverSends(_queryEnvironment.planQuery("SET useSpools='on'; " + query)), 2,
+        "Expected 'on' to share both scans, otherwise this test does not exercise the guard");
+    assertEquals(countMultiReceiverSends(_queryEnvironment.planQuery("SET useSpools='auto'; " + query)), 1);
+  }
+
+  /// Two independent subqueries draw two independent 10% samples with `RAND()`. Calcite produces two equal leaf
+  /// stages, and sharing them would give both subqueries the same sample. No mode may share them.
+  @Test
+  public void testStagesWithVolatileFunctionsAreNotShared() {
+    String sample = "(SELECT col1 FROM a WHERE %s ORDER BY col1 LIMIT 1000)";
+    String query = "SELECT x.c, y.c FROM (SELECT COUNT(*) AS c FROM " + sample + ") x "
+        + "JOIN (SELECT MAX(col1) AS c FROM " + sample + ") y ON TRUE";
+    String deterministic = String.format(query, "col3 > 10", "col3 > 10");
+    assertEquals(countMultiReceiverSends(_queryEnvironment.planQuery("SET useSpools='on'; " + deterministic)), 1,
+        "Expected the deterministic query to share its scan, otherwise this test does not exercise the check");
+    String random = String.format(query, "RAND() < 0.1", "RAND() < 0.1");
+    for (String mode : List.of("on", "auto")) {
+      assertEquals(countMultiReceiverSends(_queryEnvironment.planQuery("SET useSpools='" + mode + "'; " + random)), 0,
+          "Mode " + mode + " shared a stage that calls RAND()");
+    }
+  }
+
+  private static int countMultiReceiverSends(DispatchableSubPlan subPlan) {
+    int count = 0;
+    for (DispatchablePlanFragment fragment : subPlan.getQueryStageMap().values()) {
+      PlanNode root = fragment.getPlanFragment().getFragmentRoot();
+      if (root instanceof MailboxSendNode && ((MailboxSendNode) root).isMultiSend()) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   private static boolean hasMultiReceiverSend(DispatchableSubPlan subPlan) {
     for (DispatchablePlanFragment fragment : subPlan.getQueryStageMap().values()) {
       PlanNode root = fragment.getPlanFragment().getFragmentRoot();

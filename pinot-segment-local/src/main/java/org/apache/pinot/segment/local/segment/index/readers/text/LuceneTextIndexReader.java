@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import com.google.common.annotations.VisibleForTesting;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -30,7 +31,10 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexFormatTooOldException;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.SegmentInfos;
+import org.apache.lucene.index.StandardDirectoryReader;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.Collector;
@@ -46,6 +50,7 @@ import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.index.reader.QueryScopedCache;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -82,12 +87,24 @@ public class LuceneTextIndexReader implements TextIndexReader {
   /// parsed query only when these are equal. Computed once; immutable, with structural equality.
   private final ParseConfig _parseConfig;
 
+  /// Retains support for immutable Lucene 8 text indexes through Lucene's backward codecs.
+  /// The default reader only accepts indexes created with the current or previous major version.
+  static DirectoryReader openIndexReader(Directory directory)
+      throws IOException {
+    try {
+      return DirectoryReader.open(directory);
+    } catch (IndexFormatTooOldException e) {
+      // This lower-level reader accepts the Lucene 8 commit rejected by the default version check.
+      return StandardDirectoryReader.open(directory, SegmentInfos.readLatestCommit(directory, 8), null, null, null);
+    }
+  }
+
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
     _column = column;
     try {
       File indexFile = getTextIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
-      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexReader = openIndexReader(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
@@ -160,7 +177,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
       // Initialize from components
       _indexDirectory = indexDirectory;
-      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexReader = openIndexReader(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
 
       if (!config.isEnableQueryCache()) {
@@ -294,6 +311,42 @@ public class LuceneTextIndexReader implements TextIndexReader {
     }
   }
 
+  @Override
+  public Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString) {
+    return getDocScores(searchQuery, optionsString, null);
+  }
+
+  @Override
+  public Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    requirePerRowIndex();
+    try {
+      validateDocCount();
+      Query query = buildQuery(searchQuery, optionsString, null);
+      IndexSearcher searcher = LuceneTextScoreStatsUtils.scoringSearcher(_indexSearcher, query, _column, globalStats);
+      return new LuceneDocScoreCollector(_docIdTranslator::getPinotDocId).collectScores(searcher, query);
+    } catch (QueryException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while scoring the text index for column:" + _column + " search query:" + searchQuery, e);
+    }
+  }
+
+  @Override
+  public TextScoreStats getTextScoreStats(String searchQuery, @Nullable String optionsString) {
+    requirePerRowIndex();
+    try {
+      return LuceneTextScoreStatsUtils.collect(_indexSearcher, buildQuery(searchQuery, optionsString, null), _column);
+    } catch (QueryException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while collecting text score statistics for column:" + _column + " search query:"
+              + searchQuery, e);
+    }
+  }
+
   /// Identifies a parsing configuration. A record so that equality is structural: comparing the
   /// rendered text of these lists instead would conflate `["failed", "order"]` with
   /// `["failed, order"]`, which are different stop-word sets that parse the same string differently.
@@ -383,7 +436,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private void requirePerRowIndex() {
     if (_buildOnDictionary) {
       throw new UnsupportedOperationException(
-          "Document IDs and counts require a per-row text index for column: " + _column);
+          "Document IDs, counts and relevance scoring require a per-row text index for column: " + _column);
     }
   }
 

@@ -313,8 +313,10 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
       if (fwdReader == null) {
         return null;
       }
+      int maxNumValues = !fwdReader.isSingleValue() && fwdReader.isDictionaryEncoded()
+          ? dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry() : 0;
       return new PinotSegmentColumnReader(key, fwdReader, dataSource.getDictionary(),
-          dataSource.getNullValueVector(), 0);
+          dataSource.getNullValueVector(), maxNumValues);
     }
 
     @Override

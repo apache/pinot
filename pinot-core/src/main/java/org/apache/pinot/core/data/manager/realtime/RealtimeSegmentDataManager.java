@@ -2253,7 +2253,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _serverIngestionOomProtectionManager = realtimeTableDataManager.getServerIngestionOomProtectionManager();
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getInstanceId();
-    _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_tableNameWithType);
+    _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId, _tableNameWithType);
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverMetrics, _tableNameWithType);
     CompletionConfig completionConfig = _tableConfig.getValidationConfig().getCompletionConfig();
     _segmentCompletionMode = completionConfig != null

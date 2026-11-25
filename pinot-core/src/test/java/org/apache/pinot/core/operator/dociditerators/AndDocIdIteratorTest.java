@@ -23,7 +23,12 @@ import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.expectThrows;
 
 
 public class AndDocIdIteratorTest {
@@ -52,5 +57,25 @@ public class AndDocIdIteratorTest {
     assertEquals(andDocIdIterator.advance(16), 16);
     assertEquals(andDocIdIterator.next(), 20);
     assertEquals(andDocIdIterator.next(), Constants.EOF);
+  }
+
+  @Test
+  public void testCloseAttemptsEveryChildAndPreservesFirstFailure() {
+    BlockDocIdIterator first = mock(BlockDocIdIterator.class);
+    BlockDocIdIterator second = mock(BlockDocIdIterator.class);
+    BlockDocIdIterator third = mock(BlockDocIdIterator.class);
+    IllegalStateException firstFailure = new IllegalStateException("first close failed");
+    AssertionError secondFailure = new AssertionError("second close failed");
+    doThrow(firstFailure).when(first).close();
+    doThrow(secondFailure).when(second).close();
+    AndDocIdIterator iterator = new AndDocIdIterator(new BlockDocIdIterator[]{first, second, third});
+
+    IllegalStateException failure = expectThrows(IllegalStateException.class, iterator::close);
+    assertSame(failure, firstFailure);
+    assertEquals(failure.getSuppressed(), new Throwable[]{secondFailure});
+    iterator.close();
+    verify(first).close();
+    verify(second).close();
+    verify(third).close();
   }
 }

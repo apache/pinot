@@ -21,9 +21,9 @@ package org.apache.pinot.query.validate;
 import org.apache.pinot.spi.exception.QueryException;
 
 
-/// A [QueryException] with [org.apache.pinot.spi.exception.QueryErrorCode#QUERY_VALIDATION] for a query that failed
-/// validation and has a `GROUP BY` name that matches a `SELECT` alias and a column. The validator resolved the name to
-/// the column, because `preferSelectAliasInGroupBy` was not set. With the option set, the same query can validate.
+/// A [QueryException] for a query that failed to compile and has a `GROUP BY` name that matches a `SELECT` alias and a
+/// column. The validator resolved the name to the column, because `preferSelectAliasInGroupBy` was not set. With the
+/// option set, the same query can compile.
 ///
 /// It has the same error code, message and cause as the exception it replaces, so code that handles a
 /// [QueryException] treats both the same way. The controller uses it to retry the query with the option set. See
