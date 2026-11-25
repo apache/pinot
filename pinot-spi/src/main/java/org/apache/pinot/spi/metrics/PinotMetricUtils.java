@@ -32,6 +32,7 @@ import java.util.function.Function;
 import org.apache.pinot.spi.annotations.metrics.MetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Minion;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +107,7 @@ public class PinotMetricUtils {
   /// @param configuration The subset of the configuration containing the metrics-related keys
   private static void initializeMetrics(PinotConfiguration configuration) {
     synchronized (PinotMetricUtils.class) {
-      List<String> listenerClassNames = configuration.getProperty("metricsRegistryRegistrationListeners",
+      List<String> listenerClassNames = configuration.getProperty(Minion.METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY,
           Arrays.asList(JmxReporterMetricsRegistryRegistrationListener.class.getName()));
 
       // Build each listener using their default constructor and add them

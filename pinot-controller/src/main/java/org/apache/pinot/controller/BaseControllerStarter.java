@@ -183,7 +183,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   private static final String METRICS_REGISTRY_NAME = "pinot.controller.metrics";
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
-  private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
   private static final String MAX_STATE_TRANSITIONS_PER_INSTANCE = "MaxStateTransitionsPerInstance";
   private static final String MAX_STATE_TRANSITIONS_PER_RESOURCE = "MaxStateTransitionsPerResource";
 
@@ -748,8 +747,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       throw new RuntimeException("Caught exception while creating new AccessControlFactory instance", e);
     }
 
-    final MetadataEventNotifierFactory metadataEventNotifierFactory =
-        MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX), _helixResourceManager);
+    final MetadataEventNotifierFactory metadataEventNotifierFactory = MetadataEventNotifierFactory.loadFactory(
+        _config.subset(CommonConstants.Minion.METADATA_EVENT_OBSERVER_PREFIX), _helixResourceManager);
 
     // Created once the components an executor may use exist, see the Javadoc of the hook
     _sqlQueryExecutor = createSqlQueryExecutor();
