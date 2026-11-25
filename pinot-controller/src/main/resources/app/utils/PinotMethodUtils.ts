@@ -848,9 +848,9 @@ const getZookeeperData = (path, count) => {
     pathNames.forEach((pathName) => {
       const nodeStat = currentNodeListStat[pathName];
 
-      // Skip if nodeStat is null or undefined
-      if (!nodeStat) {
-        console.warn(`Skipping null node for path: ${pathName}`);
+      // Skip missing or error-response entries, such as { code, error } from a 404 response.
+      if (!nodeStat || typeof nodeStat !== 'object' || !Number.isInteger(nodeStat.numChildren)) {
+        console.warn(`Skipping invalid ZK child stat for path: ${pathName}`);
         return;
       }
       newTreeData[0].child.push({
