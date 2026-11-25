@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
+import org.apache.pinot.core.operator.dociditerators.RestrictedScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.spi.query.QueryScanCostContext;
@@ -69,6 +70,9 @@ public class DocIdSetOperator extends BaseDocIdSetOperator implements AutoClosea
     if (_blockDocIdSet == null) {
       _blockDocIdSet = _filterOperator.nextBlock().getBlockDocIdSet();
       _blockDocIdIterator = _blockDocIdSet.iterator();
+      if (_blockDocIdIterator instanceof RestrictedScanDocIdIterator restrictedScan && getScanCostContext() != null) {
+        restrictedScan.setChunkCheckpoint(this::checkRestrictedScanBudget);
+      }
     }
 
     QueryThreadContext.sampleUsage();
@@ -79,6 +83,16 @@ public class DocIdSetOperator extends BaseDocIdSetOperator implements AutoClosea
     _exhausted = numDocIds < _maxSizeOfDocIdSet;
     // Push the scan cost delta for proactive query killing. Also on the last call, which returns no document: a lazy
     // filter can scan the rest of the segment in that call.
+    reportEntriesScannedInFilter();
+    return numDocIds > 0 ? new DocIdSetBlock(docIds, numDocIds) : null;
+  }
+
+  private void checkRestrictedScanBudget() {
+    reportEntriesScannedInFilter();
+    checkTerminationAndSampleUsage();
+  }
+
+  private void reportEntriesScannedInFilter() {
     QueryScanCostContext scanCost = getScanCostContext();
     if (scanCost != null) {
       long currentTotal = _blockDocIdSet.getNumEntriesScannedInFilter();
@@ -88,7 +102,6 @@ public class DocIdSetOperator extends BaseDocIdSetOperator implements AutoClosea
         _lastReportedEntriesScanned = currentTotal;
       }
     }
-    return numDocIds > 0 ? new DocIdSetBlock(docIds, numDocIds) : null;
   }
 
   /// Closes the filter iterator when the consumer stops before the end of the matching documents, for example a

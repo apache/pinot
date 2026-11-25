@@ -19,26 +19,39 @@
 package org.apache.pinot.core.operator;
 
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalInt;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.accounting.QueryMonitorConfig;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.dociditerators.NotDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RestrictedScanDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.query.killing.QueryKillingManager;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
+import org.mockito.MockedStatic;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -48,8 +61,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// [DocIdSetOperator] reports the entries that the filter scans to the scan cost of the query, block by block. A lazy
-/// filter can scan the rest of the segment in the last call, which returns no document, so that call must report too.
+/// [DocIdSetOperator] reports filter scan cost and checks the query budget between restricted scan chunks.
 /// It also closes the scans of a lazy filter when its consumer stops before the end.
 public class DocIdSetOperatorScanCostTest {
   private static final int NUM_DOCS = 50000;
@@ -70,10 +82,51 @@ public class DocIdSetOperatorScanCostTest {
       DocIdSetOperator operator = new DocIdSetOperator(new FixedFilterOperator(filter), MAX_DOCS_PER_BLOCK);
 
       assertEquals(operator.nextBlock().getLength(), MAX_DOCS_PER_BLOCK);
+      assertEquals(scanCost.getNumEntriesScannedInFilter(), (long) RestrictedScanDocIdIterator.MIN_CHUNK_SIZE);
+      assertNull(operator.nextBlock());
       assertNull(operator.nextBlock());
       assertEquals(scan.getNumEntriesScannedInFilter(), NUM_DOCS, "The scan visits every candidate");
       assertEquals(scanCost.getNumEntriesScannedInFilter(), NUM_DOCS, "Every scanned entry must reach the scan cost");
     }
+  }
+
+  @Test
+  public void testScanBudgetIsEnforcedBetweenRestrictedChunks() {
+    long firstChunkSize = RestrictedScanDocIdIterator.MIN_CHUNK_SIZE;
+    PinotConfiguration config = new PinotConfiguration(Map.of(
+        Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, Accounting.ScanKillingMode.ENFORCE.getConfigValue(),
+        Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, firstChunkSize));
+    QueryKillingManager manager = new QueryKillingManager(
+        new AtomicReference<>(new QueryMonitorConfig(config, Runtime.getRuntime().maxMemory())),
+        mock(ServerMetrics.class));
+    manager.rebuildStrategy();
+
+    MutableRoaringBitmap candidates = new MutableRoaringBitmap();
+    candidates.add(0L, NUM_DOCS);
+    CountingScanDocIdSet scan = new CountingScanDocIdSet(MAX_DOCS_PER_BLOCK);
+    AndDocIdSet filter = new AndDocIdSet(List.of(BitmapDocIdSet.create(candidates, NUM_DOCS), scan), null,
+        AndRestrictionPushdown.streaming(MAX_DOCS_PER_BLOCK));
+    try (MockedStatic<QueryKillingManager> killingManager = mockStatic(QueryKillingManager.class);
+        QueryThreadContext ignored = QueryThreadContext.openForSseTest();
+        DocIdSetOperator operator = new DocIdSetOperator(new FixedFilterOperator(filter), MAX_DOCS_PER_BLOCK)) {
+      killingManager.when(QueryKillingManager::getInstance).thenReturn(manager);
+      QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
+      QueryScanCostContext scanCost = new QueryScanCostContext();
+      executionContext.setQueryScanCostContext(scanCost);
+
+      assertEquals(operator.nextBlock().getLength(), MAX_DOCS_PER_BLOCK);
+      assertEquals(scanCost.getNumEntriesScannedInFilter(), firstChunkSize);
+
+      // The next chunk has no matches. It exceeds the budget before another chunk can be scanned.
+      TerminationException failure = expectThrows(TerminationException.class, operator::nextBlock);
+      assertSame(failure, executionContext.getTerminateException());
+      assertEquals(failure.getErrorCode(), QueryErrorCode.QUERY_SCAN_LIMIT_EXCEEDED);
+      long scannedEntries = firstChunkSize + Math.min(firstChunkSize * 2, RestrictedScanDocIdIterator.MAX_CHUNK_SIZE);
+      assertEquals(scanCost.getNumEntriesScannedInFilter(), scannedEntries);
+      assertEquals(scan.getNumEntriesScannedInFilter(), scannedEntries);
+      assertEquals(scan._iterator._numCloseCalls, 1);
+    }
+    assertEquals(scan._iterator._numCloseCalls, 1);
   }
 
   @Test
