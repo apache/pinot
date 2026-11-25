@@ -507,6 +507,73 @@
         ]
       },
       {
+        "description": "Group by an alias that is not a column and uses another alias is unchanged with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT UPPER(col1) AS u, LOWER(u) AS l, COUNT(*) FROM a GROUP BY u, l",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n    PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalProject(u=[UPPER($0)], l=[LOWER(UPPER($0))])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Group by an alias that is not a column and uses a USING column is unchanged with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT UPPER(col1) AS u, COUNT(*) FROM a JOIN b USING (col1) GROUP BY u",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{1}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalProject(col1=[$0], u=[UPPER($0)])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalProject(col1=[$0])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Group by an alias that is also a USING column resolves to the alias with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT UPPER(a.col2) AS col1, COUNT(*) FROM a JOIN b USING (col1) GROUP BY col1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{1}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalProject(col1=[$0], col11=[UPPER($1)])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalProject(col1=[$0])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Group by an alias that is also a column of the outer query only resolves to the alias with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT col1 FROM e WHERE col2 IN (SELECT UPPER(a.col2) AS mcol1 FROM a GROUP BY mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalJoin(condition=[=($1, $2)], joinType=[semi])",
+          "\n    LogicalProject(col1=[$0], col2=[$1])",
+          "\n      PinotLogicalTableScan(table=[[default, e]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          PinotLogicalAggregate(group=[{0}], aggType=[LEAF])",
+          "\n            LogicalProject(mcol1=[UPPER($1)])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Group by a column aliased to its own name is unchanged with preferSelectAliasInGroupBy",
         "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT col1 AS col1, COUNT(*) FROM a GROUP BY col1",
         "output": [
