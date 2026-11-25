@@ -82,6 +82,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -456,6 +457,50 @@ public class RealtimeTableDataManagerTest {
     }
   }
 
+  // The tracker interrupts the caller when its bounded wait is interrupted. Releasing the segments is what stops the
+  // table's consumers, and its own wait would give up at once under that interrupt and drop the queued offloads.
+  @Test
+  public void testShutdownReleasesSegmentsBeforeRestoringTheCallersInterrupt()
+      throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+    File indexDir = Files.createTempDirectory("shutdown-interrupt").toFile();
+    LifecycleTableDataManager table =
+        new LifecycleTableDataManager(indexDir, mock(RealtimeSegmentDataManager.class), false, () -> { });
+    IngestionDelayTracker tracker = (IngestionDelayTracker) FieldUtils.readField(table, "_ingestionDelayTracker", true);
+    doAnswer(invocation -> {
+      Thread.currentThread().interrupt();
+      return null;
+    }).when(tracker).shutdown();
+    try {
+      table.shutDown();
+      assertTrue(table._releasedSegments, "The segments were not released");
+      assertFalse(table._interruptedWhileReleasingSegments,
+          "The segments were released with the caller interrupted, so queued offloads could be dropped");
+      assertTrue(Thread.currentThread().isInterrupted(), "The caller's interrupt must be restored after cleanup");
+    } finally {
+      Thread.interrupted();
+      FileUtils.deleteDirectory(indexDir);
+    }
+  }
+
+  // Releasing the segments is what stops the table's consumers, so a tracker that fails to shut down must not skip it.
+  @Test
+  public void testShutdownReleasesSegmentsWhenTheTrackerFailsToShutDown()
+      throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+    File indexDir = Files.createTempDirectory("shutdown-tracker-failure").toFile();
+    LifecycleTableDataManager table =
+        new LifecycleTableDataManager(indexDir, mock(RealtimeSegmentDataManager.class), false, () -> { });
+    IngestionDelayTracker tracker = (IngestionDelayTracker) FieldUtils.readField(table, "_ingestionDelayTracker", true);
+    doThrow(new IllegalStateException("KafkaConsumer is not safe for multi-threaded access")).when(tracker).shutdown();
+    try {
+      table.shutDown();
+      assertTrue(table._releasedSegments, "The segments were not released after the tracker failed to shut down");
+    } finally {
+      FileUtils.deleteDirectory(indexDir);
+    }
+  }
+
   @DataProvider
   public Object[][] upsertConsistencyModes() {
     return new Object[][]{{ConsistencyMode.NONE}, {ConsistencyMode.SYNC}, {ConsistencyMode.SNAPSHOT}};
@@ -619,6 +664,15 @@ public class RealtimeTableDataManagerTest {
     private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager =
         mock(PartitionUpsertMetadataManager.class);
     private final TableUpsertMetadataManager _upsertMetadataManager = mock(TableUpsertMetadataManager.class);
+    volatile boolean _releasedSegments;
+    volatile boolean _interruptedWhileReleasingSegments;
+
+    @Override
+    protected void releaseAndRemoveAllSegments() {
+      _releasedSegments = true;
+      _interruptedWhileReleasingSegments = Thread.currentThread().isInterrupted();
+      super.releaseAndRemoveAllSegments();
+    }
 
     LifecycleTableDataManager(File indexDir, RealtimeSegmentDataManager segment, boolean upsertEnabled,
         Runnable beforeConstructionReturns)
