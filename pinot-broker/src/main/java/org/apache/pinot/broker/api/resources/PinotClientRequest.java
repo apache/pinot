@@ -72,6 +72,7 @@ import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.querylog.QueryLogger.SqlRedactionMode;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.common.config.provider.StaticTableCache;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -81,7 +82,9 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LoggerUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
@@ -92,9 +95,14 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
+import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.validate.GroupByDiagnostics;
+import org.apache.pinot.query.validate.GroupByDiagnosticsCollector;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -106,6 +114,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
@@ -1176,5 +1185,95 @@ public class PinotClientRequest {
     }
 
     return differences;
+  }
+
+  @POST
+  @Path("query/sql/validateQueryCompilation")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Validate query compilation",
+      notes = "Performs the same compilation step used by the selected query engine without "
+          + "executing the query. Accepts a non-empty `queries` list. "
+          + "For SSE queries, compiles SQL into PinotQuery including rewrites and validation. "
+          + "For MSE queries, parses, validates and optimizes the query into a compiled "
+          + "representation. Optional top-level includeGroupByDiagnostics (default false) adds per-query "
+          + "groupByDiagnostics.overlaps: an array only after successful MSE compilation and observation, "
+          + "otherwise null (including SSE). An empty array is not a SQL-safety or compatibility certificate. "
+          + "Observes direct bare GROUP BY entries matching explicit SELECT aliases and visible inputs, "
+          + "then records Calcite's expanded grouping expression. No binding winner or safety verdict is inferred. "
+          + "Grouping constructs and general grouping expressions are outside v1 coverage. "
+          + "Positions are one-based with inclusive ends in the sanitized parser input; SET text counts.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Compilation validation result"),
+      @ApiResponse(code = 400, message = "Malformed request body"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  @ManualAuthorization
+  public List<SqlCompilationValidationResponse> validateQueryCompilation(SqlCompilationValidationRequest request,
+      @Context HttpHeaders httpHeaders) {
+    List<ObjectNode> queryNodes = request.getQueries();
+    if (queryNodes == null || queryNodes.isEmpty()) {
+      return List.of(
+          new SqlCompilationValidationResponse(false, "Request must include non-empty 'queries'",
+              QueryErrorCode.JSON_PARSING, null,
+              request.isIncludeGroupByDiagnostics() ? new GroupByDiagnostics(null) : null));
+    }
+
+    List<TableConfig> tableConfigs =
+        request.getTableConfigs() != null ? request.getTableConfigs() : List.of();
+    List<Schema> schemas = request.getSchemas() != null ? request.getSchemas() : List.of();
+    TableCache tableCache = !tableConfigs.isEmpty() && !schemas.isEmpty()
+        ? new StaticTableCache(tableConfigs, schemas, request.getLogicalTableConfigs(), request.isIgnoreCase())
+        : _tableCache;
+
+    // Unlike controller validation, broker request items are full query objects rather than raw
+    // SQL strings. Preserve each payload so per-query queryOptions can be used to select the correct
+    // SSE or MSE validation path. Forcing all queries through MSE validation path would fail since SSE validation
+    // is not a subset of MSE validation.
+    List<SqlCompilationValidationResponse> responses = new ArrayList<>(queryNodes.size());
+    for (ObjectNode queryNode : queryNodes) {
+      String sql = null;
+      GroupByDiagnostics groupByDiagnostics =
+          request.isIncludeGroupByDiagnostics() ? new GroupByDiagnostics(null) : null;
+      boolean compiledSuccessfully = false;
+      String errorMessage = null;
+      QueryErrorCode errorCode = null;
+      try {
+        if (queryNode == null || !queryNode.has(Request.SQL) || !queryNode.get(Request.SQL).isTextual()) {
+          responses.add(new SqlCompilationValidationResponse(false, "Each query must include string field 'sql'",
+              QueryErrorCode.JSON_PARSING, null, groupByDiagnostics));
+          continue;
+        }
+
+        sql = queryNode.get(Request.SQL).asText();
+        SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(sql, queryNode);
+        Map<String, String> queryOptionsMap = sqlNodeAndOptions.getOptions();
+        if (QueryOptionsUtils.isUseMultistageEngine(queryOptionsMap)) {
+          String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+          GroupByDiagnosticsCollector diagnostics =
+              request.isIncludeGroupByDiagnostics() ? new GroupByDiagnosticsCollector() : null;
+          try (QueryEnvironment.CompiledQuery compiled = new QueryEnvironment(database, tableCache, null)
+              .compileForValidation(sql, sqlNodeAndOptions, diagnostics)) {
+            // Validation only needs compilation to succeed; the compiled form is intentionally discarded.
+          }
+          if (diagnostics != null) {
+            groupByDiagnostics = diagnostics.getResult();
+          }
+        } else {
+          CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
+        }
+        compiledSuccessfully = true;
+      } catch (QueryException e) {
+        LOGGER.warn("Caught exception while compiling query: {}", e.getMessage());
+        errorMessage = e.getMessage();
+        errorCode = e.getErrorCode();
+      } catch (Exception e) {
+        LOGGER.error("Caught unexpected exception while validating query: {}", e.getMessage());
+        errorMessage = "Unexpected error: " + e.getMessage();
+        errorCode = QueryErrorCode.UNKNOWN;
+      }
+      responses.add(new SqlCompilationValidationResponse(compiledSuccessfully, errorMessage, errorCode, sql,
+          groupByDiagnostics));
+    }
+    return responses;
   }
 }

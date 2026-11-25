@@ -99,6 +99,7 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.query.validate.GroupByAliasShadowedByColumnException;
+import org.apache.pinot.query.validate.GroupByDiagnosticsCollector;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -315,9 +316,27 @@ public class QueryEnvironment {
   /// QueryErrorCode.QUERY_VALIDATION. QueryErrorCode.QUERY_EXECUTION is also possible if there is an error when
   /// a function call is reduced into a constant.
   public CompiledQuery compile(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
+    return compileInternal(sqlQuery, sqlNodeAndOptions, null);
+  }
+
+  /// Validation-endpoint entry point. Validates, converts and optimizes once without executing; the caller must close
+  /// the returned compiled query, just as with [#compile(String, SqlNodeAndOptions)].
+  /// The optional, request-confined collector observes the same validator and catalog as normal compilation.
+  /// Only publish observations after compilation and closure succeed; discard the collector on compilation errors.
+  public CompiledQuery compileForValidation(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable GroupByDiagnosticsCollector groupByDiagnostics) {
+    return compileInternal(sqlQuery, sqlNodeAndOptions, groupByDiagnostics);
+  }
+
+  private CompiledQuery compileInternal(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable GroupByDiagnosticsCollector groupByDiagnostics) {
     PlannerContext plannerContext = null;
     try {
       plannerContext = getPlannerContext(sqlNodeAndOptions);
+      if (groupByDiagnostics != null) {
+        // PlannerContext always creates a Pinot Validator. Enable observation only on this query's instance.
+        plannerContext.getValidator().enableGroupByDiagnostics(groupByDiagnostics);
+      }
 
       SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
       SqlNode queryNode;
@@ -329,6 +348,9 @@ public class QueryEnvironment {
       RelRoot relRoot = compileQuery(queryNode, plannerContext);
       return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
     } catch (QueryException e) {
+      if (plannerContext != null) {
+        plannerContext.close();
+      }
       throw e;
     } catch (Throwable t) {
       if (plannerContext != null) {

@@ -24,6 +24,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -55,6 +56,22 @@ import org.checkerframework.checker.nullness.qual.PolyNull;
 
 /// The `Validator` overwrites Calcite's Validator with Pinot specific logics.
 public class Validator extends SqlValidatorImpl {
+  @Nullable
+  private GroupByDiagnosticsCollector _groupByDiagnostics;
+
+  /// Enables observations on this request-confined validator before validation begins.
+  public void enableGroupByDiagnostics(GroupByDiagnosticsCollector groupByDiagnostics) {
+    _groupByDiagnostics = groupByDiagnostics;
+  }
+
+  @Override
+  public SqlNode validate(SqlNode topNode) {
+    if (_groupByDiagnostics != null) {
+      _groupByDiagnostics.prepare(topNode, getCatalogReader().nameMatcher());
+    }
+    return super.validate(topNode);
+  }
+
 
   /// Pinot conformance that delegates to BABEL but disables non-strict GROUP BY.
   ///
@@ -198,6 +215,7 @@ public class Validator extends SqlValidatorImpl {
   /// Calcite change does not affect them.
   @Override
   protected void validateGroupClause(SqlSelect select) {
+    List<Integer> overlaps = _groupByDiagnostics == null ? List.of() : _groupByDiagnostics.inspect(select, this);
     List<String> aliasNames = _groupByAliasNames.get(select);
     if (aliasNames != null && !_groupByAliasShadowedByColumnFound) {
       SelectScope selectScope = getRawSelectScope(select);
@@ -213,6 +231,9 @@ public class Validator extends SqlValidatorImpl {
       }
     }
     super.validateGroupClause(select);
+    if (_groupByDiagnostics != null) {
+      _groupByDiagnostics.finish(select, overlaps);
+    }
   }
 
   /// Returns whether the validation resolved a `GROUP BY` name to a column although a `SELECT` alias has the same
