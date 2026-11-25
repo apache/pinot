@@ -87,6 +87,7 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_MATERIALIZED_VIEW_RUNTIME_PREFIX = "/CONFIGS/MATERIALIZED_VIEW/RUNTIME";
   private static final String PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX = "/CONFIGS/QUERYWORKLOAD";
   private static final String PROPERTYSTORE_TASK_LOCK_SUFFIX = "-Lock";
+  private static final String PROPERTYSTORE_OPERATION_LEASES_PREFIX = "/OPERATION_LEASES";
 
   public static void setUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
@@ -263,6 +264,28 @@ public class ZKMetadataProvider {
   public static String constructPropertyStorePathForMinionTaskGenerationLock(String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType
         + PROPERTYSTORE_TASK_LOCK_SUFFIX);
+  }
+
+  /// Parent of every operation lease ZNode of a table. It is PERSISTENT and is removed when the table is deleted.
+  public static String constructPropertyStorePathForOperationLeases(String tableNameWithType) {
+    return StringUtil.join("/", PROPERTYSTORE_OPERATION_LEASES_PREFIX, tableNameWithType);
+  }
+
+  /// Path of one operation lease ZNode. `zNodeName` must be a single ZNode name; callers with a lease key use
+  /// `PinotOperationLeaseUtils#getLeasePath`, which validates the key and maps it to a ZNode name.
+  public static String constructPropertyStorePathForOperationLease(String tableNameWithType, String zNodeName) {
+    Preconditions.checkArgument(zNodeName.indexOf('/') < 0, "Operation lease ZNode name must not contain '/': %s",
+        zNodeName);
+    return StringUtil.join("/", PROPERTYSTORE_OPERATION_LEASES_PREFIX, tableNameWithType, zNodeName);
+  }
+
+  /// Removes the operation leases of a table, including leases still held. Called when the table is deleted.
+  public static void removeOperationLeasesFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    String propertyStorePath = constructPropertyStorePathForOperationLeases(tableNameWithType);
+    if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
+      propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+    }
   }
 
   public static String getPropertyStoreWorkloadConfigsPrefix() {
