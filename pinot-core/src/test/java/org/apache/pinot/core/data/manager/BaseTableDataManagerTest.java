@@ -200,6 +200,33 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
+  public void testReleaseAndRemoveAllSegmentsFinishesOffloadsWhenInterrupted()
+      throws Exception {
+    BaseTableDataManager table = createTableManager();
+    int numSegments = 3;
+    CountDownLatch offloaded = new CountDownLatch(numSegments);
+    for (int i = 0; i < numSegments; i++) {
+      SegmentDataManager segmentDataManager = mock(SegmentDataManager.class);
+      doAnswer(invocation -> {
+        Thread.sleep(200);
+        offloaded.countDown();
+        return null;
+      }).when(segmentDataManager).offload();
+      table.registerSegment(SEGMENT_NAME + i, segmentDataManager);
+    }
+
+    Thread.currentThread().interrupt();
+    try {
+      table.releaseAndRemoveAllSegments();
+      assertTrue(Thread.currentThread().isInterrupted());
+      assertEquals(offloaded.getCount(), 0L);
+      assertEquals(table.getNumSegments(), 0);
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  @Test
   @SuppressWarnings("deprecation")
   public void testOnlineSegmentLoadedDuringShutdownIsDestroyed()
       throws Exception {

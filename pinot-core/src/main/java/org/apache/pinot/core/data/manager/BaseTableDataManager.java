@@ -342,13 +342,24 @@ public abstract class BaseTableDataManager implements TableDataManager {
         });
       }
       stopExecutorService.shutdown();
-      try {
-        // Wait at most 10 minutes before exiting this method.
-        if (!stopExecutorService.awaitTermination(10, TimeUnit.MINUTES)) {
-          stopExecutorService.shutdownNow();
+      // Wait at most 10 minutes before exiting this method. An interrupt must not abandon the queued offloads, or a
+      // consuming segment could keep running after its table is gone, so keep waiting and restore the interrupt once
+      // the offloads are done.
+      long deadlineNanos = System.nanoTime() + TimeUnit.MINUTES.toNanos(10);
+      boolean interrupted = false;
+      boolean terminated = false;
+      long remainingNanos;
+      while (!terminated && (remainingNanos = deadlineNanos - System.nanoTime()) > 0) {
+        try {
+          terminated = stopExecutorService.awaitTermination(remainingNanos, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+          interrupted = true;
         }
-      } catch (InterruptedException e) {
+      }
+      if (!terminated) {
         stopExecutorService.shutdownNow();
+      }
+      if (interrupted) {
         Thread.currentThread().interrupt();
       }
     }
