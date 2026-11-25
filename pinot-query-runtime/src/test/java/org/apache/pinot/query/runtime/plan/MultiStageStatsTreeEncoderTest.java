@@ -34,6 +34,7 @@ import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
+import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -279,6 +280,47 @@ public class MultiStageStatsTreeEncoderTest {
     Assert.assertEquals(pbNode.getOperatorTypeId(), MultiStageOperator.Type.PIPELINE_BREAKER.getId());
     Assert.assertEquals(pbNode.getChildrenCount(), 1, "graft must trim to the single receive the fold kept");
     Assert.assertEquals(pbNode.getChildren(0).getOperatorTypeId(), MultiStageOperator.Type.MAILBOX_RECEIVE.getId());
+  }
+
+  /// A pipeline-breaker child does not have to be a single `MAILBOX_RECEIVE` operator. A plugin opchain converter
+  /// may build it as a subtree, for example a root operator over the receive. The fold then prepends the whole
+  /// subtree of the first child, so the graft must walk that subtree instead of counting leading receive entries.
+  /// Without this the encoder throws and the leaf stage's stats are dropped.
+  @Test
+  public void testPipelineBreakerGraftWithMultiOperatorChild()
+      throws IOException {
+    MultiStageOperator innerReceive = mockOperator();
+    MultiStageOperator childRoot = mockOperator(innerReceive);                       // child subtree of 2 operators
+    MultiStageOperator otherChildRoot = mockOperator(mockOperator());                // collapsed by the fold
+    MultiStageOperator pbRoot =
+        mockOperator(MultiStageOperator.Type.PIPELINE_BREAKER, childRoot, otherChildRoot);
+    MultiStageOperator leaf = mockOperator(MultiStageOperator.Type.LEAF);
+    MultiStageOperator send = mockOperator(leaf);
+
+    StatMap<TransformOperator.StatKey> childRootStat =
+        new StatMap<>(TransformOperator.StatKey.class).merge(TransformOperator.StatKey.EMITTED_ROWS, 7);
+    MultiStageQueryStats stats = new MultiStageQueryStats.Builder(1)
+        .customizeOpen(open -> open
+            .addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE,
+                new StatMap<>(BaseMailboxReceiveOperator.StatKey.class))
+            .addLastOperator(MultiStageOperator.Type.TRANSFORM, childRootStat)
+            .addLastOperator(MultiStageOperator.Type.PIPELINE_BREAKER,
+                new StatMap<>(PipelineBreakerOperator.StatKey.class))
+            .addLastOperator(MultiStageOperator.Type.LEAF, new StatMap<>(LeafOperator.StatKey.class))
+            .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class)))
+        .build();
+
+    Worker.MultiStageStatsTree tree = MultiStageStatsTreeEncoder.encode(send, stats, op -> List.of(), pbRoot);
+
+    Worker.StageStatsNode pbNode = tree.getCurrentStage().getChildren(0).getChildren(0);
+    Assert.assertEquals(pbNode.getOperatorTypeId(), MultiStageOperator.Type.PIPELINE_BREAKER.getId());
+    Assert.assertEquals(pbNode.getChildrenCount(), 1, "graft must keep only the child the fold kept");
+    Worker.StageStatsNode childNode = pbNode.getChildren(0);
+    Assert.assertEquals(childNode.getOperatorTypeId(), MultiStageOperator.Type.TRANSFORM.getId());
+    Assert.assertEquals(deserialize(childNode.getStatMap(), TransformOperator.StatKey.class), childRootStat);
+    Assert.assertEquals(childNode.getChildrenCount(), 1);
+    Assert.assertEquals(childNode.getChildren(0).getOperatorTypeId(),
+        MultiStageOperator.Type.MAILBOX_RECEIVE.getId());
   }
 
   /// When the stage did not fold the pipeline breaker (e.g. `skip.pipeline.breaker.stats=true`), the leaf's flat

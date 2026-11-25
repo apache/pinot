@@ -62,10 +62,14 @@ import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
 /// - **Stage did not fold the breaker.** When `skip.pipeline.breaker.stats=true` the leaf opchain does
 ///      not fold the breaker at all (its flat stats are just `LEAF`, `MAILBOX_SEND`). Callers must then
 ///      pass `pipelineBreakerRoot == null` so nothing is grafted — even though a pipeline-breaker opchain ran.
-/// - **Multiple build sides.** A breaker with several `MAILBOX_RECEIVE` children folds to _fewer_
-///      receive entries than it has children, because `PipelineBreakerOperator.calculateUpstreamStats`
-///      collapses same-stage receives via `MultiStageQueryStats.mergeUpstream`. The encoder grafts only the
-///      receives the fold kept (see [#keptPipelineBreakerReceives]), matching what the legacy path also emits.
+/// - **Multiple build sides.** A breaker with several children folds only the first one, because
+///      `PipelineBreakerOperator.calculateUpstreamStats` combines them via `MultiStageQueryStats.mergeUpstream`,
+///      which drops the current-stage entries of every child but the first. The encoder grafts only the child
+///      the fold kept (see [#keptPipelineBreakerChildren]), matching what the legacy path also emits.
+///
+/// A pipeline-breaker child is usually a single `MAILBOX_RECEIVE` operator, but a plugin opchain converter may build
+/// it as a subtree (for example a root operator over the receive). The graft walks the kept child's whole subtree,
+/// so it does not depend on the child's shape or operator types.
 public final class MultiStageStatsTreeEncoder {
   private MultiStageStatsTreeEncoder() {
   }
@@ -118,9 +122,9 @@ public final class MultiStageStatsTreeEncoder {
       throws IOException {
     MultiStageQueryStats.StageStats.Open openStats = stats.getCurrentStats();
     int flatSize = openStats.getLastOperatorIndex() + 1;
-    int keptPipelineBreakerReceives =
-        keptPipelineBreakerReceives(openStats, flatSize, pipelineBreakerRoot, stats.getCurrentStageId());
-    int treeSize = countOperators(root, pipelineBreakerRoot, keptPipelineBreakerReceives);
+    int keptPipelineBreakerChildren =
+        keptPipelineBreakerChildren(openStats, flatSize, pipelineBreakerRoot, stats.getCurrentStageId());
+    int treeSize = countOperators(root, pipelineBreakerRoot, keptPipelineBreakerChildren);
     if (treeSize != flatSize) {
       throw new IllegalStateException("Operator tree size (" + treeSize + ") does not match flat stats list size ("
           + flatSize + ") for stage " + stats.getCurrentStageId()
@@ -128,7 +132,7 @@ public final class MultiStageStatsTreeEncoder {
     }
     int[] cursor = new int[]{0};
     Worker.StageStatsNode rootNode =
-        encodeNode(root, openStats, cursor, planNodeIdResolver, pipelineBreakerRoot, keptPipelineBreakerReceives);
+        encodeNode(root, openStats, cursor, planNodeIdResolver, pipelineBreakerRoot, keptPipelineBreakerChildren);
     return Worker.MultiStageStatsTree.newBuilder()
         .setCurrentStageId(stats.getCurrentStageId())
         .setCurrentStage(rootNode)
@@ -138,13 +142,13 @@ public final class MultiStageStatsTreeEncoder {
   private static Worker.StageStatsNode encodeNode(MultiStageOperator op,
       MultiStageQueryStats.StageStats openStats, int[] cursor,
       Function<MultiStageOperator, List<Integer>> planNodeIdResolver,
-      @Nullable MultiStageOperator pipelineBreakerRoot, int keptPipelineBreakerReceives)
+      @Nullable MultiStageOperator pipelineBreakerRoot, int keptPipelineBreakerChildren)
       throws IOException {
     Worker.StageStatsNode.Builder builder = Worker.StageStatsNode.newBuilder();
     // Inorder: encode children first.
-    for (MultiStageOperator child : effectiveChildren(op, pipelineBreakerRoot, keptPipelineBreakerReceives)) {
+    for (MultiStageOperator child : effectiveChildren(op, pipelineBreakerRoot, keptPipelineBreakerChildren)) {
       builder.addChildren(
-          encodeNode(child, openStats, cursor, planNodeIdResolver, pipelineBreakerRoot, keptPipelineBreakerReceives));
+          encodeNode(child, openStats, cursor, planNodeIdResolver, pipelineBreakerRoot, keptPipelineBreakerChildren));
     }
     int idx = cursor[0]++;
     OperatorTypeDescriptor type = openStats.getOperatorType(idx);
@@ -160,44 +164,41 @@ public final class MultiStageStatsTreeEncoder {
   }
 
   private static int countOperators(MultiStageOperator op, @Nullable MultiStageOperator pipelineBreakerRoot,
-      int keptPipelineBreakerReceives) {
+      int keptPipelineBreakerChildren) {
     int count = 1;
-    for (MultiStageOperator child : effectiveChildren(op, pipelineBreakerRoot, keptPipelineBreakerReceives)) {
-      count += countOperators(child, pipelineBreakerRoot, keptPipelineBreakerReceives);
+    for (MultiStageOperator child : effectiveChildren(op, pipelineBreakerRoot, keptPipelineBreakerChildren)) {
+      count += countOperators(child, pipelineBreakerRoot, keptPipelineBreakerChildren);
     }
     return count;
   }
 
-  /// How many of the pipeline breaker's `MAILBOX_RECEIVE` children the leaf opchain's folded flat stats actually
-  /// kept. The fold (`LeafOperator.calculateUpstreamStats`) prepends the pipeline breaker as an inorder prefix
-  /// of `MAILBOX_RECEIVE` entries followed by a single `PIPELINE_BREAKER`. That prefix can hold
-  /// _fewer_ receives than the live [MultiStageOperator.Type#PIPELINE_BREAKER] operator has children,
-  /// because `PipelineBreakerOperator.calculateUpstreamStats` combines its same-stage receives via
-  /// `MultiStageQueryStats.mergeUpstream`, which collapses their current-stage entries (only the first receive's
-  /// entry survives). We therefore graft only the receives the fold kept; grafting the full live receive list would
-  /// make the tree larger than the flat list (`treeSize > flatSize`).
+  /// How many of the pipeline breaker's children the leaf opchain's folded flat stats actually kept. The fold
+  /// (`LeafOperator.calculateUpstreamStats`) prepends the pipeline breaker as an inorder prefix: the entries of its
+  /// first child's subtree followed by a single `PIPELINE_BREAKER`. Only the first child survives because
+  /// `PipelineBreakerOperator.calculateUpstreamStats` combines its children via `MultiStageQueryStats.mergeUpstream`,
+  /// which drops the current-stage entries of the merged-in children. Grafting every live child would make the tree
+  /// larger than the flat list (`treeSize > flatSize`).
   ///
   /// Returns 0 when there is no pipeline breaker to graft. Callers must pass `pipelineBreakerRoot == null`
   /// when the stage did not fold a pipeline breaker (e.g. `skip.pipeline.breaker.stats=true`); otherwise the
   /// leading entries are not the breaker's and this throws.
   ///
-  /// @throws IllegalStateException if a pipeline breaker is expected but the flat list does not start with
-  ///     `MAILBOX_RECEIVE`* then `PIPELINE_BREAKER` — a genuine shape mismatch we must not silently encode.
-  private static int keptPipelineBreakerReceives(MultiStageQueryStats.StageStats openStats, int flatSize,
+  /// @throws IllegalStateException if a pipeline breaker is expected but the flat list does not hold the first
+  ///     child's entries followed by `PIPELINE_BREAKER` — a genuine shape mismatch we must not silently encode.
+  private static int keptPipelineBreakerChildren(MultiStageQueryStats.StageStats openStats, int flatSize,
       @Nullable MultiStageOperator pipelineBreakerRoot, int stageId) {
     if (pipelineBreakerRoot == null) {
       return 0;
     }
-    int receives = 0;
-    while (receives < flatSize && openStats.getOperatorType(receives) == MultiStageOperator.Type.MAILBOX_RECEIVE) {
-      receives++;
+    List<MultiStageOperator> children = pipelineBreakerRoot.getChildOperators();
+    int kept = children.isEmpty() ? 0 : 1;
+    int prefixSize = kept == 0 ? 0 : countOperators(children.get(0), null, 0);
+    if (prefixSize >= flatSize || openStats.getOperatorType(prefixSize) != MultiStageOperator.Type.PIPELINE_BREAKER) {
+      throw new IllegalStateException("Expected a PIPELINE_BREAKER entry after the " + prefixSize + " entries of the "
+          + "pipeline breaker's first child in the folded leaf stats for stage " + stageId + ", but found "
+          + (prefixSize >= flatSize ? "end of list" : openStats.getOperatorType(prefixSize).name()));
     }
-    if (receives >= flatSize || openStats.getOperatorType(receives) != MultiStageOperator.Type.PIPELINE_BREAKER) {
-      throw new IllegalStateException("Expected a PIPELINE_BREAKER entry after " + receives + " leading "
-          + "MAILBOX_RECEIVE entries in the folded leaf stats for stage " + stageId + ", but found "
-          + (receives >= flatSize ? "end of list" : openStats.getOperatorType(receives).name()));
-    }
-    return receives;
+    return kept;
   }
 
   /// The operators to recurse into for `op`. This is `op.getChildOperators()`, except for a folded
@@ -205,18 +206,18 @@ public final class MultiStageStatsTreeEncoder {
   /// operators occupy the inorder prefix of the leaf opchain's flat stats:
   ///
   /// - at the `LEAF` node the pipeline-breaker root is grafted as an extra child, and
-  /// - at the grafted pipeline-breaker root itself only the first `keptPipelineBreakerReceives` children are
-  ///      walked — the receives the fold actually kept (see [#keptPipelineBreakerReceives]).
+  /// - at the grafted pipeline-breaker root itself only the first `keptPipelineBreakerChildren` children are
+  ///      walked — the children the fold actually kept (see [#keptPipelineBreakerChildren]).
   ///
   /// The graft only applies at the `LEAF` (the sole place a pipeline breaker folds into); the pipeline-breaker
   /// subtree itself contains no `LEAF`, so there is no double-graft.
   private static List<MultiStageOperator> effectiveChildren(MultiStageOperator op,
-      @Nullable MultiStageOperator pipelineBreakerRoot, int keptPipelineBreakerReceives) {
+      @Nullable MultiStageOperator pipelineBreakerRoot, int keptPipelineBreakerChildren) {
     if (pipelineBreakerRoot != null) {
       if (op == pipelineBreakerRoot) {
-        List<MultiStageOperator> receives = op.getChildOperators();
-        int kept = Math.min(keptPipelineBreakerReceives, receives.size());
-        return kept == receives.size() ? receives : receives.subList(0, kept);
+        List<MultiStageOperator> children = op.getChildOperators();
+        int kept = Math.min(keptPipelineBreakerChildren, children.size());
+        return kept == children.size() ? children : children.subList(0, kept);
       }
       if (op.getOperatorType() == MultiStageOperator.Type.LEAF) {
         List<MultiStageOperator> withGraft = new ArrayList<>(op.getChildOperators());
