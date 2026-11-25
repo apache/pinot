@@ -39,11 +39,13 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator.Type;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -51,12 +53,16 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -246,9 +252,9 @@ public class MailboxReceiveOperatorTest {
     }
   }
 
-  /// After an error the mailbox stays in the service's cache until it expires, and the reader callback it holds keeps
-  /// the stream that adapts it reachable. That stream must not point back at the operator, or every failed query
-  /// would pin its operator tree and execution context for as long as the mailbox lingers.
+  /// A mailbox whose sender has not finished stays in the service's cache until it expires, and the reader callback
+  /// it holds keeps the stream that adapts it reachable. That stream must not point back at the operator, or every
+  /// failed query would pin its operator tree and execution context for as long as the mailbox lingers.
   @Test
   public void shouldNotStayReachableFromTheMailboxAfterAnError()
       throws InterruptedException {
@@ -266,6 +272,56 @@ public class MailboxReceiveOperatorTest {
     assertTrue(awaitCleared(operatorRef, queue), "the mailbox must not keep the closed operator reachable");
     // The mailbox is the retention path under test, so it has to stay strongly reachable until this point.
     assertEquals(mailbox.getId(), MAILBOX_ID_1);
+  }
+
+  /// A mailbox whose sender has not finished stays in the service's cache after the operator is done with it, so that
+  /// the sender finds it cancelled. Meanwhile it must not keep the [QueryThreadContext] of the operator: that context
+  /// references the execution context that all the stages of the query on the instance share, and through it large
+  /// objects such as the per-segment operators of the leaf stage.
+  @Test
+  public void shouldNotKeepTheQueryFromMailboxesOfRunningSendersWhenClosed() {
+    ReceivingMailbox mailbox1 = new ReceivingMailbox(MAILBOX_ID_1);
+    ReceivingMailbox mailbox2 = new ReceivingMailbox(MAILBOX_ID_2);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(mailbox2);
+    MailboxReceiveOperator operator;
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED);
+    }
+    assertNotNull(mailbox1.getReceiveOperatorThreadContext());
+    assertNotNull(mailbox2.getReceiveOperatorThreadContext());
+
+    // Closed before the senders send anything, like a receive operator whose data another runtime reads
+    operator.close();
+
+    assertNull(mailbox1.getReceiveOperatorThreadContext());
+    assertNull(mailbox2.getReceiveOperatorThreadContext());
+    verify(_mailboxService, never()).releaseReceivingMailbox(any());
+  }
+
+  @Test
+  public void shouldReleaseMailboxesOfFinishedSendersAfterAnError() {
+    ReceivingMailbox mailbox1 = new ReceivingMailbox(MAILBOX_ID_1);
+    ReceivingMailbox mailbox2 = new ReceivingMailbox(MAILBOX_ID_2);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(mailbox2);
+    MailboxReceiveOperator operator;
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED);
+    }
+    // Sender 1 fails, and sender 2 sends its data and finishes before the operator reads it
+    mailbox1.offer(ErrorMseBlock.fromException(new RuntimeException("TEST ERROR")), List.of(), 1000L);
+    mailbox2.offer(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{1, 1}), List.of(), 1000L);
+    mailbox2.offer(SuccessMseBlock.INSTANCE, List.of(), 1000L);
+
+    assertTrue(operator.nextBlock().isError());
+    operator.cancel(new RuntimeException("TEST ERROR"));
+    operator.close();
+
+    assertNull(mailbox1.getReceiveOperatorThreadContext());
+    assertNull(mailbox2.getReceiveOperatorThreadContext());
+    verify(_mailboxService, atLeastOnce()).releaseReceivingMailbox(mailbox1);
+    verify(_mailboxService, atLeastOnce()).releaseReceivingMailbox(mailbox2);
   }
 
   /// Waits for `ref` to be cleared, prompting collection as it goes. The reference queue does the waiting rather than a

@@ -100,8 +100,13 @@ public class ReceivingMailbox {
 
   private final StatMap<StatKey> _stats = new StatMap<>(StatKey.class);
 
+  /// Set once the sender has offered its last block, or has been told that the mailbox takes no more blocks. The sender
+  /// does not look the mailbox up again after that.
+  private volatile boolean _senderFinished;
+
   /// Following variables are protected with synchronized block.
   private long _lastArriveTime = System.currentTimeMillis();
+  @Nullable
   private QueryThreadContext _receiveOperatorThreadContext;
   private long _untrackedCpuTimeNs;
   private long _untrackedAllocatedBytes;
@@ -133,6 +138,30 @@ public class ReceivingMailbox {
       _untrackedCpuTimeNs = 0;
       _untrackedAllocatedBytes = 0;
     }
+  }
+
+  /// Drops the [QueryThreadContext] registered with [#registerReceiveOperatorThreadContext]. Call it when the receive
+  /// operator will not read from this mailbox anymore. The resource usage of later [#offerRaw] calls is then not
+  /// charged to the query.
+  ///
+  /// The mailbox can stay in the [MailboxService] cache after the receive operator is done, and the
+  /// [QueryThreadContext] references the [QueryExecutionContext] that all the stages of the query on this instance
+  /// share. That context can reference large objects, for example the operators of a leaf stage.
+  public synchronized void unregisterReceiveOperatorThreadContext() {
+    _receiveOperatorThreadContext = null;
+  }
+
+  @VisibleForTesting
+  @Nullable
+  public synchronized QueryThreadContext getReceiveOperatorThreadContext() {
+    return _receiveOperatorThreadContext;
+  }
+
+  /// Returns true if the sender has offered its last block, or has been told that the mailbox takes no more blocks.
+  /// The sender does not look the mailbox up again after that, so the mailbox can be released from the
+  /// [MailboxService] without the risk that the sender creates a new one that nobody reads.
+  public boolean isSenderFinished() {
+    return _senderFinished;
   }
 
   @VisibleForTesting
@@ -224,6 +253,19 @@ public class ReceivingMailbox {
 
   /// Offers a block into the mailbox within the timeout specified, returns the status of the mailbox.
   private ReceivingMailboxStatus offerPrivate(MseBlock block, List<DataBuffer> stats, long timeoutMs) {
+    if (block.isEos()) {
+      // Set before the reader can see the EOS
+      _senderFinished = true;
+    }
+    ReceivingMailboxStatus status = offerToQueue(block, stats, timeoutMs);
+    if (status == ReceivingMailboxStatus.LAST_BLOCK || status == ReceivingMailboxStatus.ALREADY_TERMINATED) {
+      // The sender stops sending when it gets either status
+      _senderFinished = true;
+    }
+    return status;
+  }
+
+  private ReceivingMailboxStatus offerToQueue(MseBlock block, List<DataBuffer> stats, long timeoutMs) {
     long start = System.currentTimeMillis();
     try {
       ReceivingMailboxStatus result;
@@ -278,7 +320,11 @@ public class ReceivingMailbox {
   }
 
   /// Sets an error block into the mailbox. No more blocks are accepted after calling this method.
+  ///
+  /// Called on the sender side, when the sender fails or is cancelled.
   public void setErrorBlock(ErrorMseBlock errorBlock, List<DataBuffer> serializedStats) {
+    // Set before the reader can see the error block
+    _senderFinished = true;
     _blocks.offerEos(errorBlock, serializedStats);
   }
 

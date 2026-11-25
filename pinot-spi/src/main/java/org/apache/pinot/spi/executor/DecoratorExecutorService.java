@@ -26,9 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 
 
 /// DecoratorExecutorService is an abstract class that provides a way to decorate an ExecutorService with additional
@@ -45,15 +43,9 @@ import javax.annotation.Nullable;
 /// TODO: Convert this class and its usages into an Executor instead of an ExecutorService
 public abstract class DecoratorExecutorService implements ExecutorService {
   protected final ExecutorService _executorService;
-  private final Consumer<Future<?>> _onSubmit;
 
   public DecoratorExecutorService(ExecutorService executorService) {
-    this(executorService, null);
-  }
-
-  public DecoratorExecutorService(ExecutorService executorService, @Nullable Consumer<Future<?>> onSubmit) {
     _executorService = executorService;
-    _onSubmit = onSubmit;
   }
 
   /// Decorates the callable task.
@@ -118,29 +110,17 @@ public abstract class DecoratorExecutorService implements ExecutorService {
 
   @Override
   public <T> Future<T> submit(Callable<T> task) {
-    Future<T> future = _executorService.submit(decorate(task));
-    if (_onSubmit != null) {
-      _onSubmit.accept(future);
-    }
-    return future;
+    return _executorService.submit(decorate(task));
   }
 
   @Override
   public <T> Future<T> submit(Runnable task, T result) {
-    Future<T> future = _executorService.submit(decorate(task), result);
-    if (_onSubmit != null) {
-      _onSubmit.accept(future);
-    }
-    return future;
+    return _executorService.submit(decorate(task), result);
   }
 
   @Override
   public Future<?> submit(Runnable task) {
-    Future<?> future = _executorService.submit(decorate(task));
-    if (_onSubmit != null) {
-      _onSubmit.accept(future);
-    }
-    return future;
+    return _executorService.submit(decorate(task));
   }
 
   @Override

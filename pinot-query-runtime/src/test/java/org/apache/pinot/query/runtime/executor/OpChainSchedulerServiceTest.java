@@ -43,7 +43,9 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.executor.DecoratorExecutorService;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
+import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -151,6 +153,23 @@ public class OpChainSchedulerServiceTest {
     }
 
     assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
+  }
+
+  /// A done task keeps its result, and the execution context of the query can stay reachable after the query ends. So
+  /// the op chains must not stay in the context once they are done.
+  @Test
+  public void shouldNotKeepFinishedOpChainsInTheExecutionContext() {
+    Mockito.when(_operatorA.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+
+    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
+    QueryExecutionContext executionContext;
+    try (QueryThreadContext threadContext = QueryThreadContext.openForMseTest()) {
+      executionContext = threadContext.getExecutionContext();
+      schedulerService.register(getChain(_operatorA));
+    }
+
+    TestUtils.waitForCondition(aVoid -> executionContext.getNumTasks() == 0, 10L, 10_000L,
+        "The execution context should not keep the op chains that are done");
   }
 
   @Test
