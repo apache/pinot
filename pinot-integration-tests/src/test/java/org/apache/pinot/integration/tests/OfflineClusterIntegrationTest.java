@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.Timestamp;
@@ -45,6 +48,7 @@ import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
@@ -4598,5 +4602,69 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       // AvgDelay can be negative, so just verify it's a number
       assertNotNull(row.get(4), "AvgDelay should not be null");
     }
+  }
+
+  @Test
+  public void testServerSegmentCrcs()
+      throws Exception {
+    String tableName = getTableName();
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    String baseUrl = getControllerBaseApiUrl();
+
+    // Fetch ZK CRCs as the expected baseline
+    String zkCrcsResponse = sendGetRequest(baseUrl + "/segments/" + tableName + "/crc");
+    Map<String, String> zkCrcs = JsonUtils.stringToObject(zkCrcsResponse, new TypeReference<Map<String, String>>() {
+    });
+    assertEquals(zkCrcs.size(), NUM_SEGMENTS);
+
+    // Fetch per-replica server-loaded CRCs for all segments
+    String serverCrcsResponse = sendGetRequest(baseUrl + "/segments/" + tableNameWithType + "/serverCrcs");
+    Map<String, Map<String, String>> serverCrcs =
+        JsonUtils.stringToObject(serverCrcsResponse, new TypeReference<Map<String, Map<String, String>>>() {
+        });
+    assertEquals(serverCrcs.keySet(), zkCrcs.keySet());
+    for (Map.Entry<String, String> entry : zkCrcs.entrySet()) {
+      String segmentName = entry.getKey();
+      String expectedCrc = entry.getValue();
+      Map<String, String> replicaCrcs = serverCrcs.get(segmentName);
+      assertNotNull(replicaCrcs, "Missing replica CRCs for segment " + segmentName);
+      assertEquals(replicaCrcs.size(), getNumReplicas(),
+          "Expected " + getNumReplicas() + " replicas for segment " + segmentName);
+      for (Map.Entry<String, String> replicaEntry : replicaCrcs.entrySet()) {
+        assertEquals(replicaEntry.getValue(), expectedCrc,
+            "Loaded CRC mismatch for segment " + segmentName + " on server " + replicaEntry.getKey());
+      }
+    }
+
+    // Filter to a subset of segments via repeatable ?segments= query parameter
+    List<String> segmentNames = new ArrayList<>(zkCrcs.keySet());
+    String seg0 = segmentNames.get(0);
+    String seg1 = segmentNames.get(1);
+    String filteredUrl = baseUrl + "/segments/" + tableNameWithType + "/serverCrcs?segments="
+        + URLEncoder.encode(seg0, StandardCharsets.UTF_8) + "&segments="
+        + URLEncoder.encode(seg1, StandardCharsets.UTF_8);
+    Map<String, Map<String, String>> filteredCrcs =
+        JsonUtils.stringToObject(sendGetRequest(filteredUrl), new TypeReference<Map<String, Map<String, String>>>() {
+        });
+    assertEquals(filteredCrcs.keySet(), Set.of(seg0, seg1));
+    assertEquals(filteredCrcs.get(seg0), serverCrcs.get(seg0));
+    assertEquals(filteredCrcs.get(seg1), serverCrcs.get(seg1));
+
+    // Unmatched segment filter returns empty map
+    String unmatchedUrl = baseUrl + "/segments/" + tableNameWithType + "/serverCrcs?segments=nonExistentSegment";
+    Map<String, Map<String, String>> unmatchedCrcs =
+        JsonUtils.stringToObject(sendGetRequest(unmatchedUrl), new TypeReference<Map<String, Map<String, String>>>() {
+        });
+    assertTrue(unmatchedCrcs.isEmpty());
+
+    // Missing table type suffix -> 400 BAD_REQUEST
+    Pair<Integer, String> missingTypeResp =
+        sendGetRequestWithStatusCode(baseUrl + "/segments/" + tableName + "/serverCrcs", null);
+    assertEquals(missingTypeResp.getLeft().intValue(), HttpStatus.SC_BAD_REQUEST);
+
+    // Non-existent table -> 404 NOT_FOUND
+    Pair<Integer, String> missingTableResp =
+        sendGetRequestWithStatusCode(baseUrl + "/segments/nonExistentTable_OFFLINE/serverCrcs", null);
+    assertEquals(missingTableResp.getLeft().intValue(), HttpStatus.SC_NOT_FOUND);
   }
 }
