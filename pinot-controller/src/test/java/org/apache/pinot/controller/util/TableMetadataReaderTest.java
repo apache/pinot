@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -308,6 +309,189 @@ public class TableMetadataReaderTest {
     httpServer.createContext("/tables/" + TABLE_NAME + "/segments/metadata", exchange -> {
       exchange.sendResponseHeaders(500, -1);
       exchange.close();
+    });
+    httpServer.start();
+    _httpServers.add(httpServer);
+    return httpServer;
+  }
+
+  /// Preserves per-replica CRCs across servers, including when replicas of the same segment diverge mid-refresh.
+  @Test
+  public void testGetSegmentCrcsAcrossReplicas()
+      throws Exception {
+    HttpServer s0 = startCrcServer(TABLE_NAME, 200,
+        JsonUtils.objectToString(Map.of("seg_A", "111", "seg_B", "222")), null);
+    HttpServer s1 = startCrcServer(TABLE_NAME, 200,
+        JsonUtils.objectToString(Map.of("seg_A", "999")), null);
+    HttpServer s2 = startCrcServer(TABLE_NAME, 200,
+        JsonUtils.objectToString(Map.of("seg_B", "222")), null);
+
+    Map<String, List<String>> serverToSegments = Map.of(
+        "Server_host0_8098", List.of("seg_A", "seg_B"),
+        "Server_host1_8098", List.of("seg_A"),
+        "Server_host2_8098", List.of("seg_B"));
+    BiMap<String, String> endpoints = HashBiMap.create();
+    endpoints.put("Server_host0_8098", "http://localhost:" + s0.getAddress().getPort());
+    endpoints.put("Server_host1_8098", "http://localhost:" + s1.getAddress().getPort());
+    endpoints.put("Server_host2_8098", "http://localhost:" + s2.getAddress().getPort());
+
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    when(helixResourceManager.getServerToSegmentsMap(TABLE_NAME)).thenReturn(serverToSegments);
+    when(helixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet())).thenReturn(endpoints);
+
+    TableMetadataReader reader = new TableMetadataReader(_executor, _connectionManager, helixResourceManager);
+    Map<String, Map<String, String>> result = reader.getSegmentCrcs(TABLE_NAME, null, TIMEOUT_MS);
+
+    assertEquals(result, Map.of(
+        "seg_A", Map.of("Server_host0_8098", "111", "Server_host1_8098", "999"),
+        "seg_B", Map.of("Server_host0_8098", "222", "Server_host2_8098", "222")));
+  }
+
+  /// Filtering by segments only queries servers hosting those segments and omits unrequested segments from the result.
+  @Test
+  public void testGetSegmentCrcsWithSegmentsFilter()
+      throws Exception {
+    AtomicInteger s0Hits = new AtomicInteger();
+    AtomicInteger s1Hits = new AtomicInteger();
+    AtomicInteger s2Hits = new AtomicInteger();
+    HttpServer s0 = startCrcServer(TABLE_NAME, 200,
+        JsonUtils.objectToString(Map.of("seg_A", "111", "seg_B", "222")), s0Hits);
+    HttpServer s1 = startCrcServer(TABLE_NAME, 200,
+        JsonUtils.objectToString(Map.of("seg_A", "111")), s1Hits);
+    HttpServer s2 = startCrcServer(TABLE_NAME, 200,
+        JsonUtils.objectToString(Map.of("seg_B", "333")), s2Hits);
+
+    Map<String, List<String>> serverToSegments = Map.of(
+        "Server_host0_8098", List.of("seg_A", "seg_B"),
+        "Server_host1_8098", List.of("seg_A"),
+        "Server_host2_8098", List.of("seg_B"));
+    Set<String> expectedServers = Set.of("Server_host0_8098", "Server_host2_8098");
+    BiMap<String, String> endpoints = HashBiMap.create();
+    endpoints.put("Server_host0_8098", "http://localhost:" + s0.getAddress().getPort());
+    endpoints.put("Server_host2_8098", "http://localhost:" + s2.getAddress().getPort());
+
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    when(helixResourceManager.getServerToSegmentsMap(TABLE_NAME)).thenReturn(serverToSegments);
+    when(helixResourceManager.getDataInstanceAdminEndpoints(expectedServers)).thenReturn(endpoints);
+
+    TableMetadataReader reader = new TableMetadataReader(_executor, _connectionManager, helixResourceManager);
+    Map<String, Map<String, String>> result = reader.getSegmentCrcs(TABLE_NAME, List.of("seg_B"), TIMEOUT_MS);
+
+    assertEquals(result, Map.of("seg_B", Map.of("Server_host0_8098", "222", "Server_host2_8098", "333")));
+    assertEquals(s0Hits.get(), 1);
+    assertEquals(s1Hits.get(), 0);
+    assertEquals(s2Hits.get(), 1);
+    verify(helixResourceManager).getDataInstanceAdminEndpoints(expectedServers);
+  }
+
+  /// Empty tables and segment filters matching no servers return an empty map without contacting servers.
+  @Test
+  public void testGetSegmentCrcsEmptyTableAndUnmatchedFilter()
+      throws Exception {
+    PinotHelixResourceManager emptyHelix = mock(PinotHelixResourceManager.class);
+    when(emptyHelix.getServerToSegmentsMap(TABLE_NAME)).thenReturn(Map.of());
+    TableMetadataReader emptyReader = new TableMetadataReader(_executor, _connectionManager, emptyHelix);
+
+    assertEquals(emptyReader.getSegmentCrcs(TABLE_NAME, null, TIMEOUT_MS), Map.of());
+    verify(emptyHelix, never()).getDataInstanceAdminEndpoints(anySet());
+
+    PinotHelixResourceManager helix = mock(PinotHelixResourceManager.class);
+    when(helix.getServerToSegmentsMap(TABLE_NAME)).thenReturn(Map.of("Server_host0_8098", List.of("seg_A")));
+    TableMetadataReader reader = new TableMetadataReader(_executor, _connectionManager, helix);
+
+    assertEquals(reader.getSegmentCrcs(TABLE_NAME, List.of("seg_missing"), TIMEOUT_MS), Map.of());
+    verify(helix, never()).getDataInstanceAdminEndpoints(anySet());
+  }
+
+  /// A healthy server that has not yet loaded an assigned segment is simply absent for that segment.
+  @Test
+  public void testGetSegmentCrcsMissingSegmentOnOneReplica()
+      throws Exception {
+    HttpServer s0 = startCrcServer(TABLE_NAME, 200, JsonUtils.objectToString(Map.of("seg_A", "111")), null);
+    HttpServer s1 = startCrcServer(TABLE_NAME, 200, "{}", null);
+
+    Map<String, List<String>> serverToSegments = Map.of(
+        "Server_host0_8098", List.of("seg_A"),
+        "Server_host1_8098", List.of("seg_A"));
+    BiMap<String, String> endpoints = HashBiMap.create();
+    endpoints.put("Server_host0_8098", "http://localhost:" + s0.getAddress().getPort());
+    endpoints.put("Server_host1_8098", "http://localhost:" + s1.getAddress().getPort());
+
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    when(helixResourceManager.getServerToSegmentsMap(TABLE_NAME)).thenReturn(serverToSegments);
+    when(helixResourceManager.getDataInstanceAdminEndpoints(anySet())).thenReturn(endpoints);
+
+    TableMetadataReader reader = new TableMetadataReader(_executor, _connectionManager, helixResourceManager);
+    Map<String, Map<String, String>> result = reader.getSegmentCrcs(TABLE_NAME, null, TIMEOUT_MS);
+
+    assertEquals(result, Map.of("seg_A", Map.of("Server_host0_8098", "111")));
+  }
+
+  /// Any failing server (500, 404, or malformed JSON) must fail the whole call instead of returning partial CRCs.
+  @Test
+  public void testGetSegmentCrcsFailsOnServerError()
+      throws Exception {
+    for (Object[] failureCase : new Object[][]{{500, ""}, {404, ""}, {200, "not-json"}, {200, "null"}}) {
+      int statusCode = (int) failureCase[0];
+      String body = (String) failureCase[1];
+      HttpServer healthy = startCrcServer(TABLE_NAME, 200, JsonUtils.objectToString(Map.of("seg_A", "111")), null);
+      HttpServer broken = startCrcServer(TABLE_NAME, statusCode, body, null);
+
+      Map<String, List<String>> serverToSegments = Map.of(
+          "Server_host0_8098", List.of("seg_A"),
+          "Server_host1_8098", List.of("seg_A"));
+      BiMap<String, String> endpoints = HashBiMap.create();
+      endpoints.put("Server_host0_8098", "http://localhost:" + healthy.getAddress().getPort());
+      endpoints.put("Server_host1_8098", "http://localhost:" + broken.getAddress().getPort());
+
+      PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+      when(helixResourceManager.getServerToSegmentsMap(TABLE_NAME)).thenReturn(serverToSegments);
+      when(helixResourceManager.getDataInstanceAdminEndpoints(anySet())).thenReturn(endpoints);
+
+      TableMetadataReader reader = new TableMetadataReader(_executor, _connectionManager, helixResourceManager);
+      assertThrows(IOException.class, () -> reader.getSegmentCrcs(TABLE_NAME, null, TIMEOUT_MS));
+    }
+  }
+
+  /// Database-prefixed table names are properly encoded when requesting server CRC endpoints.
+  @Test
+  public void testGetSegmentCrcsDatabasePrefixedTable()
+      throws Exception {
+    String dbTableName = "myDb.testTable_OFFLINE";
+    HttpServer server = startCrcServer(dbTableName, 200, JsonUtils.objectToString(Map.of("seg_A", "555")), null);
+
+    Map<String, List<String>> serverToSegments = Map.of("Server_host0_8098", List.of("seg_A"));
+    BiMap<String, String> endpoints = HashBiMap.create();
+    endpoints.put("Server_host0_8098", "http://localhost:" + server.getAddress().getPort());
+
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    when(helixResourceManager.getServerToSegmentsMap(dbTableName)).thenReturn(serverToSegments);
+    when(helixResourceManager.getDataInstanceAdminEndpoints(anySet())).thenReturn(endpoints);
+
+    TableMetadataReader reader = new TableMetadataReader(_executor, _connectionManager, helixResourceManager);
+    Map<String, Map<String, String>> result = reader.getSegmentCrcs(dbTableName, null, TIMEOUT_MS);
+
+    assertEquals(result, Map.of("seg_A", Map.of("Server_host0_8098", "555")));
+  }
+
+  private HttpServer startCrcServer(String tableNameWithType, int statusCode, String responseBody,
+      @Nullable AtomicInteger hitCounter)
+      throws IOException {
+    byte[] bodyBytes = responseBody.getBytes(StandardCharsets.UTF_8);
+    HttpServer httpServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    httpServer.createContext("/tables/" + tableNameWithType + "/segments/crc", exchange -> {
+      if (hitCounter != null) {
+        hitCounter.incrementAndGet();
+      }
+      if (statusCode >= 300) {
+        exchange.sendResponseHeaders(statusCode, -1);
+        exchange.close();
+        return;
+      }
+      exchange.sendResponseHeaders(statusCode, bodyBytes.length);
+      try (OutputStream out = exchange.getResponseBody()) {
+        out.write(bodyBytes);
+      }
     });
     httpServer.start();
     _httpServers.add(httpServer);

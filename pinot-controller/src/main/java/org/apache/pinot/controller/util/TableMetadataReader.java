@@ -301,6 +301,49 @@ public class TableMetadataReader {
         timeoutMs);
   }
 
+  /// Fetches per-replica loaded segment CRCs from hosting servers for the given table.
+  ///
+  /// @param tableNameWithType Table name with type suffix (e.g. `myTable_OFFLINE`)
+  /// @param segments Optional list of segment names to filter; null or empty fetches all segments
+  /// @param timeoutMs Timeout in milliseconds for server admin HTTP requests
+  /// @return Map of segment name to a map of server instance name to loaded CRC string
+  public Map<String, Map<String, String>> getSegmentCrcs(String tableNameWithType, @Nullable List<String> segments,
+      int timeoutMs)
+      throws InvalidConfigException, IOException {
+    Map<String, List<String>> serverToSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    if (serverToSegments.isEmpty()) {
+      return Map.of();
+    }
+
+    Set<String> segmentFilter = null;
+    Set<String> targetServers;
+    if (CollectionUtils.isNotEmpty(segments)) {
+      segmentFilter = new HashSet<>(segments);
+      targetServers = new HashSet<>();
+      for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
+        for (String segment : entry.getValue()) {
+          if (segmentFilter.contains(segment)) {
+            targetServers.add(entry.getKey());
+            break;
+          }
+        }
+      }
+      if (targetServers.isEmpty()) {
+        return Map.of();
+      }
+    } else {
+      targetServers = serverToSegments.keySet();
+    }
+
+    BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(targetServers);
+    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        new ServerSegmentMetadataReader(_executor, _connectionManager,
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
+    return serverSegmentMetadataReader.getSegmentCrcsFromServers(tableNameWithType, endpoints, segmentFilter,
+        timeoutMs);
+  }
+
   public class TableReloadJsonResponse {
     private int _numFailedResponses;
     private Map<String, JsonNode> _serverReloadJsonResponses;
