@@ -34,9 +34,11 @@ import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -229,10 +231,11 @@ public class ArrayToMvValidationVisitorTest {
 
     validate(match(plainMeasure, null), true);
     for (MatchNode node : List.of(match(arrayToMv, null), match(plainMeasure, defineWithArrayToMv))) {
-      QueryException e = expectThrows(ArrayToMvValidationVisitor.ArrayToMvValidationException.class,
-          () -> validate(node, true));
+      QueryException e = expectThrows(QueryException.class, () -> validate(node, true));
+      assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_PLANNING);
       assertTrue(e.getMessage().startsWith("ARRAY_TO_MV found in MATCH_RECOGNIZE MEASURES or DEFINE in the "
           + "intermediate stage"), e.getMessage());
+      assertTrue(e.getMessage().endsWith(ArrayToMvValidationVisitor.SUPPORTED_USES), e.getMessage());
     }
   }
 
