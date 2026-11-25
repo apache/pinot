@@ -40,16 +40,16 @@ import java.util.function.Supplier;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigestInput;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.TDigestTestUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -58,14 +58,12 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
+
 
 public class PercentileTDigestAggregationFunctionTest {
+  private static final int TDIGEST_TYPE = 10;
+
   private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
   private static final Supplier<Map<String, LegacyReducerReference>> LEGACY_REDUCER_RANK_ERRORS =
       Suppliers.memoize(PercentileTDigestAggregationFunctionTest::loadLegacyReducerRankErrors);
@@ -532,10 +530,9 @@ public class PercentileTDigestAggregationFunctionTest {
     }
     TDigest empty = TDigestAccumulator.forLegacyAggregation(20.0);
 
-    PercentileTDigestAggregationFunction function =
-        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
-    TDigest lazyResult = function.deserializeIntermediateResult(
-        new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(oversizedSmall.array())));
+    PercentileTDigestAggregationFunction function = new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
+    TDigest lazyResult =
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(oversizedSmall.array())));
     assertEquals(function.serializeIntermediateResult(lazyResult).getBytes(), oversizedSmall.array());
     assertOversizedSmallIntermediateRoundTrip(function, lazyResult, numCentroids, true);
 
@@ -570,8 +567,8 @@ public class PercentileTDigestAggregationFunctionTest {
 
   private static void assertOversizedSmallIntermediateRoundTrip(PercentileTDigestAggregationFunction function,
       TDigest result, int expectedSize, boolean preservesInput) {
-    SerializedIntermediateResult serializedResult = function.serializeIntermediateResult(result);
-    Assert.assertEquals(serializedResult.getType(), ObjectSerDeUtils.ObjectType.TDigest.getValue());
+    SerializedResult serializedResult = function.serializeIntermediateResult(result);
+    Assert.assertEquals(serializedResult.getType(), TDIGEST_TYPE);
     byte[] serializedBytes = serializedResult.getBytes();
     if (preservesInput) {
       assertEquals(ByteBuffer.wrap(serializedBytes).getInt(), TDigestCodec.SMALL_ENCODING);
@@ -1065,9 +1062,9 @@ public class PercentileTDigestAggregationFunctionTest {
       maxRankErrors[i] += 1.0 / numValues;
     }
     // Serialize before any query or compression so the codec cannot mask an extra reducer merge pass.
-    SerializedIntermediateResult serializedResult = function.serializeIntermediateResult(result);
+    SerializedResult serializedResult = function.serializeIntermediateResult(result);
     assertValidReducerResult(result, rawValues, caseDescription, maxRankErrors);
-    Assert.assertEquals(serializedResult.getType(), ObjectSerDeUtils.ObjectType.TDigest.getValue());
+    Assert.assertEquals(serializedResult.getType(), TDIGEST_TYPE);
     TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(serializedResult.getBytes());
     Assert.assertTrue(roundTripped instanceof TDigestAccumulator);
     for (double quantile : new double[]{0.0, 0.5, 0.75, 0.95, 0.99, 1.0}) {
@@ -1590,8 +1587,7 @@ public class PercentileTDigestAggregationFunctionTest {
       digest.add(value);
     }
     byte[] bytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(digest);
-    return function.deserializeIntermediateResult(new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(),
-        ByteBuffer.wrap(bytes)));
+    return function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(bytes)));
   }
 
   private static int lowerBound(double[] sortedValues, double value) {

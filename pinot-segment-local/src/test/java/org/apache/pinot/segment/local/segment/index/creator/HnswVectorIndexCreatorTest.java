@@ -18,20 +18,59 @@
  */
 package org.apache.pinot.segment.local.segment.index.creator;
 
+import com.google.common.base.Throwables;
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.codecs.KnnVectorsFormat;
+import org.apache.lucene.codecs.KnnVectorsWriter;
+import org.apache.lucene.codecs.hnsw.HnswGraphProvider;
+import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsWriter;
+import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.FieldInfos;
+import org.apache.lucene.index.SegmentInfo;
+import org.apache.lucene.index.SegmentReader;
+import org.apache.lucene.index.SegmentWriteState;
+import org.apache.lucene.store.ByteBuffersDirectory;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.MergeInfo;
+import org.apache.lucene.util.InfoStream;
+import org.apache.lucene.util.StringHelper;
+import org.apache.lucene.util.Version;
+import org.apache.lucene.util.hnsw.HnswGraph;
+import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswCodec;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class HnswVectorIndexCreatorTest {
@@ -67,6 +106,111 @@ public class HnswVectorIndexCreatorTest {
   public void tearDown()
       throws IOException {
     FileUtils.deleteDirectory(INDEX_DIR);
+  }
+
+  @Test
+  public void testMmapWriterSelection()
+      throws IOException {
+    HnswVectorsFormat mmapFormat = new HnswVectorsFormat(16, 100, 1024, INDEX_DIR.toPath());
+    HnswVectorsFormat heapFormat = new HnswVectorsFormat(16, 100, 1024);
+    IOContext forcedMerge = IOContext.merge(new MergeInfo(4, 0, false, 1));
+    assertFalse(usesHeapWriter(mmapFormat, forcedMerge));
+    assertTrue(usesHeapWriter(heapFormat, forcedMerge));
+    assertTrue(usesHeapWriter(mmapFormat, IOContext.DEFAULT));
+    assertTrue(usesHeapWriter(mmapFormat, IOContext.merge(new MergeInfo(4, 0, false, -1))));
+  }
+
+  @Test
+  public void testConcurrentMergeWriterSelection()
+      throws IOException {
+    Map<String, String> properties = new HashMap<>(Map.of("vectorDimension", "8", "buildThreads", "2",
+        "concurrentMerge", "true"));
+    IOContext forcedMerge = IOContext.merge(new MergeInfo(4, 0, false, 1));
+    try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+      for (String mmap : new String[]{null, "false", "true"}) {
+        if (mmap != null) {
+          properties.put(VectorIndexConfig.MMAP_GRAPH_ON_MERGE, mmap);
+        }
+        VectorIndexConfig config = new VectorIndexConfig(properties);
+        boolean expectConcurrent = !"true".equals(mmap);
+        assertEquals(config.isHnswConcurrentMerge(), expectConcurrent);
+        HnswCodec codec = (HnswCodec) VectorIndexUtils.getImmutableIndexWriterConfig(config, INDEX_DIR.toPath(),
+            config.isHnswConcurrentMerge() ? executor : null).getCodec();
+        assertEquals(usesHeapWriter(codec.getKnnVectorsFormatForField("foo"), forcedMerge), expectConcurrent);
+      }
+    }
+  }
+
+  private static boolean usesHeapWriter(KnnVectorsFormat format, IOContext context)
+      throws IOException {
+    try (ByteBuffersDirectory directory = new ByteBuffersDirectory()) {
+      SegmentInfo segmentInfo = new SegmentInfo(directory, Version.LATEST, Version.LATEST, "_0", 4, false, false,
+          Codec.getDefault(), Map.of(), StringHelper.randomId(), Map.of(), null);
+      SegmentWriteState state = new SegmentWriteState(InfoStream.NO_OUTPUT, directory, segmentInfo, FieldInfos.EMPTY,
+          null, context);
+      try (KnnVectorsWriter writer = format.fieldsWriter(state)) {
+        return writer instanceof Lucene99HnswVectorsWriter;
+      }
+    }
+  }
+
+  @Test
+  public void testForcedMergeIndexCanBeRead()
+      throws IOException {
+    float[][] vectors = new float[128][1024];
+    Random random = new Random(42);
+    for (float[] vector : vectors) {
+      for (int dim = 0; dim < vector.length; dim++) {
+        vector[dim] = random.nextFloat() - 0.5f;
+      }
+    }
+    MergedIndex heapIndex = mergeAndReadGraph("embeddingHeap", vectors, true);
+    MergedIndex mmapIndex = mergeAndReadGraph("embeddingMmap", vectors, false);
+    // Lucene can omit a heap-built graph on small leaves. The mmap graph must contain every indexed vector.
+    assertEquals(mmapIndex.graphSize(), vectors.length);
+    assertEquals(mmapIndex.nearestDocs(), heapIndex.nearestDocs());
+  }
+
+  private static MergedIndex mergeAndReadGraph(String column, float[][] vectors, boolean optOut)
+      throws IOException {
+    // A low connection limit exercises pruning during the final merge.
+    Map<String, String> properties = new HashMap<>(Map.of("vectorDimension", "1024", "maxCon", "4",
+        "maxBufferSizeMB", "0.15"));
+    if (optOut) {
+      properties.put(VectorIndexConfig.MMAP_GRAPH_ON_MERGE, "false");
+    }
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    Path path = INDEX_DIR.toPath().resolve(column + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator(column, INDEX_DIR, config);
+        FSDirectory directory = FSDirectory.open(path)) {
+      for (float[] vector : vectors) {
+        creator.add(vector);
+      }
+      long leaves = Arrays.stream(directory.listAll()).filter(name -> name.endsWith(".si")).count();
+      assertTrue(leaves > 1 && leaves < 10, "Expected multiple Lucene segments below the background merge threshold");
+      creator.seal();
+    }
+    int[] nearestDocs = new int[vectors.length];
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader(column, INDEX_DIR, vectors.length, config)) {
+      // Compare the readers after exhaustive graph traversal, including visits to upper levels.
+      reader.setUseRelativeDistance(false);
+      for (int i = 0; i < vectors.length; i++) {
+        int[] matches = reader.getDocIds(vectors[i], 1).toArray();
+        assertEquals(matches.length, 1);
+        nearestDocs[i] = matches[0];
+      }
+    }
+    try (FSDirectory directory = FSDirectory.open(path); DirectoryReader reader = DirectoryReader.open(directory)) {
+      assertEquals(reader.leaves().size(), 1);
+      assertEquals(reader.numDocs(), vectors.length);
+      SegmentReader segment = (SegmentReader) reader.leaves().getFirst().reader();
+      PerFieldKnnVectorsFormat.FieldsReader fields = (PerFieldKnnVectorsFormat.FieldsReader) segment.getVectorReader();
+      HnswGraph graph = ((HnswGraphProvider) fields.getFieldReader(column)).getGraph(column);
+      return new MergedIndex(graph.size(), nearestDocs);
+    }
+  }
+
+  private record MergedIndex(int graphSize, int[] nearestDocs) {
   }
 
   @Test
@@ -177,6 +321,223 @@ public class HnswVectorIndexCreatorTest {
       Assert.assertEquals(debugInfo.get("effectiveHnswUseBoundedQueue"), Boolean.FALSE);
       Assert.assertEquals(debugInfo.get("supportsPreFilter"), reader.supportsPreFilter(),
           "Debug info must report the reader's actual pre-filter capability, not a hardcoded literal");
+    }
+  }
+
+  @DataProvider
+  public Object[][] parallelBuilds() {
+    // buildThreads, forceMerge, concurrentMerge, mmapGraphOnMerge, parallelBuildMaxDocs
+    // The last case outgrows the buffer and falls back to one writer.
+    return new Object[][]{
+        {1, true, false, null, 50_000}, {4, true, false, null, 50_000}, {4, true, true, null, 50_000},
+        {4, true, false, "false", 50_000}, {16, false, false, null, 50_000}, {3, false, false, null, 100}
+    };
+  }
+
+  /// Every build mode, including the default single writer, must index each row under its own doc id: searching for a
+  /// stored vector finds that row.
+  @Test(dataProvider = "parallelBuilds")
+  public void testParallelBuildKeepsDocIds(int buildThreads, boolean forceMerge, boolean concurrentMerge,
+      String mmapGraphOnMerge, int parallelBuildMaxDocs)
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "parallel");
+    FileUtils.forceMkdir(indexDir);
+    Path sentinel = Files.writeString(indexDir.toPath().resolve("bar.hnsw.part0"), "unrelated file");
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "8");
+    properties.put("buildThreads", String.valueOf(buildThreads));
+    properties.put("forceMerge", String.valueOf(forceMerge));
+    properties.put("concurrentMerge", String.valueOf(concurrentMerge));
+    if (mmapGraphOnMerge != null) {
+      properties.put(VectorIndexConfig.MMAP_GRAPH_ON_MERGE, mmapGraphOnMerge);
+    }
+    properties.put("parallelBuildMaxDocs", String.valueOf(parallelBuildMaxDocs));
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    // Small enough for Lucene to skip building graphs unless the parallel writers explicitly request them.
+    int numDocs = 512;
+    float[][] vectors = new float[numDocs][8];
+    Random random = new Random(42);
+    try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("bar", indexDir, config)) {
+      float[] reused = new float[8];
+      for (int i = 0; i < numDocs; i++) {
+        for (int d = 0; d < 8; d++) {
+          vectors[i][d] = random.nextFloat();
+          reused[d] = vectors[i][d];
+        }
+        // The creator must copy the row, since callers reuse the array
+        creator.add(reused);
+      }
+      creator.seal();
+    }
+    assertEquals(Files.readString(sentinel), "unrelated file");
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader("bar", indexDir, numDocs, config)) {
+      int expectedLeaves = forceMerge || numDocs > parallelBuildMaxDocs ? 1 : buildThreads;
+      assertEquals(reader.getIndexDebugInfo().get("luceneSegments"), expectedLeaves);
+      for (int docId = 0; docId < numDocs; docId += 37) {
+        // k widens the HNSW search beam; with k = 1 the approximate search can miss even an exact match
+        assertTrue(reader.getDocIds(vectors[docId], 10).contains(docId), "Doc " + docId + " not found");
+      }
+    }
+    File index = new File(indexDir, "bar" + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    if (buildThreads > 1 && numDocs <= parallelBuildMaxDocs) {
+      try (Directory directory = FSDirectory.open(index.toPath());
+          DirectoryReader reader = DirectoryReader.open(directory)) {
+        for (var leaf : reader.leaves()) {
+          SegmentReader segment = (SegmentReader) leaf.reader();
+          PerFieldKnnVectorsFormat.FieldsReader fields =
+              (PerFieldKnnVectorsFormat.FieldsReader) segment.getVectorReader();
+          assertEquals(((HnswGraphProvider) fields.getFieldReader("bar")).getGraph("bar").size(),
+              segment.numDocs(), "Every parallel-build leaf should retain its HNSW graph");
+        }
+      }
+    }
+    assertEquals(index.listFiles(File::isDirectory).length, 0, "Scratch directories must be removed after seal");
+    assertEquals(indexDir.list().length, 3, "Expected only the index, its doc-id mapping and the sentinel");
+  }
+
+  @DataProvider
+  public Object[][] sealFailures() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "sealFailures")
+  public void testFailedParallelSealCleansUp(boolean interrupt)
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "failed");
+    VectorIndexConfig config = new VectorIndexConfig(Map.of("vectorDimension", "2", "buildThreads", "2",
+        VectorIndexConfig.STORE_IN_SEGMENT_FILE, "true"));
+    try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("bar", indexDir, config)) {
+      creator.add(new float[]{1, 2});
+      creator.add(interrupt ? new float[]{3, 4} : new float[0]);
+      if (interrupt) {
+        Thread.currentThread().interrupt();
+      }
+      RuntimeException failure = expectThrows(RuntimeException.class, creator::seal);
+      if (interrupt) {
+        assertTrue(Thread.currentThread().isInterrupted(), "Sealing must preserve cancellation");
+      } else {
+        assertEquals(Throwables.getRootCause(failure).getMessage(), "cannot index an empty vector");
+      }
+    } finally {
+      // Leave the TestNG worker ready for the next invocation.
+      Thread.interrupted();
+    }
+    File index = new File(indexDir, "bar" + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    assertEquals(indexDir.listFiles(file -> !file.equals(index)).length, 0,
+        "A failed seal must leave neither scratch directories nor a packed index");
+    if (index.exists()) {
+      assertEquals(index.listFiles(File::isDirectory).length, 0, "Scratch directories must be removed on failure");
+      try (Directory directory = FSDirectory.open(index.toPath())) {
+        assertFalse(DirectoryReader.indexExists(directory), "A failed seal must not commit a partial index");
+      }
+    }
+  }
+
+  /// A COSINE index returns the cosine distances of the documents each search returns, the same documents as
+  /// `getDocIds`, and keeps nothing between searches; other distance functions return none.
+  @Test
+  public void testServesCosineDistances()
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "cosine");
+    FileUtils.forceMkdir(indexDir);
+    float[][] vectors = new float[200][8];
+    Random random = new Random(7);
+    for (float[] vector : vectors) {
+      for (int d = 0; d < vector.length; d++) {
+        vector[d] = random.nextFloat() - 0.5f;
+      }
+    }
+    for (String distanceFunction : new String[]{"COSINE", "EUCLIDEAN"}) {
+      Map<String, String> properties = new HashMap<>();
+      properties.put("vectorIndexType", "HNSW");
+      properties.put("vectorDimension", "8");
+      properties.put("vectorDistanceFunction", distanceFunction);
+      properties.put("buildThreads", "4");
+      properties.put("forceMerge", "false");
+      VectorIndexConfig config = new VectorIndexConfig(properties);
+      FileUtils.cleanDirectory(indexDir);
+      try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("baz", indexDir, config)) {
+        for (float[] vector : vectors) {
+          creator.add(vector);
+        }
+        creator.seal();
+      }
+      try (HnswVectorIndexReader reader = new HnswVectorIndexReader("baz", indexDir, vectors.length, config)) {
+        float[] query = vectors[3];
+        MutableRoaringBitmap allowed = new MutableRoaringBitmap();
+        allowed.add(10L, 60L);
+        if (distanceFunction.equals("EUCLIDEAN")) {
+          Assert.assertNull(reader.getCosineDistances(query, 5));
+          Assert.assertNull(reader.getCosineDistances(query, 5, allowed));
+          continue;
+        }
+        Int2FloatMap distances = reader.getCosineDistances(query, 20);
+        Assert.assertEquals(sortedDocIds(distances), reader.getDocIds(query, 20).toArray());
+        assertCosineDistances(distances, vectors, query);
+
+        Int2FloatMap filtered = reader.getCosineDistances(query, 5, allowed);
+        Assert.assertEquals(sortedDocIds(filtered), reader.getDocIds(query, 5, allowed).toArray());
+        for (int docId : filtered.keySet()) {
+          Assert.assertTrue(allowed.contains(docId), "Filtered search returned doc outside the filter: " + docId);
+        }
+        assertCosineDistances(filtered, vectors, query);
+        Assert.assertTrue(reader.getCosineDistances(query, 5, new MutableRoaringBitmap()).isEmpty());
+
+        // Stateless: a later search does not see the documents of an earlier one.
+        Assert.assertEquals(reader.getCosineDistances(query, 3).size(), 3);
+      }
+    }
+  }
+
+  /// The metric persisted in the index decides whether distances are served: a table config changed to another
+  /// function without rebuilding the index must not convert the old scores as cosine scores.
+  @Test
+  public void testServesDistancesByThePersistedMetric()
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "metric");
+    FileUtils.forceMkdir(indexDir);
+    float[][] vectors = {{2, 0}, {0, 1}, {1, 1}, {3, 4}};
+    float[] query = {1, 0};
+    for (String[] builtAndLoaded : new String[][]{{"EUCLIDEAN", "COSINE"}, {"COSINE", "EUCLIDEAN"}}) {
+      FileUtils.cleanDirectory(indexDir);
+      try (HnswVectorIndexCreator creator =
+          new HnswVectorIndexCreator("baz", indexDir, hnswConfig(builtAndLoaded[0]))) {
+        for (float[] vector : vectors) {
+          creator.add(vector);
+        }
+        creator.seal();
+      }
+      try (HnswVectorIndexReader reader =
+          new HnswVectorIndexReader("baz", indexDir, vectors.length, hnswConfig(builtAndLoaded[1]))) {
+        if (builtAndLoaded[0].equals("EUCLIDEAN")) {
+          Assert.assertNull(reader.getCosineDistances(query, 4));
+          Assert.assertNull(reader.getCosineDistances(query, 4, MutableRoaringBitmap.bitmapOf(0, 1)));
+        } else {
+          assertCosineDistances(reader.getCosineDistances(query, 4), vectors, query);
+        }
+      }
+    }
+  }
+
+  private static VectorIndexConfig hnswConfig(String distanceFunction) {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "2");
+    properties.put("vectorDistanceFunction", distanceFunction);
+    return new VectorIndexConfig(properties);
+  }
+
+  private static int[] sortedDocIds(Int2FloatMap distances) {
+    int[] docIds = distances.keySet().toIntArray();
+    Arrays.sort(docIds);
+    return docIds;
+  }
+
+  private static void assertCosineDistances(Int2FloatMap distances, float[][] vectors, float[] query) {
+    for (Int2FloatMap.Entry entry : distances.int2FloatEntrySet()) {
+      Assert.assertEquals(entry.getFloatValue(), VectorFunctions.cosineDistance(vectors[entry.getIntKey()], query),
+          1e-5);
     }
   }
 }

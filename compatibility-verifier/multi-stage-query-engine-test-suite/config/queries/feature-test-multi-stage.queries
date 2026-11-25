@@ -29,3 +29,7 @@ SELECT * FROM (SELECT stringDimSV1 FROM FeatureTest1 WHERE generationNumber = __
 
 # Windows
 SELECT stringDimSV1, longMetric1, SUM(longMetric1) OVER (PARTITION BY stringDimSV1), AVG(longMetric1) OVER (PARTITION BY stringDimSV1) FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__
+
+# Group by a multi-value column in the leaf stage. These queries must keep the plan that old servers run.
+SELECT ARRAY_TO_MV(stringDimMV1) AS mv, COUNT(*) AS cnt FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__ GROUP BY ARRAY_TO_MV(stringDimMV1)
+SELECT ARRAY_TO_MV(stringDimMV1) AS mv, COUNT(*) AS cnt FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__ AND ARRAY_TO_MV(stringDimMV1) = 'm1-5-0' GROUP BY ARRAY_TO_MV(stringDimMV1)

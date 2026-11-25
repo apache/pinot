@@ -91,8 +91,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
     public AuthorizationResult authorize(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
       if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
           .isSetTableName()) {
-        // no table restrictions? accept
-        return TableAuthorizationResult.success();
+        return authorize(requesterIdentity, Set.of());
       }
 
       return authorize(requesterIdentity, Set.of(brokerRequest.getQuerySource().getTableName()));

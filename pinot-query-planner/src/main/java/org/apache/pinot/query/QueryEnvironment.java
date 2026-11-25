@@ -84,6 +84,7 @@ import org.apache.pinot.query.planner.explain.MultiStageExplainAskingServersUtil
 import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.query.planner.logical.SpoolMode;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
@@ -97,6 +98,7 @@ import org.apache.pinot.query.planner.spi.Phase;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.query.validate.GroupByAliasShadowedByColumnException;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -443,6 +445,19 @@ public class QueryEnvironment {
   /// in case it was legal to apply an automatic cast for these types!).
   private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
     try {
+      return validateAndClassifyErrors(sqlNode, plannerContext);
+    } catch (QueryException e) {
+      if (e.getErrorCode() == QueryErrorCode.QUERY_VALIDATION
+          && plannerContext.getValidator().isGroupByNameResolvedToShadowedColumn()) {
+        // Lets callers retry with preferSelectAliasInGroupBy
+        throw new GroupByAliasShadowedByColumnException(e);
+      }
+      throw e;
+    }
+  }
+
+  private SqlNode validateAndClassifyErrors(SqlNode sqlNode, PlannerContext plannerContext) {
+    try {
       SqlNode validated = plannerContext.getValidator().validate(sqlNode);
       if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
@@ -564,8 +579,9 @@ public class QueryEnvironment {
           _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
       return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
     }
-    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()),
-        _envConfig.defaultHashFunction(), pruneUnnestColumns(plannerContext.getOptions()));
+    Map<String, String> options = plannerContext.getOptions();
+    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, getSpoolMode(options),
+        isSpoolsFeedback(options), _envConfig.defaultHashFunction(), pruneUnnestColumns(options));
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
@@ -742,12 +758,36 @@ public class QueryEnvironment {
     return ImmutableQueryEnvironment.Config.builder();
   }
 
-  public boolean useSpools(Map<String, String> options) {
+  /// Returns the spool mode of the query: the [CommonConstants.Broker.Request.QueryOptionKey#USE_SPOOLS] query option
+  /// when it is set, or [Config#defaultSpoolMode()] otherwise.
+  ///
+  /// @throws QueryException with [QueryErrorCode#QUERY_VALIDATION] if the query option is not a valid [SpoolMode].
+  public SpoolMode getSpoolMode(Map<String, String> options) {
+    return getSpoolMode(options, _envConfig.defaultSpoolMode());
+  }
+
+  public static SpoolMode getSpoolMode(Map<String, String> options, SpoolMode defaultMode) {
     String optionValue = options.get(CommonConstants.Broker.Request.QueryOptionKey.USE_SPOOLS);
     if (optionValue == null) {
-      return _envConfig.defaultUseSpools();
+      return defaultMode;
     }
-    return Boolean.parseBoolean(optionValue);
+    try {
+      return SpoolMode.fromString(optionValue);
+    } catch (IllegalArgumentException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(e.getMessage(), e);
+    }
+  }
+
+  /// Whether the response must describe the spool decisions of the planner. See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#SPOOLS_FEEDBACK].
+  ///
+  /// @throws QueryException with [QueryErrorCode#QUERY_VALIDATION] if the query option is not `true` or `false`.
+  public static boolean isSpoolsFeedback(Map<String, String> options) {
+    try {
+      return QueryOptionsUtils.isSpoolsFeedback(options);
+    } catch (IllegalArgumentException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(e.getMessage(), e);
+    }
   }
 
   /// Whether to prune unused input (passthrough) columns from the UNNEST output. Defaults to the broker config
@@ -807,15 +847,15 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT;
     }
 
-    /// Whether to use spools or not.
+    /// The spool mode.
     ///
     /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
     /// configuration.
     /// This default value can be always overridden at query level by the query option
     /// [CommonConstants.Broker.Request.QueryOptionKey#USE_SPOOLS].
     @Value.Default
-    default boolean defaultUseSpools() {
-      return CommonConstants.Broker.DEFAULT_OF_SPOOLS;
+    default SpoolMode defaultSpoolMode() {
+      return SpoolMode.fromString(CommonConstants.Broker.DEFAULT_SPOOLS_MODE);
     }
 
     /// Whether to prune unused input (passthrough) columns from the UNNEST output by default.
@@ -981,6 +1021,21 @@ public class QueryEnvironment {
     @Value.Default
     default int defaultSealedInListThreshold() {
       return CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD;
+    }
+
+    /// See [CommonConstants.Broker#CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY]. Can be overridden per query with
+    /// [CommonConstants.Broker.Request.QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY].
+    @Value.Default
+    default boolean defaultPreferSelectAliasInGroupBy() {
+      return CommonConstants.Broker.DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY;
+    }
+
+    /// Whether the validator marks `BrokerMeter.QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN`. Only the broker that
+    /// runs multi-stage queries turns it on. Other users of the validator, like the single-stage paths that compile a
+    /// query only to check it or to get its schema, and the controller, must not change the meter.
+    @Value.Default
+    default boolean meterGroupByAliasShadowedByColumn() {
+      return false;
     }
   }
 

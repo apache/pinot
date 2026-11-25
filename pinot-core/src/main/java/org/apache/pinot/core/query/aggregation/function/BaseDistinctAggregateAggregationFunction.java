@@ -28,17 +28,18 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -57,6 +58,15 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   private static final IntSet EMPTY_PLACEHOLDER = new IntOpenHashSet();
   private static final byte[] SERIALIZED_EMPTY_PLACEHOLDER =
       ObjectSerDeUtils.INT_SET_SER_DE.serialize(EMPTY_PLACEHOLDER);
+
+  // Wire type values of the set types
+  private static final int INT_SET_TYPE = 9;
+  private static final int LONG_SET_TYPE = 15;
+  private static final int FLOAT_SET_TYPE = 16;
+  private static final int DOUBLE_SET_TYPE = 17;
+  private static final int BIG_DECIMAL_SET_TYPE = 53;
+  private static final int STRING_SET_TYPE = 18;
+  private static final int BYTES_SET_TYPE = 19;
 
   private final AggregationFunctionType _functionType;
 
@@ -134,50 +144,56 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Set set) {
+  public SerializedResult serializeIntermediateResult(Set set) {
     return serializeSet(set);
   }
 
-  static SerializedIntermediateResult serializeSet(Set set) {
+  static SerializedResult serializeSet(Set set) {
     if (set.isEmpty()) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntSet.getValue(),
-          SERIALIZED_EMPTY_PLACEHOLDER);
+      return new SerializedBytes(INT_SET_TYPE, SERIALIZED_EMPTY_PLACEHOLDER);
     }
-    if (set instanceof IntSet) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntSet.getValue(),
-          ObjectSerDeUtils.INT_SET_SER_DE.serialize((IntSet) set));
-    }
-    if (set instanceof LongSet) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongSet.getValue(),
-          ObjectSerDeUtils.LONG_SET_SER_DE.serialize((LongSet) set));
-    }
-    if (set instanceof FloatSet) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FloatSet.getValue(),
-          ObjectSerDeUtils.FLOAT_SET_SER_DE.serialize((FloatSet) set));
-    }
-    if (set instanceof DoubleSet) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleSet.getValue(),
-          ObjectSerDeUtils.DOUBLE_SET_SER_DE.serialize((DoubleSet) set));
-    }
-    Object sampleValue = set.iterator().next();
-    if (sampleValue instanceof BigDecimal) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BigDecimalSet.getValue(),
-          ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE.serialize((Set<BigDecimal>) set));
-    }
-    if (sampleValue instanceof String) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringSet.getValue(),
-          ObjectSerDeUtils.STRING_SET_SER_DE.serialize((Set<String>) set));
-    }
-    if (sampleValue instanceof ByteArray) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BytesSet.getValue(),
-          ObjectSerDeUtils.BYTES_SET_SER_DE.serialize((Set<ByteArray>) set));
-    }
-    throw new IllegalStateException("Illegal data type distinct aggregation function: " + sampleValue.getClass());
+    return switch (set) {
+      case IntSet intSet -> new SerializedValue<>(INT_SET_TYPE, intSet, ObjectSerDeUtils.INT_SET_SER_DE);
+      case LongSet longSet -> new SerializedValue<>(LONG_SET_TYPE, longSet, ObjectSerDeUtils.LONG_SET_SER_DE);
+      case FloatSet floatSet -> new SerializedValue<>(FLOAT_SET_TYPE, floatSet, ObjectSerDeUtils.FLOAT_SET_SER_DE);
+      case DoubleSet doubleSet ->
+          new SerializedValue<>(DOUBLE_SET_TYPE, doubleSet, ObjectSerDeUtils.DOUBLE_SET_SER_DE);
+      default -> {
+        Object sampleValue = set.iterator().next();
+        yield switch (sampleValue) {
+          case BigDecimal _ -> new SerializedValue<>(BIG_DECIMAL_SET_TYPE, (Set<BigDecimal>) set,
+              ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE);
+          case String _ ->
+              new SerializedValue<>(STRING_SET_TYPE, (Set<String>) set, ObjectSerDeUtils.STRING_SET_SER_DE);
+          case ByteArray _ ->
+              new SerializedValue<>(BYTES_SET_TYPE, (Set<ByteArray>) set, ObjectSerDeUtils.BYTES_SET_SER_DE);
+          default -> throw new IllegalStateException(
+              "Illegal data type distinct aggregation function: " + sampleValue.getClass());
+        };
+      }
+    };
   }
 
   @Override
   public Set deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+    return deserializeSet(customObject);
+  }
+
+  /// Deserializes a set serialized by [#serializeSet]. The empty placeholder deserializes to an empty int set.
+  static Set deserializeSet(CustomObject customObject) {
+    int type = customObject.getType();
+    ByteBuffer buffer = customObject.getBuffer();
+    return switch (type) {
+      case INT_SET_TYPE -> ObjectSerDeUtils.INT_SET_SER_DE.deserialize(buffer);
+      case LONG_SET_TYPE -> ObjectSerDeUtils.LONG_SET_SER_DE.deserialize(buffer);
+      case FLOAT_SET_TYPE -> ObjectSerDeUtils.FLOAT_SET_SER_DE.deserialize(buffer);
+      case DOUBLE_SET_TYPE -> ObjectSerDeUtils.DOUBLE_SET_SER_DE.deserialize(buffer);
+      case BIG_DECIMAL_SET_TYPE -> ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE.deserialize(buffer);
+      case STRING_SET_TYPE -> ObjectSerDeUtils.STRING_SET_SER_DE.deserialize(buffer);
+      case BYTES_SET_TYPE -> ObjectSerDeUtils.BYTES_SET_SER_DE.deserialize(buffer);
+      default -> throw new IllegalStateException(
+          "Unexpected intermediate result type for distinct aggregation function: " + type);
+    };
   }
 
   /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.

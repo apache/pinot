@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -31,11 +32,13 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
@@ -130,5 +133,25 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     AggregateNode deserialized = (AggregateNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
     assertEquals(deserialized.getGroupingSets(), groupingSets);
     assertEquals(deserialized, node);
+  }
+
+  @Test
+  public void testMvAggregateNodeSerDe() {
+    // Two MV keys around one SV key, and a FILTER arg on the second aggregate call
+    DataSchema schema = new DataSchema(new String[]{"mv0", "sv", "mv1", "cnt", "filteredSum"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.LONG,
+            ColumnDataType.DOUBLE});
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.LONG, "COUNT", List.of()),
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, "SUM", List.of(new RexExpression.InputRef(3))));
+    MvAggregateNode node = new MvAggregateNode(1, schema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls,
+        List.of(-1, 4), List.of(0, 1, 2), AggType.LEAF, true,
+        List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING)), 10, List.of(0, 2));
+    PlanNode deserialized = PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertTrue(deserialized instanceof MvAggregateNode);
+    assertEquals(deserialized, node);
+    MvAggregateNode deserializedMvAggregate = (MvAggregateNode) deserialized;
+    assertEquals(deserializedMvAggregate.getMvKeyIndexes(), List.of(0, 2));
+    assertEquals(deserializedMvAggregate.getFilterArgs(), List.of(-1, 4));
   }
 }

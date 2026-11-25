@@ -49,6 +49,11 @@
         "h2Sql": "SELECT a1.intCol1, a2.intCol1, a3.intCol1 FROM {tbl1} as a1 JOIN {tbl1} as a2 ON a1.strCol1 = a2.strCol1 JOIN {tbl1} as a3 ON a1.strCol1 = a3.strCol1"
       },
       {
+        "description": "Both branches of a broadcast join read the same dimension with spool reuse and fusion requested",
+        "sql": "SET timeoutMs=10000; SET useSpools=true; SET fuseBroadcastJoins=true; SELECT /*+ joinOptions(left_distribution_type='random', right_distribution_type='broadcast') */ f.intCol1, b1.intCol1, r.ordCol, r.dimValue FROM {tbl2} f JOIN {tbl1} b1 ON f.strCol1 = b1.strCol1 JOIN (SELECT /*+ joinOptions(left_distribution_type='random', right_distribution_type='broadcast') */ d.grpCol, d.ordCol, b2.intCol1 AS dimValue FROM {tbl3} d JOIN {tbl1} b2 ON d.grpCol = b2.strCol1) r ON f.strCol1 = r.grpCol",
+        "h2Sql": "SELECT f.intCol1, b1.intCol1, r.ordCol, r.dimValue FROM {tbl2} f JOIN {tbl1} b1 ON f.strCol1 = b1.strCol1 JOIN (SELECT d.grpCol, d.ordCol, b2.intCol1 AS dimValue FROM {tbl3} d JOIN {tbl1} b2 ON d.grpCol = b2.strCol1) r ON f.strCol1 = r.grpCol"
+      },
+      {
         "description": "Spool of an aggregated stage reused by a self join",
         "sql": "SET timeoutMs=10000; SET useSpools=true; WITH g AS (SELECT strCol1, SUM(intCol1) AS s FROM {tbl1} GROUP BY strCol1) SELECT a.strCol1, a.s, b.s FROM g a JOIN g b ON a.strCol1 = b.strCol1",
         "h2Sql": "WITH g AS (SELECT strCol1, SUM(intCol1) AS s FROM {tbl1} GROUP BY strCol1) SELECT a.strCol1, a.s, b.s FROM g a JOIN g b ON a.strCol1 = b.strCol1"

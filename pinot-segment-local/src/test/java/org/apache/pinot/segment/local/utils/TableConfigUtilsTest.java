@@ -2858,6 +2858,105 @@ public class TableConfigUtilsTest {
     }
   }
 
+  @Test
+  public void testValidatePauselessUpsertModes() {
+    UpsertConfig fullUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    UpsertConfig dropOutOfOrderConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    dropOutOfOrderConfig.setDropOutOfOrderRecord(true);
+    UpsertConfig outOfOrderColumnConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    outOfOrderColumnConfig.setOutOfOrderRecordColumn("isOutOfOrder");
+    TableConfig pauselessFull = createTableConfigWithConsumptionPolicy(fullUpsertConfig, null, true);
+    TableConfig pauselessPartial = createTableConfigWithConsumptionPolicy(partialUpsertConfig, null, true);
+    TableConfig pauselessDropOutOfOrder = createTableConfigWithConsumptionPolicy(dropOutOfOrderConfig, null, true);
+    TableConfig partial = createTableConfigWithConsumptionPolicy(partialUpsertConfig, null, false);
+    TableConfig dropOutOfOrder = createTableConfigWithConsumptionPolicy(dropOutOfOrderConfig, null, false);
+    TableConfig pauselessOutOfOrderColumn = createTableConfigWithConsumptionPolicy(outOfOrderColumnConfig, null, true);
+    TableConfig outOfOrderColumn = createTableConfigWithConsumptionPolicy(outOfOrderColumnConfig, null, false);
+
+    // A new pauseless table cannot use partial upsert or dropOutOfOrderRecord
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessPartial, null));
+    assertTrue(e.getMessage().startsWith("Partial upsert cannot be used with pauseless consumption."),
+        e.getMessage());
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, null));
+    assertTrue(e.getMessage().startsWith(
+        "dropOutOfOrderRecord and outOfOrderRecordColumn cannot be used with pauseless consumption."), e.getMessage());
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessOutOfOrderColumn, null));
+    assertTrue(e.getMessage().startsWith(
+        "dropOutOfOrderRecord and outOfOrderRecordColumn cannot be used with pauseless consumption."), e.getMessage());
+    TableConfigUtils.validatePauselessUpsertModes(pauselessFull, null);
+    TableConfigUtils.validatePauselessUpsertModes(partial, null);
+    TableConfigUtils.validatePauselessUpsertModes(dropOutOfOrder, null);
+    TableConfigUtils.validatePauselessUpsertModes(outOfOrderColumn, null);
+
+    // An update is left to the backward compatibility check, so force=true can apply it
+    TableConfigUtils.validatePauselessUpsertModes(pauselessPartial, partial);
+    TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, pauselessFull);
+
+    // An update that turns either combination on is a violation, whether it enables pauseless, changes the upsert
+    // mode or dropOutOfOrderRecord, or adds the upsert config
+    TableConfig pauselessNoUpsert = createTableConfigWithConsumptionPolicy(null, null, true);
+    assertPauselessUpsertViolation(pauselessPartial, partial, true);
+    assertPauselessUpsertViolation(pauselessDropOutOfOrder, dropOutOfOrder, true);
+    assertPauselessUpsertViolation(pauselessPartial, pauselessFull, true);
+    assertPauselessUpsertViolation(pauselessDropOutOfOrder, pauselessFull, true);
+    assertPauselessUpsertViolation(pauselessPartial, pauselessNoUpsert, true);
+    assertPauselessUpsertViolation(pauselessOutOfOrderColumn, outOfOrderColumn, true);
+    assertPauselessUpsertViolation(pauselessOutOfOrderColumn, pauselessFull, true);
+
+    // An update of a table that already has a combination, or that does not turn one on, is not
+    assertPauselessUpsertViolation(pauselessPartial, pauselessPartial, false);
+    assertPauselessUpsertViolation(pauselessDropOutOfOrder, pauselessDropOutOfOrder, false);
+    assertPauselessUpsertViolation(pauselessOutOfOrderColumn, pauselessOutOfOrderColumn, false);
+    assertPauselessUpsertViolation(pauselessFull, pauselessFull, false);
+    assertPauselessUpsertViolation(partial, pauselessPartial, false);
+
+    // The check is part of the upsert validation
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", DataType.STRING)
+        .setPrimaryKeyColumns(List.of("myCol"))
+        .build();
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertConfig(pauselessDropOutOfOrder, schema));
+    assertTrue(e.getMessage().startsWith(
+        "dropOutOfOrderRecord and outOfOrderRecordColumn cannot be used with pauseless consumption."), e.getMessage());
+  }
+
+  private static void assertPauselessUpsertViolation(TableConfig newConfig, TableConfig existingConfig,
+      boolean expected) {
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.stream()
+        .anyMatch(v -> v.startsWith("pauseless consumption with partial upsert, dropOutOfOrderRecord")), expected,
+        violations.toString());
+  }
+
+  @Test
+  public void testConsumptionPolicyMatrix() {
+    ConsumingSegmentConsistencyModeListener listener = ConsumingSegmentConsistencyModeListener.getInstance();
+    try {
+      for (boolean protectedMode : new boolean[]{false, true}) {
+        listener.setMode(protectedMode ? ConsumingSegmentConsistencyModeListener.Mode.PROTECTED
+            : ConsumingSegmentConsistencyModeListener.Mode.RESTRICTED);
+        for (UpsertConfig.Mode mode : new UpsertConfig.Mode[]{UpsertConfig.Mode.FULL, UpsertConfig.Mode.PARTIAL}) {
+          for (boolean drop : new boolean[]{false, true}) {
+            UpsertConfig config = new UpsertConfig(mode);
+            config.setDropOutOfOrderRecord(drop);
+            for (ParallelSegmentConsumptionPolicy policy : ParallelSegmentConsumptionPolicy.values()) {
+              boolean rejects = protectedMode && (mode == UpsertConfig.Mode.PARTIAL || drop)
+                  && policy != ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS;
+              checkConsumptionDuringUpsertRevert(config, policy, rejects);
+            }
+          }
+        }
+      }
+    } finally {
+      listener.reset();
+    }
+  }
+
   private void checkConsumptionDuringUpsertRevert(UpsertConfig upsertConfig, ParallelSegmentConsumptionPolicy policy,
       boolean expectRejected) {
     TableConfig tableConfig = createTableConfigWithConsumptionPolicy(upsertConfig, policy);
@@ -4870,6 +4969,14 @@ public class TableConfigUtilsTest {
     assertEquals(TableConfigUtils.getPartitionColumn(tableConfig), "legacyCol");
     tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig("", 1));
     assertNull(TableConfigUtils.getPartitionColumn(tableConfig));
+  }
+
+  @Test
+  public void testUnknownSkipTokenCannotBypassValidation() {
+    for (String value : List.of("ACTIVE_TASKS", "TASK,ACTIVE_TASKS", "ALL,ACTIVE_TASKS", "active_tasks")) {
+      expectThrows(IllegalArgumentException.class, () -> TableConfigUtils.parseTypesToSkipString(value));
+    }
+    assertEquals(TableConfigUtils.parseTypesToSkipString(" task , TASK "), EnumSet.of(ValidationType.TASK));
   }
 
   @Test

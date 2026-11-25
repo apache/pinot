@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.Test;
@@ -31,6 +31,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
+@SuppressWarnings("rawtypes")
 public class ArrayAggDistinctValueAggregatorTest {
 
   @Test
@@ -43,7 +44,7 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void initialAndApplyRawValueDedup() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(1L);
+    Set set = agg.getInitialAggregatedValue(1L);
     set = agg.applyRawValue(set, 2L);
     set = agg.applyRawValue(set, 1L); // duplicate
     assertEquals(set.size(), 2);
@@ -54,11 +55,11 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void applyAggregatedValueUnions() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> a = agg.getInitialAggregatedValue(1);
+    Set a = agg.getInitialAggregatedValue(1);
     a = agg.applyRawValue(a, 2);
-    ObjectSet<Object> b = agg.getInitialAggregatedValue(2);
+    Set b = agg.getInitialAggregatedValue(2);
     b = agg.applyRawValue(b, 3);
-    ObjectSet<Object> merged = agg.applyAggregatedValue(a, b);
+    Set merged = agg.applyAggregatedValue(a, b);
     assertEquals(merged.size(), 3);
     assertTrue(merged.contains(1));
     assertTrue(merged.contains(2));
@@ -68,7 +69,7 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void nullRawValueIgnored() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(null);
+    Set set = agg.getInitialAggregatedValue(null);
     assertEquals(set.size(), 0);
     set = agg.applyRawValue(set, null);
     assertEquals(set.size(), 0);
@@ -79,7 +80,7 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void serializeDeserializeRoundTripInt() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(10);
+    Set set = agg.getInitialAggregatedValue(10);
     set = agg.applyRawValue(set, 20);
     set = agg.applyRawValue(set, 30);
     byte[] bytes = agg.serializeAggregatedValue(set);
@@ -90,7 +91,7 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void serializeDeserializeRoundTripLong() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(10L);
+    Set set = agg.getInitialAggregatedValue(10L);
     set = agg.applyRawValue(set, 20L);
     byte[] bytes = agg.serializeAggregatedValue(set);
     assertEquals(agg.deserializeAggregatedValue(bytes), set);
@@ -99,7 +100,7 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void serializeDeserializeRoundTripFloat() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(1.5f);
+    Set set = agg.getInitialAggregatedValue(1.5f);
     set = agg.applyRawValue(set, 2.5f);
     byte[] bytes = agg.serializeAggregatedValue(set);
     assertEquals(agg.deserializeAggregatedValue(bytes), set);
@@ -108,7 +109,7 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void serializeDeserializeRoundTripDouble() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(1.5d);
+    Set set = agg.getInitialAggregatedValue(1.5d);
     set = agg.applyRawValue(set, 2.5d);
     byte[] bytes = agg.serializeAggregatedValue(set);
     assertEquals(agg.deserializeAggregatedValue(bytes), set);
@@ -117,7 +118,7 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void serializeDeserializeRoundTripString() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue("hello");
+    Set set = agg.getInitialAggregatedValue("hello");
     set = agg.applyRawValue(set, "world");
     byte[] bytes = agg.serializeAggregatedValue(set);
     assertEquals(agg.deserializeAggregatedValue(bytes), set);
@@ -126,7 +127,7 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void serializeDeserializeRoundTripBigDecimal() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(new BigDecimal("1.23"));
+    Set set = agg.getInitialAggregatedValue(new BigDecimal("1.23"));
     set = agg.applyRawValue(set, new BigDecimal("4.56"));
     byte[] bytes = agg.serializeAggregatedValue(set);
     assertEquals(agg.deserializeAggregatedValue(bytes), set);
@@ -135,7 +136,7 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void emptySetSerializesToTagPlusSizeZero() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(null);
+    Set set = agg.getInitialAggregatedValue(null);
     byte[] bytes = agg.serializeAggregatedValue(set);
     assertEquals(bytes.length, Byte.BYTES + Integer.BYTES);
     ByteBuffer buffer = ByteBuffer.wrap(bytes);
@@ -144,13 +145,12 @@ public class ArrayAggDistinctValueAggregatorTest {
     assertEquals(agg.deserializeAggregatedValue(bytes).size(), 0);
   }
 
-  /// After the 1-byte element type tag, the serialized payload must match `ObjectSerDeUtils.LONG_SET_SER_DE` in
-  /// pinot-core (int size, then each long) so the query-time arrayAgg function can deserialize the star-tree cell.
-  /// This asserts the layout directly, since pinot-segment-local cannot depend on pinot-core.
+  /// After the 1-byte element type tag, the payload is the `ObjectSerDeUtils.LONG_SET_SER_DE` format, int size then
+  /// each long, which the query-time arrayAgg function reads with that codec. This pins the layout of the stored cell.
   @Test
   public void serializedLongLayoutMatchesSetSerDe() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(7L);
+    Set set = agg.getInitialAggregatedValue(7L);
     byte[] bytes = agg.serializeAggregatedValue(set);
     ByteBuffer buffer = ByteBuffer.wrap(bytes);
     buffer.get(); // element type tag
@@ -159,12 +159,12 @@ public class ArrayAggDistinctValueAggregatorTest {
     assertEquals(bytes.length, Byte.BYTES + Integer.BYTES + Long.BYTES);
   }
 
-  /// After the tag, the serialized string payload must match `ObjectSerDeUtils.STRING_SET_SER_DE`: int size, then per
-  /// value (int length, UTF-8 bytes).
+  /// After the tag, the string payload is the `ObjectSerDeUtils.STRING_SET_SER_DE` format: int size, then per value
+  /// (int length, UTF-8 bytes).
   @Test
   public void serializedStringLayoutMatchesSetSerDe() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue("ab");
+    Set set = agg.getInitialAggregatedValue("ab");
     byte[] bytes = agg.serializeAggregatedValue(set);
     ByteBuffer buffer = ByteBuffer.wrap(bytes);
     buffer.get(); // element type tag
@@ -179,7 +179,7 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void bytesElementsNormalizedToByteArray() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(new byte[]{1, 2});
+    Set set = agg.getInitialAggregatedValue(new byte[]{1, 2});
     set = agg.applyRawValue(set, new byte[]{1, 2}); // duplicate content
     set = agg.applyRawValue(set, new byte[]{3, 4});
     assertEquals(set.size(), 2);
@@ -197,34 +197,24 @@ public class ArrayAggDistinctValueAggregatorTest {
   @Test
   public void cloneIsIndependentCopy() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(1L);
-    ObjectSet<Object> clone = agg.cloneAggregatedValue(set);
+    Set set = agg.getInitialAggregatedValue(1L);
+    Set clone = agg.cloneAggregatedValue(set);
     assertEquals(clone, set);
     agg.applyRawValue(set, 2L);
     assertEquals(clone.size(), 1);
   }
 
-  /// Size tracking is incremental (never re-serializes the set), so it must stay exact through duplicates, merges and
-  /// clones for variable-width element types.
+  /// The maximum cell size is the size of the largest cell serialized so far.
   @Test
-  public void maxByteSizeStaysExactThroughDuplicatesAndMerges() {
+  public void maxByteSizeTracksLargestSerializedValue() {
     ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> a = agg.getInitialAggregatedValue("alpha");
-    a = agg.applyRawValue(a, "beta");
-    a = agg.applyRawValue(a, "alpha"); // duplicate: must not inflate the tracked size
-    ObjectSet<Object> b = agg.getInitialAggregatedValue("beta"); // overlaps with a
-    b = agg.applyRawValue(b, "gamma");
-    ObjectSet<Object> merged = agg.applyAggregatedValue(agg.cloneAggregatedValue(a), b);
-    assertEquals(merged.size(), 3);
-    assertEquals(agg.getMaxAggregatedValueByteSize(), agg.serializeAggregatedValue(merged).length);
-  }
-
-  @Test
-  public void maxByteSizeStaysExactForFixedWidthDuplicates() {
-    ArrayAggDistinctValueAggregator agg = new ArrayAggDistinctValueAggregator();
-    ObjectSet<Object> set = agg.getInitialAggregatedValue(1L);
-    set = agg.applyRawValue(set, 1L);
-    set = agg.applyRawValue(set, 2L);
-    assertEquals(agg.getMaxAggregatedValueByteSize(), agg.serializeAggregatedValue(set).length);
+    assertEquals(agg.getMaxAggregatedValueByteSize(), 0);
+    Set small = agg.getInitialAggregatedValue("a");
+    Set large = agg.applyRawValue(agg.applyRawValue(agg.getInitialAggregatedValue("alpha"), "beta"), "gamma");
+    Set medium = agg.applyRawValue(agg.getInitialAggregatedValue("alpha"), "beta");
+    agg.serializeAggregatedValue(small);
+    int largeSize = agg.serializeAggregatedValue(large).length;
+    agg.serializeAggregatedValue(medium);
+    assertEquals(agg.getMaxAggregatedValueByteSize(), largeSize);
   }
 }

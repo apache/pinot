@@ -27,7 +27,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -155,16 +154,13 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(I i) {
-    // TODO: Improve the ser/de logic
-    int type = ObjectSerDeUtils.ObjectType.getObjectType(i).getValue();
-    byte[] bytes = ObjectSerDeUtils.serialize(i, type);
-    return new SerializedIntermediateResult(type, bytes);
+  public SerializedResult serializeIntermediateResult(I i) {
+    return _mergeStrategy.serializeIntermediateResult(i);
   }
 
   @Override
   public I deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+    return _mergeStrategy.deserializeIntermediateResult(customObject);
   }
 
   @Override

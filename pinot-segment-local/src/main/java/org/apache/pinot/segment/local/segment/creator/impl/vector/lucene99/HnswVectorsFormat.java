@@ -19,12 +19,16 @@
 package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
+import org.apache.lucene.store.MergeInfo;
 
 
 /// Extend Lucene 9.5 vector format to support HNSW graph
@@ -35,8 +39,19 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
   /// store the vector values.
   public static final int DEFAULT_MAX_DIMENSIONS = 2048;
 
+  /// Controls where an opt-in parallel build writes graphs for small Lucene segments.
+  public enum SmallSegmentGraphs {
+    DEFAULT,
+    PARALLEL_PART,
+    PARALLEL_FINAL_MERGE
+  }
+
   private final int _maxDimensions;
   private final Lucene99HnswVectorsFormat _delegate;
+  private final Lucene99HnswVectorsFormat _finalMergeDelegate;
+  private final int _maxConn;
+  private final int _beamWidth;
+  private final Path _mmapMergeDirectory;
 
   /// Constructs a format using the given graph construction parameters.
   ///
@@ -44,6 +59,24 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
   /// @param beamWidth     the size of the queue maintained during graph construction.
   /// @param maxDimensions the maximum number of dimensions supported by this format
   public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions) {
+    this(maxConn, beamWidth, maxDimensions, 1, null, null);
+  }
+
+  /// Constructs a format with an optional scratch directory for the final forced merge.
+  public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions, @Nullable Path mmapMergeDirectory) {
+    this(maxConn, beamWidth, maxDimensions, 1, null, mmapMergeDirectory);
+  }
+
+  /// A final forced merge can use the supplied executor for heap-backed graph construction or a scratch
+  /// directory for mmap-backed construction. Ordinary merges use the default Lucene format.
+  public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions, int numMergeWorkers,
+      @Nullable ExecutorService mergeExec, @Nullable Path mmapMergeDirectory) {
+    this(maxConn, beamWidth, maxDimensions, numMergeWorkers, mergeExec, mmapMergeDirectory, SmallSegmentGraphs.DEFAULT);
+  }
+
+  /// Parallel part writers and final merge writers retain graphs even when Lucene would otherwise skip small segments.
+  public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions, int numMergeWorkers,
+      @Nullable ExecutorService mergeExec, @Nullable Path mmapMergeDirectory, SmallSegmentGraphs smallSegmentGraphs) {
     super("Lucene99HnswVectorsFormat");
     if (maxDimensions <= 0 || maxDimensions > DEFAULT_MAX_DIMENSIONS) {
       throw new IllegalArgumentException(
@@ -52,13 +85,27 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
               + "; maxDimensions="
               + maxDimensions);
     }
-    _delegate = new Lucene99HnswVectorsFormat(maxConn, beamWidth);
+    int graphThreshold = smallSegmentGraphs == SmallSegmentGraphs.PARALLEL_PART
+        ? 0 : Lucene99HnswVectorsFormat.HNSW_GRAPH_THRESHOLD;
+    _delegate = new Lucene99HnswVectorsFormat(maxConn, beamWidth, graphThreshold);
+    _finalMergeDelegate = numMergeWorkers > 1 || smallSegmentGraphs == SmallSegmentGraphs.PARALLEL_FINAL_MERGE
+        ? new Lucene99HnswVectorsFormat(maxConn, beamWidth, numMergeWorkers, mergeExec, 0) : _delegate;
     _maxDimensions = maxDimensions;
+    _maxConn = maxConn;
+    _beamWidth = beamWidth;
+    _mmapMergeDirectory = mmapMergeDirectory;
   }
 
   @Override
   public KnnVectorsWriter fieldsWriter(SegmentWriteState state)
       throws IOException {
+    MergeInfo mergeInfo = state.context.mergeInfo();
+    if (mergeInfo != null && mergeInfo.mergeMaxNumSegments() == 1) {
+      if (_mmapMergeDirectory != null) {
+        return new MmapHnswVectorsWriter(state, _mmapMergeDirectory, _maxConn, _beamWidth);
+      }
+      return _finalMergeDelegate.fieldsWriter(state);
+    }
     return _delegate.fieldsWriter(state);
   }
 

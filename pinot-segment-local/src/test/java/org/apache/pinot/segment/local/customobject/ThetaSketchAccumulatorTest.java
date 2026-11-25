@@ -19,14 +19,19 @@
 
 package org.apache.pinot.segment.local.customobject;
 
+import java.lang.foreign.MemorySegment;
 import java.util.stream.IntStream;
 import org.apache.datasketches.theta.ThetaSetOperationBuilder;
 import org.apache.datasketches.theta.ThetaSketch;
 import org.apache.datasketches.theta.ThetaUnion;
 import org.apache.datasketches.theta.UpdatableThetaSketch;
-import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 public class ThetaSketchAccumulatorTest {
@@ -40,8 +45,8 @@ public class ThetaSketchAccumulatorTest {
   @Test
   public void testEmptyAccumulator() {
     ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, 2);
-    Assert.assertTrue(accumulator.isEmpty());
-    Assert.assertEquals(accumulator.getResult().getEstimate(), 0.0);
+    assertTrue(accumulator.isEmpty());
+    assertEquals(accumulator.getResult().getEstimate(), 0.0);
   }
 
   @Test
@@ -53,8 +58,51 @@ public class ThetaSketchAccumulatorTest {
     ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, 2);
     accumulator.apply(sketch);
 
-    Assert.assertFalse(accumulator.isEmpty());
-    Assert.assertEquals(accumulator.getResult().getEstimate(), sketch.getEstimate());
+    assertFalse(accumulator.isEmpty());
+    assertEquals(accumulator.getResult().getEstimate(), sketch.getEstimate());
+  }
+
+  @Test
+  public void testSeededSketchIsReturnedUnchanged() {
+    ThetaSetOperationBuilder builder = new ThetaSetOperationBuilder().setNominalEntries(128);
+    for (int numEntries : new int[]{0, 1000}) {
+      UpdatableThetaSketch input = UpdatableThetaSketch.builder().build();
+      IntStream.range(0, numEntries).forEach(input::update);
+      ThetaSketch sketch = input.compact();
+      for (int threshold = 1; threshold <= 3; threshold++) {
+        ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(builder, threshold, sketch);
+
+        assertFalse(accumulator.isEmpty());
+        assertEquals(accumulator.getNumInputs(), 1);
+        assertSame(accumulator.getResult(), sketch);
+        assertSame(accumulator.getResult(), sketch);
+      }
+    }
+  }
+
+  @Test
+  public void testMergeAfterReadingSeededSketch() {
+    UpdatableThetaSketch input1 = UpdatableThetaSketch.builder().build();
+    IntStream.range(0, 1000).forEach(input1::update);
+    byte[] bytes = input1.compact().toByteArray();
+    UpdatableThetaSketch input2 = UpdatableThetaSketch.builder().build();
+    IntStream.range(500, 1500).forEach(input2::update);
+    ThetaSketch sketch2 = input2.compact();
+    ThetaSetOperationBuilder builder = new ThetaSetOperationBuilder().setNominalEntries(128);
+    for (int threshold = 1; threshold <= 3; threshold++) {
+      ThetaSketch sketch1 = ThetaSketch.heapify(MemorySegment.ofArray(bytes));
+      ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(builder, threshold, sketch1);
+      assertEquals(accumulator.getResult().toByteArray(), bytes);
+      accumulator.merge(new ThetaSketchAccumulator(builder, threshold, sketch2));
+
+      ThetaUnion expected = builder.buildUnion();
+      expected.union(sketch1);
+      expected.union(sketch2);
+      ThetaSketch result = accumulator.getResult();
+      assertEquals(accumulator.getNumInputs(), 2);
+      assertEquals(result.getRetainedEntries(true), 128);
+      assertEquals(result.getEstimate(), expected.getResult().getEstimate(), 0.0);
+    }
   }
 
   @Test
@@ -72,7 +120,7 @@ public class ThetaSketchAccumulatorTest {
     accumulator2.apply(sketch2);
     accumulator1.merge(accumulator2);
 
-    Assert.assertEquals(accumulator1.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate());
+    assertEquals(accumulator1.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate());
   }
 
   @Test
@@ -88,7 +136,7 @@ public class ThetaSketchAccumulatorTest {
     accumulator.apply(sketch1);
     accumulator.apply(sketch2);
 
-    Assert.assertEquals(accumulator.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate());
+    assertEquals(accumulator.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate());
   }
 
   @Test
@@ -104,7 +152,7 @@ public class ThetaSketchAccumulatorTest {
         accumulator.apply(sketch);
         expected.union(sketch);
       }
-      Assert.assertEquals(accumulator.getResult().getEstimate(), expected.getResult().getEstimate(), 0.0,
+      assertEquals(accumulator.getResult().getEstimate(), expected.getResult().getEstimate(), 0.0,
           "threshold " + threshold);
     }
   }
@@ -119,8 +167,8 @@ public class ThetaSketchAccumulatorTest {
       accumulator.apply(input.compact());
     }
     double first = accumulator.getResult().getEstimate();
-    Assert.assertEquals(accumulator.getResult().getEstimate(), first, 0.0);
-    Assert.assertEquals(accumulator.getResult().getEstimate(), first, 0.0);
+    assertEquals(accumulator.getResult().getEstimate(), first, 0.0);
+    assertEquals(accumulator.getResult().getEstimate(), first, 0.0);
   }
 
   @Test
@@ -130,7 +178,7 @@ public class ThetaSketchAccumulatorTest {
 
     accumulator.merge(emptyAccumulator);
 
-    Assert.assertTrue(accumulator.isEmpty());
-    Assert.assertEquals(accumulator.getResult().getEstimate(), 0.0);
+    assertTrue(accumulator.isEmpty());
+    assertEquals(accumulator.getResult().getEstimate(), 0.0);
   }
 }

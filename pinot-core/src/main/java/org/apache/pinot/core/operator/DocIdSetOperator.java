@@ -26,7 +26,6 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
@@ -40,7 +39,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 /// The returned [org.apache.pinot.core.operator.blocks.DocIdSetBlock] wraps a thread-local scratch buffer shared by
 /// all `DocIdSetOperator` instances on the same thread: its contents are invalidated by the next [#nextBlock()] call
 /// on any instance on this thread. Consumers that hold on to a block across pulls must copy the array.
-public class DocIdSetOperator extends BaseDocIdSetOperator {
+public class DocIdSetOperator extends BaseDocIdSetOperator implements AutoCloseable {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
@@ -51,7 +50,7 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
 
   private BlockDocIdSet _blockDocIdSet;
   private BlockDocIdIterator _blockDocIdIterator;
-  private int _currentDocId = 0;
+  private boolean _exhausted;
   private long _lastReportedEntriesScanned = 0;
 
   public DocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
@@ -62,7 +61,7 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
 
   @Override
   protected DocIdSetBlock getNextBlock() {
-    if (_currentDocId == Constants.EOF) {
+    if (_exhausted) {
       return null;
     }
 
@@ -74,29 +73,32 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
 
     QueryThreadContext.sampleUsage();
 
-    int pos = 0;
     int[] docIds = THREAD_LOCAL_DOC_IDS.get();
-    for (int i = 0; i < _maxSizeOfDocIdSet; i++) {
-      _currentDocId = _blockDocIdIterator.next();
-      if (_currentDocId == Constants.EOF) {
-        break;
+    int numDocIds = _blockDocIdIterator.nextBatch(docIds, _maxSizeOfDocIdSet);
+    // A short batch means the iterator is exhausted.
+    _exhausted = numDocIds < _maxSizeOfDocIdSet;
+    // Push the scan cost delta for proactive query killing. Also on the last call, which returns no document: a lazy
+    // filter can scan the rest of the segment in that call.
+    QueryScanCostContext scanCost = getScanCostContext();
+    if (scanCost != null) {
+      long currentTotal = _blockDocIdSet.getNumEntriesScannedInFilter();
+      long delta = currentTotal - _lastReportedEntriesScanned;
+      if (delta > 0) {
+        scanCost.addEntriesScannedInFilter(delta);
+        _lastReportedEntriesScanned = currentTotal;
       }
-      docIds[pos++] = _currentDocId;
     }
-    if (pos > 0) {
-      // Push scan cost delta for proactive query killing
-      QueryScanCostContext scanCost = getScanCostContext();
-      if (scanCost != null) {
-        long currentTotal = _blockDocIdSet.getNumEntriesScannedInFilter();
-        long delta = currentTotal - _lastReportedEntriesScanned;
-        if (delta > 0) {
-          scanCost.addEntriesScannedInFilter(delta);
-          _lastReportedEntriesScanned = currentTotal;
-        }
-      }
-      return new DocIdSetBlock(docIds, pos);
-    } else {
-      return null;
+    return numDocIds > 0 ? new DocIdSetBlock(docIds, numDocIds) : null;
+  }
+
+  /// Closes the filter iterator when the consumer stops before the end of the matching documents, for example a
+  /// selection that has filled its LIMIT. A lazy filter keeps scan readers open until its end, and this releases them.
+  /// A later [#nextBlock()] returns `null`. Idempotent.
+  @Override
+  public void close() {
+    if (_blockDocIdIterator != null && !_exhausted) {
+      _exhausted = true;
+      _blockDocIdIterator.close();
     }
   }
 

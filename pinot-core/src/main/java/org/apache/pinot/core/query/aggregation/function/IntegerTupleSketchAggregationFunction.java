@@ -34,7 +34,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -98,7 +97,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
 @SuppressWarnings({"rawtypes"})
 public class IntegerTupleSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
+  private static final int TUPLE_INT_SKETCH_ACCUMULATOR_TYPE = 48;
   private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
+
   final ExpressionContext _expressionContext;
   final IntegerSummarySetOperations _setOps;
   protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
@@ -235,9 +236,6 @@ public class IntegerTupleSketchAggregationFunction
     if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
-    intermediateResult1.setThreshold(_accumulatorThreshold);
-    intermediateResult1.setNominalEntries(_nominalEntries);
-    intermediateResult1.setSetOperations(_setOps);
     intermediateResult1.merge(intermediateResult2);
     return intermediateResult1;
   }
@@ -248,14 +246,14 @@ public class IntegerTupleSketchAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(TupleIntSketchAccumulator tupleIntSketchAccumulator) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.TupleIntSketchAccumulator.getValue(),
-        ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_ACCUMULATOR_SER_DE.serialize(tupleIntSketchAccumulator));
+  public SerializedResult serializeIntermediateResult(TupleIntSketchAccumulator tupleIntSketchAccumulator) {
+    return new SerializedBytes(TUPLE_INT_SKETCH_ACCUMULATOR_TYPE, tupleIntSketchAccumulator.getResult().toByteArray());
   }
 
   @Override
   public TupleIntSketchAccumulator deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_ACCUMULATOR_SER_DE.deserialize(customObject.getBuffer());
+    return new TupleIntSketchAccumulator(_setOps, _nominalEntries, _accumulatorThreshold,
+        TupleSketch.heapifySketch(MemorySegment.ofBuffer(customObject.getBuffer()), new IntegerSummaryDeserializer()));
   }
 
   @Override
@@ -274,9 +272,6 @@ public class IntegerTupleSketchAggregationFunction
       }
       accumulator = emptyAccumulator();
     }
-    accumulator.setNominalEntries(_nominalEntries);
-    accumulator.setSetOperations(_setOps);
-    accumulator.setThreshold(_accumulatorThreshold);
     return Base64.getEncoder().encodeToString(accumulator.getResult().toByteArray());
   }
 

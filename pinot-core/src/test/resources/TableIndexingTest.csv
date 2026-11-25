@@ -182,7 +182,7 @@ DECIMAL;sv_BIG;raw;h3_index;false;Cannot create H3 index on column: col of store
 DECIMAL;sv_BIG;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
 DECIMAL;sv_BIG;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 DECIMAL;sv_BIG;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
-DECIMAL;sv_BIG;raw;range_index;false;Unsupported data type: BIG_DECIMAL
+DECIMAL;sv_BIG;raw;range_index;false;Cannot create range index on BIG_DECIMAL column: col without dictionary
 DECIMAL;sv_BIG;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
 DECIMAL;sv_BIG;raw;vector_index;false;Cannot create vector index on single-value column: col
 DECIMAL;sv_BIG;raw;multi_col_text_index;false;Cannot create TEXT index on column: col of stored type other than STRING

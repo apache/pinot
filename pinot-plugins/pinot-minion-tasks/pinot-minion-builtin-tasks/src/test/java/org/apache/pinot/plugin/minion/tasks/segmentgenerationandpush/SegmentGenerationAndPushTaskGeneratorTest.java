@@ -22,7 +22,7 @@ import java.io.File;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -125,11 +125,9 @@ public class SegmentGenerationAndPushTaskGeneratorTest {
     Map<String, String> taskConfig =
         new HashMap<>(invokeGetSingleFileGenerationTaskConfig(batchConfigMap(extraBatchConfigs)));
     ClassLoader classLoader = getClass().getClassLoader();
-    URL resourcesLoc = classLoader.getResource(".");
-    assertNotNull(resourcesLoc);
     URL tableConfigUrl = classLoader.getResource("dummyTable.json");
     assertNotNull(tableConfigUrl);
-    taskConfig.put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, resourcesLoc + "dummyTable.json");
+    taskConfig.put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, tableConfigUrl.toString());
     taskConfig.put(BatchConfigProperties.RECORD_READER_CLASS, "AReaderClass");
     taskConfig.put(BatchConfigProperties.RECORD_READER_CONFIG_CLASS, "AReaderConfigClass");
     taskConfig.put(BatchConfigProperties.SCHEMA, new Schema.SchemaBuilder().build().toSingleLineJsonString());
@@ -138,8 +136,13 @@ public class SegmentGenerationAndPushTaskGeneratorTest {
 
     SegmentGenerationAndPushTaskExecutor executor = new SegmentGenerationAndPushTaskExecutor();
     FieldUtils.writeField(executor, "_eventObserver", new DefaultMinionEventObserver(), true);
-    SegmentGenerationTaskSpec spec = executor.generateTaskSpec(taskConfig, Paths.get(resourcesLoc.toURI()).toFile());
-    assertEquals(spec.getSegmentNameGeneratorSpec().getConfigs().get(APPEND_UUID_TO_SEGMENT_NAME_KEY), expected);
+    File tempDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
+    try {
+      SegmentGenerationTaskSpec spec = executor.generateTaskSpec(taskConfig, tempDir);
+      assertEquals(spec.getSegmentNameGeneratorSpec().getConfigs().get(APPEND_UUID_TO_SEGMENT_NAME_KEY), expected);
+    } finally {
+      FileUtils.deleteDirectory(tempDir);
+    }
   }
 
   @SuppressWarnings("unchecked")

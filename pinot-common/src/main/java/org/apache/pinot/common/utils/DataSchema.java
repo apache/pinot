@@ -1082,6 +1082,8 @@ public class DataSchema {
           return PinotDataType.STRING_ARRAY;
         case BYTES_ARRAY:
           return PinotDataType.BYTES_ARRAY;
+        case UUID_ARRAY:
+          return PinotDataType.UUID_ARRAY;
         default:
           throw new IllegalStateException("Cannot convert ColumnDataType: " + this + " to PinotDataType");
       }

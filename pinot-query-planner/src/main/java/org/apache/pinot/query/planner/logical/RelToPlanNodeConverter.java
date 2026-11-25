@@ -57,9 +57,11 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalMvAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -75,6 +77,7 @@ import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -84,6 +87,7 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.query.type.OpenStructSqlType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,6 +145,8 @@ public final class RelToPlanNodeConverter {
       result = convertLogicalFilter((LogicalFilter) node);
     } else if (node instanceof PinotLogicalAggregate) {
       result = convertLogicalAggregate((PinotLogicalAggregate) node);
+    } else if (node instanceof PinotLogicalMvAggregate) {
+      result = convertLogicalMvAggregate((PinotLogicalMvAggregate) node);
     } else if (node instanceof LogicalSort) {
       result = convertLogicalSort((LogicalSort) node);
     } else if (node instanceof Exchange) {
@@ -539,6 +545,13 @@ public final class RelToPlanNodeConverter {
     if (expr instanceof RexFieldAccess) {
       RexFieldAccess fieldAccess = (RexFieldAccess) expr;
       if (fieldAccess.getReferenceExpr() instanceof RexCorrelVariable) {
+        // The field index refers to the correlation variable's row type, which is the left input's row type. Prefer
+        // it over the name: the left input's field names need not match the names used in the query, e.g. when the
+        // left input is an aggregate whose output fields are named like agg#0.
+        Integer idx = resolveCorrelFieldByIndex(fieldAccess, leftRowType);
+        if (idx != null) {
+          return idx;
+        }
         String fieldName = fieldAccess.getField().getName();
         List<RelDataTypeField> fields = leftRowType.getFieldList();
         // SQL field names are case-insensitive by default in Calcite, so we use equalsIgnoreCase for matching.
@@ -566,6 +579,23 @@ public final class RelToPlanNodeConverter {
       }
     }
     return null;
+  }
+
+  /// Resolves a correlated field reference by position, as long as the correlation variable's row type still lines
+  /// up with the left input's row type (same field count and the same field type at that position). Returns null
+  /// otherwise, so that the caller can fall back to matching by name.
+  @Nullable
+  private static Integer resolveCorrelFieldByIndex(RexFieldAccess fieldAccess, RelDataType leftRowType) {
+    RelDataType correlRowType = fieldAccess.getReferenceExpr().getType();
+    if (!correlRowType.isStruct() || correlRowType.getFieldCount() != leftRowType.getFieldCount()) {
+      return null;
+    }
+    int index = fieldAccess.getField().getIndex();
+    if (index < 0 || index >= leftRowType.getFieldCount()) {
+      return null;
+    }
+    RelDataType leftFieldType = leftRowType.getFieldList().get(index).getType();
+    return SqlTypeUtil.equalSansNullability(leftFieldType, fieldAccess.getField().getType()) ? index : null;
   }
 
   private ExchangeNode convertLogicalExchange(Exchange node) {
@@ -712,6 +742,21 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
         node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit(),
         GroupingSetsPlanUtils.computeGroupingSets(node));
+  }
+
+  private MvAggregateNode convertLogicalMvAggregate(PinotLogicalMvAggregate node) {
+    List<AggregateCall> aggregateCalls = node.getAggCallList();
+    int numAggregates = aggregateCalls.size();
+    List<RexExpression.FunctionCall> functionCalls = new ArrayList<>(numAggregates);
+    List<Integer> filterArgs = new ArrayList<>(numAggregates);
+    for (AggregateCall aggregateCall : aggregateCalls) {
+      functionCalls.add(RexExpressionUtils.fromAggregateCall(aggregateCall));
+      filterArgs.add(aggregateCall.filterArg);
+    }
+    return new MvAggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()),
+        NodeHint.fromRelHints(node.getHints()), convertInputs(node.getInputs()), functionCalls, filterArgs,
+        node.getGroupSet().asList(), node.getAggType(), node.isLeafReturnFinalResult(), node.getCollations(),
+        node.getLimit(), node.getMvKeyIndexes());
   }
 
   private ProjectNode convertLogicalProject(LogicalProject node) {
@@ -1035,6 +1080,10 @@ public final class RelToPlanNodeConverter {
   }
 
   public static ColumnDataType convertToColumnDataType(RelDataType relDataType) {
+    if (relDataType instanceof OpenStructSqlType) {
+      // The leaf returns an OPEN_STRUCT column as JSON text, as the single-stage engine does
+      return ColumnDataType.JSON;
+    }
     SqlTypeName sqlTypeName = relDataType.getSqlTypeName();
     if (sqlTypeName == SqlTypeName.NULL) {
       return ColumnDataType.UNKNOWN;

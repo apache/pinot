@@ -20,10 +20,14 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /// Tests for [VectorIndexConfigValidator].
@@ -66,8 +70,8 @@ public class VectorIndexConfigValidatorTest {
     properties.put("version", "1");
 
     VectorIndexConfig config = new VectorIndexConfig(properties);
-    // Must not throw
     VectorIndexConfigValidator.validate(config);
+    assertTrue(config.isMmapGraphOnMerge());
   }
 
   // ============================================================
@@ -82,10 +86,12 @@ public class VectorIndexConfigValidatorTest {
     properties.put("vectorDistanceFunction", "COSINE");
     properties.put("maxCon", "32");
     properties.put("beamWidth", "200");
+    properties.put(VectorIndexConfig.MMAP_GRAPH_ON_MERGE, "true");
 
     VectorIndexConfig config = new VectorIndexConfig(properties);
     VectorIndexConfigValidator.validate(config);
     assertEquals(config.resolveBackendType(), VectorBackendType.HNSW);
+    assertTrue(config.isMmapGraphOnMerge());
   }
 
   @Test
@@ -100,9 +106,43 @@ public class VectorIndexConfigValidatorTest {
     properties.put("maxBufferSizeMB", "256.5");
     properties.put("useCompoundFile", "true");
     properties.put("mode", "BEST_SPEED");
+    properties.put(VectorIndexConfig.MMAP_GRAPH_ON_MERGE, "false");
+    properties.put("buildThreads", "4");
+    properties.put("forceMerge", "FALSE");
+    properties.put("concurrentMerge", "true");
+    properties.put("parallelBuildMaxDocs", "20000");
 
     VectorIndexConfig config = new VectorIndexConfig(properties);
     VectorIndexConfigValidator.validate(config);
+    assertFalse(config.isMmapGraphOnMerge());
+  }
+
+  @DataProvider
+  public Object[][] invalidHnswBuildProperties() {
+    return new Object[][]{
+        {"buildThreads", null, ".*buildThreads must be a valid integer.*"},
+        {"buildThreads", "four", ".*buildThreads must be a valid integer.*"},
+        {"buildThreads", "0", ".*buildThreads must be a positive integer.*"},
+        {"buildThreads", "2000", ".*buildThreads must be <= 32.*"},
+        {"parallelBuildMaxDocs", "-1", ".*parallelBuildMaxDocs must be a positive integer.*"},
+        {"forceMerge", "yes", ".*forceMerge must be true or false.*"},
+        {"concurrentMerge", "1", ".*concurrentMerge must be true or false.*"}
+    };
+  }
+
+  @Test(dataProvider = "invalidHnswBuildProperties")
+  public void testRejectsInvalidHnswBuildProperty(String key, String value, String messageRegex) {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "128");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put(key, value);
+    try {
+      VectorIndexConfigValidator.validate(new VectorIndexConfig(properties));
+      fail("Expected " + key + "=" + value + " to be rejected");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().matches(messageRegex), e.getMessage());
+    }
   }
 
   @Test
@@ -111,6 +151,21 @@ public class VectorIndexConfigValidatorTest {
     VectorIndexConfig config = new VectorIndexConfig(false, "HNSW", 768, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, null);
     VectorIndexConfigValidator.validate(config);
+    assertTrue(config.isMmapGraphOnMerge());
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*mmapGraphOnMerge must be true or false.*")
+  public void testRejectMalformedMmapGraphOnMerge() {
+    VectorIndexConfigValidator.validate(new VectorIndexConfig(Map.of("vectorDimension", "1024",
+        VectorIndexConfig.MMAP_GRAPH_ON_MERGE, "yes")));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*mmapGraphOnMerge.*cannot be used with vectorIndexType IVF_FLAT.*")
+  public void testRejectMmapGraphOnMergeOnIvfFlat() {
+    VectorIndexConfigValidator.validate(new VectorIndexConfig(Map.of("vectorIndexType", "IVF_FLAT", "vectorDimension",
+        "1024", VectorIndexConfig.MMAP_GRAPH_ON_MERGE, "false")));
   }
 
   // ============================================================

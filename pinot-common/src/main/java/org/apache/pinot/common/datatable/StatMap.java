@@ -93,6 +93,12 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return this;
   }
 
+  /// Removes the value of the given key, so that it reads as the default value and is not serialized.
+  public StatMap<K> remove(K key) {
+    _map.remove(key);
+    return this;
+  }
+
   public long getLong(K key) {
     if (key.getType() == Type.INT) {
       return getInt(key);

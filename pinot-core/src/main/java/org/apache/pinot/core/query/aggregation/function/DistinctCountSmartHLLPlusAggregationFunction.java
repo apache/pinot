@@ -30,9 +30,9 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.segment.local.utils.HyperLogLogPlusUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -57,6 +57,7 @@ import org.roaringbitmap.RoaringBitmap;
 /// Example of second argument: 'threshold=10;p=12;sp=25'
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCountSmartSketchAggregationFunction {
+  private static final int HYPER_LOG_LOG_PLUS_TYPE = 40;
 
   private final int _threshold;
   private final int _p;
@@ -326,17 +327,20 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Object o) {
-    if (o instanceof HyperLogLogPlus) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.HyperLogLogPlus.getValue(),
-          ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize((HyperLogLogPlus) o));
+  public SerializedResult serializeIntermediateResult(Object o) {
+    if (o instanceof HyperLogLogPlus hyperLogLogPlus) {
+      return new SerializedBytes(HYPER_LOG_LOG_PLUS_TYPE,
+          ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus));
     }
     return BaseDistinctAggregateAggregationFunction.serializeSet((Set) o);
   }
 
   @Override
-  public Object deserializeIntermediateResult(@Nullable CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+  public Object deserializeIntermediateResult(CustomObject customObject) {
+    if (customObject.getType() == HYPER_LOG_LOG_PLUS_TYPE) {
+      return ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(customObject.getBuffer());
+    }
+    return BaseDistinctAggregateAggregationFunction.deserializeSet(customObject);
   }
 
   @Override

@@ -94,7 +94,6 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
-import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -439,16 +438,17 @@ public class PinotClientRequest {
         }
       });
 
+      HttpRequesterIdentity requesterIdentity = makeHttpIdentity(requestCtx);
       if (isExplainMode(requestJson)) {
         BrokerResponse explainResponse = _requestHandler.handleExplainTimeSeriesRequest(language, queryString,
-            queryParams);
+            queryParams, requesterIdentity, httpHeaders);
         asyncResponse.resume(explainResponse);
         return;
       }
 
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         TimeSeriesBlock timeSeriesBlock = executeTimeSeriesQuery(language, queryString, queryParams,
-            requestContext, makeHttpIdentity(requestCtx), httpHeaders);
+            requestContext, requesterIdentity, httpHeaders);
         asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(timeSeriesBlock));
       }
     } catch (BadRequestException bre) {
@@ -458,7 +458,7 @@ public class PinotClientRequest {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (QueryException e) {
-      asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(e));
+      asyncResponse.resume(timeSeriesErrorResponse(e, TimeSeriesResponseMapper.toBrokerResponse(e)));
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST timeseries request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
@@ -490,7 +490,9 @@ public class PinotClientRequest {
         asyncResponse.resume(response);
       }
     } catch (QueryException e) {
-      asyncResponse.resume(PinotBrokerTimeSeriesResponse.fromException(e));
+      asyncResponse.resume(timeSeriesErrorResponse(e, PinotBrokerTimeSeriesResponse.fromException(e)));
+    } catch (WebApplicationException e) {
+      asyncResponse.resume(e);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
@@ -768,8 +770,7 @@ public class PinotClientRequest {
     if (!authorizationResult.hasAccess()) {
       throw deleteAccessDenied(null, null, authorizationResult);
     }
-    // Access controls that authenticate the caller in their table check rather than in the first step (e.g. the
-    // ZooKeeper basic auth) reject an unauthenticated caller here, before the table is looked up
+    // Some access controls authenticate the caller only in their table check.
     authorizationResult = authorizeTables(accessControl, requesterIdentity, Set.of());
     if (!authorizationResult.hasAccess()) {
       throw deleteAccessDenied(null, null, authorizationResult);
@@ -877,7 +878,9 @@ public class PinotClientRequest {
     }
     checkDeleteAccess(accessControl.authorizeDeleteRows(requesterIdentity, httpHeaders, tableName), tableName,
         writtenTableName);
-    if (hasRowFilters(accessControl, requesterIdentity, tableName)) {
+    if (_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
+        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)
+        && AccessControl.hasRowFilters(accessControl, requesterIdentity, tableName)) {
       throw deleteAccessDenied(tableName, writtenTableName, new BasicAuthorizationResultImpl(false,
           "Row-level security applies to the table, and would not restrict the rows the statement deletes"));
     }
@@ -972,30 +975,6 @@ public class PinotClientRequest {
         Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(text).find();
   }
 
-  /// Returns whether row-level security filters apply to the table for the caller, when the broker enables row-level
-  /// security. The filters of the table name as given are checked first, since the caller is authorized for it and
-  /// every access control answers for it, then those of its raw name, where filters are usually configured, when it
-  /// differs and the caller is authorized for it: an access control may refuse to answer for a table the caller
-  /// cannot access, e.g. a basic auth principal whose `tables` list the name with its type only.
-  private boolean hasRowFilters(AccessControl accessControl, RequesterIdentity requesterIdentity, String tableName) {
-    if (!_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
-        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH)) {
-      return false;
-    }
-    if (hasRowFilters(accessControl.getRowColFilters(requesterIdentity, tableName))) {
-      return true;
-    }
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    return !rawTableName.equals(tableName)
-        && accessControl.authorize(requesterIdentity, Set.of(rawTableName)).hasAccess()
-        && hasRowFilters(accessControl.getRowColFilters(requesterIdentity, rawTableName));
-  }
-
-  private static boolean hasRowFilters(TableRowColAccessResult rowColFilters) {
-    List<String> rowFilters = rowColFilters.getRLSFilters().orElse(null);
-    return rowFilters != null && !rowFilters.isEmpty();
-  }
-
   @VisibleForTesting
   SqlSyntaxValidationResponse validateSqlSyntax(ObjectNode sqlRequestJson) {
     try {
@@ -1027,6 +1006,13 @@ public class PinotClientRequest {
     }
 
     return fingerprint;
+  }
+
+  private static Response timeSeriesErrorResponse(QueryException e, Object entity) {
+    Response.Status status = e.getErrorCode() == QueryErrorCode.ACCESS_DENIED
+        ? Response.Status.FORBIDDEN
+        : Response.Status.OK;
+    return Response.status(status).entity(entity).build();
   }
 
   private TimeSeriesBlock executeTimeSeriesQuery(String language, String queryString,

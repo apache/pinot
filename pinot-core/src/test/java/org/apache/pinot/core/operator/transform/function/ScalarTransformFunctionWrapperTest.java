@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.IntToLongFunction;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -63,6 +64,39 @@ import static org.testng.Assert.assertTrue;
 
 
 public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTest {
+
+  @Test
+  public void testPrimitiveBitwiseFunctions() {
+    assertBitwise("bitAnd(33, intSVNull)", DataType.INT, i -> 33 & _intSVValues[i]);
+    assertBitwise("bit_or(intSVNull, longSV)", DataType.LONG, i -> _intSVValues[i] | _longSVValues[i]);
+    assertBitwise("bitXor(longSV, intSVNull < 0)", DataType.LONG,
+        i -> _longSVValues[i] ^ (_intSVValues[i] < 0 ? 1 : 0));
+    assertBitwise("bitAnd(TRUE, intSVNull < 0)", DataType.INT, i -> _intSVValues[i] < 0 ? 1 : 0);
+    assertBitwise("bitNot(intSVNull < 0)", DataType.INT, i -> _intSVValues[i] < 0 ? -2 : -1);
+    assertBitwise("bitShiftLeft(intSVNull, longSV)", DataType.INT, i -> _intSVValues[i] << _longSVValues[i]);
+    assertBitwise("bitShiftRight(longSV, intSVNull)", DataType.LONG, i -> _longSVValues[i] >> _intSVValues[i]);
+    assertBitwise("bitShiftRightLogical(intSVNull, 33)", DataType.INT, i -> _intSVValues[i] >>> 1);
+    assertBitwise("bitMask(bitAnd(intSVNull, 63))", DataType.LONG, i -> 1L << (_intSVValues[i] & 63));
+    assertBitwise("extractBit(longSV, bitAnd(intSVNull, 63))", DataType.INT,
+        i -> (_longSVValues[i] >>> (_intSVValues[i] & 63)) & 1);
+    assertBitwise("bitExtract(intSVNull, 4294967296)", DataType.INT, i -> 0);
+    assertBitwise("bitCount(intSVNull)", DataType.INT, i -> Long.bitCount(_intSVValues[i]));
+  }
+
+  private void assertBitwise(String sql, DataType type, IntToLongFunction expected) {
+    TransformFunction function = TransformFunctionFactory.getNullHandlingEnabled(
+        RequestContextUtils.getExpression(sql), _dataSourceMap);
+    assertTrue(function instanceof BitwiseTransformFunction, sql);
+    assertEquals(function.getResultMetadata().getDataType(), type, sql);
+    RoaringBitmap nulls = function.getNullBitmap(_projectionBlock);
+    long[] values = function.transformToLongValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(nulls.contains(i), isNullRow(i), sql);
+      if (!isNullRow(i)) {
+        assertEquals(values[i], expected.applyAsLong(i), sql);
+      }
+    }
+  }
 
   @Test
   public void testStringLowerTransformFunction() {
@@ -1467,7 +1501,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("bitCount(%s)", LONG_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertTrue(transformFunction instanceof BitwiseTransformFunction);
     assertEquals(transformFunction.getName(), "bitCount");
     int[] expectedValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {

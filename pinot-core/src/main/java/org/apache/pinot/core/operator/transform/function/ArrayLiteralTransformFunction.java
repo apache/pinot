@@ -404,42 +404,47 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
     float[][] floatArrayResult = _floatArrayResult;
     if (floatArrayResult == null || floatArrayResult.length < numDocs) {
       floatArrayResult = new float[numDocs][];
-      float[] floatArrayLiteral = _floatArrayLiteral;
-      if (floatArrayLiteral == null) {
-        switch (_dataType) {
-          case BOOLEAN:
-          case INT:
-            floatArrayLiteral = new float[_intArrayLiteral.length];
-            for (int i = 0; i < _intArrayLiteral.length; i++) {
-              floatArrayLiteral[i] = _intArrayLiteral[i];
-            }
-            break;
-          case LONG:
-            floatArrayLiteral = new float[_longArrayLiteral.length];
-            for (int i = 0; i < _longArrayLiteral.length; i++) {
-              floatArrayLiteral[i] = _longArrayLiteral[i];
-            }
-            break;
-          case DOUBLE:
-            floatArrayLiteral = new float[_doubleArrayLiteral.length];
-            for (int i = 0; i < _doubleArrayLiteral.length; i++) {
-              floatArrayLiteral[i] = (float) _doubleArrayLiteral[i];
-            }
-            break;
-          case STRING:
-            floatArrayLiteral = new float[_stringArrayLiteral.length];
-            for (int i = 0; i < _stringArrayLiteral.length; i++) {
-              floatArrayLiteral[i] = Float.parseFloat(_stringArrayLiteral[i]);
-            }
-            break;
-          default:
-            throw new IllegalStateException("Unable to convert data type: " + _dataType + " to float array");
-        }
-      }
-      Arrays.fill(floatArrayResult, floatArrayLiteral);
+      Arrays.fill(floatArrayResult, getFloatArrayValue());
       _floatArrayResult = floatArrayResult;
     }
     return floatArrayResult;
+  }
+
+  /// Returns the literal with the same float conversion used by the multi-value transform.
+  float[] getFloatArrayValue() {
+    float[] floatArrayLiteral = _floatArrayLiteral;
+    if (floatArrayLiteral == null) {
+      switch (_dataType) {
+        case BOOLEAN:
+        case INT:
+          floatArrayLiteral = new float[_intArrayLiteral.length];
+          for (int i = 0; i < _intArrayLiteral.length; i++) {
+            floatArrayLiteral[i] = _intArrayLiteral[i];
+          }
+          break;
+        case LONG:
+          floatArrayLiteral = new float[_longArrayLiteral.length];
+          for (int i = 0; i < _longArrayLiteral.length; i++) {
+            floatArrayLiteral[i] = _longArrayLiteral[i];
+          }
+          break;
+        case DOUBLE:
+          floatArrayLiteral = new float[_doubleArrayLiteral.length];
+          for (int i = 0; i < _doubleArrayLiteral.length; i++) {
+            floatArrayLiteral[i] = (float) _doubleArrayLiteral[i];
+          }
+          break;
+        case STRING:
+          floatArrayLiteral = new float[_stringArrayLiteral.length];
+          for (int i = 0; i < _stringArrayLiteral.length; i++) {
+            floatArrayLiteral[i] = Float.parseFloat(_stringArrayLiteral[i]);
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unable to convert data type: " + _dataType + " to float array");
+      }
+    }
+    return floatArrayLiteral;
   }
 
   @Override

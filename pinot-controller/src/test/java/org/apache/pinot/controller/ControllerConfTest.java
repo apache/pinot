@@ -29,9 +29,13 @@ import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class ControllerConfTest {
@@ -295,5 +299,54 @@ public class ControllerConfTest {
     Assert.assertEquals(conf.getSegmentReplaceExternalViewMaxWaitMs(), 45 * 60_000L);
     Assert.assertEquals(conf.getSegmentReplaceExternalViewCheckIntervalMs(), 500L);
     Assert.assertEquals(conf.getSegmentReplaceMaxRetryAttempts(), 2);
+  }
+
+  @DataProvider
+  public Object[][] segmentMetadataEntryLimits() {
+    return new Object[][]{
+        // default, max, valid
+        {10_001, 10_000, false},
+        {10_000, 10_000, true},
+        {1, 10_000, true},
+        {0, 10_000, false},
+        {-1, 10_000, false}
+    };
+  }
+
+  @Test(dataProvider = "segmentMetadataEntryLimits")
+  public void testSegmentMetadataEntryLimitsValidation(int defaultLimit, int maxLimit, boolean valid) {
+    ControllerConf conf = new ControllerConf();
+    conf.setProperty(ControllerConf.SEGMENT_METADATA_DEFAULT_ENTRY_LIMIT, defaultLimit);
+    conf.setProperty(ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT, maxLimit);
+
+    if (valid) {
+      conf.validateSegmentMetadataEntryLimits();
+    } else {
+      expectThrows(IllegalStateException.class, conf::validateSegmentMetadataEntryLimits);
+    }
+  }
+
+  /// Lowering only the max entry limit leaves the default (50,000) above it.
+  @Test
+  public void testSegmentMetadataMaxEntryLimitBelowDefault() {
+    ControllerConf conf = new ControllerConf();
+    conf.setProperty(ControllerConf.SEGMENT_METADATA_MAX_ENTRY_LIMIT, 10_000);
+
+    expectThrows(IllegalStateException.class, conf::validateSegmentMetadataEntryLimits);
+  }
+
+  @Test
+  public void testSegmentUploadRejectOutOfRetentionDefault() {
+    ControllerConf conf = new ControllerConf();
+    assertFalse(conf.isSegmentUploadRejectOutOfRetention());
+  }
+
+  @Test
+  public void testSegmentUploadRejectOutOfRetentionOverride() {
+    ControllerConf conf = new ControllerConf();
+    conf.setSegmentUploadRejectOutOfRetention(true);
+    assertTrue(conf.isSegmentUploadRejectOutOfRetention());
+    conf.setSegmentUploadRejectOutOfRetention(false);
+    assertFalse(conf.isSegmentUploadRejectOutOfRetention());
   }
 }

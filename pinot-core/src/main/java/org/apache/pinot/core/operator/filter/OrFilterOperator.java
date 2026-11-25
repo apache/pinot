@@ -24,6 +24,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
@@ -38,12 +39,27 @@ public class OrFilterOperator extends BaseFilterOperator {
 
   private final List<BaseFilterOperator> _filterOperators;
   private final Map<String, String> _queryOptions;
+  private final AndRestrictionPushdown _restrictionPushdown;
 
   public OrFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
       int numDocs, boolean nullHandlingEnabled) {
+    this(filterOperators, queryOptions, numDocs, nullHandlingEnabled, false);
+  }
+
+  public OrFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
+      int numDocs, boolean nullHandlingEnabled, boolean restrictionPushdownEnabled) {
+    this(filterOperators, queryOptions, numDocs, nullHandlingEnabled,
+        AndRestrictionPushdown.of(restrictionPushdownEnabled));
+  }
+
+  /// @param restrictionPushdown how the AND that derives the NULL documents pushes its restriction into its children;
+  ///                            see [BaseFilterOperator#deriveNulls(Map, AndRestrictionPushdown)]
+  public OrFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
+      int numDocs, boolean nullHandlingEnabled, AndRestrictionPushdown restrictionPushdown) {
     super(numDocs, nullHandlingEnabled);
     _filterOperators = filterOperators;
     _queryOptions = queryOptions;
+    _restrictionPushdown = restrictionPushdown;
   }
 
   @Override
@@ -90,7 +106,7 @@ public class OrFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.unscanned();
+    return mayHaveNulls() ? deriveNulls(_queryOptions, _restrictionPushdown) : EmptyDocIdSet.unscanned();
   }
 
   @Override

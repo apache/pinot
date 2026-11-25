@@ -44,7 +44,8 @@ import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
@@ -321,11 +322,11 @@ public class PredownloadSchedulerTest {
       throws Exception {
     // Test default parallelism (should use numProcessors * 3)
     Map<String, Object> defaultProps = Map.of(
-        "pinot.server.instance.id", INSTANCE_ID,
-        "pinot.server.instance.dataDir", INSTANCE_DATA_DIR,
-        "pinot.server.instance.readMode", READ_MODE,
-        "pinot.cluster.name", CLUSTER_NAME,
-        "pinot.zk.server", ZK_ADDRESS
+        Server.CONFIG_OF_INSTANCE_ID, INSTANCE_ID,
+        Server.CONFIG_OF_INSTANCE_DATA_DIR, INSTANCE_DATA_DIR,
+        Server.CONFIG_OF_READ_MODE, READ_MODE,
+        Helix.CONFIG_OF_CLUSTER_NAME, CLUSTER_NAME,
+        Helix.CONFIG_OF_ZOOKEEPER_SERVER, ZK_ADDRESS
     );
     PropertiesConfiguration defaultConfig = new PropertiesConfiguration();
     defaultProps.forEach((key, value) -> defaultConfig.setProperty(key, value));
@@ -340,12 +341,12 @@ public class PredownloadSchedulerTest {
     // Test custom parallelism
     int customParallelism = 10;
     Map<String, Object> customProps = Map.of(
-        "pinot.server.instance.id", INSTANCE_ID,
-        "pinot.server.instance.dataDir", INSTANCE_DATA_DIR,
-        "pinot.server.instance.readMode", READ_MODE,
-        "pinot.cluster.name", CLUSTER_NAME,
-        "pinot.zk.server", ZK_ADDRESS,
-        "pinot.server.predownload.parallelism", String.valueOf(customParallelism)
+        Server.CONFIG_OF_INSTANCE_ID, INSTANCE_ID,
+        Server.CONFIG_OF_INSTANCE_DATA_DIR, INSTANCE_DATA_DIR,
+        Server.CONFIG_OF_READ_MODE, READ_MODE,
+        Helix.CONFIG_OF_CLUSTER_NAME, CLUSTER_NAME,
+        Helix.CONFIG_OF_ZOOKEEPER_SERVER, ZK_ADDRESS,
+        Server.CONFIG_OF_PREDOWNLOAD_PARALLELISM, String.valueOf(customParallelism)
     );
     PropertiesConfiguration customConfig = new PropertiesConfiguration();
     customProps.forEach((key, value) -> customConfig.setProperty(key, value));
@@ -358,12 +359,12 @@ public class PredownloadSchedulerTest {
 
     // Test zero/negative parallelism (should fall back to default)
     Map<String, Object> zeroProps = Map.of(
-        "pinot.server.instance.id", INSTANCE_ID,
-        "pinot.server.instance.dataDir", INSTANCE_DATA_DIR,
-        "pinot.server.instance.readMode", READ_MODE,
-        "pinot.cluster.name", CLUSTER_NAME,
-        "pinot.zk.server", ZK_ADDRESS,
-        "pinot.server.predownload.parallelism", "0"
+        Server.CONFIG_OF_INSTANCE_ID, INSTANCE_ID,
+        Server.CONFIG_OF_INSTANCE_DATA_DIR, INSTANCE_DATA_DIR,
+        Server.CONFIG_OF_READ_MODE, READ_MODE,
+        Helix.CONFIG_OF_CLUSTER_NAME, CLUSTER_NAME,
+        Helix.CONFIG_OF_ZOOKEEPER_SERVER, ZK_ADDRESS,
+        Server.CONFIG_OF_PREDOWNLOAD_PARALLELISM, "0"
     );
     PropertiesConfiguration zeroConfig = new PropertiesConfiguration();
     zeroProps.forEach((key, value) -> zeroConfig.setProperty(key, value));
@@ -443,7 +444,7 @@ public class PredownloadSchedulerTest {
 
   private PredownloadScheduler buildPeerEnabledScheduler(PropertiesConfiguration properties)
       throws Exception {
-    properties.setProperty(CommonConstants.Server.CONFIG_OF_PEER_DOWNLOAD_ENABLED, true);
+    properties.setProperty(Server.CONFIG_OF_PEER_DOWNLOAD_ENABLED, true);
     PredownloadScheduler scheduler = spy(new PredownloadScheduler(properties));
     scheduler._executor = Runnable::run;
 
@@ -491,7 +492,7 @@ public class PredownloadSchedulerTest {
     assertEquals(enabledField.get(disabled), false);
     disabled.stop();
 
-    properties.setProperty(CommonConstants.Server.CONFIG_OF_PEER_DOWNLOAD_ENABLED, true);
+    properties.setProperty(Server.CONFIG_OF_PEER_DOWNLOAD_ENABLED, true);
     PredownloadScheduler enabled = new PredownloadScheduler(properties);
     assertEquals(enabledField.get(enabled), true);
     enabled.stop();

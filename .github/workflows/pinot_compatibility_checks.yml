@@ -56,6 +56,8 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 2
+      - name: Test compatibility verifier readiness
+        run: python3 compatibility-verifier/test_server_readiness.py
       - name: Select binary compatibility baseline
         id: binary-baseline
         env:
@@ -180,8 +182,8 @@ jobs:
       - name: Compare API
         run: |
           for mod in pinot-spi pinot-segment-spi; do
-            OLD=$(ls master-head/$mod/target/$mod-*.jar | grep -v '\-tests.jar' | head -1)
-            NEW=$(ls $mod/target/$mod-*.jar | grep -v '\-tests.jar' | head -1)
+            OLD=$(find "master-head/$mod/target" -maxdepth 1 -name "$mod-*.jar" ! -name '*-tests.jar' -print -quit)
+            NEW=$(find "$mod/target" -maxdepth 1 -name "$mod-*.jar" ! -name '*-tests.jar' -print -quit)
 
             java -jar japicmp.jar \
               --old "$OLD" \
@@ -198,8 +200,9 @@ jobs:
       fail-fast: false
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
+        # Releases before 1.6.0 cannot roll back from Lucene 10 text/HNSW indexes.
         old_commit: [
-          "release-1.5.0", "master"
+          "release-1.6.0", "master"
         ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
@@ -249,6 +252,16 @@ jobs:
         timeout-minutes: 120
         run: |
           .github/workflows/scripts/.pinot_compatibility_verifier.sh
+      - name: Store compatibility verifier diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: compatibility-verifier-${{ matrix.old_commit }}-logs
+          retention-days: 3
+          if-no-files-found: ignore
+          path: |
+            /tmp/compatibility-verifier/logs/
+            !/tmp/compatibility-verifier/logs/zkdir/**
   multi-stage-compatibility-verifier:
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
@@ -257,8 +270,9 @@ jobs:
       fail-fast: false
       matrix:
         test_suite: [ "compatibility-verifier/multi-stage-query-engine-test-suite" ]
+        # Releases before 1.6.0 cannot roll back from Lucene 10 text/HNSW indexes.
         old_commit: [
-          "release-1.5.0", "master"
+          "release-1.6.0", "master"
         ]
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
@@ -308,3 +322,13 @@ jobs:
         timeout-minutes: 120
         run: |
           .github/workflows/scripts/.pinot_compatibility_verifier.sh
+      - name: Store multi-stage compatibility verifier diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: multi-stage-compatibility-verifier-${{ matrix.old_commit }}-logs
+          retention-days: 3
+          if-no-files-found: ignore
+          path: |
+            /tmp/multi-stage-compatibility-verifier/logs/
+            !/tmp/multi-stage-compatibility-verifier/logs/zkdir/**

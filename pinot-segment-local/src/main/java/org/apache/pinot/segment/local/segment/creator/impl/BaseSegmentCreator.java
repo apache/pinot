@@ -162,6 +162,17 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     ColumnStatistics columnStatistics = _columnStatisticsMap.get(columnName);
     Preconditions.checkNotNull(columnStatistics, "Missing column statistics for column: %s", columnName);
 
+    // Consuming segments have already used the effective limit, which can be set by a consuming tier override.
+    if (!_config.isRealtimeConversion() && !fieldSpec.isSingleValueField()) {
+      Integer maxNumMultiValues = originalConfig.getConfig(StandardIndexes.forward()).getMaxNumMultiValues();
+      if (maxNumMultiValues != null && !originalConfig.getConfig(StandardIndexes.vector()).isEnabled()) {
+        int numValues = columnStatistics.getMaxNumberOfMultiValues();
+        Preconditions.checkState(numValues <= maxNumMultiValues,
+            "Number of values: %s in MV column: %s exceeds the maximum allowed: %s", numValues, columnName,
+            maxNumMultiValues);
+      }
+    }
+
     boolean dictEnabledColumn = createDictionaryForColumn(columnStatistics, _config, fieldSpec);
     if (originalConfig.getConfig(StandardIndexes.inverted()).isEnabled()) {
       Preconditions.checkState(dictEnabledColumn,

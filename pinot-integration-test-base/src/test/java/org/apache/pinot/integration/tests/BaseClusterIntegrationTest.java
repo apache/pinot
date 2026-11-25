@@ -773,12 +773,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     createKafkaTopic(getKafkaTopic());
   }
 
+  /// Creates the embedded Kafka fixture; subclasses can retain the allocated instance during startup.
+  protected EmbeddedKafkaCluster createEmbeddedKafkaCluster() {
+    return new EmbeddedKafkaCluster();
+  }
+
   protected void startKafkaWithoutTopic() {
     int requestedBrokers = getNumKafkaBrokers();
     Properties props = new Properties();
     props.setProperty(EmbeddedKafkaCluster.BROKER_COUNT_PROP, Integer.toString(requestedBrokers));
     props.putAll(getKafkaExtraProperties());
-    EmbeddedKafkaCluster cluster = new EmbeddedKafkaCluster();
+    EmbeddedKafkaCluster cluster = createEmbeddedKafkaCluster();
     cluster.init(props);
     cluster.start();
     _kafkaStarters = List.of(cluster);

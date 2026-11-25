@@ -35,12 +35,16 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown.Strategy;
 import org.apache.pinot.core.plan.AcquireReleaseColumnsSegmentPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
@@ -55,6 +59,7 @@ import org.apache.pinot.core.plan.StreamingInstanceResponsePlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
+import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -68,11 +73,13 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
 import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,6 +91,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
   // Cap planning work independently of the query's configurable group limit.
+  private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
   private static final int MAX_GROUPING_SETS_DICTIONARY_SCAN_ENTRIES = 1 << 20;
 
   private final FetchPlanner _fetchPlanner = FetchPlannerRegistry.getPlanner();
@@ -233,8 +241,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService) {
-    rewriteQueryContextWithHints(queryContext, segmentContexts);
     applyQueryOptions(queryContext);
+    rewriteQueryContextWithHints(queryContext, segmentContexts);
+    applyAndRestrictionPushdown(queryContext, true);
     boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
     // No ResultsBlockStreamer here, so nothing can stream. SelectionPlanNode gates the streaming leaf on this same
     // option and cannot see the streamer, so clear it for the whole plan rather than let it be half-honored.
@@ -260,33 +269,97 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         new InstanceResponsePlanNode(combinePlanNode, fetchSegmentContexts, fetchContexts, queryContext));
   }
 
-  /// Resolves [AndRestrictionPushdownMode] for a query.
+  /// Resolves [AndRestrictionPushdownMode] for a query into an [AndRestrictionPushdown].
   ///
-  /// The push-down materializes the filter result instead of streaming it, so under AUTO it is only applied to a
-  /// query that is going to read every matching document anyway. That is exactly the aggregation and group-by
-  /// queries:
+  /// - `NEVER`: no push-down.
+  /// - `ALWAYS`: the eager push-down, which materializes the filter result.
+  /// - `STREAMING`: the streaming push-down for unordered selections with a finite LIMIT; eager otherwise.
+  /// - `AUTO`: eager for aggregation and group-by queries with a positive LIMIT; off for other queries.
   ///
-  /// - a selection query without ORDER BY stops as soon as it has LIMIT rows;
-  /// - a DISTINCT query without ORDER BY stops the same way, in `DistinctOperator#getNextBlock`;
-  /// - whether a selection query *with* ORDER BY can stop early is decided per segment, because
-  ///   [org.apache.pinot.core.plan.SelectionPlanNode] picks `SelectionPartiallyOrderedBy*` from the segment's sorted
-  ///   column, so it cannot be ruled out here and is excluded conservatively;
-  /// - LIMIT 0 reads nothing at all.
-  ///
-  /// Use ALWAYS to push down on a workload known not to terminate early.
-  private static boolean isAndRestrictionPushdownEnabled(AndRestrictionPushdownMode mode, QueryContext queryContext) {
+  /// Under row-level security (RLS), `NEVER`, `AUTO`, and `STREAMING` stream a single eligible user predicate.
+  /// All other RLS queries use the eager restriction.
+  private static AndRestrictionPushdown resolveAndRestrictionPushdown(AndRestrictionPushdownMode mode,
+      QueryContext queryContext) {
+    if (queryContext.getRowFilter() != null) {
+      boolean canStream =
+          mode != AndRestrictionPushdownMode.ALWAYS && QueryContextUtils.getRlsStreamingPredicate(queryContext) != null;
+      return canStream
+          ? AndRestrictionPushdown.streaming(getMaxDocsToRead(queryContext))
+          : AndRestrictionPushdown.EAGER;
+    }
     switch (mode) {
       case ALWAYS:
-        return true;
+        return AndRestrictionPushdown.EAGER;
       case NEVER:
-        return false;
+        return AndRestrictionPushdown.OFF;
+      case STREAMING:
+        return canStopAtSelectionLimit(queryContext)
+            ? AndRestrictionPushdown.streaming(getMaxDocsToRead(queryContext))
+            : AndRestrictionPushdown.EAGER;
       case AUTO:
-        // NOTE: DISTINCT is modelled as an aggregation function, so it has to be excluded explicitly
+        // DISTINCT is modelled as an aggregation function, but its LIMIT counts distinct values.
         return queryContext.getLimit() > 0 && QueryContextUtils.isAggregationQuery(queryContext)
-            && !QueryContextUtils.isDistinctQuery(queryContext);
+            && !QueryContextUtils.isDistinctQuery(queryContext)
+            ? AndRestrictionPushdown.EAGER
+            : AndRestrictionPushdown.OFF;
       default:
         throw new IllegalStateException("Unsupported AND restriction push-down mode: " + mode);
     }
+  }
+
+  /// Resolves the strategy after expression hints have rewritten the policy and WHERE predicates.
+  private void applyAndRestrictionPushdown(QueryContext queryContext, boolean canCloseEarly) {
+    AndRestrictionPushdownMode mode = QueryOptionsUtils.getAndRestrictionPushdownMode(queryContext.getQueryOptions());
+    AndRestrictionPushdown pushdown =
+        resolveAndRestrictionPushdown(mode != null ? mode : _andRestrictionPushdownMode, queryContext);
+    // The transport's streaming selection operators can stop before EOF without closing the filter iterator.
+    if (!canCloseEarly && pushdown.getStrategy() == Strategy.STREAMING) {
+      pushdown = AndRestrictionPushdown.EAGER;
+    }
+    queryContext.setAndRestrictionPushdown(pushdown);
+  }
+
+  private static boolean canStopAtSelectionLimit(QueryContext queryContext) {
+    return queryContext.getLimit() > 0 && QueryContextUtils.isSelectionOnlyQuery(queryContext)
+        && getMaxDocsToRead(queryContext) < Integer.MAX_VALUE;
+  }
+
+  /// Returns the most matching documents that the query reads from one segment: its limit plus its offset.
+  private static int getMaxDocsToRead(QueryContext queryContext) {
+    return (int) Math.min((long) queryContext.getLimit() + queryContext.getOffset(), Integer.MAX_VALUE);
+  }
+
+  /// Optimizes the row-level security (RLS) filter with the schema of the table, as the WHERE clause that holds the
+  /// same filter. Then the RLS bitmap and the WHERE clause evaluate the same predicate: for example, the optimizer
+  /// turns `intColumn = 2.0` into `intColumn = 2`, which the dictionary of an INT column can look up.
+  ///
+  /// Always starts from the filter that the broker sent, so a second call gives the same result. Fails the query when
+  /// the optimizer fails, because the query must not run without the RLS filter.
+  private static void optimizeRowFilter(QueryContext queryContext) {
+    Expression rowFilterExpression = queryContext.getRowFilterExpression();
+    if (rowFilterExpression == null) {
+      return;
+    }
+    FilterContext rowFilter;
+    try {
+      // Match the broker's order: optimize the policy before the physical table overrides, then optimize again.
+      // Start from the original every time, so repeated planning does not follow chains of overrides.
+      rowFilterExpression = QUERY_OPTIMIZER.optimizeFilter(rowFilterExpression.deepCopy(), queryContext.getSchema());
+      Map<Expression, Expression> expressionOverrideMap = queryContext.getRowFilterExpressionOverrideMap();
+      if (expressionOverrideMap != null) {
+        rowFilterExpression =
+            QueryOptimizer.applyExpressionOverrideToFilterOperands(rowFilterExpression, expressionOverrideMap);
+        rowFilterExpression = QUERY_OPTIMIZER.optimizeFilter(rowFilterExpression, queryContext.getSchema());
+      }
+      rowFilter = RequestContextUtils.getFilter(rowFilterExpression);
+    } catch (Exception e) {
+      // Do not put the filter or the error in the message: they can show the RLS policy to the user
+      throw new BadQueryRequestException(
+          "Cannot apply the row-level security filter for table: " + TableNameBuilder.extractRawTableName(
+              queryContext.getTableName()));
+    }
+    queryContext.setRowFilter(rowFilter);
+    queryContext.prepareForExecution(Set.of());
   }
 
   @VisibleForTesting
@@ -306,11 +379,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set skipScanFilterReorder
     queryContext.setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(queryOptions));
 
-    // Set andRestrictionPushdown, letting the query option override the server default
-    AndRestrictionPushdownMode andRestrictionPushdownMode =
-        QueryOptionsUtils.getAndRestrictionPushdownMode(queryOptions);
-    queryContext.setAndRestrictionPushdownEnabled(isAndRestrictionPushdownEnabled(
-        andRestrictionPushdownMode != null ? andRestrictionPushdownMode : _andRestrictionPushdownMode, queryContext));
+    optimizeRowFilter(queryContext);
 
     queryContext.setSkipIndexes(QueryOptionsUtils.getSkipIndexes(queryOptions));
 
@@ -456,8 +525,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer) {
-    rewriteQueryContextWithHints(queryContext, segmentContexts);
     applyQueryOptions(queryContext);
+    rewriteQueryContextWithHints(queryContext, segmentContexts);
+    applyAndRestrictionPushdown(queryContext, false);
     boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
     resolveSortedSelectionMergeMode(segmentContexts, queryContext);
 
@@ -879,6 +949,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
     if (queryContext.getFilter() != null) {
       overrideWithExpressionHints(queryContext.getFilter(), hints, hintFunctionArities, changedFunctions);
+    }
+    if (queryContext.getRowFilter() != null) {
+      overrideWithExpressionHints(queryContext.getRowFilter(), hints, hintFunctionArities, changedFunctions);
     }
     if (queryContext.getHavingFilter() != null) {
       overrideWithExpressionHints(queryContext.getHavingFilter(), hints, hintFunctionArities, changedFunctions);

@@ -24,12 +24,12 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -134,13 +134,13 @@ public class PercentileRawTDigestAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(TDigest tDigest) {
+  public SerializedResult serializeIntermediateResult(TDigest tDigest) {
     return _percentileTDigestAggregationFunction.serializeIntermediateResult(tDigest);
   }
 
   @Override
   public TDigest deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+    return _percentileTDigestAggregationFunction.deserializeIntermediateResult(customObject);
   }
 
   @Override

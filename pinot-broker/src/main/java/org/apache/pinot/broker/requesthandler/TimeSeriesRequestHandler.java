@@ -32,11 +32,11 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -68,6 +68,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -75,6 +76,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
+import org.apache.pinot.tsdb.planner.physical.TimeSeriesRoutingCustomizer;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -97,10 +99,19 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       ThreadAccountant threadAccountant,
       MultiClusterRoutingContext multiClusterRoutingContext) {
+    this(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        threadAccountant, multiClusterRoutingContext, TimeSeriesRoutingCustomizer.NO_OP);
+  }
+
+  public TimeSeriesRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, BrokerRoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
+      TimeSeriesRoutingCustomizer routingCustomizer) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext);
     TimeSeriesBuilderFactoryProvider.init(config);
-    _queryEnvironment = new TimeSeriesQueryEnvironment(config, routingManager, tableCache);
+    _queryEnvironment = new TimeSeriesQueryEnvironment(config, routingManager, tableCache, routingCustomizer);
     _queryEnvironment.init(config);
     _queryDispatcher = new TimeSeriesQueryDispatcher();
   }
@@ -145,7 +156,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       requestContext.setRequestId(_requestIdGenerator.get());
       setTrackedHeadersInRequestContext(requestContext, httpHeaders, _trackedHeaders);
 
-      firstStageAccessControlCheck(requesterIdentity);
+      AccessControl accessControl = _accessControlFactory.create();
+      checkAccess(accessControl.authorize(requesterIdentity));
       RangeTimeSeriesRequest timeSeriesRequest;
       try {
         timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
@@ -156,14 +168,17 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       requestContext.setQuery(timeSeriesRequest.getQuery());
 
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
+      Consumer<List<String>> tableAuthorizer = authorizeLogicalTables(logicalPlanResult, accessControl,
+          requesterIdentity, httpHeaders);
       // If there are no buckets in the logical plan, return an empty response.
       if (logicalPlanResult.getTimeBuckets().getNumBuckets() == 0) {
+        _queryEnvironment.resolveAndAuthorizeTables(logicalPlanResult, requestContext, tableAuthorizer);
         timeSeriesBlock = new TimeSeriesBlock(logicalPlanResult.getTimeBuckets(), new HashMap<>());
         return timeSeriesBlock;
       }
-      TimeSeriesDispatchablePlan dispatchablePlan =
-          _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
-      validatePhysicalPlan(httpHeaders, dispatchablePlan);
+      TimeSeriesDispatchablePlan dispatchablePlan = _queryEnvironment.buildPhysicalPlan(timeSeriesRequest,
+          requestContext, logicalPlanResult, tableAuthorizer);
+      validatePhysicalPlanColumns(dispatchablePlan);
 
       timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
           timeSeriesRequest.getTimeout().toMillis(), requestContext);
@@ -174,6 +189,11 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     } catch (Exception e) {
       QueryException qe;
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
+      if (e instanceof WebApplicationException wae
+          && (wae.getResponse().getStatus() == 401 || wae.getResponse().getStatus() == 403)) {
+        requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
+        throw wae;
+      }
       if (e instanceof QueryException) {
         qe = (QueryException) e;
       } else {
@@ -283,27 +303,11 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     return HumanReadableDuration.from(step).getSeconds();
   }
 
-  /// First-stage access control check for the request.
-  /// This method checks if the requester has access to the broker to prevent unauthenticated requests from
-  /// using up resources.
-  /// Secondary table-level access control checks will be performed later.
-  ///
-  /// @param requesterIdentity The identity of the requester.
-  private void firstStageAccessControlCheck(RequesterIdentity requesterIdentity) {
-    AccessControl accessControl = _accessControlFactory.create();
-    AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
+  private void checkAccess(AuthorizationResult authorizationResult) {
     if (!authorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
-        Response.Status.FORBIDDEN);
+      throw QueryErrorCode.ACCESS_DENIED.asException("Permission denied. " + authorizationResult.getFailureMessage());
     }
-  }
-
-  private void validatePhysicalPlan(HttpHeaders httpHeaders, TimeSeriesDispatchablePlan dispatchablePlan) {
-    // check authorization for table
-    tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableNames());
-    // validate column names for all LeafTimeSeriesPlanNode in the physical plan
-    validatePhysicalPlanColumns(dispatchablePlan);
   }
 
   private void validatePhysicalPlanColumns(TimeSeriesDispatchablePlan dispatchablePlan) {
@@ -381,30 +385,46 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  /// Table-level access control check for the request.
-  /// This method checks if the requester has access to the tables in the request.
-  ///
-  /// @param httpHeaders The HTTP headers of the request.
-  /// @param tableNames The list of table to check access for.
-  private void tableLevelAccessControlCheck(HttpHeaders httpHeaders, List<String> tableNames) {
-    AccessControl accessControl = _accessControlFactory.create();
-    for (String tableName : tableNames) {
-      AuthorizationResult authorizationResult = accessControl.authorize(httpHeaders, TargetType.TABLE, tableName,
-          Actions.Table.QUERY);
-      if (!authorizationResult.hasAccess()) {
-        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-        throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
-          Response.Status.FORBIDDEN);
+  /// Check the caller's grants on the names used in the query, then apply the provider's fine-grained
+  /// permissions to the resolved OFFLINE/REALTIME tables before any results are returned.
+  private Consumer<List<String>> authorizeLogicalTables(TimeSeriesLogicalPlanResult plan, AccessControl accessControl,
+      RequesterIdentity identity, HttpHeaders headers) {
+    Set<String> tables = Set.copyOf(TimeSeriesQueryEnvironment.leafTableNames(plan.getPlanNode()));
+    try {
+      checkAccess(accessControl.authorize(identity, tables));
+    } catch (UnsupportedOperationException e) {
+      throw QueryErrorCode.ACCESS_DENIED.asException("The access control cannot authorize time-series tables", e);
+    }
+    if (_enableRowColumnLevelAuth) {
+      tables.forEach(table -> rejectRowFilters(accessControl, identity, table));
+    }
+    return resolvedTables -> {
+      for (String table : resolvedTables) {
+        checkAccess(accessControl.authorize(headers, TargetType.TABLE, table, Actions.Table.QUERY));
+        if (_enableRowColumnLevelAuth && !tables.contains(table)
+            && accessControl.authorize(identity, Set.of(table)).hasAccess()) {
+          rejectRowFilters(accessControl, identity, table);
+        }
       }
+    };
+  }
+
+  private void rejectRowFilters(AccessControl accessControl, RequesterIdentity identity, String table) {
+    if (AccessControl.hasRowFilters(accessControl, identity, table)) {
+      throw QueryErrorCode.ACCESS_DENIED.asException("Time-series queries cannot enforce row filters for " + table);
     }
   }
 
   @Override
   public BrokerResponse handleExplainTimeSeriesRequest(String lang, String rawQueryParamString,
-      Map<String, String> queryParams) {
+      Map<String, String> queryParams, RequesterIdentity requesterIdentity, HttpHeaders httpHeaders) {
     try {
+      AccessControl accessControl = _accessControlFactory.create();
+      checkAccess(accessControl.authorize(requesterIdentity));
       RangeTimeSeriesRequest request = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       TimeSeriesLogicalPlanResult planResult = _queryEnvironment.buildLogicalPlan(request);
+      _queryEnvironment.resolveAndAuthorizeTables(planResult, new DefaultRequestContext(),
+          authorizeLogicalTables(planResult, accessControl, requesterIdentity, httpHeaders));
       String plan = explainPlanTree(planResult.getPlanNode(), new StringBuilder(), 0).toString();
       DataSchema schema = new DataSchema(new String[]{"QUERY", "PLAN"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});

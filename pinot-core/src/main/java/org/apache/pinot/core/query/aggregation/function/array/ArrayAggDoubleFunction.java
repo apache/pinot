@@ -23,12 +23,14 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 
 
 public class ArrayAggDoubleFunction extends BaseArrayAggDoubleFunction<DoubleArrayList> {
+  private static final int DOUBLE_ARRAY_LIST_TYPE = 3;
+
   public ArrayAggDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }
@@ -71,9 +73,8 @@ public class ArrayAggDoubleFunction extends BaseArrayAggDoubleFunction<DoubleArr
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubleArrayList));
+  public SerializedResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
+    return new SerializedValue<>(DOUBLE_ARRAY_LIST_TYPE, doubleArrayList, ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE);
   }
 
   @Override

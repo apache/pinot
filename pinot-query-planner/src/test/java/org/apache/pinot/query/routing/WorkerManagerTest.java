@@ -25,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -55,6 +56,7 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -90,6 +92,54 @@ public class WorkerManagerTest {
     simpleFields.put(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY, String.valueOf(port));
     simpleFields.put(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, String.valueOf(port));
     return new ServerInstance(instanceConfig);
+  }
+
+  /// The plan tells each sender which instance its receivers are, so that an instance reached through a stale
+  /// connection can reject the stream. Receivers do not connect to senders, so the lists of senders leave it out.
+  @Test(dataProvider = "physicalOptimizer")
+  public void testMailboxInfosOfReceiversCarryInstanceIdHash(boolean usePhysicalOptimizer) {
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    ServerInstance server2 = getServerInstance("localhost", 2);
+    Map<String, ServerInstance> serverInstanceMap =
+        Map.of(server1.getInstanceId(), server1, server2.getInstanceId(), server2);
+    RoutingTable routingTable = new RoutingTable(Map.of(server1, new SegmentsToQuery(List.of("segment1"), List.of()),
+        server2, new SegmentsToQuery(List.of("segment2"), List.of())), List.of(), 0);
+    QueryEnvironment queryEnvironment = newQueryEnvironment(schema,
+        new CapturingRoutingManager(serverInstanceMap, Map.of("testTable_OFFLINE", routingTable)));
+    // By mailbox port: the servers use 1 and 2, the broker 3
+    Map<Integer, Long> instanceIdHashes = Map.of(1, QueryServerInstance.hashInstanceId(server1.getInstanceId()), 2,
+        QueryServerInstance.hashInstanceId(server2.getInstanceId()), 3,
+        QueryServerInstance.hashInstanceId("Broker_localhost"));
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET usePhysicalOptimizer=" + usePhysicalOptimizer + "; SELECT col1, COUNT(*) FROM testTable GROUP BY col1")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      Set<Integer> receiverPorts = new HashSet<>();
+      for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStageMap().values()) {
+        int stageId = fragment.getPlanFragment().getFragmentId();
+        for (WorkerMetadata workerMetadata : fragment.getWorkerMetadataList()) {
+          for (Map.Entry<Integer, MailboxInfos> entry : workerMetadata.getMailboxInfosMap().entrySet()) {
+            // The other stage receives from this one when its id is lower
+            boolean receivers = entry.getKey() < stageId;
+            for (MailboxInfo mailboxInfo : entry.getValue().getMailboxInfos()) {
+              long expected = receivers ? instanceIdHashes.get(mailboxInfo.getPort()) : 0L;
+              assertEquals(mailboxInfo.getInstanceIdHash(), expected,
+                  "Stage: " + stageId + ", mailbox: " + mailboxInfo);
+              if (receivers) {
+                receiverPorts.add(mailboxInfo.getPort());
+              }
+            }
+          }
+        }
+      }
+      assertEquals(receiverPorts, Set.of(1, 2, 3));
+    }
+  }
+
+  @DataProvider
+  public Object[][] physicalOptimizer() {
+    return new Object[][]{{false}, {true}};
   }
 
   /// Tests that when useLeafServerForIntermediateStage is enabled and querying an empty table
@@ -517,6 +567,47 @@ public class WorkerManagerTest {
       for (Expression operand : function.getOperands()) {
         validatePrunableFilter(operand);
       }
+    }
+  }
+
+  @DataProvider
+  public Object[][] leafFanoutOptions() {
+    return new Object[][]{
+        {"", 1},
+        {"SET leafStageWorkersPerServer=4;", 4},
+        {"SET leafStageWorkersPerServer=16;", 7},
+        {"SET leafStageWorkersPerServer=4; SET multiStageLeafLimit=100;", 1}
+    };
+  }
+
+  @Test(dataProvider = "leafFanoutOptions")
+  public void testOptInFanoutWithFusedBroadcastJoins(String options, int factWorkers) {
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    List<String> segments = IntStream.range(0, 7).mapToObj(Integer::toString).toList();
+    RoutingTable routing = new RoutingTable(Map.of(server, new SegmentsToQuery(segments, List.of())), List.of(), 0);
+    QueryEnvironment env = newQueryEnvironment(schema,
+        new CapturingRoutingManager(Map.of(server.getInstanceId(), server), Map.of("testTable_OFFLINE", routing)));
+    String query = options + " SET fuseBroadcastJoins=true; "
+        + "SELECT /*+ joinOptions(left_distribution_type='random',right_distribution_type='broadcast') */ "
+        + "f.col3,c.col2,p.col2 FROM testTable f JOIN testTable c ON f.col1=c.col1 "
+        + "JOIN testTable p ON f.col2=p.col2";
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(query)) {
+      DispatchableSubPlan subPlan = compiled.planQuery(0).getQueryPlan();
+      List<Integer> fanouts = new ArrayList<>();
+      for (DispatchablePlanFragment stage : subPlan.getQueryStageMap().values()) {
+        Map<Integer, Map<String, List<String>>> assigned = stage.getWorkerIdToSegmentsMap();
+        if (assigned == null || assigned.isEmpty()) {
+          continue;
+        }
+        List<String> scanned = assigned.values().stream().flatMap(map -> map.get("OFFLINE").stream()).toList();
+        assertEquals(scanned.size(), segments.size());
+        assertEquals(new HashSet<>(scanned), new HashSet<>(segments));
+        assertEquals(stage.getServerInstanceToWorkerIdMap().size(), 1);
+        fanouts.add(assigned.size());
+      }
+      fanouts.sort(Integer::compare);
+      assertEquals(fanouts, List.of(1, 1, factWorkers)); // Each broadcast build remains single-worker.
     }
   }
 

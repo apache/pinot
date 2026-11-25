@@ -62,6 +62,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.type.OpenStructSqlType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.UuidUtils;
@@ -121,6 +122,10 @@ public class RexExpressionUtils {
       return builder.getRexBuilder().makeCast(type, operand);
     }
 
+    // The third ITEM operand is the leaf's planned output type. SQL ITEM itself takes two operands.
+    if (operator.kind == SqlKind.ITEM && operands.size() == 3) {
+      return builder.call(operator, operands.subList(0, 2));
+    }
     return builder.call(operator, operands);
   }
 
@@ -317,6 +322,22 @@ public class RexExpressionUtils {
       return handleSearch(rexCall.operands.get(0), ((PinotSealedSearchOperator) rexCall.op).getSargLiteral());
     }
     switch (rexCall.op.kind) {
+      case ITEM: {
+        ColumnDataType resultType = RelToPlanNodeConverter.convertToColumnDataType(rexCall.type);
+        RexNode column = rexCall.operands.get(0);
+        if (!(column.getType() instanceof OpenStructSqlType)) {
+          return new RexExpression.FunctionCall(resultType, SqlKind.ITEM.name(), fromRexNodes(rexCall.operands));
+        }
+        RexNode key = rexCall.operands.get(1);
+        if (RexLiteral.isNullLiteral(key)) {
+          return new RexExpression.Literal(resultType, null);
+        }
+        Preconditions.checkArgument(column instanceof RexInputRef,
+            "OPEN_STRUCT key lookup requires a column reference");
+        // A segment may have inferred a different type or shape. Carry the planned type into pushed-down expressions.
+        return new RexExpression.FunctionCall(resultType, SqlKind.ITEM.name(), List.of(fromRexNode(column),
+            fromRexNode(key), new RexExpression.Literal(ColumnDataType.STRING, resultType.name())));
+      }
       case CAST:
         return handleCast(rexCall);
       case REINTERPRET:

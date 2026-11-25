@@ -98,9 +98,9 @@ public class ZkBasicAuthAccessControlFactoryTest {
     assertTrue(_accessControl.authorize(identity("deleter", "delsecret"), Set.of("orders")).hasAccess());
     assertTrue(_accessControl.authorize(identity("deleter", "delsecret"), Set.of("orders_OFFLINE")).hasAccess());
     assertFalse(_accessControl.authorize(identity("deleter", "delsecret"), Set.of("other")).hasAccess());
-    // The first step does not authenticate the caller, the table check does, even without a table: the broker relies
-    // on it to reject an unauthenticated DELETE before looking up its table
-    assertTrue(_accessControl.authorize(identity(null, null)).hasAccess());
+    assertTrue(_accessControl.authorize(identity("deleter", "delsecret")).hasAccess());
+    expectThrows(NotAuthorizedException.class, () -> _accessControl.authorize(identity(null, null)));
+    expectThrows(NotAuthorizedException.class, () -> _accessControl.authorize(identity("deleter", "wrongsecret")));
     expectThrows(NotAuthorizedException.class, () -> _accessControl.authorize(identity(null, null), Set.of()));
     expectThrows(NotAuthorizedException.class,
         () -> _accessControl.authorize(identity("deleter", "wrongsecret"), Set.of("orders")));
