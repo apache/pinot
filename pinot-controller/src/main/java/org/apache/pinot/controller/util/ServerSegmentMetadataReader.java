@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -473,22 +474,34 @@ public class ServerSegmentMetadataReader {
       serverUrls.add(generateSegmentsCrcServerURL(tableNameWithType, endpoint));
     }
 
+    long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers, _authProvider);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs, "segment CRCs");
+        completionServiceHelper.doMultiGetRequestUntil(serverUrls, tableNameWithType, false, timeoutMs, deadlineNanos,
+            "segment CRCs");
     if (serviceResponse._failedResponseCount > 0) {
-      throw new IOException(String.format("Got %d failed responses from total %d server instances for table: %s",
-          serviceResponse._failedResponseCount, serverUrls.size(), tableNameWithType));
+      Set<String> failedServers = new TreeSet<>(serverEndpoints.keySet());
+      failedServers.removeAll(serviceResponse._httpResponses.keySet());
+      throw new IOException(String.format(
+          "Got %d failed responses from total %d server instances for table: %s (failed servers: %s)",
+          serviceResponse._failedResponseCount, serverUrls.size(), tableNameWithType, failedServers));
     }
 
     boolean filterSegments = segmentFilter != null && !segmentFilter.isEmpty();
     Map<String, Map<String, String>> segmentToServerCrcs = new TreeMap<>();
     for (Map.Entry<String, String> serverResponse : serviceResponse._httpResponses.entrySet()) {
       String serverInstance = serverResponse.getKey();
-      Map<String, String> serverSegmentCrcs =
-          JsonUtils.stringToObject(serverResponse.getValue(), new TypeReference<Map<String, String>>() {
-          });
+      Map<String, String> serverSegmentCrcs;
+      try {
+        serverSegmentCrcs =
+            JsonUtils.stringToObject(serverResponse.getValue(), new TypeReference<Map<String, String>>() {
+            });
+      } catch (JsonProcessingException e) {
+        throw new IOException(
+            String.format("Failed to parse segment CRC response from server: %s for table: %s", serverInstance,
+                tableNameWithType), e);
+      }
       if (serverSegmentCrcs == null) {
         throw new IOException(
             String.format("Received null segment CRC response from server: %s for table: %s", serverInstance,

@@ -68,8 +68,12 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -89,6 +93,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -4657,6 +4662,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         });
     assertTrue(unmatchedCrcs.isEmpty());
 
+    // Blank segment filter -> 400 BAD_REQUEST
+    Pair<Integer, String> blankSegmentResp =
+        sendGetRequestWithStatusCode(baseUrl + "/segments/" + tableNameWithType + "/serverCrcs?segments=", null);
+    assertEquals(blankSegmentResp.getLeft().intValue(), HttpStatus.SC_BAD_REQUEST);
+
     // Missing table type suffix -> 400 BAD_REQUEST
     Pair<Integer, String> missingTypeResp =
         sendGetRequestWithStatusCode(baseUrl + "/segments/" + tableName + "/serverCrcs", null);
@@ -4666,5 +4676,107 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Pair<Integer, String> missingTableResp =
         sendGetRequestWithStatusCode(baseUrl + "/segments/nonExistentTable_OFFLINE/serverCrcs", null);
     assertEquals(missingTableResp.getLeft().intValue(), HttpStatus.SC_NOT_FOUND);
+
+    // End-to-end segment refresh: re-upload an existing segment with different data (new CRC) and verify
+    // serverCrcs reflects the refreshed CRC across all replicas.
+    String refreshTable = "serverCrcsRefreshTest";
+    String refreshTableWithType = TableNameBuilder.OFFLINE.tableNameWithType(refreshTable);
+    String refreshSegmentName = "seg_refresh_test";
+    File refreshWorkDir = new File(_tempDir, "serverCrcsRefreshWork");
+    TestUtils.ensureDirectoriesExistAndEmpty(refreshWorkDir);
+    try {
+      Schema refreshSchema = createSchema();
+      refreshSchema.setSchemaName(refreshTable);
+      addSchema(refreshSchema);
+      TableConfig refreshTableConfig =
+          new TableConfigBuilder(TableType.OFFLINE).setTableName(refreshTable)
+              .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
+              .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
+              .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
+              .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
+              .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode())
+              .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
+              .setIngestionConfig(getIngestionConfig()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+      addTableConfig(refreshTableConfig);
+
+      List<File> avroFiles = unpackAvroData(new File(refreshWorkDir, "avro"));
+      assertTrue(avroFiles.size() >= 2);
+      File v1TarDir = new File(refreshWorkDir, "v1Tar");
+      File v2TarDir = new File(refreshWorkDir, "v2Tar");
+      TestUtils.ensureDirectoriesExistAndEmpty(v1TarDir, v2TarDir);
+      buildNamedSegmentFromAvro(avroFiles.get(0), refreshTableConfig, refreshSchema, refreshSegmentName,
+          new File(refreshWorkDir, "v1Seg"), v1TarDir);
+      buildNamedSegmentFromAvro(avroFiles.get(1), refreshTableConfig, refreshSchema, refreshSegmentName,
+          new File(refreshWorkDir, "v2Seg"), v2TarDir);
+
+      // Upload v1 and wait until all replicas are ONLINE and report v1 CRC
+      uploadSegments(refreshTable, v1TarDir);
+      waitForNumOfSegmentsBecomeOnline(refreshTableWithType, 1);
+      Map<String, String> zkCrcsV1 = JsonUtils.stringToObject(
+          sendGetRequest(baseUrl + "/segments/" + refreshTable + "/crc"), new TypeReference<Map<String, String>>() {
+          });
+      String crcV1 = zkCrcsV1.get(refreshSegmentName);
+      assertNotNull(crcV1);
+      String refreshCrcsUrl = baseUrl + "/segments/" + refreshTableWithType + "/serverCrcs?segments="
+          + URLEncoder.encode(refreshSegmentName, StandardCharsets.UTF_8);
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          Map<String, Map<String, String>> crcs = JsonUtils.stringToObject(sendGetRequest(refreshCrcsUrl),
+              new TypeReference<Map<String, Map<String, String>>>() {
+              });
+          Map<String, String> replicas = crcs.get(refreshSegmentName);
+          return replicas != null && replicas.size() == getNumReplicas()
+              && replicas.values().stream().allMatch(crcV1::equals);
+        } catch (Exception e) {
+          return false;
+        }
+      }, 60_000L, "Failed to observe initial CRC " + crcV1 + " across all replicas");
+
+      // Re-upload v2 with the same segment name (triggers REFRESH_SEGMENT) and verify all replicas converge to crcV2
+      uploadSegments(refreshTable, v2TarDir);
+      Map<String, String> zkCrcsV2 = JsonUtils.stringToObject(
+          sendGetRequest(baseUrl + "/segments/" + refreshTable + "/crc"), new TypeReference<Map<String, String>>() {
+          });
+      String crcV2 = zkCrcsV2.get(refreshSegmentName);
+      assertNotNull(crcV2);
+      assertNotEquals(crcV2, crcV1, "Expected refreshed segment to have a different CRC");
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          Map<String, Map<String, String>> crcs = JsonUtils.stringToObject(sendGetRequest(refreshCrcsUrl),
+              new TypeReference<Map<String, Map<String, String>>>() {
+              });
+          Map<String, String> replicas = crcs.get(refreshSegmentName);
+          return replicas != null && replicas.size() == getNumReplicas()
+              && replicas.values().stream().allMatch(crcV2::equals);
+        } catch (Exception e) {
+          return false;
+        }
+      }, 60_000L, "Failed to observe refreshed CRC " + crcV2 + " across all replicas");
+    } finally {
+      if (_helixResourceManager.hasTable(refreshTableWithType)) {
+        dropOfflineTable(refreshTable);
+        waitForEVToDisappear(refreshTableWithType);
+      }
+      deleteSchema(refreshTable);
+      FileUtils.deleteQuietly(refreshWorkDir);
+    }
+  }
+
+  private static void buildNamedSegmentFromAvro(File avroFile, TableConfig tableConfig, Schema schema,
+      String segmentName, File segmentDir, File tarDir)
+      throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(segmentDir);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setFormat(FileFormat.AVRO);
+    config.setInputFilePath(avroFile.getPath());
+    config.setOutDir(segmentDir.getPath());
+    config.setTableName(tableConfig.getTableName());
+    config.setSegmentName(segmentName);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    driver.build();
+    File indexDir = new File(segmentDir, driver.getSegmentName());
+    File tarFile = new File(tarDir, driver.getSegmentName() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    TarCompressionUtils.createCompressedTarFile(indexDir, tarFile);
   }
 }

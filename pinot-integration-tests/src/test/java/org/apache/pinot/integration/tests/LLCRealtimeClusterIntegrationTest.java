@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -700,6 +703,81 @@ public class LLCRealtimeClusterIntegrationTest extends SharedKafkaRealtimeIntegr
   public void testHardcodedServerPartitionedSqlQueries()
       throws Exception {
     super.testHardcodedServerPartitionedSqlQueries();
+  }
+
+  @Test
+  public void testServerSegmentCrcs()
+      throws Exception {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    String baseUrl = getControllerBaseApiUrl();
+    String consumingCrc = Long.toString(Long.MIN_VALUE);
+
+    // Wait briefly in case a prior test left a segment mid-transition, then verify every ONLINE segment matches
+    // ZK metadata CRC and every CONSUMING segment reports Long.MIN_VALUE across its assigned replicas.
+    String[] sampleSegments = new String[2]; // [0]=completed, [1]=consuming
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String response = sendGetRequest(baseUrl + "/segments/" + realtimeTableName + "/serverCrcs");
+        Map<String, Map<String, String>> serverCrcs =
+            JsonUtils.stringToObject(response, new TypeReference<Map<String, Map<String, String>>>() {
+            });
+        IdealState idealState = _helixResourceManager.getTableIdealState(realtimeTableName);
+        if (idealState == null) {
+          return false;
+        }
+        String onlineSeg = null;
+        String consumingSeg = null;
+        for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+          String segmentName = entry.getKey();
+          Map<String, String> instanceStates = entry.getValue();
+          SegmentZKMetadata zkMetadata = null;
+          for (Map.Entry<String, String> stateEntry : instanceStates.entrySet()) {
+            String server = stateEntry.getKey();
+            String state = stateEntry.getValue();
+            if (CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE.equals(state)) {
+              continue;
+            }
+            Map<String, String> replicaCrcs = serverCrcs.get(segmentName);
+            if (replicaCrcs == null || !replicaCrcs.containsKey(server)) {
+              return false;
+            }
+            String actualCrc = replicaCrcs.get(server);
+            if (CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING.equals(state)) {
+              if (!consumingCrc.equals(actualCrc)) {
+                return false;
+              }
+              consumingSeg = segmentName;
+            } else if (CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)) {
+              if (zkMetadata == null) {
+                zkMetadata = _helixResourceManager.getSegmentZKMetadata(realtimeTableName, segmentName);
+              }
+              if (zkMetadata == null || !Long.toString(zkMetadata.getCrc()).equals(actualCrc)) {
+                return false;
+              }
+              onlineSeg = segmentName;
+            }
+          }
+        }
+        if (onlineSeg != null && consumingSeg != null) {
+          sampleSegments[0] = onlineSeg;
+          sampleSegments[1] = consumingSeg;
+          return true;
+        }
+        return false;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000L, "Failed to verify server-loaded CRCs for ONLINE and CONSUMING segments of " + realtimeTableName);
+
+    // Verify repeatable ?segments= filtering works for both completed and consuming segments
+    String filteredUrl = baseUrl + "/segments/" + realtimeTableName + "/serverCrcs?segments="
+        + URLEncoder.encode(sampleSegments[0], StandardCharsets.UTF_8) + "&segments="
+        + URLEncoder.encode(sampleSegments[1], StandardCharsets.UTF_8);
+    Map<String, Map<String, String>> filteredCrcs = JsonUtils.stringToObject(sendGetRequest(filteredUrl),
+        new TypeReference<Map<String, Map<String, String>>>() {
+        });
+    assertEquals(filteredCrcs.keySet(), Set.of(sampleSegments[0], sampleSegments[1]));
+    assertTrue(filteredCrcs.get(sampleSegments[1]).values().stream().allMatch(consumingCrc::equals));
   }
 
   public static class ExceptingKafka4ConsumerFactory

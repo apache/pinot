@@ -56,7 +56,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class TableMetadataReaderTest {
@@ -427,7 +430,7 @@ public class TableMetadataReaderTest {
     assertEquals(result, Map.of("seg_A", Map.of("Server_host0_8098", "111")));
   }
 
-  /// Any failing server (500, 404, or malformed JSON) must fail the whole call instead of returning partial CRCs.
+  /// Any failing server (500, 404, or malformed JSON) must fail the whole call and identify the failing server.
   @Test
   public void testGetSegmentCrcsFailsOnServerError()
       throws Exception {
@@ -449,8 +452,78 @@ public class TableMetadataReaderTest {
       when(helixResourceManager.getDataInstanceAdminEndpoints(anySet())).thenReturn(endpoints);
 
       TableMetadataReader reader = new TableMetadataReader(_executor, _connectionManager, helixResourceManager);
-      assertThrows(IOException.class, () -> reader.getSegmentCrcs(TABLE_NAME, null, TIMEOUT_MS));
+      IOException ex = expectThrows(IOException.class, () -> reader.getSegmentCrcs(TABLE_NAME, null, TIMEOUT_MS));
+      assertTrue(ex.getMessage().contains("Server_host1_8098"), ex.getMessage());
+      assertFalse(ex.getMessage().contains("Server_host0_8098"), ex.getMessage());
     }
+  }
+
+  /// Slow servers exceeding the overall deadline fail the call and are named in the error message.
+  @Test
+  public void testGetSegmentCrcsDeadlineTimeout()
+      throws Exception {
+    HttpServer healthy = startCrcServer(TABLE_NAME, 200, JsonUtils.objectToString(Map.of("seg_A", "111")), null);
+    HttpServer slow = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    slow.createContext("/tables/" + TABLE_NAME + "/segments/crc", exchange -> {
+      try {
+        Thread.sleep(2_000);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
+      exchange.sendResponseHeaders(200, body.length);
+      try (OutputStream out = exchange.getResponseBody()) {
+        out.write(body);
+      }
+    });
+    slow.start();
+    _httpServers.add(slow);
+
+    Map<String, List<String>> serverToSegments = Map.of(
+        "Server_host0_8098", List.of("seg_A"),
+        "Server_host1_8098", List.of("seg_A"));
+    BiMap<String, String> endpoints = HashBiMap.create();
+    endpoints.put("Server_host0_8098", "http://localhost:" + healthy.getAddress().getPort());
+    endpoints.put("Server_host1_8098", "http://localhost:" + slow.getAddress().getPort());
+
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    when(helixResourceManager.getServerToSegmentsMap(TABLE_NAME)).thenReturn(serverToSegments);
+    when(helixResourceManager.getDataInstanceAdminEndpoints(anySet())).thenReturn(endpoints);
+
+    TableMetadataReader reader = new TableMetadataReader(_executor, _connectionManager, helixResourceManager);
+    IOException ex = expectThrows(IOException.class, () -> reader.getSegmentCrcs(TABLE_NAME, null, 200));
+    assertTrue(ex.getMessage().contains("Server_host1_8098"), ex.getMessage());
+    assertFalse(ex.getMessage().contains("Server_host0_8098"), ex.getMessage());
+  }
+
+  /// REALTIME tables return completed segment CRCs alongside Long.MIN_VALUE for mutable CONSUMING segments.
+  @Test
+  public void testGetSegmentCrcsRealtimeConsumingSegment()
+      throws Exception {
+    String realtimeTable = "testTable_REALTIME";
+    String consumingCrc = Long.toString(Long.MIN_VALUE);
+    HttpServer s0 = startCrcServer(realtimeTable, 200,
+        JsonUtils.objectToString(Map.of("seg_completed_0", "12345", "seg_consuming_1", consumingCrc)), null);
+    HttpServer s1 = startCrcServer(realtimeTable, 200,
+        JsonUtils.objectToString(Map.of("seg_completed_0", "12345", "seg_consuming_1", consumingCrc)), null);
+
+    Map<String, List<String>> serverToSegments = Map.of(
+        "Server_host0_8098", List.of("seg_completed_0", "seg_consuming_1"),
+        "Server_host1_8098", List.of("seg_completed_0", "seg_consuming_1"));
+    BiMap<String, String> endpoints = HashBiMap.create();
+    endpoints.put("Server_host0_8098", "http://localhost:" + s0.getAddress().getPort());
+    endpoints.put("Server_host1_8098", "http://localhost:" + s1.getAddress().getPort());
+
+    PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
+    when(helixResourceManager.getServerToSegmentsMap(realtimeTable)).thenReturn(serverToSegments);
+    when(helixResourceManager.getDataInstanceAdminEndpoints(anySet())).thenReturn(endpoints);
+
+    TableMetadataReader reader = new TableMetadataReader(_executor, _connectionManager, helixResourceManager);
+    Map<String, Map<String, String>> result = reader.getSegmentCrcs(realtimeTable, null, TIMEOUT_MS);
+
+    assertEquals(result, Map.of(
+        "seg_completed_0", Map.of("Server_host0_8098", "12345", "Server_host1_8098", "12345"),
+        "seg_consuming_1", Map.of("Server_host0_8098", consumingCrc, "Server_host1_8098", consumingCrc)));
   }
 
   /// Database-prefixed table names are properly encoded when requesting server CRC endpoints.

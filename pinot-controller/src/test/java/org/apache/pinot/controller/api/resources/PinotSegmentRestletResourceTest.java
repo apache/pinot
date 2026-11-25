@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -38,6 +39,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -334,6 +336,27 @@ public class PinotSegmentRestletResourceTest {
         () -> _pinotSegmentRestletResource.getServerSegmentCrcs("testTable", List.of(), headers));
     assertEquals(missingType.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
 
+    // Invalid table name with multiple dots -> 400 BAD_REQUEST
+    ControllerApplicationException invalidDots = expectThrows(ControllerApplicationException.class,
+        () -> _pinotSegmentRestletResource.getServerSegmentCrcs("a.b.testTable_OFFLINE", List.of(), headers));
+    assertEquals(invalidDots.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+
+    // Conflicting database prefix and header -> 400 BAD_REQUEST
+    HttpHeaders conflictingHeaders = mock(HttpHeaders.class);
+    when(conflictingHeaders.getHeaderString(CommonConstants.DATABASE)).thenReturn("otherDb");
+    ControllerApplicationException dbConflict = expectThrows(ControllerApplicationException.class,
+        () -> _pinotSegmentRestletResource.getServerSegmentCrcs("myDb.testTable_OFFLINE", List.of(),
+            conflictingHeaders));
+    assertEquals(dbConflict.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+
+    // Blank segment filter value -> 400 BAD_REQUEST
+    ControllerApplicationException emptySegment = expectThrows(ControllerApplicationException.class,
+        () -> _pinotSegmentRestletResource.getServerSegmentCrcs("testTable_OFFLINE", List.of(""), headers));
+    assertEquals(emptySegment.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    ControllerApplicationException blankSegment = expectThrows(ControllerApplicationException.class,
+        () -> _pinotSegmentRestletResource.getServerSegmentCrcs("testTable_OFFLINE", List.of("seg_A", " "), headers));
+    assertEquals(blankSegment.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+
     // Non-existent table -> 404 NOT_FOUND
     when(_pinotHelixResourceManager.hasTable("missingTable_OFFLINE")).thenReturn(false);
     ControllerApplicationException missingTable = expectThrows(ControllerApplicationException.class,
@@ -344,6 +367,9 @@ public class PinotSegmentRestletResourceTest {
   @Test
   public void testGetServerSegmentCrcsSuccessAndDatabaseHeader()
       throws Exception {
+    ControllerConf prevConf = _pinotSegmentRestletResource._controllerConf;
+    Executor prevExecutor = _pinotSegmentRestletResource._executor;
+    HttpClientConnectionManager prevConnMgr = _pinotSegmentRestletResource._connectionManager;
     _pinotSegmentRestletResource._controllerConf = new ControllerConf();
     ExecutorService executor = Executors.newFixedThreadPool(2);
     PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
@@ -386,6 +412,9 @@ public class PinotSegmentRestletResourceTest {
           _pinotSegmentRestletResource.getServerSegmentCrcs("testTable_OFFLINE", List.of("seg_B"), headers);
       assertEquals(filteredCrcs, Map.of("seg_B", Map.of("Server_host0_8098", "222")));
     } finally {
+      _pinotSegmentRestletResource._controllerConf = prevConf;
+      _pinotSegmentRestletResource._executor = prevExecutor;
+      _pinotSegmentRestletResource._connectionManager = prevConnMgr;
       httpServers.forEach(server -> server.stop(0));
       executor.shutdownNow();
       connectionManager.close();
@@ -395,6 +424,9 @@ public class PinotSegmentRestletResourceTest {
   @Test
   public void testGetServerSegmentCrcsErrorMapping()
       throws Exception {
+    ControllerConf prevConf = _pinotSegmentRestletResource._controllerConf;
+    Executor prevExecutor = _pinotSegmentRestletResource._executor;
+    HttpClientConnectionManager prevConnMgr = _pinotSegmentRestletResource._connectionManager;
     _pinotSegmentRestletResource._controllerConf = new ControllerConf();
     ExecutorService executor = Executors.newFixedThreadPool(1);
     PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
@@ -405,17 +437,24 @@ public class PinotSegmentRestletResourceTest {
       String tableName = "testTable_OFFLINE";
       HttpHeaders headers = mock(HttpHeaders.class);
       when(_pinotHelixResourceManager.hasTable(tableName)).thenReturn(true);
-      when(_pinotHelixResourceManager.getServerToSegmentsMap(tableName))
-          .thenReturn(Map.of("Server_host0_8098", List.of("seg_A")));
 
-      // InvalidConfigException -> 400 BAD_REQUEST
+      // TOCTOU missing IdealState -> 404 NOT_FOUND
+      when(_pinotHelixResourceManager.getServerToSegmentsMap(tableName))
+          .thenThrow(new IllegalStateException("Ideal state does not exist for table: " + tableName));
+      ControllerApplicationException missingIdealState = expectThrows(ControllerApplicationException.class,
+          () -> _pinotSegmentRestletResource.getServerSegmentCrcs(tableName, List.of(), headers));
+      assertEquals(missingIdealState.getResponse().getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+
+      // InvalidConfigException (missing Helix InstanceConfig) -> 500 INTERNAL_SERVER_ERROR
+      doReturn(Map.of("Server_host0_8098", List.of("seg_A")))
+          .when(_pinotHelixResourceManager).getServerToSegmentsMap(tableName);
       when(_pinotHelixResourceManager.getDataInstanceAdminEndpoints(anySet()))
           .thenThrow(new InvalidConfigException("Missing endpoint config"));
       ControllerApplicationException badConfig = expectThrows(ControllerApplicationException.class,
           () -> _pinotSegmentRestletResource.getServerSegmentCrcs(tableName, List.of(), headers));
-      assertEquals(badConfig.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+      assertEquals(badConfig.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
 
-      // Server HTTP 500 -> 500 INTERNAL_SERVER_ERROR
+      // Server HTTP 500 -> 500 INTERNAL_SERVER_ERROR naming the failed server
       failingServer = startCrcServer(tableName, 500, "");
       BiMap<String, String> endpoints = HashBiMap.create();
       endpoints.put("Server_host0_8098", "http://localhost:" + failingServer.getAddress().getPort());
@@ -423,7 +462,11 @@ public class PinotSegmentRestletResourceTest {
       ControllerApplicationException serverErr = expectThrows(ControllerApplicationException.class,
           () -> _pinotSegmentRestletResource.getServerSegmentCrcs(tableName, List.of(), headers));
       assertEquals(serverErr.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
+      assertTrue(serverErr.getMessage().contains("Server_host0_8098"), serverErr.getMessage());
     } finally {
+      _pinotSegmentRestletResource._controllerConf = prevConf;
+      _pinotSegmentRestletResource._executor = prevExecutor;
+      _pinotSegmentRestletResource._connectionManager = prevConnMgr;
       if (failingServer != null) {
         failingServer.stop(0);
       }
