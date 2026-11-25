@@ -26,6 +26,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -54,6 +56,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
@@ -317,6 +321,28 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     adminClient.getTableClient().deleteTableConfigs(tableName1, null);
     adminClient.getTableClient().deleteTableConfigs(tableName2, null);
     adminClient.getTableClient().deleteTableConfigs(tableName3, null);
+  }
+
+  @Test
+  public void testCreateConflictPreservesPublishedConfig()
+      throws Exception {
+    String name = "publishedBeforeIdealState";
+    PinotAdminClient admin = getOrCreateAdminClient();
+    TableConfig existing = createOfflineTableConfig(name);
+    existing.setDescription("original");
+    var manager = DEFAULT_INSTANCE.getHelixResourceManager();
+    // The config exists without an IdealState. The ordinary preflight will discover the conflict only at addTable.
+    assertTrue(ZKMetadataProvider.createTableConfig(manager.getPropertyStore(), existing));
+    try {
+      TableConfigs bundle = new TableConfigs(name, createDummySchema(name), createOfflineTableConfig(name), null);
+      PinotAdminException conflict = expectThrows(PinotAdminException.class,
+          () -> admin.getTableClient().createTableConfigs(bundle.toPrettyJsonString(), null, null));
+      assertTrue(conflict.getMessage().contains("409"), conflict.getMessage());
+      assertEquals(manager.getRawTableConfig(existing.getTableName()).getDescription(), "original");
+      assertNotNull(manager.getSchema(name));
+    } finally {
+      admin.getTableClient().deleteTableConfigs(name, null);
+    }
   }
 
   /// Tests for creation of TableConfigs

@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -34,6 +35,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -54,7 +57,7 @@ public class PinotDatabaseRestletResourceTest {
     MockitoAnnotations.openMocks(this);
     when(_resourceManager.getAllTables(DATABASE)).thenReturn(TABLES);
     doNothing().when(_resourceManager).deleteTable(anyString(), any(TableType.class), any());
-    when(_resourceManager.deleteSchema(anyString())).thenReturn(true);
+    when(_resourceManager.deleteSchemaIfUnused(anyString())).thenReturn(true);
   }
 
   @Test
@@ -75,6 +78,18 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
+  public void hybridSchemaIsDeletedAfterBothVariants() {
+    List<String> tables = List.of("events_REALTIME", "events_OFFLINE");
+    when(_resourceManager.getAllTables(DATABASE)).thenReturn(tables);
+    assertEquals(_resource.deleteTablesInDatabase(DATABASE, false).getDeletedTables(), tables);
+    InOrder order = inOrder(_resourceManager);
+    order.verify(_resourceManager).deleteTable("events_REALTIME", TableType.REALTIME, null);
+    order.verify(_resourceManager).deleteTable("events_OFFLINE", TableType.OFFLINE, null);
+    order.verify(_resourceManager).deleteSchemaIfUnused("events");
+    verify(_resourceManager).deleteSchemaIfUnused("events");
+  }
+
+  @Test
   public void partialDatabaseDeletionWithDeleteTableFailureTest() {
     int failureTableIdx = TABLES.size() / 2;
     doThrow(new RuntimeException()).when(_resourceManager)
@@ -86,7 +101,7 @@ public class PinotDatabaseRestletResourceTest {
   public void partialDatabaseDeletionWithDeleteSchemaFailureTest() {
     int failureSchemaIdx = TABLES.size() / 2;
     doThrow(new RuntimeException()).when(_resourceManager)
-        .deleteSchema(TableNameBuilder.extractRawTableName(TABLES.get(failureSchemaIdx)));
+        .deleteSchemaIfUnused(TableNameBuilder.extractRawTableName(TABLES.get(failureSchemaIdx)));
     partialDatabaseDeletionCheck(failureSchemaIdx);
   }
 

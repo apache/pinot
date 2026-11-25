@@ -31,6 +31,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -317,7 +318,7 @@ public class PinotDdlRestletResource {
       return existingTarget;
     }
 
-    if (_pinotHelixResourceManager.getLogicalTableConfig(sourceName) != null) {
+    if (ZKMetadataProvider.isLogicalTableExists(_pinotHelixResourceManager.getPropertyStore(), sourceName)) {
       throw badRequest("CREATE TABLE LIKE does not support a logical table as its source: " + sourceName);
     }
     // Read templates, rather than resolved variables or decorator output, so the new definition
@@ -380,7 +381,7 @@ public class PinotDdlRestletResource {
         return racedTarget;
       }
       TableConfig firstConfig = copied.getOffline() != null ? copied.getOffline() : copied.getRealtime();
-      _pinotHelixResourceManager.addTableIfRawNameAbsent(firstConfig);
+      _pinotHelixResourceManager.addTableIfRawNameAbsent(firstConfig, schema);
       createdTables.add(firstConfig.getTableName());
       // Only the request which created the OFFLINE half may add its REALTIME sibling.
       if (copied.getOffline() != null && copied.getRealtime() != null) {
@@ -397,7 +398,7 @@ public class PinotDdlRestletResource {
         }
       }
       return createLikeFailure(response, Response.Status.CONFLICT.getStatusCode(), e);
-    } catch (SchemaAlreadyExistsException e) {
+    } catch (SchemaAlreadyExistsException | ConcurrentModificationException e) {
       return createLikeFailure(response, Response.Status.CONFLICT.getStatusCode(), e);
     } catch (ControllerApplicationException e) {
       return createLikeFailure(response, e.getResponse().getStatus(), e);
@@ -431,7 +432,7 @@ public class PinotDdlRestletResource {
   @Nullable
   private Response existingCreateLikeTarget(CompiledCreateTableLike create, String targetName,
       DdlExecutionResponse response) {
-    if (_pinotHelixResourceManager.getLogicalTableConfig(targetName) != null) {
+    if (ZKMetadataProvider.isLogicalTableExists(_pinotHelixResourceManager.getPropertyStore(), targetName)) {
       throw new ControllerApplicationException(LOGGER, "Logical table already exists: " + targetName,
           Response.Status.CONFLICT);
     }
@@ -469,6 +470,7 @@ public class PinotDdlRestletResource {
           TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Map.of());
         }
       }
+      TableConfigValidationUtils.validateSchemaGroovy(schema, _controllerConf);
       boolean ignoreCase = _pinotHelixResourceManager.getTableCache().isIgnoreCase();
       if (storedSchema == null) {
         // A new schema must pass the same admission rules as a POST to /schemas.

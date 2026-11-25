@@ -2064,7 +2064,13 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       assertNotNull(copy);
       copy.setTableName("target_OFFLINE");
       assertFalse(client.exists(primary + "/CONFIGS/TABLE"));
-      PinotHelixResourceManager.createFirstTableConfig(client, primary, copy);
+      Schema schema = new Schema.SchemaBuilder().setSchemaName("target").build();
+      assertTrue(ZKMetadataProvider.createSchema(legacyStore, schema));
+      String schemaPath = ZKMetadataProvider.constructPropertyStorePathForSchema("target");
+      try (SchemaPublicationFence fence = SchemaPublicationFence.acquire(client, "legacyOnlyTableCopy", schema,
+          store.getStat(schemaPath, AccessOption.PERSISTENT))) {
+        TableConfigPublisher.createPhysical(client, primary, copy, true, fence::addChecks);
+      }
       assertNotNull(ZKMetadataProvider.getRawTableConfig(store, "target_OFFLINE"));
       assertNull(ZKMetadataProvider.getRawTableConfig(store, "target_REALTIME"));
     } finally {

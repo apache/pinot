@@ -238,6 +238,7 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
       throws Exception {
     String target = "ddlLikeContendedTarget";
     DEFAULT_INSTANCE.addDummySchema(target);
+    Schema expectedSchema = DEFAULT_INSTANCE.getHelixResourceManager().getSchema(target);
     TableConfig offline = new TableConfigBuilder(TableType.OFFLINE).setTableName(target).setNumReplicas(1).build();
     TableConfig realtime = new TableConfigBuilder(TableType.REALTIME).setTableName(target).setNumReplicas(1)
         .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
@@ -248,7 +249,7 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
         attempts.add(executor.submit(() -> {
           start.await(10, TimeUnit.SECONDS);
           try {
-            DEFAULT_INSTANCE.getHelixResourceManager().addTableIfRawNameAbsent(config);
+            DEFAULT_INSTANCE.getHelixResourceManager().addTableIfRawNameAbsent(config, expectedSchema);
             return true;
           } catch (TableAlreadyExistsException e) {
             return false;

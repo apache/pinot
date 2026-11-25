@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 /// Paths passed to op methods are property-store-relative — i.e. the same path you would pass to
 /// `ZkHelixPropertyStore.set(...)`, e.g. `/SEGMENTS/{table}/{segment}`. The builder
 /// prepends the configured property-store root (e.g. `/{cluster}/PROPERTYSTORE`) before
-/// submitting to ZK. Multi-path writes outside the property store are intentionally not supported.
+/// submitting to ZK. Pass an empty root for a transaction that spans absolute ZooKeeper paths.
 ///
 /// On atomic rollback (e.g. version mismatch, node missing, node already exists), [#execute()]
 /// throws the underlying [KeeperException] subtype (`BadVersionException`,
@@ -71,7 +71,7 @@ public final class ZkMultiWriteBuilder {
   /// @param zkClient ZK client used to serialize records and submit the transaction.
   /// @param propertyStoreRoot absolute ZK path that all op paths are prefixed with (typically
   ///     `/{clusterName}/PROPERTYSTORE`). Must start with `/` and not end with `/`.
-  ///     Pass `""` to operate on raw absolute paths (test-only).
+  ///     Pass `""` to operate on absolute paths, for example when checking both primary and legacy property stores.
   public ZkMultiWriteBuilder(ZkClient zkClient, String propertyStoreRoot) {
     _zkClient = Preconditions.checkNotNull(zkClient, "zkClient");
     Preconditions.checkNotNull(propertyStoreRoot, "propertyStoreRoot");

@@ -731,15 +731,17 @@ reused only when its complete definition equals the copied schema after renaming
 Dry-run performs preparation and validation without writes.
 
 Writes proceed Schema → OFFLINE → REALTIME, with both configs validated before
-the first write. The first table-config write atomically requires both target
-variants to be absent, so concurrent copies cannot each create half of a hybrid.
-Finishing the hybrid still requires a separate write for its second variant.
+the first write. When publishing the first config, the controller verifies in one
+ZooKeeper transaction that the target schema still matches the validated definition
+and that the raw name is available across OFFLINE, REALTIME, and logical tables.
+During a rolling upgrade, older controllers can still create logical tables or
+delete schemas without checking this transaction. The checks cover competing creates and schema deletes
+once all controllers run the updated version. Finishing the hybrid requires
+a separate write for its second variant.
 The LIKE executor does not delete already-created resources on failure. Existing
 per-table creation still performs its own setup/cleanup. The failure response
 reports successful `addTable` calls in `createdTables`; callers must inspect partial
 state before cleanup or retry. `IF NOT EXISTS` does not repair partial creation.
-In particular, the unconditional bulk rollback in `POST /tableConfigs` is not
-reused, because it can delete resources created by a concurrent request.
 
 Successful creation returns 201; dry-run and no-op return 200. LIKE responses use
 `sourceTableName`, raw `tableName`, `tableConfigs` (the existing bundle JSON), and

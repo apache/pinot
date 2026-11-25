@@ -27,7 +27,9 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -105,24 +107,26 @@ public class PinotDatabaseRestletResource {
     if (dryRun) {
       deletedTables.addAll(tablesInDatabase);
     } else {
+      Set<String> remainingTables = new HashSet<>(tablesInDatabase);
       for (String table : tablesInDatabase) {
-        boolean isSchemaDeleted = false;
+        String rawTableName = TableNameBuilder.extractRawTableName(table);
         try {
           TableType tableType = TableNameBuilder.getTableTypeFromTableName(table);
-          String rawTableName = TableNameBuilder.extractRawTableName(table);
-          _pinotHelixResourceManager.deleteSchema(rawTableName);
-          LOGGER.info("Deleted schema: {}", rawTableName);
-          isSchemaDeleted = true;
           _pinotHelixResourceManager.deleteTable(table, tableType, null);
           LOGGER.info("Deleted table: {}", table);
+          remainingTables.remove(table);
+          // Both variants of a hybrid share their schema. Remove it after deleting the last variant.
+          if (!remainingTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))
+              && !remainingTables.contains(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))) {
+            _pinotHelixResourceManager.deleteSchemaIfUnused(rawTableName);
+          }
           deletedTables.add(table);
         } catch (Exception e) {
-          if (isSchemaDeleted) {
-            LOGGER.error("Failed to delete table {}", table);
-          } else {
-            LOGGER.error("Failed to delete table and schema for {}", table);
-          }
-          failedTables.add(new DeletionFailureWrapper(table, e.getMessage()));
+          String failure = remainingTables.contains(table)
+              ? "Failed to delete table " + table
+              : "Deleted table " + table + " but failed to delete schema " + rawTableName;
+          LOGGER.error(failure, e);
+          failedTables.add(new DeletionFailureWrapper(table, failure + ": " + e.getMessage()));
         }
       }
     }
