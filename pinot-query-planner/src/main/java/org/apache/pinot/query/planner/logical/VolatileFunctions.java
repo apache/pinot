@@ -28,6 +28,8 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
@@ -99,8 +101,27 @@ final class VolatileFunctions {
     if (node instanceof UnnestNode) {
       return anyVolatile(((UnnestNode) node).getArrayExprs());
     }
+    if (node instanceof MatchNode) {
+      return matchCallsVolatileFunction((MatchNode) node);
+    }
     // The other nodes hold no expression that can call a function: scans, sorts, set operations, values (literals
     // only) and exchanges.
+    return false;
+  }
+
+  /// A `MATCH_RECOGNIZE` holds expressions in its `DEFINE` conditions and its `MEASURES`. A symbol without a
+  /// `DEFINE` condition has a null definition.
+  private static boolean matchCallsVolatileFunction(MatchNode match) {
+    for (PatternSymbol symbol : match.getPatternSymbols()) {
+      if (isVolatile(symbol.getDefinition())) {
+        return true;
+      }
+    }
+    for (MatchNode.Measure measure : match.getMeasures()) {
+      if (isVolatile(measure.getExpression())) {
+        return true;
+      }
+    }
     return false;
   }
 

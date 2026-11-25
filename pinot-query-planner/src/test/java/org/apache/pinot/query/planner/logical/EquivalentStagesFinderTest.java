@@ -280,6 +280,29 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
     assertEquals(result.toString(), "[[0], [1], [2]]");
   }
 
+  /// A `DEFINE` condition or a measure that calls a volatile function draws its own values in each stage, so two equal
+  /// `MATCH_RECOGNIZE` stages are not equivalent. The join stage above them is not equivalent to anything either.
+  @Test(dataProvider = "volatileMatchExpressions")
+  public void matchThatCallsVolatileFunctionsIsNotEquivalent(String variation) {
+    when(
+        join(
+            exchange(1, match(tableScan("T1"), variation)),
+            exchange(2, match(tableScan("T1"), variation))
+        )
+    );
+    GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(result.toString(), "[[0], [1], [2]]",
+        "MATCH_RECOGNIZE stages with a " + variation + " must not be spooled together");
+  }
+
+  @DataProvider(name = "volatileMatchExpressions")
+  public static Object[][] volatileMatchExpressions() {
+    return new Object[][]{
+        {"volatile define"},
+        {"volatile measure"}
+    };
+  }
+
   @DataProvider(name = "nonEquivalentMatchProperties")
   public static Object[][] nonEquivalentMatchProperties() {
     return new Object[][]{
@@ -403,6 +426,13 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
           break;
         case "rows per match":
           rowsPerMatchMode = MatchNode.RowsPerMatchMode.ALL_ROWS_PER_MATCH;
+          break;
+        case "volatile define":
+          patternSymbols = List.of(new PatternSymbol("A", randomSample()), new PatternSymbol("B", null));
+          break;
+        case "volatile measure":
+          measures = List.of(new MatchNode.Measure("value", new RexExpression.FunctionCall(
+              DataSchema.ColumnDataType.DOUBLE, "rand", List.of())));
           break;
         default:
           throw new IllegalArgumentException("Unknown variation: " + variation);
