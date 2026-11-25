@@ -970,9 +970,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (!_enableSnapshot) {
       return;
     }
-    if (_partialUpsertHandler == null && !_gotFirstConsumingSegment) {
+    if (_tableType != TableType.OFFLINE && _partialUpsertHandler == null && !_gotFirstConsumingSegment) {
       // We only skip for full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded in
-      // RealtimeTableDataManager
+      // RealtimeTableDataManager. OFFLINE tables have no consuming segment, and OfflineTableDataManager only takes
+      // snapshots after all segments are loaded.
       _logger.info("Skip taking snapshot before getting the first consuming segment for full-upsert table");
       return;
     }

@@ -193,6 +193,31 @@ public class TableStateUtilsTest {
         "Local completion must still satisfy custom-named history");
   }
 
+  /// An OFFLINE upsert partition waits for its own unloaded segments, and for those of unknown partition.
+  @Test
+  public void testPartitionLoadedIsScopedByPartition() {
+    Assignment fixture = new Assignment();
+    String samePartition = "customSamePartition";
+    String otherPartition = "customOtherPartition";
+    fixture.assign(samePartition, ONLINE);
+    fixture.metadata(samePartition, partitionColumns(1));
+    fixture.assign(otherPartition, ONLINE);
+    fixture.metadata(otherPartition, partitionColumns(2));
+    ReadinessSnapshot snapshot = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
+    assertFalse(snapshot.isPartitionLoaded(1, name -> false, false));
+    assertTrue(snapshot.isPartitionLoaded(1, samePartition::equals, false), "Local completion must count as loaded");
+    assertFalse(snapshot.isPartitionLoaded(2, name -> false, false));
+    assertTrue(snapshot.isPartitionLoaded(3, name -> false, false), "Other partitions must not block");
+
+    fixture._currentState.setState(samePartition, ONLINE);
+    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false)
+        .isPartitionLoaded(1, name -> false, false));
+
+    fixture.assign("customUnknownPartition", ONLINE);
+    assertFalse(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false)
+        .isPartitionLoaded(3, name -> false, false), "A segment of unknown partition must block every partition");
+  }
+
   @Test
   public void testNamedAndUnassignedSegmentsDoNotReadMetadata() {
     Assignment fixture = new Assignment();

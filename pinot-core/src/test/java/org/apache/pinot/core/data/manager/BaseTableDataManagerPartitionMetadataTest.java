@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.manager;
 
 import com.google.common.cache.CacheBuilder;
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -188,6 +189,8 @@ public class BaseTableDataManagerPartitionMetadataTest {
     table._tableNameWithType = "testTable_REALTIME";
     table._logger = LoggerFactory.getLogger(BaseTableDataManagerPartitionMetadataTest.class);
     table._recentlyDeletedSegments = CacheBuilder.newBuilder().build();
+    // Receives the OFFLINE upsert snapshot tasks, which these tests do not run
+    table._segmentRefreshExecutor = mock(ExecutorService.class);
     if (partition != null) {
       table._tableUpsertMetadataManager = mock(TableUpsertMetadataManager.class);
       when(table._tableUpsertMetadataManager.getOrCreatePartitionManager(0)).thenReturn(partition);

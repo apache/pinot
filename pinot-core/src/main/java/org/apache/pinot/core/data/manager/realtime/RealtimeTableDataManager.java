@@ -54,7 +54,6 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -69,7 +68,6 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
-import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils.ReadinessSnapshot;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -128,9 +126,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // likely that we get fresh data each time instead of multiple copies of roughly same data.
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
-  public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
-  private static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS =
-      TimeUnit.MILLISECONDS.toNanos(READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+  public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = READINESS_SNAPSHOT_MAX_AGE_MS;
 
   public static final long DEFAULT_SEGMENT_DOWNLOAD_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10); // 10 minutes
   public static final long SLEEP_INTERVAL_MS = 30000; // 30 seconds sleep interval
@@ -139,11 +135,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final Duration STREAM_METADATA_PROVIDER_CACHE_TTL = Duration.ofMinutes(10);
 
   protected Cache<String, StreamMetadataProvider> _streamMetadataProviderCache;
-
-  // Share rejection checks across waiting consumers. Both fields are guarded by _readinessSnapshotLock.
-  private final Object _readinessSnapshotLock = new Object();
-  private ReadinessSnapshot _readinessSnapshot;
-  private long _readinessSnapshotTimeNs;
 
   private final BooleanSupplier _isServerReadyToConsumeData;
   private final BooleanSupplier _isServerReadyToServeQueries;
@@ -281,40 +272,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private boolean isReadyToConsume(LLCSegmentName consumer, long consumerCreationTimeNs) {
-    ReadinessSnapshot snapshot;
-    synchronized (_readinessSnapshotLock) {
-      long nowNs = readinessCheckTimeNs();
-      if (_readinessSnapshot == null
-          || _readinessSnapshotTimeNs - consumerCreationTimeNs < 0
-          || nowNs - _readinessSnapshotTimeNs >= READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS) {
-        // A new consumer must see its own assignment. Record the read's start time, not its completion time.
-        snapshot = TableStateUtils.getReadinessSnapshot(_helixManager, _tableNameWithType,
-            this::isPartitionMetadataInitialized);
-        _readinessSnapshot = snapshot;
-        _readinessSnapshotTimeNs = nowNs;
-        return snapshot.isReadyToConsume(consumer, this::isPartitionMetadataInitialized, true);
-      }
-      snapshot = _readinessSnapshot;
-    }
-    // Local completion can clear a cached rejection immediately, without waiting for the next ZooKeeper poll.
-    // A cached success must never authorize consumption: assignment, current state, or partition metadata may change.
-    return snapshot.isReadyToConsume(consumer, this::isPartitionMetadataInitialized)
-        && TableStateUtils.isReadyToConsume(_helixManager, _tableNameWithType, consumer,
-            this::isPartitionMetadataInitialized);
+    // A new consumer must see its own assignment
+    return isReady((snapshot, logUnavailableSegments) -> snapshot.isReadyToConsume(consumer,
+        this::isPartitionMetadataInitialized, logUnavailableSegments), consumerCreationTimeNs);
   }
 
-  private boolean isPartitionMetadataInitialized(String segmentName) {
-    SegmentDataManager manager = _segmentDataManagerMap.get(segmentName);
+  @Override
+  protected boolean isPartitionMetadataInitialized(String segmentName) {
     // Pauseless release publishes completed mutable metadata; ordinary rollover publishes a ready immutable manager
-    // before releasing the permit. Mere immutable presence is insufficient because initial upsert loading registers
-    // the manager before its metadata is populated. Always inspect the currently registered manager.
-    return manager instanceof RealtimeSegmentDataManager realtime && realtime.hasReleasedConsumerSemaphore()
-        || manager instanceof ImmutableSegmentDataManager immutable && immutable.isPartitionMetadataInitialized();
-  }
-
-  @VisibleForTesting
-  long readinessCheckTimeNs() {
-    return System.nanoTime();
+    // before releasing the permit.
+    return _segmentDataManagerMap.get(segmentName) instanceof RealtimeSegmentDataManager realtime
+        && realtime.hasReleasedConsumerSemaphore() || super.isPartitionMetadataInitialized(segmentName);
   }
 
   @VisibleForTesting
