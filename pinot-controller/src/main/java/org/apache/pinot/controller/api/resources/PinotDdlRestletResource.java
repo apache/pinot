@@ -297,31 +297,6 @@ public class PinotDdlRestletResource {
       ResourceUtils.checkPermissionAndAccess(TableNameBuilder.forType(candidate).tableNameWithType(sourceName),
           httpRequest, headers, AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
     }
-    if (_pinotHelixResourceManager.getLogicalTableConfig(sourceName) != null) {
-      throw badRequest("CREATE TABLE LIKE does not support a logical table as its source: " + sourceName);
-    }
-    // Read templates, rather than resolved variables or decorator output, so the new definition
-    // keeps its declarative settings and does not persist source-side resolved credentials.
-    TableConfig offline = sourceType == TableType.REALTIME
-        ? null
-        : readCreateLikeSourceConfig(sourceName, TableType.OFFLINE);
-    TableConfig realtime = sourceType == TableType.OFFLINE
-        ? null
-        : readCreateLikeSourceConfig(sourceName, TableType.REALTIME);
-    if (offline == null && realtime == null) {
-      throw new ControllerApplicationException(LOGGER,
-          "Source table not found: " + sourceName + (sourceType == null ? "" : " TYPE " + sourceType),
-          Response.Status.NOT_FOUND);
-    }
-    if ((offline != null && offline.isMaterializedView()) || (realtime != null && realtime.isMaterializedView())) {
-      throw badRequest("CREATE TABLE LIKE does not support a materialized view as its source: " + sourceName);
-    }
-    Schema sourceSchema = _pinotHelixResourceManager.getTableSchema(sourceName);
-    if (sourceSchema == null) {
-      throw new ControllerApplicationException(LOGGER, "Source schema not found: " + sourceName,
-          Response.Status.NOT_FOUND);
-    }
-
     // LIKE creates a new raw-name identity. Its existence/no-op policy considers both destination
     // variants even with an explicit source TYPE, so authorize both before looking at either.
     for (TableType candidate : List.of(TableType.OFFLINE, TableType.REALTIME)) {
@@ -342,6 +317,31 @@ public class PinotDdlRestletResource {
       return existingTarget;
     }
 
+    if (_pinotHelixResourceManager.getLogicalTableConfig(sourceName) != null) {
+      throw badRequest("CREATE TABLE LIKE does not support a logical table as its source: " + sourceName);
+    }
+    // Read templates, rather than resolved variables or decorator output, so the new definition
+    // keeps its declarative settings and does not persist source-side resolved credentials.
+    TableConfig offline = sourceType == TableType.REALTIME
+        ? null
+        : readCreateLikeTableConfig(sourceName, TableType.OFFLINE);
+    TableConfig realtime = sourceType == TableType.OFFLINE
+        ? null
+        : readCreateLikeTableConfig(sourceName, TableType.REALTIME);
+    if (offline == null && realtime == null) {
+      throw new ControllerApplicationException(LOGGER,
+          "Source table not found: " + sourceName + (sourceType == null ? "" : " TYPE " + sourceType),
+          Response.Status.NOT_FOUND);
+    }
+    if ((offline != null && offline.isMaterializedView()) || (realtime != null && realtime.isMaterializedView())) {
+      throw badRequest("CREATE TABLE LIKE does not support a materialized view as its source: " + sourceName);
+    }
+    Schema sourceSchema = readCreateLikeSchema(sourceName);
+    if (sourceSchema == null) {
+      throw new ControllerApplicationException(LOGGER, "Source schema not found: " + sourceName,
+          Response.Status.NOT_FOUND);
+    }
+
     TableConfigs copied;
     try {
       // TableConfig's copy constructor shares nested configs, maps, and lists. Deep-copy the
@@ -354,10 +354,9 @@ public class PinotDdlRestletResource {
     }
     copied.setTableName(targetName);
     Schema schema = copied.getSchema();
-    Schema storedSchema = _pinotHelixResourceManager.getSchema(targetName);
+    Schema storedSchema = readCreateLikeSchema(targetName);
     checkCreateLikeSchema(schema, storedSchema);
-    validateCreateLikeConfigs(copied);
-    checkCreateLikeSchema(schema, storedSchema);
+    validateCreateLikeConfigs(copied, storedSchema);
     response.setTableConfigs(toJson(copied));
     if (dryRun) {
       return Response.ok(response.setMessage("Dry run: validated CREATE TABLE LIKE without persisting.")).build();
@@ -368,26 +367,23 @@ public class PinotDdlRestletResource {
         try {
           _pinotHelixResourceManager.addSchema(schema, false, false);
         } catch (SchemaAlreadyExistsException e) {
-          Schema racedSchema = _pinotHelixResourceManager.getSchema(targetName);
+          Schema racedSchema = readCreateLikeSchema(targetName);
           if (racedSchema == null) {
             throw e;
           }
           checkCreateLikeSchema(schema, racedSchema);
         }
       }
-      // A compatible schema race must not silently turn an existing single-type table into
-      // a hybrid. Recheck the whole target before our first variant write.
+      // Recheck logical tables, materialized views and partially deleted targets after the schema write.
       Response racedTarget = existingCreateLikeTarget(create, targetName, response);
       if (racedTarget != null) {
         return racedTarget;
       }
-      // Prevalidate both variants before any writes. REALTIME is last because addTable starts
-      // normal ingestion with fresh consuming segments; source segments/offsets are not copied.
-      if (copied.getOffline() != null) {
-        _pinotHelixResourceManager.addTable(copied.getOffline());
-        createdTables.add(copied.getOffline().getTableName());
-      }
-      if (copied.getRealtime() != null) {
+      TableConfig firstConfig = copied.getOffline() != null ? copied.getOffline() : copied.getRealtime();
+      _pinotHelixResourceManager.addTableIfRawNameAbsent(firstConfig);
+      createdTables.add(firstConfig.getTableName());
+      // Only the request which created the OFFLINE half may add its REALTIME sibling.
+      if (copied.getOffline() != null && copied.getRealtime() != null) {
         _pinotHelixResourceManager.addTable(copied.getRealtime());
         createdTables.add(copied.getRealtime().getTableName());
       }
@@ -411,13 +407,23 @@ public class PinotDdlRestletResource {
   }
 
   @Nullable
-  private TableConfig readCreateLikeSourceConfig(String rawTableName, TableType tableType) {
+  private Schema readCreateLikeSchema(String rawTableName) {
+    try {
+      return _pinotHelixResourceManager.getSchemaStrict(rawTableName);
+    } catch (IOException | RuntimeException e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to read schema: " + rawTableName,
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @Nullable
+  private TableConfig readCreateLikeTableConfig(String rawTableName, TableType tableType) {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
     try {
       return _pinotHelixResourceManager.getRawTableConfig(tableNameWithType);
     } catch (IOException | RuntimeException e) {
       throw new ControllerApplicationException(LOGGER,
-          "Failed to read source table config: " + tableNameWithType,
+          "Failed to read table config: " + tableNameWithType,
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
@@ -429,8 +435,8 @@ public class PinotDdlRestletResource {
       throw new ControllerApplicationException(LOGGER, "Logical table already exists: " + targetName,
           Response.Status.CONFLICT);
     }
-    TableConfig offline = _pinotHelixResourceManager.getOfflineTableConfig(targetName, false, false);
-    TableConfig realtime = _pinotHelixResourceManager.getRealtimeTableConfig(targetName, false, false);
+    TableConfig offline = readCreateLikeTableConfig(targetName, TableType.OFFLINE);
+    TableConfig realtime = readCreateLikeTableConfig(targetName, TableType.REALTIME);
     if ((offline != null && offline.isMaterializedView()) || (realtime != null && realtime.isMaterializedView())) {
       throw badRequest("Cannot create table '" + targetName + "': a materialized view already exists at this name.");
     }
@@ -454,7 +460,7 @@ public class PinotDdlRestletResource {
     }
   }
 
-  private void validateCreateLikeConfigs(TableConfigs copied) {
+  private void validateCreateLikeConfigs(TableConfigs copied, @Nullable Schema storedSchema) {
     try {
       Schema schema = copied.getSchema();
       TableConfig[] configs = {copied.getOffline(), copied.getRealtime()};
@@ -463,7 +469,15 @@ public class PinotDdlRestletResource {
           TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Map.of());
         }
       }
-      SchemaUtils.validate(schema);
+      boolean ignoreCase = _pinotHelixResourceManager.getTableCache().isIgnoreCase();
+      if (storedSchema == null) {
+        // A new schema must pass the same admission rules as a POST to /schemas.
+        SchemaUtils.validate(schema, List.of(), ignoreCase);
+      } else {
+        // A matching legacy schema still needs to be loadable, even when it predates the admission rules.
+        checkCreateLikeSchema(schema, storedSchema);
+        SchemaUtils.validate(schema, ignoreCase);
+      }
       for (TableConfig tableConfig : configs) {
         if (tableConfig != null) {
           validateTableConfig(schema, tableConfig);

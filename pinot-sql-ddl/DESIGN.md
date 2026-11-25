@@ -723,14 +723,17 @@ execution records, pause/disabled state, and explicit hybrid time-boundary runti
 overrides are not copied. Normal REALTIME creation initializes fresh consuming
 segments and starts ingestion using the inherited configuration.
 
-Any existing target variant means 409, or 200 no-op with `IF NOT EXISTS`; the
-operation never extends an existing table into a hybrid. Incompatible object kinds
+After authorization, the controller checks the target before reading the source.
+An existing target variant yields 409, or a 200 no-op with `IF NOT EXISTS` even
+if the source has since been dropped. Incompatible object kinds
 are rejected even with `IF NOT EXISTS`. An existing standalone schema can be
 reused only when its complete definition equals the copied schema after renaming.
 Dry-run performs preparation and validation without writes.
 
 Writes proceed Schema → OFFLINE → REALTIME, with both configs validated before
-the first write. This is a sequential creation, not a multi-resource transaction.
+the first write. The first table-config write atomically requires both target
+variants to be absent, so concurrent copies cannot each create half of a hybrid.
+Finishing the hybrid still requires a separate write for its second variant.
 The LIKE executor does not delete already-created resources on failure. Existing
 per-table creation still performs its own setup/cleanup. The failure response
 reports successful `addTable` calls in `createdTables`; callers must inspect partial

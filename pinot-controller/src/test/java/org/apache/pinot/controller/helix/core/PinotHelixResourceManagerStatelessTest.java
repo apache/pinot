@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,15 +38,21 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.helix.store.zk.AutoFallbackPropertyStore;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
@@ -1155,6 +1162,26 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   }
 
   @Test
+  public void testCreateSchemaPreservesExistingZnode()
+      throws Exception {
+    String schemaName = "createSchemaCollision";
+    String path = ZKMetadataProvider.constructPropertyStorePathForSchema(schemaName);
+    ZNRecord existing = new ZNRecord(schemaName);
+    existing.setSimpleField("schemaJSON", "{invalid-json");
+    assertNull(_helixResourceManager.getSchemaStrict(schemaName));
+    assertTrue(_propertyStore.create(path, existing, AccessOption.PERSISTENT));
+    try {
+      Schema proposed = createDummySchema(schemaName);
+      expectThrows(IOException.class, () -> _helixResourceManager.getSchemaStrict(schemaName));
+      assertFalse(ZKMetadataProvider.createSchema(_propertyStore, proposed));
+      expectThrows(SchemaAlreadyExistsException.class, () -> _helixResourceManager.addSchema(proposed, false, false));
+      assertEquals(_propertyStore.get(path, null, AccessOption.PERSISTENT), existing);
+    } finally {
+      _propertyStore.remove(path, AccessOption.PERSISTENT);
+    }
+  }
+
+  @Test
   public void testAddSchemaWithOverrideRefreshesServerCaches()
       throws Exception {
     String rawTableName = "schemaOverrideRefreshTest";
@@ -1870,6 +1897,32 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Cleanup
     _helixResourceManager.deleteRealtimeTable(rawTableName);
     deleteSchema(rawTableName);
+  }
+
+  @Test
+  public void testFirstTableConfigFromLegacyStore()
+      throws Exception {
+    String clusterPath = "/legacyOnlyTableCopy";
+    String primary = clusterPath + "/PROPERTYSTORE";
+    String legacy = clusterPath + "/HELIX_PROPERTYSTORE";
+    ZkClient client = new ZkClient.Builder().setZkServer(getZkUrl()).setZkSerializer(new ZNRecordSerializer()).build();
+    ZkBaseDataAccessor<ZNRecord> accessor = new ZkBaseDataAccessor.Builder<ZNRecord>().setZkAddress(getZkUrl()).build();
+    try {
+      ZkHelixPropertyStore<ZNRecord> legacyStore = new ZkHelixPropertyStore<>(accessor, legacy, null);
+      TableConfig source = new TableConfigBuilder(TableType.OFFLINE).setTableName("source").build();
+      assertTrue(ZKMetadataProvider.createTableConfig(legacyStore, source));
+      ZkHelixPropertyStore<ZNRecord> store = new AutoFallbackPropertyStore<>(accessor, primary, legacy);
+      TableConfig copy = ZKMetadataProvider.getRawTableConfig(store, source.getTableName());
+      assertNotNull(copy);
+      copy.setTableName("target_OFFLINE");
+      assertFalse(client.exists(primary + "/CONFIGS/TABLE"));
+      PinotHelixResourceManager.createFirstTableConfig(client, primary, copy);
+      assertNotNull(ZKMetadataProvider.getRawTableConfig(store, "target_OFFLINE"));
+      assertNull(ZKMetadataProvider.getRawTableConfig(store, "target_REALTIME"));
+    } finally {
+      accessor.close();
+      client.close();
+    }
   }
 
   /// Happy-path coverage for [PinotHelixResourceManager#multiWriteZK()]: pre-creates two

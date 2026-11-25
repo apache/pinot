@@ -28,9 +28,13 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -52,7 +56,30 @@ public class ZKMetadataProviderTableConfigTest {
       throws IOException {
     ZkHelixPropertyStore<ZNRecord> store = newStore();
     assertNull(ZKMetadataProvider.getRawTableConfig(store, TABLE_NAME));
-    verify(store).get(CONFIG_PATH, null, AccessOption.PERSISTENT);
+  }
+
+  @Test
+  public void unreadableZnodeReturnsAnError() {
+    ZkHelixPropertyStore<ZNRecord> store = newStore();
+    when(store.getStat(CONFIG_PATH, AccessOption.PERSISTENT)).thenReturn(new Stat());
+    expectThrows(IOException.class, () -> ZKMetadataProvider.getRawTableConfig(store, TABLE_NAME));
+  }
+
+  @Test
+  public void rejectsFallbackRecordWhenPrimaryZnodeExists()
+      throws IOException {
+    ZkHelixPropertyStore<ZNRecord> store = newStore();
+    Stat primary = new Stat();
+    primary.setCzxid(2L);
+    when(store.getStat(CONFIG_PATH, AccessOption.PERSISTENT)).thenReturn(primary);
+    ZNRecord fallback = TableConfigSerDeUtils.toZNRecord(new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("source").build());
+    when(store.get(eq(CONFIG_PATH), any(Stat.class), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      Stat actualStat = invocation.getArgument(1);
+      actualStat.setCzxid(1L);
+      return fallback;
+    });
+    expectThrows(IOException.class, () -> ZKMetadataProvider.getRawTableConfig(store, TABLE_NAME));
   }
 
   @DataProvider(name = "tableTypes")
@@ -68,13 +95,15 @@ public class ZKMetadataProviderTableConfigTest {
     String typedName = original.getTableName();
     String path = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(typedName);
     ZkHelixPropertyStore<ZNRecord> store = newStore();
-    when(store.get(path, null, AccessOption.PERSISTENT)).thenReturn(TableConfigSerDeUtils.toZNRecord(original));
+    when(store.getStat(path, AccessOption.PERSISTENT)).thenReturn(new Stat());
+    when(store.get(eq(path), any(Stat.class), eq(AccessOption.PERSISTENT)))
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(original));
 
     TableConfig actual = ZKMetadataProvider.getRawTableConfig(store, typedName);
 
     assertEquals(actual, original);
     assertEquals(actual.getCustomConfig().getCustomConfigs().get("token"), "${PINOT_STRICT_RAW_TOKEN:resolved}");
-    verify(store).get(path, null, AccessOption.PERSISTENT);
+    verify(store).get(eq(path), any(Stat.class), eq(AccessOption.PERSISTENT));
   }
 
   @DataProvider(name = "unreadableRecords")
@@ -94,18 +123,19 @@ public class ZKMetadataProviderTableConfigTest {
       record.getSimpleFields().remove(TableConfig.TENANT_CONFIG_KEY);
     }
     ZkHelixPropertyStore<ZNRecord> store = newStore();
-    when(store.get(CONFIG_PATH, null, AccessOption.PERSISTENT)).thenReturn(record);
+    when(store.getStat(CONFIG_PATH, AccessOption.PERSISTENT)).thenReturn(new Stat());
+    when(store.get(eq(CONFIG_PATH), nullable(Stat.class), eq(AccessOption.PERSISTENT))).thenReturn(record);
 
     expectThrows(expectedException, () -> ZKMetadataProvider.getRawTableConfig(store, TABLE_NAME));
     assertNull(ZKMetadataProvider.getTableConfig(store, TABLE_NAME, false, false));
-    verify(store, times(2)).get(CONFIG_PATH, null, AccessOption.PERSISTENT);
+    verify(store, times(2)).get(eq(CONFIG_PATH), nullable(Stat.class), eq(AccessOption.PERSISTENT));
   }
 
   @Test
   public void storageFailureIsPropagated() {
     ZkHelixPropertyStore<ZNRecord> store = newStore();
     IllegalStateException failure = new IllegalStateException("storage read failed");
-    when(store.get(CONFIG_PATH, null, AccessOption.PERSISTENT)).thenThrow(failure);
+    when(store.getStat(CONFIG_PATH, AccessOption.PERSISTENT)).thenThrow(failure);
 
     assertSame(expectThrows(IllegalStateException.class,
         () -> ZKMetadataProvider.getRawTableConfig(store, TABLE_NAME)), failure);

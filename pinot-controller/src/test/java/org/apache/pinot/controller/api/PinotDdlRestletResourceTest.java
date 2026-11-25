@@ -20,15 +20,24 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
+import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidator;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
@@ -44,6 +53,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -201,6 +211,7 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
         DEFAULT_INSTANCE.getHelixResourceManager().getOfflineTableConfig(source, false, false)), sourceConfig);
     assertEquals(DEFAULT_INSTANCE.getHelixResourceManager().getSchema(source), sourceSchema);
 
+    postDdl("DROP TABLE " + source, false);
     JsonNode repeated = postDdl("CREATE TABLE IF NOT EXISTS " + target + " LIKE " + source, false);
     assertNull(repeated.get("tableConfigs"), "A no-op must not advertise copied configuration as applied");
   }
@@ -223,21 +234,61 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void createTableLikeRejectsUnreadableSourceVariantBeforePersisting()
+  public void concurrentFirstVariantsCannotCreateAHybrid()
+      throws Exception {
+    String target = "ddlLikeContendedTarget";
+    DEFAULT_INSTANCE.addDummySchema(target);
+    TableConfig offline = new TableConfigBuilder(TableType.OFFLINE).setTableName(target).setNumReplicas(1).build();
+    TableConfig realtime = new TableConfigBuilder(TableType.REALTIME).setTableName(target).setNumReplicas(1)
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    CyclicBarrier start = new CyclicBarrier(2);
+    List<Future<Boolean>> attempts = new ArrayList<>();
+    try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+      for (TableConfig config : List.of(offline, realtime)) {
+        attempts.add(executor.submit(() -> {
+          start.await(10, TimeUnit.SECONDS);
+          try {
+            DEFAULT_INSTANCE.getHelixResourceManager().addTableIfRawNameAbsent(config);
+            return true;
+          } catch (TableAlreadyExistsException e) {
+            return false;
+          }
+        }));
+      }
+      boolean offlineWon = attempts.get(0).get(30, TimeUnit.SECONDS);
+      boolean realtimeWon = attempts.get(1).get(30, TimeUnit.SECONDS);
+      assertNotEquals(offlineWon, realtimeWon, "Exactly one request may create the first variant");
+      assertEquals(DEFAULT_INSTANCE.getHelixResourceManager().hasOfflineTable(target), offlineWon);
+      assertEquals(DEFAULT_INSTANCE.getHelixResourceManager().hasRealtimeTable(target), realtimeWon);
+    }
+  }
+
+  @DataProvider(name = "unreadableConfigs")
+  public Object[][] unreadableConfigs() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "unreadableConfigs")
+  public void createTableLikeRejectsUnreadableSourceVariantBeforePersisting(boolean emptyZnode)
       throws IOException {
-    String source = "ddlLikeUnreadableSource";
-    String target = "ddlLikeUnreadableTarget";
+    String source = "ddlLikeUnreadableSource" + emptyZnode;
+    String target = "ddlLikeUnreadableTarget" + emptyZnode;
     postDdl("CREATE TABLE " + source + " (id INT) TABLE_TYPE = OFFLINE "
         + "PROPERTIES ('replication' = '1')", false);
     String realtimeName = source + "_REALTIME";
     String realtimeConfigPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(realtimeName);
-    ZNRecord unreadableConfig = TableConfigSerDeUtils.toZNRecord(
-        new TableConfigBuilder(TableType.REALTIME).setTableName(source).build());
-    unreadableConfig.setSimpleField(TableConfig.TENANT_CONFIG_KEY, "{invalid-json");
-
     try {
-      assertTrue(DEFAULT_INSTANCE.getHelixResourceManager().getPropertyStore()
-          .set(realtimeConfigPath, unreadableConfig, AccessOption.PERSISTENT));
+      if (emptyZnode) {
+        // Helix creates the parent with no payload. A read of that existing parent returns null.
+        assertTrue(DEFAULT_INSTANCE.getPropertyStore()
+            .create(realtimeConfigPath + "/child", new ZNRecord("child"), AccessOption.PERSISTENT));
+      } else {
+        ZNRecord unreadableConfig = TableConfigSerDeUtils.toZNRecord(
+            new TableConfigBuilder(TableType.REALTIME).setTableName(source).build());
+        unreadableConfig.setSimpleField(TableConfig.TENANT_CONFIG_KEY, "{invalid-json");
+        assertTrue(DEFAULT_INSTANCE.getPropertyStore()
+            .set(realtimeConfigPath, unreadableConfig, AccessOption.PERSISTENT));
+      }
       String url = DEFAULT_INSTANCE.getControllerBaseApiUrl() + "/sql/ddl";
       Pair<Integer, String> response = postRequestWithStatusCode(url,
           JsonUtils.objectToString(Map.of("sql", "CREATE TABLE " + target + " LIKE " + source)));

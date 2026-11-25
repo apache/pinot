@@ -89,6 +89,7 @@ import org.apache.helix.model.ParticipantHistory;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.util.HelixUtil;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
@@ -141,6 +142,7 @@ import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -1715,20 +1717,27 @@ public class PinotHelixResourceManager {
     String schemaName = schema.getSchemaName();
     LOGGER.info("Adding schema: {} with override: {}", schemaName, override);
 
-    Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
-    if (oldSchema != null) {
-      // Update existing schema
-      if (override) {
+    if (override) {
+      Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
+      if (oldSchema != null) {
         updateSchema(schema, oldSchema, force);
         refreshTablesUsingSchema(schemaName);
-      } else {
+        return;
+      }
+      ZKMetadataProvider.setSchema(_propertyStore, schema);
+    } else {
+      // The existence check also sees the legacy Helix property store. The create itself must still be atomic.
+      if (ZKMetadataProvider.isSchemaExists(_propertyStore, schemaName)) {
         throw new SchemaAlreadyExistsException("Schema: " + schemaName + " already exists");
       }
-    } else {
-      // Add new schema
-      ZKMetadataProvider.setSchema(_propertyStore, schema);
-      LOGGER.info("Added schema: {}", schemaName);
+      if (!ZKMetadataProvider.createSchema(_propertyStore, schema)) {
+        if (ZKMetadataProvider.isSchemaExists(_propertyStore, schemaName)) {
+          throw new SchemaAlreadyExistsException("Schema: " + schemaName + " already exists");
+        }
+        throw new IllegalStateException("Failed to create schema: " + schemaName);
+      }
     }
+    LOGGER.info("Added schema: {}", schemaName);
   }
 
   public void updateSegmentsZKTimeInterval(String tableNameWithType, DateTimeFieldSpec timeColumnFieldSpec) {
@@ -1897,6 +1906,13 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getSchema(_propertyStore, schemaName);
   }
 
+  /// Returns null for a missing schema and propagates errors reading an existing schema.
+  @Nullable
+  public Schema getSchemaStrict(String schemaName)
+      throws IOException {
+    return ZKMetadataProvider.getSchemaStrict(_propertyStore, schemaName);
+  }
+
   @Nullable
   public Schema getTableSchema(String tableName) {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
@@ -1997,6 +2013,13 @@ public class PinotHelixResourceManager {
     addTable(tableConfig, List.of());
   }
 
+  /// Creates the first physical variant of a new raw table. Claims both type names atomically
+  /// when persisting the config, so concurrent creates cannot independently assemble a hybrid.
+  public void addTableIfRawNameAbsent(TableConfig tableConfig)
+      throws IOException {
+    addTable(tableConfig, List.of(), true);
+  }
+
   /// Performs validations of table config and adds the table to zookeeper
   ///
   /// Call this api when you wanted to create a realtime table with consuming segments starting to ingest from
@@ -2008,6 +2031,11 @@ public class PinotHelixResourceManager {
   /// @throws InvalidTableConfigException if validations fail
   /// @throws TableAlreadyExistsException if the table already exists
   public void addTable(TableConfig tableConfig, List<StreamMetadata> streamMetadataList)
+      throws IOException {
+    addTable(tableConfig, streamMetadataList, false);
+  }
+
+  private void addTable(TableConfig tableConfig, List<StreamMetadata> streamMetadataList, boolean requireRawNameAbsent)
       throws IOException {
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Adding table {}: Start", tableNameWithType);
@@ -2053,7 +2081,10 @@ public class PinotHelixResourceManager {
 
     // Add table config
     LOGGER.info("Adding table {}: Creating table config in the property store", tableNameWithType);
-    if (!ZKMetadataProvider.createTableConfig(_propertyStore, tableConfig)) {
+    if (requireRawNameAbsent) {
+      createFirstTableConfig(getOrBuildMultiWriteZkClient(), PropertyPathBuilder.propertyStore(_helixClusterName),
+          tableConfig);
+    } else if (!ZKMetadataProvider.createTableConfig(_propertyStore, tableConfig)) {
       throw new RuntimeException("Failed to create table config for table: " + tableNameWithType);
     }
 
@@ -2101,6 +2132,38 @@ public class PinotHelixResourceManager {
     persistMaterializedViewDefinitionMetadataBestEffort(tableConfig);
     notifyMaterializedViewConsistencyManagerForTableCreate(tableConfig);
     LOGGER.info("Adding table {}: Successfully added table", tableNameWithType);
+  }
+
+  @VisibleForTesting
+  static void createFirstTableConfig(ZkClient zkClient, String propertyStoreRoot, TableConfig tableConfig)
+      throws IOException {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+    TableNameBuilder sibling =
+        tableConfig.getTableType() == TableType.OFFLINE ? TableNameBuilder.REALTIME : TableNameBuilder.OFFLINE;
+    String siblingName = sibling.tableNameWithType(rawTableName);
+    String siblingPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(siblingName);
+    String configPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableConfig.getTableName());
+    ZNRecord config = TableConfigSerDeUtils.toZNRecord(tableConfig);
+    boolean initializedParent = false;
+    while (true) {
+      try {
+        // ZooKeeper has no check-absent operation. Creating and deleting the sibling in one multi
+        // checks its absence without publishing a sibling config or leaving a lock to recover.
+        new ZkMultiWriteBuilder(zkClient, propertyStoreRoot).create(siblingPath, new ZNRecord(siblingName))
+            .delete(siblingPath, 0).create(configPath, config).execute();
+        return;
+      } catch (KeeperException.NodeExistsException e) {
+        throw new TableAlreadyExistsException("Table " + rawTableName + " already exists.", e);
+      } catch (KeeperException e) {
+        if (initializedParent || e.code() != KeeperException.Code.NONODE) {
+          throw new IOException("Failed to create table config for " + tableConfig.getTableName(), e);
+        }
+        // A source under the legacy property store may be the only table in the cluster.
+        // Bootstrap the primary store path, as Helix ordinarily does for a single-node create.
+        zkClient.createPersistent(propertyStoreRoot + HelixUtil.getZkParentPath(configPath), true);
+        initializedParent = true;
+      }
+    }
   }
 
   /// Adds a logical table.
@@ -4058,7 +4121,7 @@ public class PinotHelixResourceManager {
   }
 
   /// Reads the persisted definition without resolving variables or applying decorators.
-  /// Returns `null` only when no record is returned; malformed definitions and storage failures propagate.
+  /// Returns `null` only when the znode does not exist; malformed definitions and storage failures propagate.
   ///
   /// @param tableNameWithType table name including its OFFLINE or REALTIME suffix
   /// @throws IOException if the persisted config cannot be deserialized
