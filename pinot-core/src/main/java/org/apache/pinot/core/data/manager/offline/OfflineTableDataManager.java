@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.tuple.Pair;
@@ -43,8 +44,8 @@ import org.apache.pinot.spi.data.Schema;
 ///
 /// OFFLINE upsert tables have no consuming segment whose commit takes the upsert snapshot and removes the primary keys
 /// out of metadata TTL, as REALTIME tables do. Instead, both are done in the background after a segment is added or
-/// replaced, once all the segments of its partition assigned to this server are loaded. Each partition runs one such
-/// task at a time, as a REALTIME partition does on its consuming thread.
+/// replaced, once the server has started and all the segments of its partition assigned to this server are loaded.
+/// Each partition runs one such task at a time, as a REALTIME partition does on its consuming thread.
 @ThreadSafe
 public class OfflineTableDataManager extends BaseTableDataManager {
   // States of the upsert snapshot task of a partition
@@ -52,7 +53,17 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   private static final int SNAPSHOT_SCHEDULED = 1;
   private static final int SNAPSHOT_RERUN = 2;
 
+  private final BooleanSupplier _isServerReadyToServeQueries;
   private final Map<Integer, AtomicInteger> _upsertSnapshotStates = new ConcurrentHashMap<>();
+
+  public OfflineTableDataManager() {
+    this(() -> true);
+  }
+
+  /// @param isServerReadyToServeQueries whether the server finished loading its segments at startup
+  public OfflineTableDataManager(BooleanSupplier isServerReadyToServeQueries) {
+    _isServerReadyToServeQueries = isServerReadyToServeQueries;
+  }
 
   @Override
   protected void doInit() {
@@ -110,8 +121,16 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   /// Schedules the upsert snapshot and the removal of expired primary keys for the partition, and returns without
   /// waiting so the segment state transition is not slowed down. A partition has at most one task at a time: adds while
   /// it is scheduled or running make it run once more, so a burst of adds takes at most two runs.
+  ///
+  /// Nothing is scheduled while the server loads its segments at startup, which includes preloading them from their
+  /// snapshots, or while the partition preloads. During startup, most segments of a partition are still loading, and
+  /// checking whether it is loaded would read the ZK metadata of each of them. The first segment add after startup
+  /// takes the snapshot.
   @Override
   protected void onUpsertSegmentAdded(int partitionId, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+    if (!_isServerReadyToServeQueries.getAsBoolean() || partitionUpsertMetadataManager.isPreloading()) {
+      return;
+    }
     AtomicInteger state = _upsertSnapshotStates.computeIfAbsent(partitionId, k -> new AtomicInteger(SNAPSHOT_IDLE));
     if (state.getAndUpdate(s -> s == SNAPSHOT_IDLE ? SNAPSHOT_SCHEDULED : SNAPSHOT_RERUN) != SNAPSHOT_IDLE) {
       return;

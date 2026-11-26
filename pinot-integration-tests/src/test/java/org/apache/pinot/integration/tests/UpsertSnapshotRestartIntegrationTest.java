@@ -82,6 +82,7 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
   private static final double TTL_MS = 100_000d;
   private static final long PHASE1_BASE_TS = 1_000L;
   private static final long PHASE2_BASE_TS = 200_000L;
+  private static final long OFFLINE_BASE_TS = 1_700_000_000_000L;
   private static final long WAIT_MS = 300_000L;
 
   @BeforeClass
@@ -231,7 +232,9 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
   private void uploadOfflineSegment(TableConfig tableConfig, Schema schema, long baseTs, String postfix)
       throws Exception {
     File csvFile = new File(_tempDir, tableConfig.getTableName() + "_" + postfix + ".csv");
-    FileUtils.writeLines(csvFile, Stream.concat(Stream.of(CSV_HEADER), rows(baseTs).stream()).toList());
+    // OFFLINE segments must have their time range between 1971 and 2071
+    FileUtils.writeLines(csvFile,
+        Stream.concat(Stream.of(CSV_HEADER), rows(OFFLINE_BASE_TS + baseTs).stream()).toList());
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
     ClusterIntegrationTestUtils.buildSegmentFromFile(csvFile, tableConfig, schema, postfix, _segmentDir, _tarDir,
         FileFormat.CSV);

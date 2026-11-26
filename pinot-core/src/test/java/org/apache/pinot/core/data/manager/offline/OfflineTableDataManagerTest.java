@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -94,6 +96,27 @@ public class OfflineTableDataManagerTest {
         ServerMeter.UPSERT_SNAPSHOT_SKIPPED_PARTITION_NOT_LOADED, 1L);
   }
 
+  /// Nothing is scheduled while the server loads its segments at startup, or while the partition preloads, so the
+  /// partition isn't checked as loaded against ZK for every segment still loading.
+  @Test
+  public void testNoTaskDuringStartupOrPreload() {
+    PartitionUpsertMetadataManager partitionManager = mockPartitionManager(30);
+    AtomicBoolean serverReady = new AtomicBoolean();
+    OfflineTableDataManager tableDataManager = newTableDataManager(true, serverReady::get);
+    tableDataManager.onUpsertSegmentAdded(0, partitionManager);
+    assertTrue(_tasks.isEmpty());
+
+    serverReady.set(true);
+    when(partitionManager.isPreloading()).thenReturn(true);
+    tableDataManager.onUpsertSegmentAdded(0, partitionManager);
+    assertTrue(_tasks.isEmpty());
+
+    when(partitionManager.isPreloading()).thenReturn(false);
+    tableDataManager.onUpsertSegmentAdded(0, partitionManager);
+    runTasks();
+    verify(partitionManager).takeSnapshot();
+  }
+
   /// Adds while the task is scheduled share it, and adds while it runs make it run once more.
   @Test
   public void testAddsToPartitionShareOneTask() {
@@ -147,7 +170,7 @@ public class OfflineTableDataManagerTest {
       _tasks.add(invocation.getArgument(0));
       return null;
     }).when(executor).execute(any());
-    OfflineTableDataManager tableDataManager = new TestOfflineTableDataManager(true, executor);
+    OfflineTableDataManager tableDataManager = new TestOfflineTableDataManager(true, executor, () -> true);
     tableDataManager.onUpsertSegmentAdded(0, partitionManager);
     assertTrue(_tasks.isEmpty());
     verify(partitionManager, never()).takeSnapshot();
@@ -172,19 +195,24 @@ public class OfflineTableDataManagerTest {
 
   /// Returns a table data manager whose background tasks are queued in [#_tasks] until [#runTasks()].
   private OfflineTableDataManager newTableDataManager(boolean partitionLoaded) {
+    return newTableDataManager(partitionLoaded, () -> true);
+  }
+
+  private OfflineTableDataManager newTableDataManager(boolean partitionLoaded, BooleanSupplier serverReady) {
     _tasks.clear();
     ExecutorService executor = mock(ExecutorService.class);
     doAnswer(invocation -> {
       _tasks.add(invocation.getArgument(0));
       return null;
     }).when(executor).execute(any());
-    return new TestOfflineTableDataManager(partitionLoaded, executor);
+    return new TestOfflineTableDataManager(partitionLoaded, executor, serverReady);
   }
 
   private static class TestOfflineTableDataManager extends OfflineTableDataManager {
     final boolean _partitionLoaded;
 
-    TestOfflineTableDataManager(boolean partitionLoaded, ExecutorService refreshExecutor) {
+    TestOfflineTableDataManager(boolean partitionLoaded, ExecutorService refreshExecutor, BooleanSupplier serverReady) {
+      super(serverReady);
       _partitionLoaded = partitionLoaded;
       _tableNameWithType = TABLE_NAME_WITH_TYPE;
       _segmentRefreshExecutor = refreshExecutor;

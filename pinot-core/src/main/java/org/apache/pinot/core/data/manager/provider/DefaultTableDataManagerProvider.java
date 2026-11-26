@@ -83,7 +83,7 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
         if (tableConfig.isDimTable()) {
           tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableConfig.getTableName());
         } else {
-          tableDataManager = new OfflineTableDataManager();
+          tableDataManager = new OfflineTableDataManager(isServerReadyToServeQueries);
         }
         break;
       case REALTIME:

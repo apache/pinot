@@ -188,26 +188,19 @@ public class BaseTableDataManagerPartitionMetadataTest {
   }
 
   @Test
-  public void testUpsertAddAndReplacementScheduleSnapshot() {
+  public void testUpsertReplacementSchedulesSnapshot() {
     PartitionUpsertMetadataManager partition = mock(PartitionUpsertMetadataManager.class);
     BaseTableDataManager table = createTableManager(partition);
     UpsertContext context = mock(UpsertContext.class);
     when(context.getConsistencyMode()).thenReturn(ConsistencyMode.NONE);
     when(table._tableUpsertMetadataManager.getContext()).thenReturn(context);
-    // Run each task right away, so the partition is idle again and the replacement schedules its own task. The task
-    // skips the snapshot, as the partition can't be checked as loaded without Helix.
-    doAnswer(invocation -> {
-      invocation.<Runnable>getArgument(0).run();
-      return null;
-    }).when(table._segmentRefreshExecutor).execute(any(Runnable.class));
     ImmutableSegment oldSegment = createSegment();
-    table.addSegment(oldSegment, null);
-    verifyUpsertSnapshotScheduled(table, 1);
+    table.registerSegment(SEGMENT_NAME, new ImmutableSegmentDataManager(oldSegment));
 
     ImmutableSegment replacement = createSegment();
     table.addSegment(replacement, null);
     verify(partition).replaceSegment(replacement, oldSegment);
-    verifyUpsertSnapshotScheduled(table, 2);
+    verifyUpsertSnapshotScheduled(table, 1);
   }
 
   /// Verifies how many times the OFFLINE upsert snapshot was scheduled. It's scheduled after a segment is added to or
