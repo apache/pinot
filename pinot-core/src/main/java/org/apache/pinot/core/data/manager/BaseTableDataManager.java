@@ -1443,7 +1443,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   ///
   /// Extensions may return another directory, e.g. a copy of the segment that another replica already prepared on the
   /// target tier. Such a directory must hold the segment with the CRC in `zkMetadata`, be opened for the target tier
-  /// (`zkMetadata.getTier()`), and need no reprocessing for it. The reload then closes `currentDirectory`, loads the
+  /// (`zkMetadata.getTier()`), and need no reprocessing for it. Extensions should return one only when
+  /// `currentDirectory` also has that CRC: a reload that gets here with another CRC keeps the local copy on purpose,
+  /// e.g. with CRC checking on segment load disabled. The reload then closes `currentDirectory`, loads the
   /// returned directory, and removes the local copy on the current tier. A table that restores the validDocIds bitmap
   /// on reload never loads another directory, since the bitmap lives only in the local copy.
   ///
