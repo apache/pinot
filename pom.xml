@@ -199,7 +199,7 @@
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.17</swagger.version>
-    <swagger-ui.version>5.35.1</swagger-ui.version>
+    <swagger-ui.version>5.36.0</swagger-ui.version>
     <hadoop.version>3.4.3</hadoop.version>
     <jsonpath.version>2.10.0</jsonpath.version>
     <jsonsmart.version>2.6.1</jsonsmart.version>
