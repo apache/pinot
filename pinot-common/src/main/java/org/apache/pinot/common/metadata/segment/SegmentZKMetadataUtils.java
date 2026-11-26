@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -114,13 +113,6 @@ public class SegmentZKMetadataUtils {
       // Set segment status, start/end offset info for real-time table
       if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
         segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
-
-        // For new segment, start/end offset must exist if the segment name follows LLC segment name convention
-        if (newSegment && LLCSegmentName.isLLCSegment(segmentMetadata.getName())) {
-          Preconditions.checkArgument(
-              segmentMetadata.getStartOffset() != null && segmentMetadata.getEndOffset() != null,
-              "New uploaded LLC segment must have start/end offset in the segment metadata");
-        }
 
         // NOTE:
         // - If start/end offset is available in the uploaded segment, update them in the segment ZK metadata
