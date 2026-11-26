@@ -35,6 +35,16 @@ import static org.testng.Assert.*;
 
 public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
 
+  @Test
+  public void testServerReturnFinalResultWithUnpartitionedGroups() {
+    // Table a is partitioned by col2. The same col1 group can appear on both workers.
+    String explain = "EXPLAIN PLAN FOR SELECT col1, COUNT(DISTINCT col2) FROM a GROUP BY col1";
+    String options = "SET usePhysicalOptimizer=true; ";
+    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    assertEquals(_queryEnvironment.explainQuery(options + "SET serverReturnFinalResult=true; " + explain, requestId),
+        _queryEnvironment.explainQuery(options + explain, requestId));
+  }
+
   private String explainQueryWithRuleDisabled(String query, String ruleToSkip) {
     SqlNodeAndOptions parsed = CalciteSqlParser.compileToSqlNodeAndOptions(query);
     SqlNode sqlNode = parsed.getSqlNode();
