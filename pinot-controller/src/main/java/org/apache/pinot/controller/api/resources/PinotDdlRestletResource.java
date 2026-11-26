@@ -28,7 +28,6 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -50,7 +49,9 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.TaskState;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -421,24 +422,33 @@ public class PinotDdlRestletResource {
 
   @Nullable
   private Schema readCreateLikeSchema(String rawTableName) {
-    try {
-      return _pinotHelixResourceManager.getSchemaStrict(rawTableName);
-    } catch (IOException | RuntimeException e) {
-      throw new ControllerApplicationException(LOGGER, "Failed to read schema: " + rawTableName,
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+    ZkHelixPropertyStore<ZNRecord> store = _pinotHelixResourceManager.getPropertyStore();
+    if (!ZKMetadataProvider.isSchemaExists(store, rawTableName)) {
+      return null;
     }
+    Schema schema = _pinotHelixResourceManager.getSchema(rawTableName);
+    if (schema == null && ZKMetadataProvider.isSchemaExists(store, rawTableName)) {
+      throw new ControllerApplicationException(LOGGER, "Failed to read schema: " + rawTableName,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return schema;
   }
 
   @Nullable
   private TableConfig readCreateLikeTableConfig(String rawTableName, TableType tableType) {
+    ZkHelixPropertyStore<ZNRecord> store = _pinotHelixResourceManager.getPropertyStore();
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
-    try {
-      return _pinotHelixResourceManager.getRawTableConfig(tableNameWithType);
-    } catch (IOException | RuntimeException e) {
-      throw new ControllerApplicationException(LOGGER,
-          "Failed to read table config: " + tableNameWithType,
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+    if (!ZKMetadataProvider.isTableConfigExists(store, tableNameWithType)) {
+      return null;
     }
+    TableConfig config = tableType == TableType.OFFLINE
+        ? _pinotHelixResourceManager.getOfflineTableConfig(rawTableName, false, false)
+        : _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName, false, false);
+    if (config == null && ZKMetadataProvider.isTableConfigExists(store, tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER, "Failed to read table config: " + tableNameWithType,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return config;
   }
 
   @Nullable

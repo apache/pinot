@@ -1897,13 +1897,6 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getSchema(_propertyStore, schemaName);
   }
 
-  /// Returns null for a missing schema and propagates errors reading an existing schema.
-  @Nullable
-  public Schema getSchemaStrict(String schemaName)
-      throws IOException {
-    return ZKMetadataProvider.getSchemaStrict(_propertyStore, schemaName);
-  }
-
   @Nullable
   public Schema getTableSchema(String tableName) {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
@@ -4062,17 +4055,6 @@ public class PinotHelixResourceManager {
   @Nullable
   public TableConfig getTableConfig(String tableNameWithType) {
     return ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-  }
-
-  /// Reads the persisted definition without resolving variables or applying decorators.
-  /// Returns `null` only when the znode does not exist; malformed definitions and storage failures propagate.
-  ///
-  /// @param tableNameWithType table name including its OFFLINE or REALTIME suffix
-  /// @throws IOException if the persisted config cannot be deserialized
-  @Nullable
-  public TableConfig getRawTableConfig(String tableNameWithType)
-      throws IOException {
-    return ZKMetadataProvider.getRawTableConfig(_propertyStore, tableNameWithType);
   }
 
   /// Get all table configs.

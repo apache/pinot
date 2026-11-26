@@ -481,36 +481,6 @@ public class ZKMetadataProvider {
         AccessOption.PERSISTENT), replaceVariables, applyDecorator);
   }
 
-  /// Reads the persisted table definition without variable substitution or config decorators.
-  /// Returns `null` only when the znode does not exist. Deserialization and storage failures propagate
-  /// so callers can distinguish an unreadable definition from an absent table config.
-  ///
-  /// @param tableNameWithType table name including its OFFLINE or REALTIME suffix
-  /// @throws IOException if the persisted config cannot be deserialized
-  @Nullable
-  public static TableConfig getRawTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType)
-      throws IOException {
-    ZNRecord record = getRecordStrict(propertyStore, constructPropertyStorePathForResourceConfig(tableNameWithType));
-    return record == null ? null : TableConfigSerDeUtils.fromZNRecord(record);
-  }
-
-  @Nullable
-  private static ZNRecord getRecordStrict(ZkHelixPropertyStore<ZNRecord> propertyStore, String path)
-      throws IOException {
-    // AutoFallbackPropertyStore.getStat prefers the primary znode when it exists. Its get can instead return a
-    // readable legacy record if the primary cannot be decoded. Verify which znode actually supplied the data.
-    Stat expectedStat = propertyStore.getStat(path, AccessOption.PERSISTENT);
-    if (expectedStat == null) {
-      return null;
-    }
-    Stat actualStat = new Stat();
-    ZNRecord record = propertyStore.get(path, actualStat, AccessOption.PERSISTENT);
-    if (record == null || actualStat.getCzxid() != expectedStat.getCzxid()) {
-      throw new IOException("Unreadable or replaced ZNRecord at " + path);
-    }
-    return record;
-  }
-
   @Nullable
   public static ImmutablePair<TableConfig, Stat> getTableConfigWithStat(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {
@@ -642,22 +612,6 @@ public class ZKMetadataProvider {
       LOGGER.error("Caught exception while getting schema: {}", schemaName, e);
       return null;
     }
-  }
-
-  /// Reads the persisted schema, returning null only for a missing znode and propagating read or decoding errors.
-  @Nullable
-  public static Schema getSchemaStrict(ZkHelixPropertyStore<ZNRecord> propertyStore, String schemaName)
-      throws IOException {
-    String path = constructPropertyStorePathForSchema(schemaName);
-    ZNRecord record = getRecordStrict(propertyStore, path);
-    if (record == null) {
-      return null;
-    }
-    Schema schema = SchemaSerDeUtils.fromZNRecord(record);
-    if (schema == null) {
-      throw new IOException("Missing schema in ZNRecord at " + path);
-    }
-    return schema;
   }
 
   /// Check if the schema exists in the property store.

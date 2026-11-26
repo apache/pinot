@@ -706,12 +706,12 @@ permissions are required because any existing target variant blocks the operatio
 including when `TYPE` selects just one source variant. With no `TYPE`,
 both source candidates require READ permission, consistent with other untyped DDLs.
 
-Source configs are fetched without environment-variable substitution or config
-decorators. The source reader propagates malformed-definition errors instead of
-converting them to a missing config. A selected source variant that cannot be read
-or deserialized produces 500 before any target writes; only absent records are
-omitted. Explicit `TYPE` reads only that variant. JSON deep copies preserve the stored
-definition, including schema metadata, distinct per-variant settings, and symbolic
+LIKE reads source configs through the same getters as `GET /tableConfigs`, with
+variable substitution and decorators disabled. If a getter returns no definition
+for an existing config or schema during preflight, LIKE returns 500 before writing.
+The getters use the controller's standard legacy property-store fallback. Explicit
+`TYPE` reads only the selected variant. JSON deep copies preserve schema metadata,
+distinct per-variant settings, and symbolic
 `${VAR}` references. `TableConfigs.setTableName` changes structural table/schema
 names. Arbitrary config values such as stream topics, tenants, task settings, and
 explicit instance-partition references retain their values. Target tuning and the
