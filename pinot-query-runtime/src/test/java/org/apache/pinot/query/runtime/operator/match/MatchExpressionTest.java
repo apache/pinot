@@ -214,6 +214,44 @@ public class MatchExpressionTest {
     assertEquals(doubleAverage.evaluate(tape(doubleRows)), 2.0);
   }
 
+  /// A sum that leaves the range of its result type fails the query instead of wrapping around to a wrong value.
+  @Test
+  public void testIntegralSumOverflowFailsWithActionableError() {
+    MatchTerm.Aggregate longSum = aggregate(MatchTerm.Aggregate.Kind.SUM, ColumnDataType.LONG, ColumnDataType.LONG);
+    assertEquals(longSum.evaluate(tape(List.of(new Object[]{Long.MAX_VALUE - 1}, new Object[]{1L}))),
+        Long.MAX_VALUE);
+    assertSumOverflows(longSum, List.of(new Object[]{Long.MAX_VALUE}, new Object[]{1L}), "BIGINT");
+    assertSumOverflows(longSum, List.of(new Object[]{Long.MIN_VALUE}, new Object[]{-1L}), "BIGINT");
+
+    // An INT result type comes from a DECIMAL(p, 0) argument with p <= 10, which the planner maps to INT.
+    MatchTerm.Aggregate intSum = aggregate(MatchTerm.Aggregate.Kind.SUM, ColumnDataType.INT, ColumnDataType.INT);
+    assertEquals(intSum.evaluate(tape(List.of(new Object[]{Integer.MAX_VALUE - 1}, new Object[]{1}))),
+        Integer.MAX_VALUE);
+    assertSumOverflows(intSum, List.of(new Object[]{Integer.MAX_VALUE}, new Object[]{1}), "INT");
+    assertSumOverflows(intSum, List.of(new Object[]{Integer.MIN_VALUE}, new Object[]{-1}), "INT");
+  }
+
+  /// An integral AVG comes from a DECIMAL(p, 0) argument and truncates toward zero. Its intermediate sum may leave the
+  /// BIGINT range while the average itself fits, and the average is then still exact.
+  @Test
+  public void testIntegralAverageTruncatesAndSurvivesSumOverflow() {
+    MatchTerm.Aggregate longAverage =
+        aggregate(MatchTerm.Aggregate.Kind.AVG, ColumnDataType.LONG, ColumnDataType.LONG);
+    assertEquals(longAverage.evaluate(tape(List.of(new Object[]{1L}, new Object[]{2L}))), 1L);
+    assertEquals(longAverage.evaluate(tape(List.of(new Object[]{-1L}, new Object[]{-2L}))), -1L);
+    assertEquals(longAverage.evaluate(
+        tape(List.of(new Object[]{Long.MAX_VALUE}, new Object[]{null}, new Object[]{Long.MAX_VALUE - 2}))),
+        Long.MAX_VALUE - 1);
+    assertEquals(longAverage.evaluate(tape(List.of(new Object[]{Long.MIN_VALUE}, new Object[]{Long.MIN_VALUE + 1}))),
+        Long.MIN_VALUE + 1);
+
+    MatchTerm.Aggregate intAverage = aggregate(MatchTerm.Aggregate.Kind.AVG, ColumnDataType.INT, ColumnDataType.INT);
+    Object average =
+        intAverage.evaluate(tape(List.of(new Object[]{Integer.MAX_VALUE}, new Object[]{Integer.MAX_VALUE})));
+    assertTrue(average instanceof Integer);
+    assertEquals(average, Integer.MAX_VALUE);
+  }
+
   @Test
   public void testAggregateEmptySetIdentitiesAndStoredResultTypes() {
     MatchTape nullTape = tape(List.<Object[]>of(new Object[]{null}));
@@ -336,6 +374,13 @@ public class MatchExpressionTest {
         {MatchTerm.Aggregate.Kind.SUM, ColumnDataType.BIG_DECIMAL, BigDecimal.ONE},
         {MatchTerm.Aggregate.Kind.AVG, ColumnDataType.BIG_DECIMAL, BigDecimal.ONE}
     };
+  }
+
+  private static void assertSumOverflows(MatchTerm.Aggregate sum, List<Object[]> rows, String resultType) {
+    QueryException exception = expectThrows(QueryException.class, () -> sum.evaluate(tape(rows)));
+    assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_EXECUTION);
+    assertEquals(exception.getMessage(), "MATCH_RECOGNIZE SUM overflowed its " + resultType + " result type. Cast the "
+        + "argument to DECIMAL for an exact sum, or to DOUBLE for an approximate one.");
   }
 
   private static void assertNavigationCompileFails(RexExpression.Literal offset, String expectedMessage) {

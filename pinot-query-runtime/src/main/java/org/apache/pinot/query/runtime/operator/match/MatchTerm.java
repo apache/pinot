@@ -30,6 +30,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
@@ -304,6 +305,13 @@ public interface MatchTerm {
       }
     }
 
+    /// Handles the `INT` and `BIGINT` result types. `SUM` over an integral argument is `BIGINT`, while a
+    /// `DECIMAL(p, 0)` argument keeps its type for both `SUM` and `AVG`, and that type maps to `INT` or `BIGINT` (see
+    /// `RelToPlanNodeConverter.resolveDecimal`). Such an `AVG` truncates toward zero, like an integer division.
+    ///
+    /// A `SUM` that leaves the range of its result type fails the query instead of wrapping around, unlike the
+    /// `SUMLONG` aggregation function. The average of values that fit the result type always fits it too, so when only
+    /// the intermediate sum of an `AVG` leaves the `BIGINT` range, [#evaluateLargeIntegralAverage] computes it exactly.
     @Nullable
     private Object evaluateIntegralSumOrAverage(MatchTape tape, int rowCount, List<Object[]> partitionRows) {
       long sum = 0;
@@ -312,18 +320,55 @@ public interface MatchTerm {
         checkTerminationPeriodically();
         Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value != null) {
-          sum += numericValue(value).longValue();
+          try {
+            sum = Math.addExact(sum, numericValue(value).longValue());
+          } catch (ArithmeticException e) {
+            if (_kind == Kind.AVG) {
+              return evaluateLargeIntegralAverage(tape, rowCount, partitionRows);
+            }
+            throw resultTypeOverflow(e);
+          }
           count++;
         }
       }
       if (count == 0) {
         return null;
       }
-      long result = _kind == Kind.AVG ? sum / count : sum;
-      if (_storedType == ColumnDataType.INT) {
-        return (int) result;
+      return toIntegralResult(_kind == Kind.AVG ? sum / count : sum);
+    }
+
+    /// The `AVG` of integral values whose sum leaves the `BIGINT` range, computed over [BigInteger] and truncated
+    /// toward zero like the `long` division of [#evaluateIntegralSumOrAverage]. Scans the rows again, which only
+    /// happens for values close to the `BIGINT` limits.
+    private Object evaluateLargeIntegralAverage(MatchTape tape, int rowCount, List<Object[]> partitionRows) {
+      BigInteger sum = BigInteger.ZERO;
+      long count = 0;
+      for (int i = 0; i < rowCount; i++) {
+        checkTerminationPeriodically();
+        Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
+        if (value != null) {
+          sum = sum.add(BigInteger.valueOf(numericValue(value).longValue()));
+          count++;
+        }
       }
-      return result;
+      return toIntegralResult(sum.divide(BigInteger.valueOf(count)).longValueExact());
+    }
+
+    private Object toIntegralResult(long result) {
+      if (_storedType != ColumnDataType.INT) {
+        return result;
+      }
+      try {
+        return Math.toIntExact(result);
+      } catch (ArithmeticException e) {
+        throw resultTypeOverflow(e);
+      }
+    }
+
+    private QueryException resultTypeOverflow(ArithmeticException cause) {
+      String resultType = _storedType == ColumnDataType.INT ? "INT" : "BIGINT";
+      return QueryErrorCode.QUERY_EXECUTION.asException("MATCH_RECOGNIZE " + _kind + " overflowed its " + resultType
+          + " result type. Cast the argument to DECIMAL for an exact sum, or to DOUBLE for an approximate one.", cause);
     }
 
     @Nullable

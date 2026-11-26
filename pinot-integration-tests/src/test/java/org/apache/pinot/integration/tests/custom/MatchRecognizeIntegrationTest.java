@@ -378,6 +378,32 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     }, "STRING", "LONG", "LONG", "LONG", "INT", "INT", "DOUBLE");
   }
 
+  /// A `DECIMAL(p, 0)` argument keeps its type for SUM and AVG, and Pinot maps that type to INT for p <= 10 and to
+  /// BIGINT for p <= 38, so these aggregates accumulate integers into an INT or BIGINT result. AVG truncates toward
+  /// zero, so AAPL's 62 / 7 is 8.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testScaleZeroDecimalAggregatesKeepTheirIntegralType(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT * FROM " + getTableName() + " MATCH_RECOGNIZE ("
+        + " PARTITION BY symbolCol ORDER BY seqCol"
+        + " MEASURES SUM(CAST(A.priceCol AS DECIMAL(10, 0))) AS int_sum,"
+        + " AVG(CAST(A.priceCol AS DECIMAL(10, 0))) AS int_avg,"
+        + " SUM(CAST(A.priceCol AS DECIMAL(18, 0))) AS long_sum,"
+        + " AVG(CAST(A.priceCol AS DECIMAL(18, 0))) AS long_avg"
+        + " ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW"
+        + " PATTERN (A+)"
+        + " DEFINE A AS A.priceCol > 0"
+        + ") AS mr ORDER BY symbolCol";
+    assertMatchRows(query, new Object[][]{
+        {"AAPL", 62, 8, 62, 8},
+        {"AMZN", 75, 15, 75, 15},
+        {"GOOG", 12, 4, 12, 4},
+        {"MSFT", 16, 5, 16, 5},
+        {"NFLX", 36, 4, 36, 4}
+    }, "STRING", "INT", "INT", "LONG", "LONG");
+  }
+
   /// DESC and the ascending tie-breaker must both affect the distributed sort feeding the matcher, not merely
   /// survive in the logical plan. GOOG's equal prices make the second key observable.
   @Test(dataProvider = "useV2QueryEngine")
