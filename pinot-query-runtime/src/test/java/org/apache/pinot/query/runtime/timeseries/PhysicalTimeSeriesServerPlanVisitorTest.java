@@ -36,12 +36,14 @@ import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class PhysicalTimeSeriesServerPlanVisitorTest {
@@ -53,6 +55,30 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
   @BeforeClass
   public void setUp() {
     TimeSeriesBuilderFactoryProvider.registerSeriesBuilderFactory(LANGUAGE, new SimpleTimeSeriesBuilderFactory());
+  }
+
+  @DataProvider
+  public Object[][] leafScriptExpressions() {
+    String marker = "abs(Groovy())";
+    return new Object[][] {
+        {marker, "", "orderCount", "cityName"},
+        {"orderTime", marker + " > 0", "orderCount", "cityName"},
+        {"orderTime", "", marker, "cityName"},
+        {"orderTime", "", "orderCount", marker}
+    };
+  }
+
+  @Test(dataProvider = "leafScriptExpressions")
+  public void testRejectsScriptFunctions(String time, String filter, String value, String groupBy) {
+    PhysicalTimeSeriesServerPlanVisitor visitor = new PhysicalTimeSeriesServerPlanVisitor(
+        mock(QueryExecutor.class), mock(ExecutorService.class), mock(ServerMetrics.class));
+    LeafTimeSeriesPlanNode leaf = new LeafTimeSeriesPlanNode("leaf", List.of(), "orderTable", time, TimeUnit.SECONDS,
+        0L, filter, value, new AggInfo("SUM", false, Map.of()), List.of(groupBy), SERIES_LIMIT, QUERY_OPTIONS);
+    TimeSeriesExecutionContext context = new TimeSeriesExecutionContext(LANGUAGE,
+        TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100), DUMMY_DEADLINE_MS, Map.of(), Map.of(), Map.of());
+
+    assertEquals(expectThrows(IllegalArgumentException.class, () -> visitor.compileQueryContext(leaf, context))
+        .getMessage(), "Groovy functions are not supported in time-series worker plans");
   }
 
   @Test
