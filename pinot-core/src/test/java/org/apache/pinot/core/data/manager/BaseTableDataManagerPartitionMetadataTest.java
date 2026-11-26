@@ -99,6 +99,7 @@ public class BaseTableDataManagerPartitionMetadataTest {
     }
     verify(segment).onSegmentAdded();
     verify(partition).addSegment(segment);
+    verifyUpsertSnapshotScheduled(table, failInitialization ? 0 : 1);
   }
 
   @Test(dataProvider = "initializationFailure")
@@ -130,6 +131,8 @@ public class BaseTableDataManagerPartitionMetadataTest {
       verify(segment).onSegmentAdded();
     }
     verify(partition).preloadSegment(segment);
+    // Preloaded segments come with their snapshot, so they don't schedule one
+    verifyUpsertSnapshotScheduled(table, 0);
   }
 
   @DataProvider
@@ -182,6 +185,35 @@ public class BaseTableDataManagerPartitionMetadataTest {
       verify(oldSegment).offload();
     }
     verify(partition).replaceSegment(replacement, oldSegment);
+  }
+
+  @Test
+  public void testUpsertAddAndReplacementScheduleSnapshot() {
+    PartitionUpsertMetadataManager partition = mock(PartitionUpsertMetadataManager.class);
+    BaseTableDataManager table = createTableManager(partition);
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.getConsistencyMode()).thenReturn(ConsistencyMode.NONE);
+    when(table._tableUpsertMetadataManager.getContext()).thenReturn(context);
+    // Run each task right away, so the partition is idle again and the replacement schedules its own task. The task
+    // skips the snapshot, as the partition can't be checked as loaded without Helix.
+    doAnswer(invocation -> {
+      invocation.<Runnable>getArgument(0).run();
+      return null;
+    }).when(table._segmentRefreshExecutor).execute(any(Runnable.class));
+    ImmutableSegment oldSegment = createSegment();
+    table.addSegment(oldSegment, null);
+    verifyUpsertSnapshotScheduled(table, 1);
+
+    ImmutableSegment replacement = createSegment();
+    table.addSegment(replacement, null);
+    verify(partition).replaceSegment(replacement, oldSegment);
+    verifyUpsertSnapshotScheduled(table, 2);
+  }
+
+  /// Verifies how many times the OFFLINE upsert snapshot was scheduled. It's scheduled after a segment is added to or
+  /// replaced in its partition, and not when that fails or the segment is preloaded.
+  private static void verifyUpsertSnapshotScheduled(BaseTableDataManager table, int numScheduled) {
+    verify(table._segmentRefreshExecutor, times(numScheduled)).execute(any(Runnable.class));
   }
 
   private static BaseTableDataManager createTableManager(PartitionUpsertMetadataManager partition) {

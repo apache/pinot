@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.mockito.InOrder;
@@ -45,6 +47,8 @@ import static org.testng.Assert.assertTrue;
 /// background after a segment is added to an upsert partition, in the same order as a REALTIME segment commit, and
 /// runs one such task per partition at a time.
 public class OfflineTableDataManagerTest {
+  private static final String TABLE_NAME_WITH_TYPE = "testTable_OFFLINE";
+
   private final List<Runnable> _tasks = new ArrayList<>();
 
   @Test
@@ -67,14 +71,27 @@ public class OfflineTableDataManagerTest {
     inOrder.verify(partitionManager).takeSnapshot();
   }
 
-  /// Before the partition's segments are loaded, e.g. while the server starts, the run is skipped.
+  /// Before the partition's segments are loaded, e.g. while the server starts, the run is skipped and counted.
   @Test
   public void testSkipBeforePartitionIsLoaded() {
     PartitionUpsertMetadataManager partitionManager = mockPartitionManager(30);
-    newTableDataManager(false).onUpsertSegmentAdded(0, partitionManager);
+    ServerMetrics previousServerMetrics = ServerMetrics.get();
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    ServerMetrics.deregister();
+    ServerMetrics.register(serverMetrics);
+    OfflineTableDataManager tableDataManager;
+    try {
+      tableDataManager = newTableDataManager(false);
+    } finally {
+      ServerMetrics.deregister();
+      ServerMetrics.register(previousServerMetrics);
+    }
+    tableDataManager.onUpsertSegmentAdded(0, partitionManager);
     runTasks();
     verify(partitionManager, never()).takeSnapshot();
     verify(partitionManager, never()).removeExpiredPrimaryKeys();
+    verify(serverMetrics).addMeteredTableValue(TABLE_NAME_WITH_TYPE,
+        ServerMeter.UPSERT_SNAPSHOT_SKIPPED_PARTITION_NOT_LOADED, 1L);
   }
 
   /// Adds while the task is scheduled share it, and adds while it runs make it run once more.
@@ -169,6 +186,7 @@ public class OfflineTableDataManagerTest {
 
     TestOfflineTableDataManager(boolean partitionLoaded, ExecutorService refreshExecutor) {
       _partitionLoaded = partitionLoaded;
+      _tableNameWithType = TABLE_NAME_WITH_TYPE;
       _segmentRefreshExecutor = refreshExecutor;
       _logger = LoggerFactory.getLogger(OfflineTableDataManagerTest.class);
     }

@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -131,6 +132,11 @@ public class OfflineTableDataManager extends BaseTableDataManager {
       state.set(SNAPSHOT_SCHEDULED);
       if (isPartitionLoaded(partitionId)) {
         takeSnapshotAndRemoveExpiredPrimaryKeys(partitionUpsertMetadataManager);
+      } else {
+        // Expected while the partition loads. If it keeps increasing, e.g. with a segment of the partition in ERROR
+        // state, the partition takes no snapshot and keeps the primary keys out of metadata TTL.
+        _serverMetrics.addMeteredTableValue(_tableNameWithType,
+            ServerMeter.UPSERT_SNAPSHOT_SKIPPED_PARTITION_NOT_LOADED, 1L);
       }
     } while (!state.compareAndSet(SNAPSHOT_SCHEDULED, SNAPSHOT_IDLE));
   }
