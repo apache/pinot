@@ -1379,11 +1379,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
             if (restoreValidDocIdsOnDiskBitmap) {
               // The validDocIds bitmap lives only in the local copy, so the reload must carry it over by copying.
               closeSegmentDirectoryQuietly(reusableDirectory);
-            } else {
-              _logger.info("Reloading segment: {} using the directory already prepared on tier: {}", segmentName,
-                  TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
-              closeSegmentDirectoryQuietly(segmentDirectory);
-              loadReusedDirectory(indexDir, reusableDirectory, indexLoadingConfig, zkMetadata);
+            } else if (tryLoadReusedDirectory(indexDir, segmentDirectory, reusableDirectory, indexLoadingConfig,
+                zkMetadata)) {
               return;
             }
           }
@@ -1445,40 +1442,85 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /// target tier. Such a directory must hold the segment with the CRC in `zkMetadata`, be opened for the target tier
   /// (`zkMetadata.getTier()`), and need no reprocessing for it. Extensions should return one only when
   /// `currentDirectory` also has that CRC: a reload that gets here with another CRC keeps the local copy on purpose,
-  /// e.g. with CRC checking on segment load disabled. The reload then closes `currentDirectory`, loads the
-  /// returned directory, and removes the local copy on the current tier. A table that restores the validDocIds bitmap
-  /// on reload never loads another directory, since the bitmap lives only in the local copy.
+  /// e.g. with CRC checking on segment load disabled. The reload loads the returned directory, and only once it has
+  /// loaded, closes `currentDirectory` and removes the local copy on the current tier. If it fails to load, the reload
+  /// copies `currentDirectory` out and reprocesses it instead. A table that restores the validDocIds bitmap on reload
+  /// never loads another directory, since the bitmap lives only in the local copy.
+  ///
+  /// The default returns `currentDirectory` when [#canReuseExistingDirectoryForReload] returns true, and null
+  /// otherwise, so that existing overrides of that method keep working.
   ///
   /// Called under the segment lock.
   @Nullable
   protected SegmentDirectory getReusableDirectoryForReload(SegmentZKMetadata zkMetadata,
       @Nullable String currentSegmentTier, SegmentDirectory currentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
+    return canReuseExistingDirectoryForReload(zkMetadata, currentSegmentTier, currentDirectory, indexLoadingConfig)
+        ? currentDirectory : null;
+  }
+
+  /// Returns whether a reload without download can load the current directory as is: the segment stays on its tier
+  /// and needs no reprocessing.
+  ///
+  /// @deprecated Override [#getReusableDirectoryForReload] instead, which can also return another directory to load.
+  /// Its default implementation still calls this method.
+  @Deprecated
+  protected boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
+      SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
-    boolean canReuse = !segmentDirectoryLoader.needsTierMigration(zkMetadata.getTier(), currentSegmentTier)
-        && !ImmutableSegmentLoader.needPreprocess(currentDirectory, indexLoadingConfig);
-    return canReuse ? currentDirectory : null;
+    return !segmentDirectoryLoader.needsTierMigration(segmentZKMetadata.getTier(), currentSegmentTier)
+        && !ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
   }
 
   /// Loads a directory other than the current one, returned by [#getReusableDirectoryForReload], in place of the
-  /// segment. The directory serves the segment on its target tier, so the local copy on the current tier is moved to
-  /// the backup directory first. If loading fails, the caller's reload failure recovery restores it; once the segment
-  /// is replaced, it is removed, so that no later load of the segment finds it.
-  private void loadReusedDirectory(File indexDir, SegmentDirectory segmentDirectory,
-      IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata)
+  /// segment, and returns true once the segment is replaced. The directory serves the segment on its target tier, so
+  /// the local copy on the current tier is then removed, so that no later load of the segment finds it.
+  ///
+  /// The local copy and `currentDirectory` stay as they are until the directory has loaded. If it fails to load, e.g.
+  /// because an index in it is unreadable although it needs no reprocessing, it is closed and this returns false, so
+  /// that the reload copies `currentDirectory` out and reprocesses it instead of failing on the same directory every
+  /// time. An interrupt propagates, after closing both directories.
+  private boolean tryLoadReusedDirectory(File indexDir, SegmentDirectory currentDirectory,
+      SegmentDirectory reusableDirectory, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata)
       throws Exception {
+    String segmentName = zkMetadata.getSegmentName();
+    String targetTier = TierConfigUtils.normalizeTierName(zkMetadata.getTier());
+    _logger.info("Reloading segment: {} using the directory already prepared on tier: {}", segmentName, targetTier);
     ImmutableSegment segment;
     try {
-      createBackup(indexDir);
-      segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig.copyWithSegmentTier(
-          zkMetadata.getTier()));
+      segment = ImmutableSegmentLoader.load(reusableDirectory,
+          indexLoadingConfig.copyWithSegmentTier(zkMetadata.getTier()));
     } catch (Exception e) {
-      closeSegmentDirectoryQuietly(segmentDirectory);
-      throw e;
+      closeSegmentDirectoryQuietly(reusableDirectory);
+      if (e instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
+        closeSegmentDirectoryQuietly(currentDirectory);
+        throw e;
+      }
+      _logger.warn("Failed to load the directory prepared on tier: {} for segment: {}, reprocessing the local copy "
+          + "instead", targetTier, segmentName, e);
+      return false;
     }
+    closeSegmentDirectoryQuietly(currentDirectory);
     addSegment(segment, zkMetadata);
-    removeBackup(indexDir);
+    removeLocalCopy(indexDir);
+    return true;
+  }
+
+  /// Removes the segment's local directory once the segment no longer serves from it. Renaming it to the temporary
+  /// directory first is atomic, so a failure part way through the delete leaves only the temporary directory, which
+  /// the next reload failure recovery deletes, and never a partial index directory.
+  private static void removeLocalCopy(File indexDir)
+      throws IOException {
+    if (!indexDir.exists()) {
+      return;
+    }
+    File segmentTempDir =
+        new File(indexDir.getParentFile(), indexDir.getName() + CommonConstants.Segment.SEGMENT_TEMP_DIR_SUFFIX);
+    Preconditions.checkState(indexDir.renameTo(segmentTempDir),
+        "Failed to rename index directory: %s to segment temporary directory: %s", indexDir, segmentTempDir);
+    FileUtils.deleteDirectory(segmentTempDir);
   }
 
   /// \_segmentDataManagerMap is used for fetching segments that need to be queried. If a new segment is created,

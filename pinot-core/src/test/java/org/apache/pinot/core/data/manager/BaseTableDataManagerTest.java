@@ -505,10 +505,11 @@ public class BaseTableDataManagerTest {
     verify(tableDataManager, never()).downloadSegment(any());
   }
 
-  /// When the directory [BaseTableDataManager#getReusableDirectoryForReload] returns fails to load, the reload fails,
-  /// closes that directory, and restores the local copy on the current tier.
+  /// When the directory [BaseTableDataManager#getReusableDirectoryForReload] returns fails to load, the reload closes
+  /// it and migrates the local copy instead, as it would without that directory, so that a retry does not fail on the
+  /// same directory every time.
   @Test
-  public void testReloadSegmentRestoresLocalCopyWhenReusableDirectoryFailsToLoad()
+  public void testReloadSegmentFallsBackToLocalCopyWhenReusableDirectoryFailsToLoad()
       throws Exception {
     File indexDir = createSegment(SegmentVersion.v3, 5);
     long crc = getCRC(indexDir);
@@ -519,18 +520,89 @@ public class BaseTableDataManagerTest {
     BaseTableDataManager tableDataManager = spy(createTableManager());
     tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, crc));
     seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
-    doAnswer(invocation -> createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG))
+    doAnswer(invocation -> createTierIndexLoadingConfig(TIER_TABLE_CONFIG))
         .when(tableDataManager).fetchIndexLoadingConfig();
     SegmentDirectory brokenDirectory = mock(SegmentDirectory.class);
     when(brokenDirectory.getSegmentMetadata()).thenThrow(new IllegalStateException("broken copy"));
     doReturn(brokenDirectory).when(tableDataManager).getReusableDirectoryForReload(any(), any(), any(), any());
 
-    expectThrows(IllegalStateException.class, () -> tableDataManager.reloadSegment(SEGMENT_NAME, false, null));
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
     verify(brokenDirectory).close();
-    assertTrue(indexDir.exists());
-    assertEquals(getCRC(indexDir), crc);
+    File tierDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME, TIER_NAME, TIER_TABLE_CONFIG);
+    ImmutableSegment segment = (ImmutableSegment) tableDataManager.getSegmentDataManager(SEGMENT_NAME).getSegment();
+    assertEquals(segment.getTier(), TIER_NAME);
+    assertEquals(segment.getSegmentMetadata().getIndexDir(), tierDataDir);
+    assertEquals(new SegmentMetadataImpl(tierDataDir).getTotalDocs(), 5);
+    assertEquals(getCRC(tierDataDir), crc);
+    assertFalse(indexDir.exists());
     assertFalse(tableDataManager.getSegmentDataDir(SEGMENT_NAME + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX)
         .exists());
+  }
+
+  /// An interrupt while loading the directory [BaseTableDataManager#getReusableDirectoryForReload] returns is not a
+  /// load failure to recover from: the reload fails with the interrupt flag still set, and keeps the local copy.
+  @Test
+  public void testReloadSegmentStopsWhenInterruptedLoadingReusableDirectory()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    long crc = getCRC(indexDir);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(crc);
+    zkMetadata.setTier(TIER_NAME);
+
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, crc));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> createTierIndexLoadingConfig(TIER_TABLE_CONFIG))
+        .when(tableDataManager).fetchIndexLoadingConfig();
+    SegmentDirectory interruptedDirectory = mock(SegmentDirectory.class);
+    when(interruptedDirectory.getSegmentMetadata()).thenAnswer(invocation -> {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("interrupted while reading");
+    });
+    doReturn(interruptedDirectory).when(tableDataManager).getReusableDirectoryForReload(any(), any(), any(), any());
+
+    try {
+      expectThrows(IllegalStateException.class, () -> tableDataManager.reloadSegment(SEGMENT_NAME, false, null));
+      // Thread.interrupted() also clears the flag, so it does not leak into other tests
+      assertTrue(Thread.interrupted());
+    } finally {
+      Thread.interrupted();
+    }
+    verify(interruptedDirectory).close();
+    verify(tableDataManager, never()).createBackup(any());
+    assertTrue(indexDir.exists());
+    assertEquals(getCRC(indexDir), crc);
+    assertFalse(tableDataManager.getSegmentDataDir(SEGMENT_NAME, TIER_NAME, TIER_TABLE_CONFIG).exists());
+  }
+
+  /// A table data manager that still overrides the deprecated
+  /// [BaseTableDataManager#canReuseExistingDirectoryForReload] keeps deciding whether a reload reuses the current
+  /// directory.
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testReloadSegmentHonorsDeprecatedCanReuseOverride()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    long crc = getCRC(indexDir);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(crc);
+
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, crc));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG))
+        .when(tableDataManager).fetchIndexLoadingConfig();
+
+    // Same tier and nothing to reprocess: the default reuses the current directory.
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
+    verify(tableDataManager, never()).createBackup(indexDir);
+
+    // An override that declines makes the reload copy the current directory out instead.
+    doReturn(false).when(tableDataManager).canReuseExistingDirectoryForReload(any(), any(), any(), any());
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
+    verify(tableDataManager).createBackup(indexDir);
+    assertEquals(getCRC(indexDir), crc);
   }
 
   private static SegmentDirectory loadSegmentDirectory(File indexDir, String tier)
