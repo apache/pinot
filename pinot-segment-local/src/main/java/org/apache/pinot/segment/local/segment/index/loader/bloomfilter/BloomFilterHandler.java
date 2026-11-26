@@ -119,8 +119,10 @@ public class BloomFilterHandler extends BaseIndexHandler {
         StandardIndexes.bloomFilter().createIndexCreator(context, bloomFilterConfig);
         Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
       int length = dictionary.length();
+      boolean bigDecimal = columnMetadata.getDataType().getStoredType() == DataType.BIG_DECIMAL;
       for (int i = 0; i < length; i++) {
-        bloomFilterCreator.add(dictionary.getStringValue(i));
+        bloomFilterCreator.add(bigDecimal ? BloomFilterCreator.toBloomFilterString(dictionary.getBigDecimalValue(i))
+            : dictionary.getStringValue(i));
       }
       bloomFilterCreator.seal();
     }
@@ -294,6 +296,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
       case LONG:
       case FLOAT:
       case DOUBLE:
+      case BIG_DECIMAL:
       case STRING:
       case BYTES:
         PinotDataBuffer buf = segmentWriter.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.dictionary());

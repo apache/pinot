@@ -25,7 +25,9 @@ import com.google.common.hash.Funnels;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +39,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.core.query.prefetch.DefaultFetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
@@ -45,6 +49,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.OnHeapGuavaBloomFilterReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.FetchContext;
@@ -191,6 +196,102 @@ public class BloomFilterSegmentPrunerTest {
       }
       FileUtils.deleteDirectory(indexDir);
     }
+  }
+
+  /// A bloom filter must never prune a segment that holds the queried value, whatever literal form the query uses to
+  /// spell it (for example {@code 1} for a stored {@code 1.0}).
+  @Test(dataProvider = "literalFormModes")
+  public void testBloomFilterKeepsSegmentForEquivalentLiterals(boolean noDictionary, boolean createOnLoad)
+      throws Exception {
+    File indexDir = Files.createTempDirectory("literalFormsBloomSegment").toFile();
+    ImmutableSegment segment = null;
+    try {
+      Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("floatCol", DataType.FLOAT)
+          .addSingleValueDimension("doubleCol", DataType.DOUBLE)
+          .addSingleValueDimension("decimalCol", DataType.BIG_DECIMAL)
+          .addSingleValueDimension("timestampCol", DataType.TIMESTAMP)
+          .addSingleValueDimension("boolCol", DataType.BOOLEAN).build();
+      List<String> columns = List.of("floatCol", "doubleCol", "decimalCol", "timestampCol", "boolCol");
+      TableConfigBuilder builder = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable");
+      if (noDictionary) {
+        builder.setNoDictionaryColumns(columns);
+      }
+      TableConfig tableConfig = builder.build();
+      Map<String, BloomFilterConfig> bloomConfigs = new HashMap<>();
+      for (String column : columns) {
+        bloomConfigs.put(column, new BloomFilterConfig(1e-9, 0, false));
+      }
+      TableConfig bloomTableConfig = tableConfig;
+      if (!createOnLoad) {
+        tableConfig.getIndexingConfig().setBloomFilterConfigs(bloomConfigs);
+      } else {
+        bloomTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+        bloomTableConfig.getIndexingConfig().setBloomFilterConfigs(bloomConfigs);
+      }
+
+      GenericRow row = new GenericRow();
+      row.putValue("floatCol", 1.0f);
+      row.putValue("doubleCol", 1.0d);
+      row.putValue("decimalCol", new BigDecimal("1.50"));
+      row.putValue("timestampCol", 1700000000000L);
+      row.putValue("boolCol", true);
+      GenericRow row2 = new GenericRow();
+      row2.putValue("floatCol", 100.0f);
+      row2.putValue("doubleCol", 100.0d);
+      row2.putValue("decimalCol", new BigDecimal("100"));
+      row2.putValue("timestampCol", 1700000001000L);
+      row2.putValue("boolCol", false);
+
+      SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+      generatorConfig.setSegmentName("literalFormsSegment");
+      generatorConfig.setOutDir(indexDir.getAbsolutePath());
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(generatorConfig, new GenericRowRecordReader(List.of(row, row2)));
+      driver.build();
+      File segmentDir = new File(indexDir, "literalFormsSegment");
+      segment = createOnLoad ? ImmutableSegmentLoader.load(segmentDir, new IndexLoadingConfig(bloomTableConfig, schema))
+          : ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
+
+      String[] predicates = {
+          "floatCol = 1", "floatCol = 1.0", "floatCol = '1'", "floatCol = 100", "floatCol = 1e2",
+          "doubleCol = 1", "doubleCol = 1.0", "doubleCol = '1'", "doubleCol = 100", "doubleCol = 1e2",
+          "decimalCol = 1.5", "decimalCol = 1.50", "decimalCol = 1.500", "decimalCol = '1.5'",
+          "decimalCol = 100", "decimalCol = 100.0", "decimalCol = 1e2",
+          "timestampCol = 1700000000000", "timestampCol = '1700000000000'",
+          "timestampCol = '" + new Timestamp(1700000000000L) + "'",
+          "boolCol = true", "boolCol = 'true'", "boolCol = 1", "boolCol = '1'", "boolCol = false", "boolCol = 0"
+      };
+      List<String> wronglyPruned = new ArrayList<>();
+      for (String predicate : predicates) {
+        if (runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE " + predicate)) {
+          wronglyPruned.add(predicate);
+        }
+      }
+      assertTrue(wronglyPruned.isEmpty(), "wrongly pruned: " + wronglyPruned);
+    } finally {
+      if (segment != null) {
+        segment.destroy();
+      }
+      FileUtils.deleteDirectory(indexDir);
+    }
+  }
+
+  /// Segments created before BIG_DECIMAL values were normalized for the bloom filter hold the scientific form of the
+  /// value, which must still match.
+  @Test
+  public void testBigDecimalBloomFilterStillMatchesLegacyScientificForm() {
+    BloomFilterReader bloomFilter = mock(BloomFilterReader.class);
+    GuavaBloomFilterReaderUtils.Hash128AsLongs legacyHash = GuavaBloomFilterReaderUtils.hashAsLongs("1E-7");
+    when(bloomFilter.mightContain(legacyHash.getHash1(), legacyHash.getHash2())).thenReturn(true);
+    ValueBasedSegmentPruner.ValueCache valueCache = new ValueBasedSegmentPruner.ValueCache();
+    EqPredicate predicate = new EqPredicate(ExpressionContext.forIdentifier("decimalCol"), "0.0000001");
+
+    assertTrue(valueCache.get(predicate, DataType.BIG_DECIMAL).mightBeContained(bloomFilter));
+  }
+
+  @DataProvider(name = "literalFormModes")
+  public Object[][] literalFormModes() {
+    return new Object[][]{{false, false}, {true, false}, {false, true}, {true, true}};
   }
 
   @DataProvider(name = "uuidBloomFilterCreationModes")
