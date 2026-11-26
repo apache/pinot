@@ -30,10 +30,12 @@ import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
@@ -233,7 +235,19 @@ public class PinotDispatchPlanner {
       List<PlanNode> senderInputs = sender.getInputs();
       Preconditions.checkState(!senderInputs.isEmpty(),
           "MailboxSendNode (stageId=%s) has no inputs", sender.getStageId());
-      return inlineAllLeafStagesEmptyInputs(senderInputs.get(0));
+      PlanNode inlined = inlineAllLeafStagesEmptyInputs(senderInputs.get(0));
+      // A spool can send more columns than this receiver reads, see ReceiverSpec. Keep the columns that the nodes
+      // above the receive expect.
+      List<Integer> columnMask = sender.getReceiverSpec(mailboxReceiveNode.getStageId()).columnMask();
+      if (columnMask == null) {
+        return inlined;
+      }
+      List<RexExpression> projects = new ArrayList<>(columnMask.size());
+      for (int column : columnMask) {
+        projects.add(new RexExpression.InputRef(column));
+      }
+      return new ProjectNode(mailboxReceiveNode.getStageId(), mailboxReceiveNode.getDataSchema(),
+          mailboxReceiveNode.getNodeHint(), List.of(inlined), projects);
     }
     List<PlanNode> inputs = node.getInputs();
     if (inputs.isEmpty()) {

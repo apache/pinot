@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -309,6 +310,16 @@ public class QueryEnvironmentTestBase {
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
       Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
       @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap) {
+    return getQueryEnvironment(reducerPort, port1, port2, schemaMap, segmentMap1, segmentMap2, partitionedSegmentsMap,
+        UnaryOperator.identity());
+  }
+
+  /// Same as [#getQueryEnvironment(int, int, int, Map, Map, Map, Map)], with a decorator for the routing manager, for
+  /// example to change the capabilities that the servers advertise.
+  public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
+      Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
+      @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap,
+      UnaryOperator<RoutingManager> routingManagerDecorator) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
     for (Map.Entry<String, Schema> entry : schemaMap.entrySet()) {
       factory.registerTable(entry.getValue(), entry.getKey());
@@ -344,7 +355,7 @@ public class QueryEnvironmentTestBase {
         partitionInfoMap.put(tableNameWithType, tablePartitionReplicatedServersInfo);
       }
     }
-    RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);
+    RoutingManager routingManager = routingManagerDecorator.apply(factory.buildRoutingManager(partitionInfoMap));
     TableCache tableCache = factory.buildTableCache();
     return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
         new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager));

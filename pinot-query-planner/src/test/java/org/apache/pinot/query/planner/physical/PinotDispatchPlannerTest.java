@@ -21,13 +21,25 @@ package org.apache.pinot.query.planner.physical;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -148,6 +160,88 @@ public class PinotDispatchPlannerTest extends QueryEnvironmentTestBase {
     for (String mode : List.of("on", "auto")) {
       assertEquals(countMultiReceiverSends(_queryEnvironment.planQuery("SET useSpools='" + mode + "'; " + random)), 0,
           "Mode " + mode + " shared a stage that calls RAND()");
+    }
+  }
+
+  /// The two scans of `a` read different columns (col2 and col3), so they only share a stage through column masks. The
+  /// test servers support receiver specs, so the leader scans the union of the columns and each receiver reads its own
+  /// columns.
+  @Test
+  public void testScansWithDifferentColumnsAreSharedWithColumnMasks() {
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery("SET useSpools='on'; "
+        + "SELECT a1.col2, a2.col3 FROM a AS a1 JOIN b ON a1.col1 = b.col1 JOIN a AS a2 ON a2.col1 = b.col1");
+    MailboxSendNode spool = null;
+    for (DispatchablePlanFragment fragment : subPlan.getQueryStageMap().values()) {
+      PlanNode root = fragment.getPlanFragment().getFragmentRoot();
+      if (root instanceof MailboxSendNode && ((MailboxSendNode) root).isMultiSend()) {
+        assertNull(spool, "Expected a single spool");
+        spool = (MailboxSendNode) root;
+      }
+    }
+    assertNotNull(spool, "Query did not produce a spool: " + subPlan.getQueryStageMap().keySet());
+    assertFalse(spool.hasUniformReceivers());
+    List<String> spoolColumns = List.of(spool.getDataSchema().getColumnNames());
+    assertTrue(spoolColumns.containsAll(List.of("col1", "col2", "col3")), "Spool columns: " + spoolColumns);
+    for (int receiverStageId : spool.getReceiverStageIds()) {
+      List<Integer> columnMask = spool.getReceiverSpec(receiverStageId).columnMask();
+      assertNotNull(columnMask, "Receiver " + receiverStageId + " reads every column: " + spoolColumns);
+      assertEquals(columnMask.size(), 2, "Receiver " + receiverStageId + " reads " + columnMask);
+    }
+  }
+
+  /// During a rolling upgrade some servers do not advertise the capability. The planner must then not share the two
+  /// scans, because a server that does not know column masks would send every column to every receiver.
+  @Test
+  public void testScansWithDifferentColumnsAreNotSharedWithoutTheCapability() {
+    QueryEnvironment queryEnvironment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
+        SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, routingManager -> {
+          RoutingManager spy = spy(routingManager);
+          doReturn(0).when(spy).getMinServerCapabilityRevision(any());
+          return spy;
+        });
+    DispatchableSubPlan subPlan = queryEnvironment.planQuery("SET useSpools='on'; "
+        + "SELECT a1.col2, a2.col3 FROM a AS a1 JOIN b ON a1.col1 = b.col1 JOIN a AS a2 ON a2.col1 = b.col1");
+    assertEquals(countMultiReceiverSends(subPlan), 0);
+  }
+
+  /// When every leaf is empty, the broker inlines the leaf stages into the reduce stage. A spool sends more columns
+  /// than each receiver reads, so the inlined input must keep only the columns of the receiver.
+  @Test
+  public void testRewriteReduceStageKeepsTheColumnsOfMaskedReceivers() {
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery("SET useSpools='on'; "
+        + "SELECT a1.col2, a2.col3 FROM a AS a1 JOIN b ON a1.col1 = b.col1 JOIN a AS a2 ON a2.col1 = b.col1 "
+        + "WHERE a1.ts < 0 AND a2.ts < 0 AND b.ts < 0");
+    assertEquals(countMultiReceiverSends(subPlan), 1, "Expected the two scans of a to share a spool");
+    Map<Integer, DispatchablePlanFragment> fragmentMap = new HashMap<>(subPlan.getQueryStageMap());
+    PinotDispatchPlanner.rewriteReduceStageForEmptyLeaves(fragmentMap);
+    PlanNode root = fragmentMap.get(0).getPlanFragment().getFragmentRoot();
+    assertInputsMatchTheirConsumers(root);
+  }
+
+  /// Checks that every join outputs the columns of its inputs, and that every project reads columns of its input with
+  /// the types it declares.
+  private static void assertInputsMatchTheirConsumers(PlanNode node) {
+    if (node instanceof JoinNode && ((JoinNode) node).getJoinType() == JoinRelType.INNER) {
+      int numInputColumns = 0;
+      for (PlanNode input : node.getInputs()) {
+        numInputColumns += input.getDataSchema().size();
+      }
+      assertEquals(numInputColumns, node.getDataSchema().size(), "Join columns do not match its inputs: " + node);
+    }
+    if (node instanceof ProjectNode) {
+      DataSchema inputSchema = node.getInputs().get(0).getDataSchema();
+      List<RexExpression> projects = ((ProjectNode) node).getProjects();
+      for (int i = 0; i < projects.size(); i++) {
+        if (projects.get(i) instanceof RexExpression.InputRef) {
+          int index = ((RexExpression.InputRef) projects.get(i)).getIndex();
+          assertTrue(index < inputSchema.size(), "Project reads column " + index + " of " + inputSchema);
+          assertEquals(inputSchema.getColumnDataType(index), node.getDataSchema().getColumnDataType(i),
+              "Project column " + i + " reads a column of another type");
+        }
+      }
+    }
+    for (PlanNode input : node.getInputs()) {
+      assertInputsMatchTheirConsumers(input);
     }
   }
 

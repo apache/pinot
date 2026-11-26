@@ -49,6 +49,16 @@
         "h2Sql": "SELECT a1.intCol1, a2.intCol1, a3.intCol1 FROM {tbl1} as a1 JOIN {tbl1} as a2 ON a1.strCol1 = a2.strCol1 JOIN {tbl1} as a3 ON a1.strCol1 = a3.strCol1"
       },
       {
+        "description": "Spool of two scans of the same table that read different columns. The leader scans the union of the columns and each receiver reads its own columns.",
+        "sql": "SET timeoutMs=10000; SET useSpools=true; SELECT a1.intCol1, a2.strCol2 FROM {tbl1} as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN {tbl1} as a2 ON a2.strCol1 = b.strCol1",
+        "h2Sql": "SELECT a1.intCol1, a2.strCol2 FROM {tbl1} as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN {tbl1} as a2 ON a2.strCol1 = b.strCol1"
+      },
+      {
+        "description": "Spool of two filtered scans that read different columns. The filter reads a column that neither consumer outputs.",
+        "sql": "SET timeoutMs=10000; SET useSpools=true; SELECT a1.strCol2, a2.intCol1 FROM (SELECT * FROM {tbl1} WHERE intCol1 > 0) as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN (SELECT * FROM {tbl1} WHERE intCol1 > 0) as a2 ON a2.strCol1 = b.strCol1",
+        "h2Sql": "SELECT a1.strCol2, a2.intCol1 FROM (SELECT * FROM {tbl1} WHERE intCol1 > 0) as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN (SELECT * FROM {tbl1} WHERE intCol1 > 0) as a2 ON a2.strCol1 = b.strCol1"
+      },
+      {
         "description": "Spool of an aggregated stage reused by a self join",
         "sql": "SET timeoutMs=10000; SET useSpools=true; WITH g AS (SELECT strCol1, SUM(intCol1) AS s FROM {tbl1} GROUP BY strCol1) SELECT a.strCol1, a.s, b.s FROM g a JOIN g b ON a.strCol1 = b.strCol1",
         "h2Sql": "WITH g AS (SELECT strCol1, SUM(intCol1) AS s FROM {tbl1} GROUP BY strCol1) SELECT a.strCol1, a.s, b.s FROM g a JOIN g b ON a.strCol1 = b.strCol1"

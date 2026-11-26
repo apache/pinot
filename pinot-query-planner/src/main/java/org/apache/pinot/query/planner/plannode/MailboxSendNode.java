@@ -167,6 +167,15 @@ public class MailboxSendNode extends BasePlanNode {
     _receiverSpecs.remove(node.getStageId());
   }
 
+  /// Replaces the input of this node, and takes the data schema of the new input. The planner uses it to add columns to
+  /// the output of a spool, before it sets the [ReceiverSpec]s of the receivers. The node must have no explicit spec
+  /// yet, because a spec references the columns of the node.
+  public void replaceInput(PlanNode input) {
+    Preconditions.checkState(_receiverSpecs.isEmpty(), "Stage %s already has receiver specs", _stageId);
+    _inputs = List.of(input);
+    _dataSchema = input.getDataSchema();
+  }
+
   /// Returns how this node sends to the given receiver stage: its explicit spec, or [#getDefaultReceiverSpec(int)].
   public ReceiverSpec getReceiverSpec(int receiverStageId) {
     ReceiverSpec spec = _receiverSpecs.get(receiverStageId);

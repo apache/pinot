@@ -475,4 +475,168 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
     GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
     assertEquals(result.toString(), "[[0], [1], [2]]");
   }
+
+  /// Two scans of the same table that project different columns compute the same rows. With column mapping they are
+  /// one group: the leader adds the columns that the other stage needs.
+  @Test
+  public void differentProjectionsAreEquivalentWithColumnMapping() {
+    when(
+        join(
+            exchange(1, project(tableScan("T1", "INT:a", "LONG:b"), 0, 1))
+                .withDistributionType(RelDistribution.Type.HASH_DISTRIBUTED).withKeys(List.of(0)),
+            exchange(2, project(tableScan("T1", "INT:a", "STRING:c"), 0, 1))
+                .withDistributionType(RelDistribution.Type.HASH_DISTRIBUTED).withKeys(List.of(0))
+        )
+    );
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), true).toString(), "[[0], [1, 2]]");
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), false).toString(), "[[0], [1], [2]]");
+  }
+
+  /// The planner scans the columns that each consumer needs, in its own order. Columns are compared by name, so the
+  /// order does not matter.
+  @Test
+  public void columnOrderDoesNotBreakEquivalence() {
+    when(
+        join(
+            exchange(1, project(tableScan("T1", "INT:a", "LONG:b"), 0, 1)),
+            exchange(2, project(tableScan("T1", "LONG:b", "INT:a"), 1, 0))
+        )
+    );
+    // Both stages output (a, b), so they do not even need a column mask.
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), false).toString(), "[[0], [1, 2]]");
+  }
+
+  /// The distribution keys are compared by column, not by ordinal.
+  @Test
+  public void keysAreComparedByColumn() {
+    when(
+        join(
+            exchange(1, project(tableScan("T1", "INT:a", "LONG:b"), 0, 1))
+                .withDistributionType(RelDistribution.Type.HASH_DISTRIBUTED).withKeys(List.of(1)),
+            exchange(2, project(tableScan("T1", "LONG:b", "STRING:c"), 0, 1))
+                .withDistributionType(RelDistribution.Type.HASH_DISTRIBUTED).withKeys(List.of(0))
+        )
+    );
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), true).toString(), "[[0], [1, 2]]");
+  }
+
+  @Test
+  public void differentKeyColumnsBreakEquivalence() {
+    when(
+        join(
+            exchange(1, project(tableScan("T1", "INT:a", "LONG:b"), 0, 1))
+                .withDistributionType(RelDistribution.Type.HASH_DISTRIBUTED).withKeys(List.of(0)),
+            exchange(2, project(tableScan("T1", "INT:a", "LONG:b"), 0, 1))
+                .withDistributionType(RelDistribution.Type.HASH_DISTRIBUTED).withKeys(List.of(1))
+        )
+    );
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), true).toString(), "[[0], [1], [2]]");
+  }
+
+  /// A filter is compared by the columns it reads, so the same condition at different ordinals is equivalent.
+  @Test
+  public void filtersAreComparedByColumn() {
+    RexExpression bIsPositive = greaterThanZero(1);
+    RexExpression bIsPositiveAt0 = greaterThanZero(0);
+    when(
+        join(
+            exchange(1, project(filter(tableScan("T1", "INT:a", "LONG:b"), bIsPositive), 0)),
+            exchange(2, project(filter(tableScan("T1", "LONG:b", "INT:a"), bIsPositiveAt0), 1))
+        )
+    );
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), false).toString(), "[[0], [1, 2]]");
+  }
+
+  @Test
+  public void filtersOnDifferentColumnsBreakEquivalence() {
+    when(
+        join(
+            exchange(1, project(filter(tableScan("T1", "INT:a", "LONG:b"), greaterThanZero(1)), 0)),
+            exchange(2, project(filter(tableScan("T1", "INT:a", "LONG:b"), greaterThanZero(0)), 0))
+        )
+    );
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), true).toString(), "[[0], [1], [2]]");
+  }
+
+  /// A stage that reads a subset of the columns of the leader only needs a column mask, so the leader does not need
+  /// a project to add columns.
+  @Test
+  public void aSubsetOfTheColumnsNeedsNoWidening() {
+    when(
+        join(
+            exchange(1, tableScan("T1", "INT:a", "LONG:b"))
+                .withDistributionType(RelDistribution.Type.BROADCAST_DISTRIBUTED),
+            exchange(2, tableScan("T1", "LONG:b"))
+                .withDistributionType(RelDistribution.Type.BROADCAST_DISTRIBUTED)
+        )
+    );
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), true).toString(), "[[0], [1, 2]]");
+  }
+
+  /// The leader can only add columns when it is a table scan under projects and filters, with a project on top.
+  @Test
+  public void extraColumnsNeedALeaderThatCanAddThem() {
+    when(
+        join(
+            exchange(1, tableScan("T1", "INT:a"))
+                .withDistributionType(RelDistribution.Type.BROADCAST_DISTRIBUTED),
+            exchange(2, tableScan("T1", "INT:a", "LONG:b"))
+                .withDistributionType(RelDistribution.Type.BROADCAST_DISTRIBUTED)
+        )
+    );
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), true).toString(), "[[0], [1], [2]]");
+  }
+
+  /// Receiver specs do not support every distribution, so stages with different columns and an unsupported
+  /// distribution are not grouped.
+  @Test
+  public void differentColumnsNeedADistributionThatSpecsSupport() {
+    when(
+        join(
+            exchange(1, project(tableScan("T1", "INT:a", "LONG:b"), 0, 1))
+                .withDistributionType(RelDistribution.Type.SINGLETON),
+            exchange(2, project(tableScan("T1", "INT:a", "STRING:c"), 0, 1))
+                .withDistributionType(RelDistribution.Type.SINGLETON)
+        )
+    );
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), true).toString(), "[[0], [1], [2]]");
+  }
+
+  /// A stage above two equivalent stages with different columns reads the columns of the group by identity.
+  @Test
+  public void stagesAboveMappedStagesAreEquivalent() {
+    when(
+        join(
+            exchange(1, project(exchange(2, project(tableScan("T1", "INT:a", "LONG:b"), 0, 1))
+                .withDistributionType(RelDistribution.Type.BROADCAST_DISTRIBUTED), 0)),
+            exchange(3, project(exchange(4, project(tableScan("T1", "INT:a", "STRING:c"), 0, 1))
+                .withDistributionType(RelDistribution.Type.BROADCAST_DISTRIBUTED), 0))
+        )
+    );
+    // Stages 1 and 3 both read column a of the group [2, 4].
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), true).toString(), "[[0], [1, 3], [2, 4]]");
+  }
+
+  /// A stage that only reads deterministic columns computes the same rows as a volatile stage over the same scan, but
+  /// it must not read them from a stage that draws random values.
+  @Test
+  public void volatileStagesAreNotReferences() {
+    RexExpression rand = new RexExpression.FunctionCall(DataSchema.ColumnDataType.DOUBLE, "rand", List.of());
+    when(
+        join(
+            exchange(1, project(tableScan("T1", "INT:a"), List.of(new RexExpression.InputRef(0), rand),
+                DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE))
+                .withDistributionType(RelDistribution.Type.BROADCAST_DISTRIBUTED),
+            exchange(2, project(tableScan("T1", "INT:a"), List.of(new RexExpression.InputRef(0)),
+                DataSchema.ColumnDataType.INT))
+                .withDistributionType(RelDistribution.Type.BROADCAST_DISTRIBUTED)
+        )
+    );
+    assertEquals(EquivalentStagesFinder.findEquivalentStages(stage(0), true).toString(), "[[0], [1], [2]]");
+  }
+
+  private static RexExpression greaterThanZero(int column) {
+    return new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, SqlKind.GREATER_THAN.name(),
+        List.of(new RexExpression.InputRef(column), new RexExpression.Literal(DataSchema.ColumnDataType.LONG, 0L)));
+  }
 }

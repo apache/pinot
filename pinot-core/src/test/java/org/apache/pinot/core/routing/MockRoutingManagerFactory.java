@@ -31,6 +31,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -216,6 +217,12 @@ public class MockRoutingManagerFactory {
       _serverInstances = serverInstances;
       _disabledTables = disabledTables;
       _partitionInfoMap = partitionInfoMap;
+    }
+
+    /// The fake servers run this version, so they support every capability of this version.
+    @Override
+    public int getMinServerCapabilityRevision(InstanceCapability capability) {
+      return InstanceCapability.values().contains(capability) ? capability.revision() : 0;
     }
 
     @Override

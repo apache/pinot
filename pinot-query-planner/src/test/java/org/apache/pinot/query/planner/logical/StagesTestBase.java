@@ -42,6 +42,7 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -144,6 +145,12 @@ public class StagesTestBase {
       return (stageId, dataSchema, hints, _, distribution, keys, prePartitioned, collations, sort, sortedOnSender) ->
           build(stageId, dataSchema, hints, PinotRelExchangeType.PIPELINE_BREAKER, distribution, keys, prePartitioned,
               collations, sort, sortedOnSender);
+    }
+
+    default ExchangeBuilder withKeys(List<Integer> keys) {
+      return (stageId, dataSchema, hints, exchangeType, distribution, _, prePartitioned, collations, sort,
+          sortedOnSender) -> build(stageId, dataSchema, hints, exchangeType, distribution, keys, prePartitioned,
+          collations, sort, sortedOnSender);
     }
 
     default ExchangeBuilder withDistributionType(RelDistribution.Type distribution) {
@@ -280,6 +287,55 @@ public class StagesTestBase {
 
   /// Looks for the mailbox that corresponds to the given stageId.
   /// @throws IllegalStateException if the mailbox is not found.
+  /// Creates a table scan node that reads the given columns of the table. Each column is named `type:name`, for
+  /// example `INT:col1`, and the data schema of the scan follows the columns.
+  public SimpleChildBuilder<TableScanNode> tableScan(String tableName, String... typedColumns) {
+    String[] names = new String[typedColumns.length];
+    DataSchema.ColumnDataType[] types = new DataSchema.ColumnDataType[typedColumns.length];
+    for (int i = 0; i < typedColumns.length; i++) {
+      String[] parts = typedColumns[i].split(":", 2);
+      types[i] = DataSchema.ColumnDataType.valueOf(parts[0]);
+      names[i] = parts[1];
+    }
+    DataSchema dataSchema = new DataSchema(names, types);
+    return (stageId, mySchema, myHints) -> new TableScanNode(stageId, dataSchema, myHints, List.of(), tableName,
+        List.of(names));
+  }
+
+  /// Creates a project node that reads the given columns of its input, in the given order.
+  public SimpleChildBuilder<ProjectNode> project(SimpleChildBuilder<? extends PlanNode> childBuilder,
+      int... inputColumns) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      DataSchema inputSchema = input.getDataSchema();
+      String[] names = new String[inputColumns.length];
+      DataSchema.ColumnDataType[] types = new DataSchema.ColumnDataType[inputColumns.length];
+      List<RexExpression> projects = new ArrayList<>(inputColumns.length);
+      for (int i = 0; i < inputColumns.length; i++) {
+        names[i] = inputSchema.getColumnName(inputColumns[i]);
+        types[i] = inputSchema.getColumnDataType(inputColumns[i]);
+        projects.add(new RexExpression.InputRef(inputColumns[i]));
+      }
+      DataSchema schema = mySchema != null ? mySchema : new DataSchema(names, types);
+      return new ProjectNode(stageId, schema, myHints, List.of(input), projects);
+    };
+  }
+
+  /// Creates a project node with the given expressions over its input. All the columns are named `expr<i>` and use
+  /// the given types.
+  public SimpleChildBuilder<ProjectNode> project(SimpleChildBuilder<? extends PlanNode> childBuilder,
+      List<RexExpression> projects, DataSchema.ColumnDataType... types) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      String[] names = new String[projects.size()];
+      for (int i = 0; i < names.length; i++) {
+        names[i] = "expr" + i;
+      }
+      DataSchema schema = mySchema != null ? mySchema : new DataSchema(names, types);
+      return new ProjectNode(stageId, schema, myHints, List.of(input), projects);
+    };
+  }
+
   public MailboxSendNode stage(int stageId) {
     MailboxSendNode result = _stageRoots.get(stageId);
     Preconditions.checkState(result != null, "Mailbox not found for stageId: %s", stageId);

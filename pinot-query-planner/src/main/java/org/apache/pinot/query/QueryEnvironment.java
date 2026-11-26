@@ -72,6 +72,7 @@ import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
 import org.apache.pinot.common.catalog.PinotCatalogReader;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
@@ -581,7 +582,8 @@ public class QueryEnvironment {
     }
     Map<String, String> options = plannerContext.getOptions();
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, getSpoolMode(options),
-        isSpoolsFeedback(options), _envConfig.defaultHashFunction(), pruneUnnestColumns(options));
+        isSpoolsFeedback(options), _envConfig.defaultHashFunction(), pruneUnnestColumns(options),
+        serversSupportReceiverSpecs());
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
@@ -756,6 +758,18 @@ public class QueryEnvironment {
 
   public static ImmutableQueryEnvironment.Config.Builder configBuilder() {
     return ImmutableQueryEnvironment.Config.builder();
+  }
+
+  /// Whether every server can run send nodes whose receivers read different data, see
+  /// [InstanceCapability#MSE_RECEIVER_SPECS]. During a rolling upgrade this is false, and spools only group stages
+  /// that output the same columns.
+  private boolean serversSupportReceiverSpecs() {
+    WorkerManager workerManager = _envConfig.getWorkerManager();
+    if (workerManager == null) {
+      return false;
+    }
+    InstanceCapability capability = InstanceCapability.MSE_RECEIVER_SPECS;
+    return workerManager.getRoutingManager().getMinServerCapabilityRevision(capability) >= capability.revision();
   }
 
   /// Returns the spool mode of the query: the [CommonConstants.Broker.Request.QueryOptionKey#USE_SPOOLS] query option

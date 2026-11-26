@@ -27,9 +27,11 @@ import org.apache.pinot.common.utils.DataSchema;
 
 public abstract class BasePlanNode implements PlanNode {
   protected int _stageId;
-  protected final DataSchema _dataSchema;
+  // Not final only so that MailboxSendNode#replaceInput can change the output of a stage while the planner builds it.
+  protected DataSchema _dataSchema;
   protected final NodeHint _nodeHint;
-  protected final List<PlanNode> _inputs;
+  // Not final only so that MailboxSendNode#replaceInput can change the output of a stage while the planner builds it.
+  protected List<PlanNode> _inputs;
 
   public BasePlanNode(int stageId, DataSchema dataSchema, @Nullable NodeHint nodeHint, List<PlanNode> inputs) {
     _stageId = stageId;

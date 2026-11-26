@@ -21,11 +21,13 @@ package org.apache.pinot.query.planner.logical;
 import com.google.common.base.Preconditions;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 
@@ -72,6 +74,14 @@ public abstract class GroupedStages {
 
   public abstract Set<MailboxSendNode> getStages();
 
+  /// Returns the identities of the output columns of the stage, see [ColumnIds], or null when they are unknown.
+  ///
+  /// [EquivalentStagesFinder] sets them for every stage. Two stages of a group can have different columns: each
+  /// stage reads the columns of the group by identity. The identities of two stages of the same group are
+  /// comparable with each other.
+  @Nullable
+  public abstract List<Object> getColumnIds(MailboxSendNode stage);
+
   @Override
   public String toString() {
     String content = getGroups().stream()
@@ -95,6 +105,9 @@ public abstract class GroupedStages {
 
     /// Map from stage to the group of stages it belongs to.
     private final IdentityHashMap<MailboxSendNode, SortedSet<MailboxSendNode>> _stageToGroup = new IdentityHashMap<>();
+
+    /// The identities of the output columns of each stage, see [#getColumnIds(MailboxSendNode)].
+    private final IdentityHashMap<MailboxSendNode, List<Object>> _columnIds = new IdentityHashMap<>();
 
     /// Adds a new group of equivalent stages.
     ///
@@ -154,7 +167,21 @@ public abstract class GroupedStages {
       return group;
     }
 
+    @Nullable
+    @Override
+    public List<Object> getColumnIds(MailboxSendNode stage) {
+      return _columnIds.get(stage);
+    }
+
+    /// Sets the identities of the output columns of a stage that this object contains.
+    public Mutable setColumnIds(MailboxSendNode stage, List<Object> columnIds) {
+      Preconditions.checkArgument(containsStage(stage), "Stage %s is not part of this class", stage.getStageId());
+      _columnIds.put(stage, List.copyOf(columnIds));
+      return this;
+    }
+
     public Mutable removeStage(MailboxSendNode stage) {
+      _columnIds.remove(stage);
       SortedSet<MailboxSendNode> group = _stageToGroup.remove(stage);
       Preconditions.checkNotNull(group, "Stage {} is not part of this class", stage);
       group.remove(stage);

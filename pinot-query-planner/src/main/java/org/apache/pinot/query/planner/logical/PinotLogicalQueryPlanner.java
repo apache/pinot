@@ -69,10 +69,22 @@ public class PinotLogicalQueryPlanner {
   public static SubPlan makePlan(RelRoot relRoot,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, SpoolMode spoolMode,
       boolean spoolsFeedback, String hashFunction, boolean pruneUnnestColumns) {
+    return makePlan(relRoot, tracker, spoolMode, spoolsFeedback, hashFunction, pruneUnnestColumns, false);
+  }
+
+  /// Converts a Calcite [RelRoot] into a Pinot [SubPlan].
+  ///
+  /// @param receiverSpecs whether every server can run send nodes whose receivers read different columns, see
+  ///                      `InstanceCapability.MSE_RECEIVER_SPECS`. When false, spools only group stages that output
+  ///                      the same columns.
+  public static SubPlan makePlan(RelRoot relRoot,
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, SpoolMode spoolMode,
+      boolean spoolsFeedback, String hashFunction, boolean pruneUnnestColumns, boolean receiverSpecs) {
     PlanNode rootNode = new RelToPlanNodeConverter(tracker, hashFunction,
         !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE, pruneUnnestColumns).toPlanNode(relRoot.rel);
 
-    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, spoolMode, spoolsFeedback, hashFunction);
+    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, spoolMode, spoolsFeedback, hashFunction,
+        receiverSpecs);
     return new SubPlan(rootFragment,
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
 
@@ -118,14 +130,14 @@ public class PinotLogicalQueryPlanner {
 
   private static PlanFragment planNodeToPlanFragment(
       PlanNode node, @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, SpoolMode spoolMode,
-      boolean spoolsFeedback, String hashFunction) {
+      boolean spoolsFeedback, String hashFunction, boolean receiverSpecs) {
     PlanFragmenter fragmenter = new PlanFragmenter();
     PlanFragmenter.Context fragmenterContext = fragmenter.createContext();
     node = node.visit(fragmenter, fragmenterContext);
 
     List<SpoolSubstitution> substitutions = List.of();
     if (spoolMode.isEnabled()) {
-      GroupedStages equivalentStages = EquivalentStagesFinder.findEquivalentStages(node);
+      GroupedStages equivalentStages = EquivalentStagesFinder.findEquivalentStages(node, receiverSpecs);
       substitutions = EquivalentStagesReplacer.replaceEquivalentStages(node, equivalentStages, fragmenter,
           spoolMode.isGuarded());
     }
