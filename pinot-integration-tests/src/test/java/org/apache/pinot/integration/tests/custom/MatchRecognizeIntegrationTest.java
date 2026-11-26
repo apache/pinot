@@ -20,14 +20,21 @@ package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.integration.tests.QueryAssert;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -770,6 +777,56 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         + " PATTERN (DOWN+ UP+)"
         + V_SHAPE_DEFINE
         + ") AS mr", "collides with a PARTITION BY column or an earlier measure alias");
+  }
+
+  /// A server that predates `MATCH_RECOGNIZE` cannot read its plan node. Every server of this build advertises the
+  /// instance capability `MSE_MATCH_RECOGNIZE`, and the broker rejects `MATCH_RECOGNIZE` with an actionable error while
+  /// any server lacks it. The test lowers the revision that one server advertises to 0, as an older server would, and
+  /// checks that the broker picks up the change from the instance config in both directions.
+  @Test
+  public void testRejectedWhileAServerLacksTheCapability()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    String query = canonicalVShapeQuery(V_SHAPE_DEFINE);
+    assertMatchRows(query, CANONICAL_V_SHAPE_MATCHES);
+
+    String capability = InstanceCapability.MSE_MATCH_RECOGNIZE.name();
+    String expectedError = "does not advertise the instance capability '" + capability + "'";
+    String serverInstanceId = getSharedServerStarters().get(0).getInstanceId();
+    InstanceConfig instanceConfig = getSharedHelixResourceManager().getHelixInstanceConfig(serverInstanceId);
+    assertEquals(instanceConfig.getRecord().getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY)
+        .get(capability), "1");
+    setCapabilityRevision(serverInstanceId, capability, "0");
+    try {
+      TestUtils.waitForCondition(aVoid -> hasExceptionContaining(query, expectedError), 30_000L,
+          "The broker kept running MATCH_RECOGNIZE after a server stopped advertising " + capability);
+      QueryAssert.assertThat(postQuery("SELECT COUNT(*) FROM " + getTableName())).hasNoExceptions();
+    } finally {
+      setCapabilityRevision(serverInstanceId, capability, "1");
+    }
+    TestUtils.waitForCondition(aVoid -> !hasExceptionContaining(query, expectedError), 30_000L,
+        "The broker kept rejecting MATCH_RECOGNIZE after every server advertised " + capability + " again");
+    assertMatchRows(query, CANONICAL_V_SHAPE_MATCHES);
+  }
+
+  private void setCapabilityRevision(String instanceId, String capability, String revision) {
+    HelixAdmin helixAdmin = getSharedHelixResourceManager().getHelixAdmin();
+    InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(getHelixClusterName(), instanceId);
+    Map<String, String> capabilities =
+        new HashMap<>(instanceConfig.getRecord().getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY));
+    capabilities.put(capability, revision);
+    instanceConfig.getRecord().setMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY, capabilities);
+    helixAdmin.setInstanceConfig(getHelixClusterName(), instanceId, instanceConfig);
+  }
+
+  private boolean hasExceptionContaining(String query, String message) {
+    try {
+      JsonNode exceptions = postQuery(query).get("exceptions");
+      return exceptions != null && exceptions.size() > 0
+          && exceptions.get(0).get("message").asText().contains(message);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private String neighbourQuery(String definition) {

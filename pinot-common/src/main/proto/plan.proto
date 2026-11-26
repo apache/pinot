@@ -50,8 +50,9 @@ message PlanNode {
     // AggregateNode, which an old server runs.
     MvAggregateNode mvAggregateNode = 19;
     // Rolling-upgrade boundary: servers released before MATCH_RECOGNIZE do not know field 20. Protobuf preserves it
-    // as an unknown field, but their PlanNodeDeserializer sees NODE_NOT_SET and cannot execute the stage. Upgrade all
-    // servers before issuing MATCH_RECOGNIZE queries; there is no mixed-version fallback to another node kind.
+    // as an unknown field, but their PlanNodeDeserializer sees NODE_NOT_SET and cannot execute the stage. The broker
+    // therefore plans MATCH_RECOGNIZE only once every server advertises the instance capability MSE_MATCH_RECOGNIZE;
+    // there is no mixed-version fallback to another node kind.
     MatchNode matchNode = 20;
   }
 }

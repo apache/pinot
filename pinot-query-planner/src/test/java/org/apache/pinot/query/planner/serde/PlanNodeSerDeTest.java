@@ -209,8 +209,8 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     DynamicMessage legacyPlanNode = DynamicMessage.parseFrom(legacyPlanNodeDescriptor, serialized.toByteArray());
 
     // A server schema predating MATCH_RECOGNIZE preserves field 20 but does not select a node in its oneof. Its plan
-    // deserializer therefore observes NODE_NOT_SET and cannot execute the stage, which is why all servers must be
-    // upgraded before MATCH_RECOGNIZE queries are issued.
+    // deserializer therefore observes NODE_NOT_SET and cannot execute the stage, which is why the broker plans
+    // MATCH_RECOGNIZE only once every server advertises the instance capability MSE_MATCH_RECOGNIZE.
     assertNull(legacyPlanNode.getOneofFieldDescriptor(legacyPlanNodeDescriptor.getOneofs().get(0)));
     assertEquals(legacyPlanNode.getUnknownFields().getField(20).getLengthDelimitedList().size(), 1);
   }

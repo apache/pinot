@@ -73,6 +73,7 @@ import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
 import org.apache.pinot.common.catalog.PinotCatalogReader;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
@@ -460,13 +461,16 @@ public class QueryEnvironment {
       // SqlToRelConverter with an assertion instead of a usable message. See MatchRecognizeValidator.
       MatchRecognizeValidator matchRecognizeValidator = new MatchRecognizeValidator();
       sqlNode.accept(matchRecognizeValidator);
-      if (matchRecognizeValidator.hasMatchRecognize() && plannerContext.isUsePhysicalOptimizer()) {
-        PhysicalPlannerContext physicalPlannerContext = plannerContext.getPhysicalPlannerContext();
-        boolean useLiteMode = physicalPlannerContext != null && physicalPlannerContext.isUseLiteMode();
-        throw new MatchRecognizeValidator.UnsupportedMatchRecognizeException(
-            "MATCH_RECOGNIZE is not supported by the multi-stage physical optimizer"
-                + (useLiteMode ? " in lite mode" : "")
-                + ". Retry with the query option 'usePhysicalOptimizer=false'.");
+      if (matchRecognizeValidator.hasMatchRecognize()) {
+        if (plannerContext.isUsePhysicalOptimizer()) {
+          PhysicalPlannerContext physicalPlannerContext = plannerContext.getPhysicalPlannerContext();
+          boolean useLiteMode = physicalPlannerContext != null && physicalPlannerContext.isUseLiteMode();
+          throw new MatchRecognizeValidator.UnsupportedMatchRecognizeException(
+              "MATCH_RECOGNIZE is not supported by the multi-stage physical optimizer"
+                  + (useLiteMode ? " in lite mode" : "")
+                  + ". Retry with the query option 'usePhysicalOptimizer=false'.");
+        }
+        plannerContext.markContainsMatchRecognize();
       }
       SqlNode validated = plannerContext.getValidator().validate(sqlNode);
       if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
@@ -584,6 +588,9 @@ public class QueryEnvironment {
 
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+    if (plannerContext.containsMatchRecognize()) {
+      checkServersSupportMatchRecognize();
+    }
     long requestId = _envConfig.getRequestId();
     if (plannerContext.isUsePhysicalOptimizer()) {
       Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> plan = PinotLogicalQueryPlanner.makePlanV2(relRoot,
@@ -599,6 +606,30 @@ public class QueryEnvironment {
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
     return pinotDispatchPlanner.createDispatchableSubPlan(plan, _multiClusterRoutingContext);
+  }
+
+  /// A server that predates `MATCH_RECOGNIZE` cannot read its plan node and fails the query with an error that does
+  /// not say why, for example while a rolling upgrade is in progress. Rejects the query with an actionable error
+  /// instead, until every server advertises [InstanceCapability#MSE_MATCH_RECOGNIZE]. The routing manager computes the
+  /// minimum revision from the instance configs that it already reads, so the check costs no ZooKeeper access. The
+  /// minimum covers the instance config of every server, also of a disabled, stopped or decommissioned one.
+  ///
+  /// It runs where the dispatchable plan is built, so the execution and every `EXPLAIN` that plans the implementation
+  /// fail. `EXPLAIN PLAN WITHOUT IMPLEMENTATION` builds no dispatchable plan and still returns the logical plan.
+  private void checkServersSupportMatchRecognize() {
+    WorkerManager workerManager = _envConfig.getWorkerManager();
+    if (workerManager == null) {
+      // Without a worker manager there are no servers to dispatch to.
+      return;
+    }
+    InstanceCapability capability = InstanceCapability.MSE_MATCH_RECOGNIZE;
+    if (workerManager.getRoutingManager().getMinServerCapabilityRevision(capability) < capability.revision()) {
+      throw QueryErrorCode.QUERY_PLANNING.asException("MATCH_RECOGNIZE requires every server to support it, but the "
+          + "instance config of at least one server, possibly a disabled, stopped or decommissioned one, does not "
+          + "advertise the instance capability '" + capability + "'. Upgrade all servers to a version that supports "
+          + "MATCH_RECOGNIZE, or drop the instance configs of servers that no longer exist, and retry. The broker log "
+          + "names the servers below the required revision.");
+    }
   }
 
   // --------------------------------------------------------------------------

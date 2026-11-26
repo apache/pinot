@@ -72,8 +72,13 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 /// that changes, it keeps the shape of a record and of an enum: the accessors use the record style (`name()`,
 /// `instanceType()`, `revision()`) instead of getters, and [#values()] and `name()` follow `Enum`.
 public final class InstanceCapability {
+  /// The server can execute the `MatchNode` of a multi-stage `MATCH_RECOGNIZE` query. A server that predates it cannot
+  /// read that plan node, so the broker rejects `MATCH_RECOGNIZE` until every server advertises revision 1.
+  public static final InstanceCapability MSE_MATCH_RECOGNIZE =
+      new InstanceCapability("MSE_MATCH_RECOGNIZE", InstanceType.SERVER, 1);
+
   // Declare the constants above this field: it reads them when the class initializes.
-  private static final List<InstanceCapability> VALUES = checkUniqueNames(List.of());
+  private static final List<InstanceCapability> VALUES = checkUniqueNames(List.of(MSE_MATCH_RECOGNIZE));
 
   private final String _name;
   private final InstanceType _instanceType;
