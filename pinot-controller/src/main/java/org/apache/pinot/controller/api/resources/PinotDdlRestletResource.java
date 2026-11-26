@@ -31,7 +31,6 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -363,27 +362,47 @@ public class PinotDdlRestletResource {
       return Response.ok(response.setMessage("Dry run: validated CREATE TABLE LIKE without persisting.")).build();
     }
 
+    boolean schemaCreated = false;
     try {
+      boolean addedSchema = false;
       if (storedSchema == null) {
         try {
           _pinotHelixResourceManager.addSchema(schema, false, false);
+          addedSchema = true;
         } catch (SchemaAlreadyExistsException e) {
-          Schema racedSchema = readCreateLikeSchema(targetName);
-          if (racedSchema == null) {
-            throw e;
-          }
-          checkCreateLikeSchema(schema, racedSchema);
+          // A concurrent request created the schema. Check its definition below before reusing it.
         }
       }
-      // Recheck logical tables, materialized views and partially deleted targets after the schema write.
+      Schema currentSchema = readCreateLikeSchema(targetName);
+      if (addedSchema) {
+        // addSchema can return normally when the property-store write fails. Confirm it before reporting progress.
+        if (currentSchema == null) {
+          throw new IllegalStateException("Could not confirm creation of destination schema: " + targetName);
+        }
+        schemaCreated = schema.equals(currentSchema);
+      }
       Response racedTarget = existingCreateLikeTarget(create, targetName, response);
       if (racedTarget != null) {
         return racedTarget;
       }
+      if (currentSchema == null) {
+        throw new ControllerApplicationException(LOGGER, "Destination schema disappeared: " + targetName,
+            Response.Status.CONFLICT);
+      }
+      checkCreateLikeSchema(schema, currentSchema);
       TableConfig firstConfig = copied.getOffline() != null ? copied.getOffline() : copied.getRealtime();
-      _pinotHelixResourceManager.addTableIfRawNameAbsent(firstConfig, schema);
+      try {
+        _pinotHelixResourceManager.addTable(firstConfig);
+      } catch (TableAlreadyExistsException e) {
+        if (create.isIfNotExists()) {
+          Response existing = existingCreateLikeTarget(create, targetName, response);
+          if (existing != null) {
+            return existing;
+          }
+        }
+        throw e;
+      }
       createdTables.add(firstConfig.getTableName());
-      // Only the request which created the OFFLINE half may add its REALTIME sibling.
       if (copied.getOffline() != null && copied.getRealtime() != null) {
         _pinotHelixResourceManager.addTable(copied.getRealtime());
         createdTables.add(copied.getRealtime().getTableName());
@@ -391,19 +410,12 @@ public class PinotDdlRestletResource {
       return Response.status(Response.Status.CREATED)
           .entity(response.setMessage("Successfully created table " + targetName + " LIKE " + sourceName)).build();
     } catch (TableAlreadyExistsException e) {
-      if (createdTables.isEmpty() && create.isIfNotExists()) {
-        Response racedTarget = existingCreateLikeTarget(create, targetName, response);
-        if (racedTarget != null) {
-          return racedTarget;
-        }
-      }
-      return createLikeFailure(response, Response.Status.CONFLICT.getStatusCode(), e);
-    } catch (SchemaAlreadyExistsException | ConcurrentModificationException e) {
-      return createLikeFailure(response, Response.Status.CONFLICT.getStatusCode(), e);
+      return createLikeFailure(targetName, schemaCreated, createdTables, Response.Status.CONFLICT.getStatusCode(), e);
     } catch (ControllerApplicationException e) {
-      return createLikeFailure(response, e.getResponse().getStatus(), e);
+      return createLikeFailure(targetName, schemaCreated, createdTables, e.getResponse().getStatus(), e);
     } catch (Exception e) {
-      return createLikeFailure(response, Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), e);
+      return createLikeFailure(targetName, schemaCreated, createdTables,
+          Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), e);
     }
   }
 
@@ -497,14 +509,26 @@ public class PinotDdlRestletResource {
     }
   }
 
-  private static Response createLikeFailure(DdlExecutionResponse response, int status, Exception cause) {
-    // Never delete by raw name here: a concurrent request may own a sibling variant or schema.
-    // Preserve completed creates and report them even when a later variant failed.
-    LOGGER.error("CREATE TABLE LIKE failed for {}; completed variants: {}", response.getTableName(),
-        response.getCreatedTables(), cause);
-    response.setMessage("Failed to create table " + response.getTableName() + ": " + cause.getMessage()
-        + ". Completed variants: " + response.getCreatedTables());
-    return Response.status(status).entity(response).build();
+  private static Response createLikeFailure(String targetName, boolean schemaCreated, List<String> createdTables,
+      int status, Exception cause) {
+    String message = "Failed to create table " + targetName + ": " + cause.getMessage();
+    if (schemaCreated) {
+      message += ". This request created schema " + targetName;
+    }
+    if (!createdTables.isEmpty()) {
+      message += ". Completed table variants: " + createdTables;
+    }
+    if (!(cause instanceof ControllerApplicationException)) {
+      // ControllerApplicationException already logged the failure at the appropriate level.
+      if (status >= 500) {
+        LOGGER.error(message, cause);
+      } else {
+        LOGGER.info(message);
+      }
+    }
+    Map<String, Object> error =
+        Map.of("code", status, "error", message, "schemaCreated", schemaCreated, "createdTables", createdTables);
+    return Response.status(status).type(MediaType.APPLICATION_JSON).entity(error).build();
   }
 
   // -------------------------------------------------------------------------------------------

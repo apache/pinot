@@ -20,23 +20,19 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
-import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidator;
@@ -44,6 +40,7 @@ import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.ConfigValidationException;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -53,7 +50,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -234,34 +230,34 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void concurrentFirstVariantsCannotCreateAHybrid()
-      throws Exception {
-    String target = "ddlLikeContendedTarget";
-    DEFAULT_INSTANCE.addDummySchema(target);
-    Schema expectedSchema = DEFAULT_INSTANCE.getHelixResourceManager().getSchema(target);
-    TableConfig offline = new TableConfigBuilder(TableType.OFFLINE).setTableName(target).setNumReplicas(1).build();
-    TableConfig realtime = new TableConfigBuilder(TableType.REALTIME).setTableName(target).setNumReplicas(1)
-        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
-    CyclicBarrier start = new CyclicBarrier(2);
-    List<Future<Boolean>> attempts = new ArrayList<>();
-    try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
-      for (TableConfig config : List.of(offline, realtime)) {
-        attempts.add(executor.submit(() -> {
-          start.await(10, TimeUnit.SECONDS);
-          try {
-            DEFAULT_INSTANCE.getHelixResourceManager().addTableIfRawNameAbsent(config, expectedSchema);
-            return true;
-          } catch (TableAlreadyExistsException e) {
-            return false;
-          }
-        }));
-      }
-      boolean offlineWon = attempts.get(0).get(30, TimeUnit.SECONDS);
-      boolean realtimeWon = attempts.get(1).get(30, TimeUnit.SECONDS);
-      assertNotEquals(offlineWon, realtimeWon, "Exactly one request may create the first variant");
-      assertEquals(DEFAULT_INSTANCE.getHelixResourceManager().hasOfflineTable(target), offlineWon);
-      assertEquals(DEFAULT_INSTANCE.getHelixResourceManager().hasRealtimeTable(target), realtimeWon);
+  public void createTableLikeCopiesBothHybridVariantsAndStartsFreshConsumption()
+      throws IOException {
+    String source = "ddlLikeHybridSource";
+    String target = "ddlLikeHybridTarget";
+    DEFAULT_INSTANCE.createHybridTables(List.of(source));
+
+    String sql = "CREATE TABLE IF NOT EXISTS " + target + " LIKE " + source;
+    JsonNode created = postDdl(sql, false);
+    String offline = target + "_OFFLINE";
+    String realtime = target + "_REALTIME";
+    assertEquals(created.get("createdTables"), JsonUtils.objectToJsonNode(List.of(offline, realtime)));
+
+    PinotHelixResourceManager manager = DEFAULT_INSTANCE.getHelixResourceManager();
+    assertEquals(manager.getTableConfig(offline).getTableType(), TableType.OFFLINE);
+    assertEquals(manager.getTableConfig(realtime).getTableType(), TableType.REALTIME);
+    assertTrue(manager.getTableIdealState(offline).getPartitionSet().isEmpty());
+    IdealState realtimeState = manager.getTableIdealState(realtime);
+    assertEquals(realtimeState.getPartitionSet().size(), FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS);
+    for (String segment : realtimeState.getPartitionSet()) {
+      LLCSegmentName name = new LLCSegmentName(segment);
+      assertEquals(name.getTableName(), target);
+      assertEquals(name.getSequenceNumber(), 0);
+      assertTrue(realtimeState.getInstanceStateMap(segment).containsValue(SegmentStateModel.CONSUMING));
     }
+
+    JsonNode repeated = postDdl(sql, false);
+    assertTrue(repeated.get("createdTables").isEmpty());
+    assertEquals(manager.getTableIdealState(realtime).getPartitionSet(), realtimeState.getPartitionSet());
   }
 
   @DataProvider(name = "unreadableConfigs")
@@ -295,7 +291,9 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
           JsonUtils.objectToString(Map.of("sql", "CREATE TABLE " + target + " LIKE " + source)));
 
       assertEquals(response.getLeft().intValue(), 500, response.getRight());
-      assertTrue(response.getRight().contains(realtimeName), response.getRight());
+      // This helper returns the error reason decoded by Pinot's HTTP client.
+      assertTrue(response.getRight().contains("Failed to read table config: " + realtimeName), response.getRight());
+      assertFalse(response.getRight().contains("tableConfigs"));
       assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getSchema(target));
       assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getOfflineTableConfig(target, false, false));
       assertNull(DEFAULT_INSTANCE.getHelixResourceManager().getRealtimeTableConfig(target, false, false));

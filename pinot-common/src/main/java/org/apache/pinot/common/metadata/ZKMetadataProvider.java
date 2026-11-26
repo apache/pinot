@@ -624,12 +624,6 @@ public class ZKMetadataProvider {
     }
   }
 
-  /// Creates a schema only if its znode does not yet exist.
-  public static boolean createSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, Schema schema) {
-    return propertyStore.create(constructPropertyStorePathForSchema(schema.getSchemaName()),
-        SchemaSerDeUtils.toZNRecord(schema), AccessOption.PERSISTENT);
-  }
-
   public static void setSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, Schema schema) {
     propertyStore.set(constructPropertyStorePathForSchema(schema.getSchemaName()), SchemaSerDeUtils.toZNRecord(schema),
         AccessOption.PERSISTENT);

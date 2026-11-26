@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.util.ConcurrentModificationException;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +31,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.SimpleHttpErrorInfo;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -63,6 +64,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -71,6 +73,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -109,9 +112,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       assertEquals(body.getTableConfigs().has("realtime"), expectedTables.contains("copied_table_REALTIME"));
 
       ArgumentCaptor<TableConfig> configs = ArgumentCaptor.forClass(TableConfig.class);
-      verify(fixture._manager).addTableIfRawNameAbsent(configs.capture(),
-          eq(Schema.cloneSchemaWithName(fixture._schema, "copied_table")));
-      verify(fixture._manager, times(expectedTables.size() - 1)).addTable(configs.capture());
+      verify(fixture._manager, times(expectedTables.size())).addTable(configs.capture());
       assertEquals(configs.getAllValues().stream().map(TableConfig::getTableName).toList(), expectedTables);
       verify(fixture._manager).addSchema(any(Schema.class), eq(false), eq(false));
     }
@@ -137,7 +138,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       Response response = fixture.execute("CREATE TABLE copied_table LIKE old", false);
       assertEquals(response.getStatus(), 201);
       ArgumentCaptor<TableConfig> configCaptor = ArgumentCaptor.forClass(TableConfig.class);
-      verify(fixture._manager).addTableIfRawNameAbsent(configCaptor.capture(), any(Schema.class));
+      verify(fixture._manager).addTable(configCaptor.capture());
       TableConfig copied = configCaptor.getValue();
       assertEquals(copied.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().getFirst()
           .get("stream.kafka.topic.name"), "${LIKE_TOPIC}");
@@ -366,20 +367,27 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
   }
 
   @Test
-  public void appliesExistencePolicyWhenSiblingWinsAtFirstWrite()
+  public void appliesExistencePolicyWhenTargetWinsAtFirstWrite()
       throws Exception {
     for (boolean ifNotExists : List.of(false, true)) {
-      try (Fixture fixture = new Fixture("old", true, false)) {
+      try (Fixture fixture = new Fixture("old", true, true)) {
         doAnswer(invocation -> {
-          when(fixture._manager.getRawTableConfig("copied_table_REALTIME"))
-              .thenReturn(newConfig("copied_table", TableType.REALTIME));
-          throw new TableAlreadyExistsException("Sibling already exists");
-        }).when(fixture._manager).addTableIfRawNameAbsent(any(), any());
+          when(fixture._manager.getRawTableConfig("copied_table_OFFLINE"))
+              .thenReturn(newConfig("copied_table", TableType.OFFLINE));
+          throw new TableAlreadyExistsException("Target already exists");
+        }).when(fixture._manager).addTable(any());
         String sql = "CREATE TABLE " + (ifNotExists ? "IF NOT EXISTS " : "") + "copied_table LIKE old";
         Response response = fixture.execute(sql, false);
         assertEquals(response.getStatus(), ifNotExists ? 200 : 409);
-        assertTrue(body(response).getCreatedTables().isEmpty());
-        verify(fixture._manager, never()).addTable(any());
+        if (ifNotExists) {
+          assertTrue(body(response).getCreatedTables().isEmpty());
+        } else {
+          JsonNode error = JsonUtils.objectToJsonNode(response.getEntity());
+          assertEquals(error.get("code").intValue(), 409);
+          assertTrue(error.get("createdTables").isEmpty());
+          assertTrue(error.get("schemaCreated").booleanValue());
+        }
+        verify(fixture._manager, never()).addTable(argThat(config -> config.getTableType() == TableType.REALTIME));
       }
     }
   }
@@ -399,20 +407,39 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
           .thenReturn(Schema.cloneSchemaWithName(fixture._schema, "copied_table"));
       assertEquals(fixture.execute("CREATE TABLE copied_table LIKE old", false).getStatus(), 201);
       verify(fixture._manager, never()).addSchema(any(), eq(false), eq(false));
-      verify(fixture._manager).addTableIfRawNameAbsent(any(TableConfig.class), any(Schema.class));
+      verify(fixture._manager).addTable(any(TableConfig.class));
     }
   }
 
   @Test
-  public void schemaChangedDuringPublicationReturnsConflictEvenWithIfNotExists()
+  public void unconfirmedSchemaWriteDoesNotReportCreatedResources()
+      throws Exception {
+    try (Fixture fixture = new Fixture("old", true, false)) {
+      doNothing().when(fixture._manager).addSchema(any(Schema.class), eq(false), eq(false));
+      Response response = fixture.execute("CREATE TABLE IF NOT EXISTS copied_table LIKE old", false);
+      assertEquals(response.getStatus(), 500);
+      JsonNode error = JsonUtils.objectToJsonNode(response.getEntity());
+      assertFalse(error.get("schemaCreated").booleanValue());
+      assertTrue(error.get("createdTables").isEmpty());
+      verify(fixture._manager, never()).addTable(any());
+    }
+  }
+
+  @Test
+  public void rejectsSchemaChangedBeforeFirstTableWrite()
       throws Exception {
     try (Fixture fixture = new Fixture("old", true, true)) {
-      doThrow(new ConcurrentModificationException("Destination schema changed")).when(fixture._manager)
-          .addTableIfRawNameAbsent(any(), any());
+      Schema matching = Schema.cloneSchemaWithName(fixture._schema, "copied_table");
+      Schema replacement = Schema.cloneSchemaWithName(matching, "copied_table");
+      replacement.setDescription("concurrent update");
+      when(fixture._manager.getSchemaStrict("copied_table")).thenReturn(matching, replacement);
+
       Response response = fixture.execute("CREATE TABLE IF NOT EXISTS copied_table LIKE old", false);
       assertEquals(response.getStatus(), 409);
-      assertTrue(body(response).getCreatedTables().isEmpty());
-      verify(fixture._manager, never()).addTable(any());
+      JsonNode error = JsonUtils.objectToJsonNode(response.getEntity());
+      assertFalse(error.get("schemaCreated").booleanValue());
+      assertTrue(error.get("createdTables").isEmpty());
+      fixture.verifyNoWrites();
     }
   }
 
@@ -529,17 +556,19 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       List<String> createdTables)
       throws Exception {
     try (Fixture fixture = new Fixture("old", true, true)) {
-      PinotHelixResourceManager failingManager = doThrow(new IOException("injected create failure"))
-          .when(fixture._manager);
-      if (failedType == TableType.OFFLINE) {
-        failingManager.addTableIfRawNameAbsent(any(), any());
-      } else {
-        failingManager.addTable(any());
-      }
+      doThrow(new IOException("injected create failure")).when(fixture._manager)
+          .addTable(argThat(config -> config.getTableType() == failedType));
       Response response = fixture.execute("CREATE TABLE copied_table LIKE old", false);
       assertEquals(response.getStatus(), 500);
-      assertEquals(body(response).getCreatedTables(), createdTables);
-      assertTrue(body(response).getMessage().contains("injected create failure"));
+      JsonNode error = JsonUtils.objectToJsonNode(response.getEntity());
+      assertEquals(error.get("createdTables"), JsonUtils.objectToJsonNode(createdTables));
+      assertTrue(error.get("schemaCreated").booleanValue());
+      assertFalse(error.has("tableConfigs"));
+      // Use the same deserializer as HttpClient.getErrorMessage to verify that clients receive the concise reason.
+      SimpleHttpErrorInfo reason = JsonUtils.stringToObject(error.toString(), SimpleHttpErrorInfo.class);
+      assertEquals(reason.getCode(), 500);
+      assertTrue(reason.getError().contains("injected create failure"));
+      assertTrue(reason.getError().contains("created schema copied_table"));
       verify(fixture._manager, never()).deleteOfflineTable(any());
       verify(fixture._manager, never()).deleteRealtimeTable(any());
       verify(fixture._manager, never()).deleteSchema(any());
@@ -568,7 +597,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
     private final MockedStatic<TableConfigTunerUtils> _tuner = mockStatic(TableConfigTunerUtils.class);
 
     private Fixture(String source, boolean offline, boolean realtime)
-        throws IOException {
+        throws Exception {
       _resource._pinotHelixResourceManager = _manager;
       when(_manager.getPropertyStore()).thenReturn(_store);
       _resource._pinotHelixTaskResourceManager = mock(PinotHelixTaskResourceManager.class);
@@ -587,6 +616,11 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
           .thenReturn(offline ? newConfig(source, TableType.OFFLINE) : null);
       when(_manager.getRawTableConfig(source + "_REALTIME")).thenReturn(_realtime);
       when(_manager.getSchemaStrict(source)).thenReturn(_schema);
+      doAnswer(invocation -> {
+        Schema schema = invocation.getArgument(0);
+        when(_manager.getSchemaStrict(schema.getSchemaName())).thenReturn(schema);
+        return null;
+      }).when(_manager).addSchema(any(Schema.class), eq(false), eq(false));
       when(_manager.getTableCache()).thenReturn(mock(TableCache.class));
     }
 
@@ -613,7 +647,6 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
         throws Exception {
       verify(_manager, never()).addSchema(any(), eq(false), eq(false));
       verify(_manager, never()).addTable(any(TableConfig.class));
-      verify(_manager, never()).addTableIfRawNameAbsent(any(TableConfig.class), any(Schema.class));
     }
 
     @Override

@@ -32,7 +32,6 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.ConcurrentModificationException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -559,13 +558,7 @@ public class PinotSchemaRestletResource {
     }
 
     LOGGER.info("Trying to delete schema {}", schemaName);
-    boolean deleted;
-    try {
-      deleted = _pinotHelixResourceManager.deleteSchemaIfUnused(schemaName);
-    } catch (ConcurrentModificationException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
-    }
-    if (deleted) {
+    if (_pinotHelixResourceManager.deleteSchema(schemaName)) {
       LOGGER.info("Notifying metadata event for deleting schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.DELETE);
       LOGGER.info("Successfully deleted schema: {}", schemaName);

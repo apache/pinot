@@ -75,12 +75,15 @@ creation starts normal ingestion using the copied stream configuration, so the
 target may receive data immediately. Use `?dryRun=true` to inspect the copied
 `tableConfigs` without creating resources.
 
-Any existing target variant causes a conflict, or a no-op with `IF NOT EXISTS`.
-The no-op does not add missing variants to an existing table. Hybrid creation is
-sequential after validation of both configs; it is not atomic. On a write failure,
-the error response includes `createdTables`, listing variants whose creation
-completed. Successful variants and the schema are retained. Inspect that state
-before cleanup or retry; `IF NOT EXISTS` does not repair a partial creation.
+If a target variant already exists, the controller returns a conflict or a no-op
+with `IF NOT EXISTS`. A no-op leaves existing variants as they are. Hybrid creation
+validates both configs and then creates OFFLINE and REALTIME in separate calls.
+Coordinate concurrent creates or schema changes for the same target name.
+
+A write failure returns `code` and `error`, plus `createdTables` for variants
+whose creation completed and `schemaCreated` when the request added and verified the schema.
+For example, if REALTIME creation fails after OFFLINE succeeds, inspect the schema
+and the OFFLINE table before retrying. `IF NOT EXISTS` leaves this partial table in place.
 
 ## Module layout
 

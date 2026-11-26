@@ -33,7 +33,7 @@ import org.apache.pinot.sql.ddl.compile.DdlOperation;
 /// - CREATE_TABLE: `tableName, tableType, schema, tableConfig, ifNotExists, warnings, dryRun`
 /// - CREATE_TABLE_LIKE: `tableName, sourceTableName, tableConfigs, createdTables, ifNotExists, dryRun`.
 ///   `tableConfigs` is omitted for an existing-target no-op; `createdTables` records completed
-///   variant creations, including on a partial failure.
+///   variant creations. Write errors carry `code`, `error`, `schemaCreated`, and `createdTables`.
 /// - CREATE_MATERIALIZED_VIEW: same as CREATE_TABLE; `tableType` is always `OFFLINE`.
 /// - DROP_TABLE: `tableName, tableType, deletedTables, ifExists, dryRun`
 /// - SHOW_TABLES: `tableNames` (raw names of every OFFLINE/REALTIME table in scope, including

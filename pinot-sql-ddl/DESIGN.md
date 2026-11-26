@@ -730,18 +730,20 @@ are rejected even with `IF NOT EXISTS`. An existing standalone schema can be
 reused only when its complete definition equals the copied schema after renaming.
 Dry-run performs preparation and validation without writes.
 
-Writes proceed Schema → OFFLINE → REALTIME, with both configs validated before
-the first write. When publishing the first config, the controller verifies in one
-ZooKeeper transaction that the target schema still matches the validated definition
-and that the raw name is available across OFFLINE, REALTIME, and logical tables.
-During a rolling upgrade, older controllers can still create logical tables or
-delete schemas without checking this transaction. The checks cover competing creates and schema deletes
-once all controllers run the updated version. Finishing the hybrid requires
-a separate write for its second variant.
-The LIKE executor does not delete already-created resources on failure. Existing
-per-table creation still performs its own setup/cleanup. The failure response
-reports successful `addTable` calls in `createdTables`; callers must inspect partial
-state before cleanup or retry. `IF NOT EXISTS` does not repair partial creation.
+After validating both configs, the controller uses the existing Helix property store
+and the standard `addSchema` and `addTable` operations. It creates the schema first,
+then OFFLINE, then REALTIME when requested. Each write completes separately.
+Concurrent requests can change the schema or create a target variant between the
+existence check and a write. A concurrent create can still return a write error
+with `IF NOT EXISTS` if the ordinary table API cannot confirm a duplicate.
+Serialize competing creates and schema changes when a caller requires exclusive
+ownership of the target name.
+
+Write-phase failures use the controller's standard `code` and `error` fields.
+`createdTables` lists variants whose `addTable` call completed. `schemaCreated`
+is true when this request completed `addSchema` and read back the expected
+definition. A matching schema reused from an earlier request leaves this flag false. Inspect the current
+target state before cleanup or retry, particularly if other requests were active.
 
 Successful creation returns 201; dry-run and no-op return 200. LIKE responses use
 `sourceTableName`, raw `tableName`, `tableConfigs` (the existing bundle JSON), and

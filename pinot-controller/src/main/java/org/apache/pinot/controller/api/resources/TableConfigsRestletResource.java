@@ -30,7 +30,6 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.ConcurrentModificationException;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +50,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -245,13 +243,11 @@ public class TableConfigsRestletResource {
           PinotTableRestletResource.tableTasksValidation(realtimeTableConfig, _pinotHelixTaskResourceManager);
         }
       }
-      _pinotHelixResourceManager.addSchema(schema, false, false);
-      LOGGER.info("Added schema: {}", schema.getSchemaName());
-      boolean offlineAdded = false;
       try {
+        _pinotHelixResourceManager.addSchema(schema, false, false);
+        LOGGER.info("Added schema: {}", schema.getSchemaName());
         if (offlineTableConfig != null) {
           _pinotHelixResourceManager.addTable(offlineTableConfig);
-          offlineAdded = true;
           LOGGER.info("Added offline table config: {}", offlineTableConfig.getTableName());
         }
         if (realtimeTableConfig != null) {
@@ -259,15 +255,11 @@ public class TableConfigsRestletResource {
           LOGGER.info("Added realtime table config: {}", realtimeTableConfig.getTableName());
         }
       } catch (Exception e) {
-        // A competing CREATE can reuse our schema and publish a variant. Only undo a completed add from this POST.
-        try {
-          if (offlineAdded) {
-            _pinotHelixResourceManager.deleteOfflineTable(rawTableName);
-          }
-          _pinotHelixResourceManager.deleteSchemaIfUnused(schema.getSchemaName());
-        } catch (RuntimeException cleanupFailure) {
-          e.addSuppressed(cleanupFailure);
-        }
+        // In case of exception when adding any of the above configs, revert all configs added
+        // Invoke delete on tables whether they exist or not, to account for metadata/segments etc.
+        _pinotHelixResourceManager.deleteRealtimeTable(rawTableName);
+        _pinotHelixResourceManager.deleteOfflineTable(rawTableName);
+        _pinotHelixResourceManager.deleteSchema(schema.getSchemaName());
         throw e;
       }
 
@@ -278,8 +270,7 @@ public class TableConfigsRestletResource {
       if (e instanceof InvalidTableConfigException) {
         throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s. Reason: %s",
             rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
-      } else if (e instanceof TableAlreadyExistsException || e instanceof SchemaAlreadyExistsException
-          || e instanceof ConcurrentModificationException) {
+      } else if (e instanceof TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
       } else if (e instanceof ControllerApplicationException) {
         throw e;
@@ -334,7 +325,7 @@ public class TableConfigsRestletResource {
           ignoreActiveTasks, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
       _pinotHelixResourceManager.deleteOfflineTable(tableName);
       LOGGER.info("Deleted offline table: {}", tableName);
-      boolean schemaExists = _pinotHelixResourceManager.deleteSchemaIfUnused(tableName);
+      boolean schemaExists = _pinotHelixResourceManager.deleteSchema(tableName);
       LOGGER.info("Deleted schema: {}", tableName);
       if (tableExists || schemaExists) {
         return new SuccessResponse("Deleted TableConfigs: " + tableName);
@@ -342,8 +333,6 @@ public class TableConfigsRestletResource {
         return new SuccessResponse(
             "TableConfigs: " + tableName + " don't exist. Invoked delete anyway to clean stale metadata/segments");
       }
-    } catch (ConcurrentModificationException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
