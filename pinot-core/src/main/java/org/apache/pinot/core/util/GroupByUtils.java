@@ -520,6 +520,18 @@ public final class GroupByUtils {
     return capacityByLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max((int) capacityByLimit, minNumGroups);
   }
 
+  /// Returns how many groups a combine or reducer table keeps when it trims: [#getTableCapacity(int, int)], or the
+  /// `limit` itself when the query is ordered only by its group keys with no HAVING (a safe trim). Then the query's
+  /// `limit` smallest keys are among the `limit` smallest of every table that has them, so keeping more changes
+  /// nothing. A non-positive `minTrimSize` disables the trim.
+  @VisibleForTesting
+  static int getTrimSize(QueryContext queryContext, int limit, int minTrimSize) {
+    if (minTrimSize <= 0) {
+      return Integer.MAX_VALUE;
+    }
+    return queryContext.isUnsafeTrim() ? getTableCapacity(limit, minTrimSize) : limit;
+  }
+
   /// Returns the actual trim threshold used for the indexed table. Trim threshold should be at least (2 \* trimSize) to
   /// avoid excessive trimming. When trim threshold is non-positive or higher than 10^9, trim is considered disabled,
   /// where `Integer.MAX_VALUE` is returned.
@@ -529,6 +541,20 @@ public final class GroupByUtils {
       return Integer.MAX_VALUE;
     }
     return Math.max(trimThreshold, 2 * trimSize);
+  }
+
+  /// Returns the size at which a combine or reducer table trims down to `trimSize`: [#getIndexedTableTrimThreshold],
+  /// or twice `trimSize`, the least that rule allows, under a safe trim (see [#getTrimSize]). Such a table needs only
+  /// its `limit` smallest keys, so it trims once it holds twice as many instead of growing to the configured threshold
+  /// first. A threshold that disables the trim still disables it, and a `trimSize` of 0 keeps that rule, since a
+  /// threshold of 0 would trim on every insert.
+  @VisibleForTesting
+  static int getTrimThreshold(QueryContext queryContext, int trimSize, int trimThreshold) {
+    int indexedTableTrimThreshold = getIndexedTableTrimThreshold(trimSize, trimThreshold);
+    if (indexedTableTrimThreshold == Integer.MAX_VALUE || trimSize == 0 || queryContext.isUnsafeTrim()) {
+      return indexedTableTrimThreshold;
+    }
+    return 2 * trimSize;
   }
 
   /// Returns the initial capacity of the indexed table required by the given query.
@@ -572,8 +598,7 @@ public final class GroupByUtils {
           executorService);
     }
 
-    // Disable trim when min trim size is non-positive
-    int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
+    int trimSize = getTrimSize(queryContext, limit, minTrimSize);
 
     // When there is no ORDER BY, trim is not required because the indexed table stops accepting new groups once the
     // result size is reached
@@ -600,7 +625,7 @@ public final class GroupByUtils {
     } else {
       resultSize = trimSize;
     }
-    int trimThreshold = getIndexedTableTrimThreshold(trimSize, queryContext.getGroupTrimThreshold());
+    int trimThreshold = getTrimThreshold(queryContext, trimSize, queryContext.getGroupTrimThreshold());
     int initialCapacity = getIndexedTableInitialCapacity(trimThreshold, numGroups, minInitialIndexedTableCapacity);
     if (trimThreshold == Integer.MAX_VALUE) {
       return getTrimDisabledIndexedTable(dataSchema, false, queryContext, resultSize, initialCapacity, numThreads,
@@ -624,8 +649,7 @@ public final class GroupByUtils {
     int minTrimSize = reducerContext.getMinGroupTrimSize();
     int minInitialIndexedTableCapacity = reducerContext.getMinInitialIndexedTableCapacity();
 
-    // Disable trim when min trim size is non-positive
-    int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
+    int trimSize = getTrimSize(queryContext, limit, minTrimSize);
 
     // Keep more groups when there is HAVING clause
     // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
@@ -649,7 +673,7 @@ public final class GroupByUtils {
           numThreads, executorService);
     }
 
-    int trimThreshold = getIndexedTableTrimThreshold(trimSize, reducerContext.getGroupByTrimThreshold());
+    int trimThreshold = getTrimThreshold(queryContext, trimSize, reducerContext.getGroupByTrimThreshold());
     int initialCapacity = getIndexedTableInitialCapacity(trimThreshold, numGroups, minInitialIndexedTableCapacity);
     if (trimThreshold == Integer.MAX_VALUE) {
       return getTrimDisabledIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, initialCapacity,
