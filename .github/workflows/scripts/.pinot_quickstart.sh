@@ -120,6 +120,12 @@ if [ "${PASS}" != 1 ]; then
     exit 1;
 fi
 
+# Users also start the launchers with "sh bin/pinot-admin.sh", so they must parse as POSIX shell.
+# On Ubuntu, sh is dash.
+for SCRIPT in build/bin/*.sh; do
+  sh -n "${SCRIPT}" || { echo "${SCRIPT} does not parse with sh"; exit 1; }
+done
+
 # Check the layout and the class linkage of a thin distribution before starting it.
 if [ "${PINOT_DIST_LAYOUT}" = "thin-plugins" ]; then
   java .github/workflows/scripts/thin-plugins/ThinDistributionCheck.java build \

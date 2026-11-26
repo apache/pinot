@@ -21,19 +21,13 @@ package org.apache.pinot.tools.admin.command;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.SystemUtils;
@@ -62,12 +56,8 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   public static final String BASEDIR = "basedir";
   public static final String LOCAL_FILE_PREFIX = "local://";
   public static final String PINOT_MAIN_JAR_PREFIX = "pinot-all";
-  /// Directory holding plugin dependencies that are shared between plugins, stored once each.
-  /// Its jars cannot be attributed to a plugin by their location, so they are never added by
-  /// walking the directory; they are added from the index of each selected plugin instead.
+  /// The shared dependency store and the per-plugin index of a thin-plugins distribution. See [#resolveDepsJars].
   private static final String SHARED_PLUGIN_LIBS_DIR = "plugin-libs";
-  /// Written next to a plugin's jar at build time: the shared-store jars that plugin needs, as
-  /// distribution-relative paths in classpath form.
   private static final String PLUGIN_CLASSPATH_INDEX = "pinot-plugin.classpath";
 
   @CommandLine.Option(names = {"-jobSpecFile", "-jobSpec"}, required = true, description = "Ingestion job spec file")
@@ -164,8 +154,6 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       }
     }
 
-    checkNotThinDistribution(_pinotBaseDir);
-
     Preconditions.checkNotNull(System.getenv(SPARK_HOME),
         "SPARK_HOME environment variable should be set to Spark installation path");
 
@@ -243,24 +231,6 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     return true;
   }
 
-  /// Fails when the Pinot installation has the thin plugin layout (a `plugin-libs/` directory). The
-  /// Spark ingestion jar relocates Jackson and Guava, and links against the relocated copies in the
-  /// `pinot-all` jar of the default distribution. The thin `pinot-all` does not relocate them, so the
-  /// job fails with linkage errors on the executors. A remote base directory is not checked.
-  @VisibleForTesting
-  static void checkNotThinDistribution(String pinotBaseDir) {
-    URI uri = URI.create(pinotBaseDir);
-    if (uri.getScheme() != null && !uri.getScheme().equals("file")) {
-      return;
-    }
-    File baseDir = uri.getScheme() == null ? new File(pinotBaseDir) : new File(uri);
-    if (new File(baseDir, SHARED_PLUGIN_LIBS_DIR).isDirectory()) {
-      throw new UnsupportedOperationException("Spark ingestion is not supported from a Pinot distribution built "
-          + "with the thin-plugins profile (" + baseDir + " has a " + SHARED_PLUGIN_LIBS_DIR + "/ directory). "
-          + "Use a distribution built with the default profile.");
-    }
-  }
-
   private void addAppResource(SparkLauncher sparkLauncher, String depsJarDir, List<String> extraClassPath)
       throws IOException {
     if (depsJarDir != null) {
@@ -298,18 +268,20 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     }
   }
 
-  /// Works out which jars under the Pinot installation should be shipped to the executors, honouring
-  /// [#shouldLoadPlugin]. A plugin is identified by the directory its jar sits in, so the shared
-  /// dependency store is a special case: every jar in it has the same parent directory and belongs
-  /// to no single plugin, and adding it wholesale would ignore `-pluginsToLoad` and
-  /// `-pluginsToExclude` entirely. Those jars are therefore reached only through the
-  /// `pinot-plugin.classpath` index of a plugin that was selected.
+  /// The plugin jars under the Pinot installation to ship to the executors, honouring [#shouldLoadPlugin]. A plugin is
+  /// identified by the directory its jar sits in.
+  ///
+  /// Fails on a distribution built with the thin-plugins profile, that is, one with a shared `plugin-libs/` store or
+  /// a `pinot-plugin.classpath` index. The Spark ingestion jar relocates Jackson and Guava, and links against the
+  /// relocated copies in the `pinot-all` jar of the default distribution. The thin `pinot-all` does not relocate
+  /// them, so the job would fail with linkage errors on the executors. The check reads the listing that selects the
+  /// jars, so it covers local and remote (`s3://`, `hdfs://`) installations.
   @VisibleForTesting
   List<String> resolveDepsJars(String depsJarDir)
       throws IOException {
-    Set<String> resolved = new LinkedHashSet<>();
+    List<String> jars = new ArrayList<>();
     if (depsJarDir == null) {
-      return new ArrayList<>(resolved);
+      return jars;
     }
     URI depsJarDirURI = URI.create(depsJarDir);
     if (depsJarDirURI.getScheme() == null) {
@@ -321,42 +293,16 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
         continue;
       }
       String parentDir = FilenameUtils.getName(file.substring(0, file.lastIndexOf('/')));
-      if (file.endsWith(".jar")) {
-        if (!SHARED_PLUGIN_LIBS_DIR.equals(parentDir) && shouldLoadPlugin(parentDir)) {
-          resolved.add(file);
-        }
-      } else if (PLUGIN_CLASSPATH_INDEX.equals(FilenameUtils.getName(file)) && shouldLoadPlugin(parentDir)) {
-        for (String dep : readPluginClasspathIndex(pinotFS, file)) {
-          resolved.add(depsJarDir.endsWith("/") ? depsJarDir + dep : depsJarDir + "/" + dep);
-        }
+      if (SHARED_PLUGIN_LIBS_DIR.equals(parentDir) || PLUGIN_CLASSPATH_INDEX.equals(FilenameUtils.getName(file))) {
+        throw new UnsupportedOperationException("Spark ingestion is not supported from a Pinot distribution built "
+            + "with the thin-plugins profile (" + depsJarDir + " contains " + file + "). Use a distribution built "
+            + "with the default profile.");
+      }
+      if (file.endsWith(".jar") && shouldLoadPlugin(parentDir)) {
+        jars.add(file);
       }
     }
-    return new ArrayList<>(resolved);
-  }
-
-  /// Reads a plugin's shared-store dependency list. A plugin with no index (an old-format plugin
-  /// that keeps its own jars beside it) simply contributes nothing here, and an unreadable index
-  /// is logged rather than failing the submit - the plugin's own jars have already been added.
-  @VisibleForTesting
-  List<String> readPluginClasspathIndex(PinotFS pinotFS, String indexFile) {
-    List<String> deps = new ArrayList<>();
-    try (InputStream in = pinotFS.open(URI.create(indexFile));
-        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-      String line;
-      while ((line = reader.readLine()) != null) {
-        // The index is a classpath fragment, so entries may be ':'-separated as well as split
-        // across lines.
-        for (String entry : line.split(":")) {
-          String dep = entry.trim();
-          if (!dep.isEmpty()) {
-            deps.add(dep);
-          }
-        }
-      }
-    } catch (Exception e) {
-      LOGGER.warn("Failed to read plugin classpath index: {}", indexFile, e);
-    }
-    return deps;
+    return jars;
   }
 
   @VisibleForTesting

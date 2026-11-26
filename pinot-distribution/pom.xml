@@ -109,6 +109,31 @@
       <id>bin-dist</id>
       <build>
         <plugins>
+          <!-- The dir format of the assembly writes into the output of the previous build. Without this
+               clean, a rebuild after a dependency upgrade keeps the old jar next to the new one, and
+               the launcher puts both on the class path through plugin-libs/*. The tar.gz is not
+               affected. Only the assembled directory is removed: the shaded jar stays in target/. -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-clean-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>clean-assembled-distribution</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>clean</goal>
+                </goals>
+                <configuration>
+                  <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                  <filesets>
+                    <fileset>
+                      <directory>${project.build.directory}/apache-pinot-${project.version}-bin</directory>
+                    </fileset>
+                  </filesets>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-assembly-plugin</artifactId>
