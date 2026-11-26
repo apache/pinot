@@ -640,7 +640,22 @@ public class WorkerManager {
     if (metadata.isRequiresSingletonInstance()) {
       // When singleton instance is required, assign it to a random candidate server.
       List<QueryServerInstance> candidateServers = getCandidateServers(context);
-      metadata.setWorkerIdToServerInstanceMap(Map.of(0, candidateServers.get(RANDOM.nextInt(candidateServers.size()))));
+      QueryServerInstance singletonServer = candidateServers.get(RANDOM.nextInt(candidateServers.size()));
+      metadata.setWorkerIdToServerInstanceMap(Map.of(0, singletonServer));
+      // Handle replicated leaf stage: this stage has a single worker, so a single leaf worker scanning the whole table
+      // is enough. More leaf workers would each send the whole table to it and duplicate the rows.
+      for (PlanFragment child : children) {
+        DispatchablePlanMetadata childMetadata = metadataMap.get(child.getFragmentId());
+        Map<String, List<String>> replicatedSegments = childMetadata.getReplicatedSegments();
+        if (replicatedSegments != null) {
+          List<QueryServerInstance> replicatedLeafServers =
+              getCandidateServersForReplicatedLeaf(context, List.of(singletonServer));
+          Preconditions.checkState(!replicatedLeafServers.isEmpty(),
+              "Failed to find any server for replicated leaf stage: %s", child.getFragmentId());
+          childMetadata.setWorkerIdToServerInstanceMap(Map.of(0, replicatedLeafServers.get(0)));
+          childMetadata.setWorkerIdToSegmentsMap(Map.of(0, replicatedSegments));
+        }
+      }
       return;
     }
 
