@@ -32,6 +32,7 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -80,5 +81,42 @@ public class MailboxSendNodeSerDeTest {
     Plan.PlanNode proto = PlanNodeSerializer.process(node);
     assertEquals(proto.getMailboxSendNode().getReceiverSpecsCount(), 1);
     assertEquals(proto.getMailboxSendNode().getReceiverSpecs(0).getReceiverStageId(), 3);
+  }
+
+  /// A node with specs writes PER_RECEIVER in the legacy distribution field, so that a server that does not know the
+  /// specs fails instead of sending the same data to every receiver. The distribution of the node moves to its own
+  /// field.
+  @Test
+  public void specsReplaceTheLegacyDistribution() {
+    MailboxSendNode node = node();
+    node.setReceiverSpec(new ReceiverSpec(2, RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), List.of(0)));
+    Plan.MailboxSendNode proto = PlanNodeSerializer.process(node).getMailboxSendNode();
+    assertEquals(proto.getDistributionType(), Plan.DistributionType.PER_RECEIVER);
+    assertEquals(proto.getDefaultDistributionType(), Plan.DistributionType.HASH_DISTRIBUTED);
+
+    MailboxSendNode deserialized = (MailboxSendNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertEquals(deserialized.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    assertEquals(deserialized, node);
+  }
+
+  /// Without specs, the legacy field keeps the distribution of the node.
+  @Test
+  public void uniformReceiversKeepTheLegacyDistribution() {
+    Plan.MailboxSendNode proto = PlanNodeSerializer.process(node()).getMailboxSendNode();
+    assertEquals(proto.getDistributionType(), Plan.DistributionType.HASH_DISTRIBUTED);
+    assertTrue(proto.getReceiverSpecsList().isEmpty());
+  }
+
+  /// A PER_RECEIVER node without the distribution of the node reads as SINGLETON, which cannot have specs. The
+  /// deserializer fails instead of sending with a wrong distribution.
+  @Test
+  public void perReceiverWithoutDefaultDistributionFails() {
+    MailboxSendNode node = node();
+    node.setReceiverSpec(new ReceiverSpec(2, RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), List.of(0)));
+    Plan.PlanNode proto = PlanNodeSerializer.process(node);
+    Plan.PlanNode broken = proto.toBuilder()
+        .setMailboxSendNode(proto.getMailboxSendNode().toBuilder().clearDefaultDistributionType())
+        .build();
+    assertThrows(IllegalStateException.class, () -> PlanNodeDeserializer.process(broken));
   }
 }

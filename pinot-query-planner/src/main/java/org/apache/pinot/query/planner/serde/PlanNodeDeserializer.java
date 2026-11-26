@@ -183,9 +183,19 @@ public class PlanNodeDeserializer {
 
     return new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), extractInputs(protoNode),
         receiverIds, convertExchangeType(protoMailboxSendNode.getExchangeType()),
-        convertDistributionType(protoMailboxSendNode.getDistributionType()), protoMailboxSendNode.getKeysList(),
+        convertNodeDistributionType(protoMailboxSendNode), protoMailboxSendNode.getKeysList(),
         protoMailboxSendNode.getPrePartitioned(), convertCollations(protoMailboxSendNode.getCollationsList()),
         protoMailboxSendNode.getSort(), hashFunction, convertReceiverSpecs(protoMailboxSendNode));
+  }
+
+  /// The distribution of the node. When its receivers do not all read the same data, the legacy field holds
+  /// `PER_RECEIVER` and the distribution of the node is in `defaultDistributionType`.
+  private static RelDistribution.Type convertNodeDistributionType(Plan.MailboxSendNode protoMailboxSendNode) {
+    Plan.DistributionType distributionType = protoMailboxSendNode.getDistributionType();
+    if (distributionType == Plan.DistributionType.PER_RECEIVER) {
+      return convertDistributionType(protoMailboxSendNode.getDefaultDistributionType());
+    }
+    return convertDistributionType(distributionType);
   }
 
   private static List<ReceiverSpec> convertReceiverSpecs(Plan.MailboxSendNode protoMailboxSendNode) {

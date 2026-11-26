@@ -182,6 +182,10 @@ enum DistributionType {
   ROUND_ROBIN_DISTRIBUTED = 4;
   BROADCAST_DISTRIBUTED = 5;
   ANY = 6;
+  // Only in MailboxSendNode.distributionType, when the receivers of the node do not all read the same data. The
+  // distribution of the node is then in MailboxSendNode.defaultDistributionType. Servers that do not know
+  // receiverSpecs fail on this value instead of sending wrong data.
+  PER_RECEIVER = 7;
 }
 
 enum Direction {
@@ -225,9 +229,12 @@ message MailboxSendNode {
   bool sort = 7;
   repeated int32 receiverStageIds = 8;
   string hashFunction = 9;
-  // How the node sends to some of its receivers. A receiver without an entry uses distributionType, keys and every
-  // column. Servers that do not know this field send to every receiver as if it had no entry.
+  // How the node sends to some of its receivers. A receiver without an entry uses the distribution of the node, keys
+  // and every column. When this list is not empty, distributionType is PER_RECEIVER, so that servers that do not know
+  // this field fail instead of sending the same data to every receiver.
   repeated ReceiverSpec receiverSpecs = 10;
+  // The distribution of the node when distributionType is PER_RECEIVER. Not set otherwise.
+  DistributionType defaultDistributionType = 11;
 }
 
 message ReceiverSpec {

@@ -218,20 +218,27 @@ public class PlanNodeSerializer {
       }
       assert !receiverStageIds.isEmpty() : "Receiver stage IDs should not be empty";
 
-      Plan.MailboxSendNode mailboxSendNode =
+      Plan.MailboxSendNode.Builder mailboxSendNode =
           Plan.MailboxSendNode.newBuilder()
               .setReceiverStageId(receiverStageIds.get(0)) // to keep backward compatibility
               .addAllReceiverStageIds(receiverStageIds)
           .setExchangeType(convertExchangeType(node.getExchangeType()))
-          .setDistributionType(convertDistributionType(node.getDistributionType()))
           .addAllKeys(node.getKeys())
           .setPrePartitioned(node.isPrePartitioned())
           .setHashFunction(node.getHashFunction())
           .addAllCollations(convertCollations(node.getCollations()))
-          .setSort(node.isSort())
-          .addAllReceiverSpecs(convertReceiverSpecs(node))
-          .build();
-      builder.setMailboxSendNode(mailboxSendNode);
+          .setSort(node.isSort());
+      List<Plan.ReceiverSpec> receiverSpecs = convertReceiverSpecs(node);
+      if (receiverSpecs.isEmpty()) {
+        mailboxSendNode.setDistributionType(convertDistributionType(node.getDistributionType()));
+      } else {
+        // A server that does not know receiverSpecs would send the same data to every receiver. PER_RECEIVER makes it
+        // fail instead, see plan.proto.
+        mailboxSendNode.setDistributionType(Plan.DistributionType.PER_RECEIVER)
+            .setDefaultDistributionType(convertDistributionType(node.getDistributionType()))
+            .addAllReceiverSpecs(receiverSpecs);
+      }
+      builder.setMailboxSendNode(mailboxSendNode.build());
       return null;
     }
 

@@ -72,8 +72,14 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 /// that changes, it keeps the shape of a record and of an enum: the accessors use the record style (`name()`,
 /// `instanceType()`, `revision()`) instead of getters, and [#values()] and `name()` follow `Enum`.
 public final class InstanceCapability {
+  /// The server runs multi-stage send nodes whose receivers do not all read the same data: each receiver stage can
+  /// have its own `ReceiverSpec` (distribution, keys and column mask). The broker only plans such nodes when every
+  /// server advertises this capability. A server without it would send the same rows and columns to every receiver.
+  public static final InstanceCapability MSE_RECEIVER_SPECS =
+      new InstanceCapability("MSE_RECEIVER_SPECS", InstanceType.SERVER, 1);
+
   // Declare the constants above this field: it reads them when the class initializes.
-  private static final List<InstanceCapability> VALUES = checkUniqueNames(List.of());
+  private static final List<InstanceCapability> VALUES = checkUniqueNames(List.of(MSE_RECEIVER_SPECS));
 
   private final String _name;
   private final InstanceType _instanceType;
