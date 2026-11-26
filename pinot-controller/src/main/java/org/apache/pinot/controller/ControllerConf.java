@@ -435,7 +435,6 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
   public static final String DEFAULT_ACCESS_CONTROL_USERNAME = "admin";
-  public static final String DEFAULT_ACCESS_CONTROL_PASSWORD = "admin";
   public static final String DEFAULT_LINEAGE_MANAGER =
       "org.apache.pinot.controller.helix.core.lineage.DefaultLineageManager";
   public static final String DEFAULT_REBALANCE_PRE_CHECKER =
@@ -1261,7 +1260,10 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public String getInitAccessControlPassword() {
-    return getProperty(ACCESS_CONTROL_PASSWORD, DEFAULT_ACCESS_CONTROL_PASSWORD);
+    String password = getProperty(ACCESS_CONTROL_PASSWORD);
+    Preconditions.checkState(StringUtils.isNotBlank(password),
+        "Set %s to a nonblank password to initialize ZooKeeper access control", ACCESS_CONTROL_PASSWORD);
+    return password;
   }
 
   public String getAccessControlFactoryClass() {
