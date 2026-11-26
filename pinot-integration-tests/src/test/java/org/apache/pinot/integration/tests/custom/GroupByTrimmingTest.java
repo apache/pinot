@@ -364,7 +364,8 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
             + "95,\t995,\t380.0");
 
     assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
-        "BROKER_REDUCE(sort:[plus(i,j) DESC],limit:5,postAggregations:filter(sum(i),greater_than(i,'0'))),\t1,\t0\n"
+        "BROKER_REDUCE(sort:[plus(i,j) DESC, i ASC, j ASC],limit:5,"
+            + "postAggregations:filter(sum(i),greater_than(i,'0'))),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY_FILTERED(groupKeys:i, j, aggregations:sum(i)),\t3,\t2\n" // <-- trimming happens here
@@ -398,7 +399,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
             + "95,\t995,\t4");
 
     assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
-        "BROKER_REDUCE(sort:[plus(i,j) DESC],limit:5),\t1,\t0\n"
+        "BROKER_REDUCE(sort:[plus(i,j) DESC, i ASC, j ASC],limit:5),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n" //<-- trimming happens here
@@ -408,21 +409,19 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test
-  public void testSSQEGroupsTrimmedAtSegmentLevelWithOrderBySomeGroupByKeysIsNotSafe()
+  public void testSSQEGroupsTrimmedAtSegmentLevelWithOrderBySomeGroupByKeysIsSafe()
       throws Exception {
     setUseMultiStageQueryEngine(false);
+    // The single-stage broker appends the group-by keys the ORDER BY leaves out (ORDER BY j DESC, i ASC), so the rows
+    // are ordered by all group-by keys and trimming them is safe
     String query = "SELECT i, j, COUNT(*) FROM " + getTableName() + " GROUP BY i, j ORDER BY j DESC LIMIT 5";
 
     Connection conn = getPinotConnection();
     assertTrimFlagNotSet(conn.execute(query));
 
     ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
-    assertTrimFlagSet(result);
+    assertTrimFlagNotSet(result);
 
-    // With test data set result is stable, but in general, trimming data ordered by subset of
-    // group by keys can produce incomplete group aggregates due to lack of stability.
-    // That is because, for a given value of j, sorting treats all values of i the same,
-    // and segment data is usually unordered.
     assertEquals(toResultStr(result),
         "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
             + "99,\t999,\t4\n"
@@ -432,7 +431,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
             + "95,\t995,\t4");
 
     assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
-        "BROKER_REDUCE(sort:[j DESC],limit:5),\t1,\t0\n"
+        "BROKER_REDUCE(sort:[j DESC, i ASC],limit:5),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n" // <- trimming happens here
@@ -563,7 +562,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
             + "4,\t4,\t4");
 
     assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
-        "BROKER_REDUCE(sort:[times(count(*),j) ASC],limit:5,postAggregations:times(count(*),j)),\t1,\t0\n"
+        "BROKER_REDUCE(sort:[times(count(*),j) ASC, i ASC, j ASC],limit:5,postAggregations:times(count(*),j)),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
@@ -575,9 +574,11 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
   // SSQE inter-segment level
 
   @Test
-  public void testSSQEGroupsTrimmedAtInterSegmentLevelWithOrderByOnSomeGroupByKeysIsNotSafe()
+  public void testSSQEGroupsTrimmedAtInterSegmentLevelWithOrderByOnSomeGroupByKeysIsSafe()
       throws Exception {
     setUseMultiStageQueryEngine(false);
+    // The single-stage broker appends the group-by keys the ORDER BY leaves out (ORDER BY i DESC, j ASC), so the rows
+    // are ordered by all group-by keys and trimming them is safe
     String query = "SELECT i, j, COUNT(*) FROM " + getTableName() + " GROUP BY i, j ORDER BY i DESC  LIMIT 5";
 
     Connection conn = getPinotConnection();
@@ -585,11 +586,18 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
 
     // on server level, trimming occurs only when threshold is reached
     ResultSetGroup result = conn.execute("SET minServerGroupTrimSize = 5; SET groupTrimThreshold = 50; " + query);
-    assertTrimFlagSet(result);
-    // result's order is not stable due to concurrent operations on indexed table
+    assertTrimFlagNotSet(result);
+
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+            + "99,\t99,\t4\n"
+            + "99,\t199,\t4\n"
+            + "99,\t299,\t4\n"
+            + "99,\t399,\t4\n"
+            + "99,\t499,\t4");
 
     assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
-        "BROKER_REDUCE(sort:[i DESC],limit:5),\t1,\t0\n"
+        "BROKER_REDUCE(sort:[i DESC, j ASC],limit:5),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n" // <-- trimming happens here
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
@@ -646,7 +654,8 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
     assertTrimFlagSet(result);
 
     assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
-        "BROKER_REDUCE(sort:[times(count(*),j) DESC],limit:5,postAggregations:times(count(*),j)),\t1,\t0\n"
+        "BROKER_REDUCE(sort:[times(count(*),j) DESC, i ASC, j ASC],limit:5,"
+            + "postAggregations:times(count(*),j)),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n" //<-- trimming happens here
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
@@ -718,9 +727,11 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test
-  public void testSSQEGroupsTrimmedAtBrokerLevelOrderedBySomeGroupByKeysIsNotSafe()
+  public void testSSQEGroupsTrimmedAtBrokerLevelOrderedBySomeGroupByKeysIsSafe()
       throws Exception {
     setUseMultiStageQueryEngine(false);
+    // The single-stage broker appends the group-by keys the ORDER BY leaves out (ORDER BY j DESC, i ASC), so the rows
+    // are ordered by all group-by keys and trimming them is safe
     String query = "SELECT i, j, COUNT(*) FROM " + getTableName() + " GROUP BY i, j ORDER BY j DESC LIMIT 5";
 
     Connection conn = getPinotConnection();
@@ -729,7 +740,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
 
     // on broker level, trimming occurs only when threshold is reached
     ResultSetGroup result = conn.execute("SET minBrokerGroupTrimSize = 5; SET groupTrimThreshold = 50; " + query);
-    assertTrimFlagSet(result);
+    assertTrimFlagNotSet(result);
 
     assertEquals(toResultStr(result),
         "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
@@ -740,7 +751,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
             + "95,\t995,\t4");
 
     assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
-        "BROKER_REDUCE(sort:[j DESC],limit:5),\t1,\t0\n" //<-- trimming happens here
+        "BROKER_REDUCE(sort:[j DESC, i ASC],limit:5),\t1,\t0\n" //<-- trimming happens here
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
@@ -794,7 +805,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
     assertTrimFlagSet(result);
 
     assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
-        "BROKER_REDUCE(sort:[times(count(*),j) DESC],limit:5," //<-- trimming happens here
+        "BROKER_REDUCE(sort:[times(count(*),j) DESC, i ASC, j ASC],limit:5," //<-- trimming happens here
             + "postAggregations:times(count(*),j)),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"

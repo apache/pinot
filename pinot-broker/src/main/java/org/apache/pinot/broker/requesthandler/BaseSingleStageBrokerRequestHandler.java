@@ -142,6 +142,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.rewriter.ExprMinMaxRewriter;
+import org.apache.pinot.sql.parsers.rewriter.OrderByGroupKeysRewriter;
 import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
@@ -167,6 +168,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       Set.of(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPR_MIN,
           CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPR_MAX);
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
+  private static final OrderByGroupKeysRewriter ORDER_BY_GROUP_KEYS_REWRITER = new OrderByGroupKeysRewriter();
 
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
   @Nullable
@@ -1292,6 +1294,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (_enableDistinctCountBitmapOverride) {
       handleDistinctCountBitmapOverride(serverPinotQuery);
     }
+    // Order a GROUP BY without ORDER BY on its group keys when the servers then take the sorted combine, so that every
+    // server and the reduce, which reads this query, keep the same groups. The materialized view rewrite runs later and
+    // sees the ordering as if the user wrote it.
+    ORDER_BY_GROUP_KEYS_REWRITER.rewrite(serverPinotQuery);
 
     Schema schema = _tableCache.getSchema(rawTableName);
     _queryOptimizer.optimize(serverPinotQuery, schema);
