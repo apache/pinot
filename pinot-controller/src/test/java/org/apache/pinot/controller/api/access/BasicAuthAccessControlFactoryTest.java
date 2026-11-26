@@ -143,6 +143,21 @@ public class BasicAuthAccessControlFactoryTest {
     assertTrue(accessControl.hasAccess(headers(SCOPED_ADMIN_USER, SCOPED_ADMIN_PASSWORD), TargetType.CLUSTER));
   }
 
+  @Test
+  public void testUserMutationAuthorization()
+      throws Exception {
+    AccessControl zk = createZkAccessControl();
+    AccessControl file = createStaticAccessControl();
+    HttpHeaders fullUser = headers(FULL_USER, FULL_PASSWORD);
+    HttpHeaders admin = headers("admin", FULL_PASSWORD);
+    for (String action : List.of(Actions.Cluster.CREATE_USER, Actions.Cluster.UPDATE_USER,
+        Actions.Cluster.DELETE_USER)) {
+      assertFalse(zk.hasAccess(fullUser, TargetType.CLUSTER, null, action), action);
+      assertTrue(zk.hasAccess(admin, TargetType.CLUSTER, null, action), action);
+      assertTrue(file.hasAccess(fullUser, TargetType.CLUSTER, null, action), action);
+    }
+  }
+
   @Test(dataProvider = "accessControls")
   public void testBasicAuthWorkflow(AccessControl accessControl) {
     assertFalse(accessControl.protectAnnotatedOnly());
@@ -270,6 +285,8 @@ public class BasicAuthAccessControlFactoryTest {
         user(FULL_USER, FULL_PASSWORD, null,
             List.of(org.apache.pinot.spi.config.user.AccessType.values())),
         user(WILDCARD_USER, WILDCARD_PASSWORD, null, null),
+        new UserConfig("admin", BcryptUtils.encrypt(FULL_PASSWORD), ComponentType.CONTROLLER.name(),
+            RoleType.ADMIN.name(), null, null, null),
         user(SCOPED_ADMIN_USER, SCOPED_ADMIN_PASSWORD, List.of(ALLOWED_TABLE),
             List.of(org.apache.pinot.spi.config.user.AccessType.values())),
         user(EXCLUDED_USER, EXCLUDED_PASSWORD, null, List.of("otherTable"), null),
