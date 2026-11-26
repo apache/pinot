@@ -184,8 +184,7 @@ public enum TransformFunctionType {
   // Nullable: both the transform and the scalar function return NULL for a NULL value, unless the IdSet is empty. The
   // multi-stage planner also uses this operator for the inIdSet scalar function (see IdSetFunctions).
   IN_ID_SET("inIdSet", ReturnTypes.BOOLEAN_NULLABLE, OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
-  // Reads another table: a DELETE predicate rejects it, see DeleteStatement#CROSS_TABLE_FUNCTIONS, which lists the
-  // functions by hand and must gain any new function that reads another table
+  // Reads another table. Register any new table-reading transform in RequestUtils.CrossTableFunction as well.
   LOOKUP("lookUp"),
   // Runs a script: a DELETE predicate rejects it, see DeleteStatement#SCRIPT_FUNCTIONS, which must gain any new
   // script function

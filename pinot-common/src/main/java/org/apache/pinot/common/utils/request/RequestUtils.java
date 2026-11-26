@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -97,8 +98,18 @@ public class RequestUtils {
     long parserStartTimeNs = System.nanoTime();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
     setOptions(sqlNodeAndOptions, request);
+    validateClientQueryOptions(sqlNodeAndOptions.getOptions());
     sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parserStartTimeNs);
     return sqlNodeAndOptions;
+  }
+
+  /// Rejects row-filter metadata from clients. Only the broker can attach row filters after authorization.
+  public static void validateClientQueryOptions(Map<String, String> options) {
+    for (String key : options.keySet()) {
+      if (Strings.CI.startsWith(key, CommonConstants.RLS_FILTERS)) {
+        throw QueryErrorCode.QUERY_VALIDATION.asException("Row-filter options are reserved for the broker");
+      }
+    }
   }
 
   /// Extracts and merges SQL and request payload options without parsing the executable SQL statement.
@@ -630,24 +641,58 @@ public class RequestUtils {
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalName, canonicalName);
   }
 
-  /// Canonical names, see [#canonicalizeFunctionName(String)], of the functions that read rows from somewhere other
-  /// than the FROM clause of the query that calls them: `lookup()` joins a dimension table by primary key,
-  /// `IN_SUBQUERY` runs its quoted subquery as a request of its own and `IN_PARTITIONED_SUBQUERY` runs it on the
-  /// server. The access checks keyed on the FROM clause do not cover them, so the single-stage broker rejects them
-  /// under row-level security, see [#isCrossTableFunction(String)].
-  ///
-  /// Nothing derives this set from the function registries, so a function that reads another table or runs a nested
-  /// query must be added here when it is defined, and to `DeleteStatement#CROSS_TABLE_FUNCTIONS`, which keeps the
-  /// same list in its own fold: `lookup` is `TransformFunctionType#LOOKUP` (with `LookupTransformFunction` in
-  /// pinot-core), `insubquery` is rewritten by `BaseSingleStageBrokerRequestHandler#IN_SUBQUERY` in pinot-broker and
-  /// `inpartitionedsubquery` by `ServerQueryExecutorV1Impl#IN_PARTITIONED_SUBQUERY` in pinot-core.
-  private static final Set<String> CROSS_TABLE_FUNCTIONS = Set.of("lookup", "insubquery", "inpartitionedsubquery");
+  /// Built-in functions whose execution reads a table or runs a query through an expression rather than a data source.
+  /// The single-stage broker uses this classification to account for table dependencies and enforce row-level security.
+  /// DELETE rejects these functions because its authorization only covers the table being modified.
+  public enum CrossTableFunction {
+    LOOKUP,
+    IN_SUBQUERY,
+    IN_PARTITIONED_SUBQUERY
+  }
 
-  /// Returns whether `canonicalName` names a function that reads rows from somewhere other than the FROM clause, see
-  /// [#CROSS_TABLE_FUNCTIONS]. The name must already be canonical, see [#canonicalizeFunctionName(String)], as the
-  /// parser leaves the operator of every compiled function call; a name as written in a query is not matched.
+  // Classify each new built-in that reads another table or runs a nested query and define how its dependencies are
+  // authorized. The transform function registry describes LOOKUP, and the two subqueries are handled by rewriters.
+  private static final Map<String, CrossTableFunction> CROSS_TABLE_FUNCTIONS = Map.of(
+      "lookup", CrossTableFunction.LOOKUP, "insubquery", CrossTableFunction.IN_SUBQUERY,
+      "inpartitionedsubquery", CrossTableFunction.IN_PARTITIONED_SUBQUERY);
+
+  /// Returns the built-in's classification, or null for other functions. The name must already be canonical, see
+  /// [#canonicalizeFunctionName(String)].
+  @Nullable
+  public static CrossTableFunction getCrossTableFunction(String canonicalName) {
+    return CROSS_TABLE_FUNCTIONS.get(canonicalName);
+  }
+
+  /// Returns whether a canonical name belongs to a built-in function with table dependencies outside its data source.
   public static boolean isCrossTableFunction(String canonicalName) {
-    return CROSS_TABLE_FUNCTIONS.contains(canonicalName);
+    return getCrossTableFunction(canonicalName) != null;
+  }
+
+  /// Classifies a compiled operator, matching the server's case-insensitive partitioned-subquery name check.
+  @Nullable
+  public static CrossTableFunction classifyCrossTableFunction(String operator) {
+    String name = StringUtils.remove(operator, '_');
+    if (name.equalsIgnoreCase("inPartitionedSubquery")) {
+      return CrossTableFunction.IN_PARTITIONED_SUBQUERY;
+    }
+    return getCrossTableFunction(name.toLowerCase(Locale.ROOT));
+  }
+
+  /// Returns whether any call in this expression reads a table outside its data source.
+  public static boolean containsCrossTableFunction(@Nullable Expression expression) {
+    Function function = expression == null ? null : expression.getFunctionCall();
+    if (function == null) {
+      return false;
+    }
+    if (classifyCrossTableFunction(function.getOperator()) != null) {
+      return true;
+    }
+    for (Expression operand : function.getOperands()) {
+      if (containsCrossTableFunction(operand)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Returns true iff `expression` is an `AS`-wrapped function call

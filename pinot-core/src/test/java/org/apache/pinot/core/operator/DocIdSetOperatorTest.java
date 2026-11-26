@@ -102,14 +102,14 @@ public class DocIdSetOperatorTest {
   @DataProvider
   public Object[][] scanCostTails() {
     return new Object[][]{
-        {new int[0], new long[]{20}, 0L},
-        {new int[]{2, 6}, new long[]{3, 7, 20}, 7L},
-        {new int[]{2, 6, 9}, new long[]{3, 7, 10, 20}, 20L}
+        {new int[0], new long[]{20}},
+        {new int[]{2, 6}, new long[]{3, 7, 20}},
+        {new int[]{2, 6, 9}, new long[]{3, 7, 10, 20}}
     };
   }
 
   @Test(dataProvider = "scanCostTails")
-  public void testScanCostPreservesUnmatchedTerminalTail(int[] docIds, long[] scanTotals, long expectedPushedCost) {
+  public void testScanCostPreservesUnmatchedTerminalTail(int[] docIds, long[] scanTotals) {
     StrictDocIdSet docIdSet = new StrictDocIdSet(docIds, scanTotals);
     DocIdSetOperator operator = new DocIdSetOperator(new FixedFilterOperator(docIdSet), 2);
     QueryExecutionContext executionContext = QueryExecutionContext.forSseTest();
@@ -118,17 +118,18 @@ public class DocIdSetOperatorTest {
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mock(ThreadAccountant.class))) {
       assertEquals(operator.getExecutionStatistics().getNumEntriesScannedInFilter(), 0L);
       while (operator.nextBlock() != null) {
-        // Consume the full stream, including any unmatched tail found while looking for EOF.
+        assertEquals(scanCost.getNumEntriesScannedInFilter(), docIdSet.getNumEntriesScannedInFilter());
       }
-      // Existing proactive accounting only publishes deltas with a nonempty block. Final statistics include all scans.
-      assertEquals(scanCost.getNumEntriesScannedInFilter(), expectedPushedCost);
+      // A terminal pull can scan an unmatched tail even when it produces an empty block.
+      long expectedScanCost = scanTotals[scanTotals.length - 1];
+      assertEquals(scanCost.getNumEntriesScannedInFilter(), expectedScanCost);
       ExecutionStatistics statistics = operator.getExecutionStatistics();
-      assertEquals(statistics.getNumEntriesScannedInFilter(), 20L);
+      assertEquals(statistics.getNumEntriesScannedInFilter(), expectedScanCost);
       assertEquals(statistics.getNumDocsScanned(), 0L);
       assertEquals(statistics.getNumEntriesScannedPostFilter(), 0L);
       assertEquals(statistics.getNumTotalDocs(), 0L);
       assertNull(operator.nextBlock());
-      assertEquals(scanCost.getNumEntriesScannedInFilter(), expectedPushedCost);
+      assertEquals(scanCost.getNumEntriesScannedInFilter(), expectedScanCost);
       assertEquals(docIdSet._nextCalls, docIds.length + 1);
     }
   }

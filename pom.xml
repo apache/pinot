@@ -43,6 +43,7 @@
     <module>pinot-dependency-patches</module>
     <module>pinot-spi</module>
     <module>pinot-segment-spi</module>
+    <module>pinot-foreign-buffers</module>
     <module>pinot-broker</module>
     <module>pinot-common</module>
     <module>pinot-clients</module>
@@ -218,8 +219,8 @@
     <async-http-client.version>3.0.14</async-http-client.version>
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
-    <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.35.1</swagger-ui.version>
+    <swagger.version>1.6.17</swagger.version>
+    <swagger-ui.version>5.36.0</swagger-ui.version>
     <hadoop.version>3.4.3</hadoop.version>
     <jsonpath.version>2.10.0</jsonpath.version>
     <jsonsmart.version>2.6.1</jsonsmart.version>
@@ -227,7 +228,7 @@
     <calcite.version>1.42.0</calcite.version>
     <joou.version>0.9.6</joou.version>
     <immutables.version>2.12.3</immutables.version>
-    <lucene.version>9.12.0</lucene.version>
+    <lucene.version>10.6.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
     <dynatrace.hash4j.version>0.31.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
@@ -240,7 +241,7 @@
     <log4j.version>2.26.1</log4j.version>
     <slf4j.version>2.0.20</slf4j.version>
     <netty.version>4.2.19.Final</netty.version>
-    <reactor-netty.version>1.3.8</reactor-netty.version>
+    <reactor-netty.version>1.4.0</reactor-netty.version>
     <reactor-core.version>3.9.0</reactor-core.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
@@ -251,7 +252,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.2</stax2-api.version>
-    <aws.sdk.version>2.59.5</aws.sdk.version>
+    <aws.sdk.version>2.59.7</aws.sdk.version>
     <azure.sdk.version>1.3.10</azure.sdk.version>
     <azure.msal4j.version>1.26.1</azure.msal4j.version>
     <joda-time.version>2.15.1</joda-time.version>
@@ -341,7 +342,7 @@
     <google.re2j.version>1.8</google.re2j.version>
     <google.cloud.opentelemetry.version>0.36.0</google.cloud.opentelemetry.version>
     <opentelemetry.gcp.resources.version>1.62.1-alpha</opentelemetry.gcp.resources.version>
-    <google.errorprone.version>2.52.0</google.errorprone.version>
+    <google.errorprone.version>2.53.0</google.errorprone.version>
     <google.j2objc.version>3.1</google.j2objc.version>
 
     <!-- Configuration for Scala -->
@@ -388,7 +389,7 @@
     <ivy.version>2.6.0</ivy.version>
     <c3p0.version>0.15.1</c3p0.version>
     <mchange-commons-java.version>0.7.1</mchange-commons-java.version>
-    <animal-sniffer-annotations.version>1.29.1</animal-sniffer-annotations.version>
+    <animal-sniffer-annotations.version>1.29.2</animal-sniffer-annotations.version>
 
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
@@ -397,7 +398,7 @@
     <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>2.0.5</testcontainers.version>
     <h2.version>2.5.252</h2.version>
-    <jnr-posix.version>3.2.8</jnr-posix.version>
+    <jnr-posix.version>3.2.9</jnr-posix.version>
     <scalatest.version>3.2.20</scalatest.version>
     <assertj.version>3.27.7</assertj.version>
 

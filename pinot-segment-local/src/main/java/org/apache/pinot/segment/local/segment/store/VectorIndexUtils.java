@@ -31,13 +31,15 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.codecs.lucene912.Lucene912Codec;
+import org.apache.lucene.codecs.lucene104.Lucene104Codec;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
+import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneCombinedTextIndexConstants;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswCodec;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat.SmallSegmentGraphs;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.vector.IvfPqIndexFormat;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
@@ -327,24 +329,38 @@ public class VectorIndexUtils {
   }
 
   public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig) {
-    return getIndexWriterConfig(vectorIndexConfig, 1, null, null);
+    return getIndexWriterConfig(vectorIndexConfig, 1, null, null, SmallSegmentGraphs.DEFAULT);
   }
 
   public static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig,
       @Nullable Path mmapMergeDirectory) {
-    return getIndexWriterConfig(vectorIndexConfig, 1, null, mmapMergeDirectory);
+    return getIndexWriterConfig(vectorIndexConfig, 1, null, mmapMergeDirectory, SmallSegmentGraphs.DEFAULT);
+  }
+
+  /// Configures an individual part writer of an opt-in parallel HNSW build.
+  public static IndexWriterConfig getParallelBuildPartWriterConfig(VectorIndexConfig vectorIndexConfig) {
+    return getIndexWriterConfig(vectorIndexConfig, 1, null, null, SmallSegmentGraphs.PARALLEL_PART);
   }
 
   /// Configures the main immutable writer with the final merge mode selected by the table configuration.
   public static IndexWriterConfig getImmutableIndexWriterConfig(VectorIndexConfig vectorIndexConfig, Path segmentDir,
       @Nullable ExecutorService mergeExecutor) {
-    return getIndexWriterConfig(vectorIndexConfig, mergeExecutor != null ? vectorIndexConfig.getHnswBuildThreads() : 1,
-        mergeExecutor, vectorIndexConfig.isMmapGraphOnMerge() ? segmentDir : null);
+    int buildThreads = vectorIndexConfig.getHnswBuildThreads();
+    Path mmapMergeDirectory = vectorIndexConfig.isMmapGraphOnMerge() ? segmentDir : null;
+    SmallSegmentGraphs smallSegmentGraphs =
+        mmapMergeDirectory == null && buildThreads > 1 && vectorIndexConfig.isHnswForceMerge()
+            ? SmallSegmentGraphs.PARALLEL_FINAL_MERGE : SmallSegmentGraphs.DEFAULT;
+    return getIndexWriterConfig(vectorIndexConfig, mergeExecutor != null ? buildThreads : 1, mergeExecutor,
+        mmapMergeDirectory, smallSegmentGraphs);
   }
 
   private static IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig, int numMergeWorkers,
-      @Nullable ExecutorService mergeExec, @Nullable Path mmapMergeDirectory) {
+      @Nullable ExecutorService mergeExec, @Nullable Path mmapMergeDirectory, SmallSegmentGraphs smallSegmentGraphs) {
     IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
+    // Lucene 10 disables this by default; retain the previous merge I/O throttling behavior.
+    ConcurrentMergeScheduler mergeScheduler = new ConcurrentMergeScheduler();
+    mergeScheduler.enableAutoIOThrottle();
+    indexWriterConfig.setMergeScheduler(mergeScheduler);
 
     Map<String, String> properties = vectorIndexConfig.getProperties();
     if (properties == null) {
@@ -367,11 +383,11 @@ public class VectorIndexUtils {
     int maxDimensions = Integer.parseInt(properties
         .getOrDefault("maxDimensions", String.valueOf(HnswVectorsFormat.DEFAULT_MAX_DIMENSIONS)));
 
-    HnswVectorsFormat knnVectorsFormat =
-        new HnswVectorsFormat(maxCon, beamWidth, maxDimensions, numMergeWorkers, mergeExec, mmapMergeDirectory);
+    HnswVectorsFormat knnVectorsFormat = new HnswVectorsFormat(maxCon, beamWidth, maxDimensions, numMergeWorkers,
+        mergeExec, mmapMergeDirectory, smallSegmentGraphs);
 
-    Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(properties
-        .getOrDefault("mode", Lucene912Codec.Mode.BEST_SPEED.name()));
+    Lucene104Codec.Mode mode = Lucene104Codec.Mode.valueOf(properties
+        .getOrDefault("mode", Lucene104Codec.Mode.BEST_SPEED.name()));
     indexWriterConfig.setCodec(new HnswCodec(mode, knnVectorsFormat));
     return indexWriterConfig;
   }

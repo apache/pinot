@@ -84,6 +84,11 @@ public class RangeIndexType
           storedType.isNumeric() || indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
           "Cannot create range index on non-numeric column: %s without dictionary", column);
       Preconditions.checkState(storedType != DataType.MAP, "Cannot create range index on MAP column: %s", column);
+      // BIG_DECIMAL is numeric, but neither range index creator can index its raw values; they can only index it
+      // through dictionary ids.
+      Preconditions.checkState(
+          storedType != DataType.BIG_DECIMAL || indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+          "Cannot create range index on BIG_DECIMAL column: %s without dictionary", column);
       // Legacy range index (version 1) over dict IDs is non-exact: query-time partial matches fall back to
       // ScanBasedFilterOperator, which on a RAW forward column would have to apply a dict-based evaluator
       // against raw values — silently producing wrong results. Reject this combination upfront and require

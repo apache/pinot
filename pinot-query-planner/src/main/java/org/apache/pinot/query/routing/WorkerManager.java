@@ -55,10 +55,13 @@ import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.PlanFragment;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -991,6 +994,26 @@ public class WorkerManager {
         new ArrayList<>(serverInstanceToSegmentsMap.entrySet());
     sortedServerInstanceToSegmentsMap.sort(Comparator.comparing(entry -> entry.getKey().getInstanceId()));
 
+    // Only a plain, randomly distributed OFFLINE scan can be divided without changing ordering,
+    // partition affinity, replication, leaf limits or aggregation. Keep one worker otherwise.
+    if (context.getPlannerContext().getOptions().containsKey(QueryOptionKey.LEAF_STAGE_WORKERS_PER_SERVER)
+        && sortedServerInstanceToSegmentsMap.size() == 1) {
+      Map.Entry<ServerInstance, Map<String, List<String>>> entry = sortedServerInstanceToSegmentsMap.get(0);
+      List<String> segments = entry.getValue().get(TableType.OFFLINE.name());
+      if (entry.getValue().size() == 1 && segments != null && segments.size() > 1) {
+        int workers = getRandomScanWorkers(fragment.getFragmentRoot(), context.getPlannerContext().getOptions());
+        if (workers > 1) {
+          QueryServerInstance server = new QueryServerInstance(entry.getKey());
+          Map<Integer, Map<String, List<String>>> shards = shardOfflineSegments(segments, workers);
+          Map<Integer, QueryServerInstance> servers = Maps.newHashMapWithExpectedSize(shards.size());
+          shards.keySet().forEach(worker -> servers.put(worker, server));
+          metadata.setWorkerIdToServerInstanceMap(servers);
+          metadata.setWorkerIdToSegmentsMap(shards);
+          return;
+        }
+      }
+    }
+
     // Assign 1 worker per server
     int numWorkers = sortedServerInstanceToSegmentsMap.size();
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
@@ -1008,6 +1031,45 @@ public class WorkerManager {
 
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+  }
+
+  private static int getRandomScanWorkers(PlanNode root, Map<String, String> options) {
+    String value = options.get(QueryOptionKey.LEAF_STAGE_WORKERS_PER_SERVER);
+    if (value == null || value.equals("1") || QueryOptionsUtils.getMultiStageLeafLimit(options) != null
+        || options.containsKey(QueryOptionKey.TABLE_SAMPLER) || !(root instanceof MailboxSendNode send)
+        || send.getDistributionType() != RelDistribution.Type.RANDOM_DISTRIBUTED
+        || send.isMultiSend() || send.isPrePartitioned() || send.isSort() || !send.getCollations().isEmpty()
+        || send.getInputs().size() != 1) {
+      return 1;
+    }
+    PlanNode input = send.getInputs().get(0);
+    if (input instanceof ProjectNode project && project.getInputs().size() == 1
+        && project.getProjects().stream().allMatch(expr -> expr instanceof RexExpression.InputRef)) {
+      input = project.getInputs().get(0);
+    }
+    if (!(input instanceof TableScanNode)) {
+      return 1;
+    }
+    int workers = Integer.parseInt(value);
+    Preconditions.checkArgument(workers >= 1 && workers <= 16, "leafStageWorkersPerServer must be in [1, 16]");
+    return workers;
+  }
+
+  private static Map<Integer, Map<String, List<String>>> shardOfflineSegments(List<String> segments,
+      int requestedWorkers) {
+    int workers = Math.min(requestedWorkers, segments.size());
+    List<List<String>> shards = new ArrayList<>(workers);
+    for (int worker = 0; worker < workers; worker++) {
+      shards.add(new ArrayList<>());
+    }
+    for (int i = 0; i < segments.size(); i++) {
+      shards.get(i % workers).add(segments.get(i));
+    }
+    Map<Integer, Map<String, List<String>>> result = Maps.newHashMapWithExpectedSize(workers);
+    for (int worker = 0; worker < workers; worker++) {
+      result.put(worker, Map.of(TableType.OFFLINE.name(), shards.get(worker)));
+    }
+    return result;
   }
 
   /// Acquire routing table for items listed in [org.apache.pinot.query.planner.plannode.TableScanNode].

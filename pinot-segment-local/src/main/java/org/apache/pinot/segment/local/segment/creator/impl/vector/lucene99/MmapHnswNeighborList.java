@@ -23,7 +23,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.Arrays;
 import org.apache.lucene.util.hnsw.RandomVectorScorer;
-import org.apache.lucene.util.hnsw.RandomVectorScorerSupplier;
+import org.apache.lucene.util.hnsw.UpdateableRandomVectorScorer;
 
 
 /// Fixed-capacity mapped neighbor row. Diversity pruning follows Lucene 9.12 NeighborArray.
@@ -67,24 +67,25 @@ final class MmapHnswNeighborList {
     set(_size++, node, score);
   }
 
-  void appendAndPrune(int neighbor, float score, int owner, RandomVectorScorerSupplier supplier)
+  void appendAndPrune(int neighbor, float score, int owner, UpdateableRandomVectorScorer scorer)
       throws IOException {
     append(neighbor, score);
     if (_size == _capacity) {
-      int remove = findWorstNonDiverse(owner, supplier);
+      int remove = findWorstNonDiverse(owner, scorer);
       move(remove + 1, remove, _size - remove - 1);
       _size--;
       _sortedSize--;
     }
   }
 
-  private int findWorstNonDiverse(int owner, RandomVectorScorerSupplier supplier)
+  private int findWorstNonDiverse(int owner, UpdateableRandomVectorScorer scorer)
       throws IOException {
-    int[] unchecked = sortPending(supplier.scorer(owner));
+    scorer.setScoringOrdinal(owner);
+    int[] unchecked = sortPending(scorer);
     int cursor = unchecked.length - 1;
     for (int candidate = _size - 1; candidate > 0 && cursor >= 0; candidate--) {
       float minSimilarity = score(candidate);
-      RandomVectorScorer scorer = supplier.scorer(node(candidate));
+      scorer.setScoringOrdinal(node(candidate));
       if (candidate == unchecked[cursor]) {
         for (int i = candidate - 1; i >= 0; i--) {
           if (scorer.score(node(i)) >= minSimilarity) {

@@ -21,26 +21,34 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import org.apache.helix.AccessOption;
+import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.controller.api.access.AccessControl;
+import org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory;
+import org.apache.pinot.controller.api.access.ZkBasicAuthAccessControlFactory;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.TargetType;
+import org.apache.zookeeper.data.Stat;
+import org.mockito.InOrder;
+import org.mockito.Mockito;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.expectThrows;
 
 
 public class ZookeeperResourceTest extends ControllerTest {
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    setupSharedStateAndValidate();
-  }
-
   @Test
   public void testZookeeperDataEndpoints()
       throws Exception {
+    setupSharedStateAndValidate();
     PinotAdminClient adminClient = getOrCreateAdminClient();
     String path = "/zookeeper";
     int expectedVersion = -1;
@@ -117,5 +125,56 @@ public class ZookeeperResourceTest extends ControllerTest {
         new TypeReference<List<ZNRecord>>() { });
     Assert.assertEquals(recordList4.get(0), recordList3.get(0));
     Assert.assertEquals(recordList4.get(1), recordList3.get(1));
+  }
+
+  @Test
+  public void testUserMetadataWriteAuthorization()
+      throws Exception {
+    ZookeeperResource resource = new ZookeeperResource();
+    PinotHelixResourceManager manager = Mockito.mock(PinotHelixResourceManager.class);
+    AccessControl accessControl = Mockito.mock(AccessControl.class);
+    resource._pinotHelixResourceManager = manager;
+    resource._accessControlFactory = Mockito.mock(ZkBasicAuthAccessControlFactory.class);
+    resource._httpHeaders = Mockito.mock(HttpHeaders.class);
+    Mockito.when(resource._accessControlFactory.create()).thenReturn(accessControl);
+
+    String configRoot = PropertyPathBuilder.propertyStore("testCluster") + "/CONFIGS";
+    String userPath = configRoot + "/USER/fixture";
+    Mockito.when(manager.getZKStat(configRoot)).thenReturn(new Stat());
+    Mockito.when(manager.getZKChildNames(configRoot)).thenReturn(List.of("USER"));
+    String record = ZookeeperResource.MAPPER.writeValueAsString(new ZNRecord("fixture"));
+    String batch = ZookeeperResource.MAPPER.writeValueAsString(List.of(new ZNRecord("other"), new ZNRecord("USER")));
+    assertForbidden(() -> resource.createNode(userPath, -1, AccessOption.PERSISTENT, record));
+    assertForbidden(() -> resource.putData(userPath, null, -1, AccessOption.PERSISTENT, record));
+    assertForbidden(() -> resource.putData("/peers/testCluster/HELIX_PROPERTYSTORE/CONFIGS/USER/fixture", null, -1,
+        AccessOption.PERSISTENT, record));
+    assertForbidden(() -> resource.putChildren(configRoot, null, -1, AccessOption.PERSISTENT, batch));
+    assertForbidden(() -> resource.delete(configRoot));
+    Mockito.verifyNoMoreInteractions(Mockito.ignoreStubs(manager));
+
+    String topLevel = "/fixture";
+    Mockito.when(manager.getZKStat(topLevel)).thenReturn(new Stat());
+    Mockito.when(manager.getZKChildNames(topLevel)).thenReturn(List.of("child"));
+    Mockito.when(manager.deleteZKLeaf(topLevel + "/child")).thenReturn(true);
+    Mockito.when(manager.deleteZKLeaf(topLevel)).thenReturn(true);
+    resource.delete(topLevel);
+    InOrder deletes = Mockito.inOrder(manager);
+    deletes.verify(manager).deleteZKLeaf(topLevel + "/child");
+    deletes.verify(manager).deleteZKLeaf(topLevel);
+    Mockito.verify(manager, Mockito.never()).deleteZKPath(topLevel);
+
+    Mockito.when(accessControl.hasAccess(resource._httpHeaders, TargetType.CLUSTER, null, Actions.Cluster.UPDATE_USER))
+        .thenReturn(true);
+    Mockito.when(manager.deleteZKPath(configRoot)).thenReturn(true);
+    resource.delete(configRoot);
+    Mockito.verify(manager).deleteZKPath(configRoot);
+    resource._accessControlFactory = Mockito.mock(BasicAuthAccessControlFactory.class);
+    resource.delete(configRoot);
+    Mockito.verify(manager, Mockito.times(2)).deleteZKPath(configRoot);
+  }
+
+  private static void assertForbidden(Runnable operation) {
+    ControllerApplicationException exception = expectThrows(ControllerApplicationException.class, operation::run);
+    Assert.assertEquals(exception.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
   }
 }

@@ -25,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -566,6 +567,47 @@ public class WorkerManagerTest {
       for (Expression operand : function.getOperands()) {
         validatePrunableFilter(operand);
       }
+    }
+  }
+
+  @DataProvider
+  public Object[][] leafFanoutOptions() {
+    return new Object[][]{
+        {"", 1},
+        {"SET leafStageWorkersPerServer=4;", 4},
+        {"SET leafStageWorkersPerServer=16;", 7},
+        {"SET leafStageWorkersPerServer=4; SET multiStageLeafLimit=100;", 1}
+    };
+  }
+
+  @Test(dataProvider = "leafFanoutOptions")
+  public void testOptInFanoutWithFusedBroadcastJoins(String options, int factWorkers) {
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    List<String> segments = IntStream.range(0, 7).mapToObj(Integer::toString).toList();
+    RoutingTable routing = new RoutingTable(Map.of(server, new SegmentsToQuery(segments, List.of())), List.of(), 0);
+    QueryEnvironment env = newQueryEnvironment(schema,
+        new CapturingRoutingManager(Map.of(server.getInstanceId(), server), Map.of("testTable_OFFLINE", routing)));
+    String query = options + " SET fuseBroadcastJoins=true; "
+        + "SELECT /*+ joinOptions(left_distribution_type='random',right_distribution_type='broadcast') */ "
+        + "f.col3,c.col2,p.col2 FROM testTable f JOIN testTable c ON f.col1=c.col1 "
+        + "JOIN testTable p ON f.col2=p.col2";
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(query)) {
+      DispatchableSubPlan subPlan = compiled.planQuery(0).getQueryPlan();
+      List<Integer> fanouts = new ArrayList<>();
+      for (DispatchablePlanFragment stage : subPlan.getQueryStageMap().values()) {
+        Map<Integer, Map<String, List<String>>> assigned = stage.getWorkerIdToSegmentsMap();
+        if (assigned == null || assigned.isEmpty()) {
+          continue;
+        }
+        List<String> scanned = assigned.values().stream().flatMap(map -> map.get("OFFLINE").stream()).toList();
+        assertEquals(scanned.size(), segments.size());
+        assertEquals(new HashSet<>(scanned), new HashSet<>(segments));
+        assertEquals(stage.getServerInstanceToWorkerIdMap().size(), 1);
+        fanouts.add(assigned.size());
+      }
+      fanouts.sort(Integer::compare);
+      assertEquals(fanouts, List.of(1, 1, factWorkers)); // Each broadcast build remains single-worker.
     }
   }
 

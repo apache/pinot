@@ -586,7 +586,7 @@ SLF4J 2 Provider for Log4j API
 Copyright 1999-2025 The Apache Software Foundation
 
 Apache Lucene
-Copyright 2001-2022 The Apache Software Foundation
+Copyright 2001-2025 The Apache Software Foundation
 
 Includes software from other Apache Software Foundation projects,
 including, but not limited to:
@@ -685,9 +685,6 @@ developed by Dawid Weiss and Marcin Miłkowski
 (https://github.com/morfologik/morfologik-stemming) and uses
 data from the BSD-licensed dictionary of Polish (SGJP, http://sgjp.pl/morfeusz/).
 
-Servlet-api.jar and javax.servlet-*.jar are under the CDDL license, the original
-source code for this can be found at http://www.eclipse.org/jetty/downloads.php
-
 ===========================================================================
 Kuromoji Japanese Morphological Analyzer - Apache Lucene Integration
 ===========================================================================
@@ -777,11 +774,11 @@ Nori Korean Morphological Analyzer - Apache Lucene Integration
 
 This software includes a binary and/or source version of data from
 
-  mecab-ko-dic-2.0.3-20170922
+  mecab-ko-dic-2.1.1-20180720
 
 which can be obtained from
 
-  https://bitbucket.org/eunjeon/mecab-ko-dic/downloads/mecab-ko-dic-2.0.3-20170922.tar.gz
+  https://bitbucket.org/eunjeon/mecab-ko-dic/downloads/mecab-ko-dic-2.1.1-20180720.tar.gz
 
 ORC Core
 Copyright 2013-2026 The Apache Software Foundation

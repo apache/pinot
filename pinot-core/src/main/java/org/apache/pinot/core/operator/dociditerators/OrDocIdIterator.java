@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 
@@ -107,6 +108,19 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     }
   }
 
+  /// Closes the children that are not exhausted yet, for a consumer that stops before the end. The exhausted ones are
+  /// already closed.
+  @Override
+  public void close() {
+    close(null);
+  }
+
+  private void close(@Nullable Throwable failure) {
+    int numNotExhaustedIterators = _numNotExhaustedIterators;
+    _numNotExhaustedIterators = 0;
+    DocIdIteratorUtils.closeAll(_docIdIterators, numNotExhaustedIterators, failure);
+  }
+
   /// Helper method to remove exhausted iterators.
   ///
   /// Whenever we find an exhausted iterator, we replace it with the last one, and update number of not exhausted
@@ -115,13 +129,17 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     int i = 0;
     while (i < _numNotExhaustedIterators) {
       if (_nextDocIds[i] == Constants.EOF) {
-        // Close the exhausted iterator
-        _docIdIterators[i].close();
-
+        BlockDocIdIterator exhaustedIterator = _docIdIterators[i];
         // Need to check the new iterator moved to this index, so do not increase the index
         _numNotExhaustedIterators--;
         _docIdIterators[i] = _docIdIterators[_numNotExhaustedIterators];
         _nextDocIds[i] = _nextDocIds[_numNotExhaustedIterators];
+        try {
+          exhaustedIterator.close();
+        } catch (RuntimeException | Error e) {
+          close(e);
+          throw e;
+        }
       } else {
         i++;
       }

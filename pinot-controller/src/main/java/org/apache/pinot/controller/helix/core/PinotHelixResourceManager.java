@@ -2386,6 +2386,11 @@ public class PinotHelixResourceManager {
     return _helixDataAccessor.getBaseDataAccessor().remove(path, -1);
   }
 
+  /// Removes only a leaf, even if children are added concurrently.
+  public boolean deleteZKLeaf(String path) {
+    return _helixDataAccessor.getBaseDataAccessor().removeWithExpectedVersion(path, AccessOption.PERSISTENT, -1);
+  }
+
   public ZNRecord readZKData(String path) {
     return _helixDataAccessor.getBaseDataAccessor().get(path, null, -1);
   }

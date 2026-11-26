@@ -22,23 +22,102 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
+import java.io.File;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufCodeGenMessageDecoder.ALLOWED_JAR_LOCATIONS_PROPERTY;
 import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufCodeGenMessageDecoder.PROTOBUF_JAR_FILE_PATH;
 import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufCodeGenMessageDecoder.PROTO_CLASS_NAME;
 import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufTestDataGenerator.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertThrows;
 
 
 public class ProtoBufCodeGenMessageDecoderTest {
+  private static final String SAMPLE_CLASS = "org.apache.pinot.plugin.inputformat.protobuf.Sample$SampleRecord";
+
+  @BeforeMethod
+  public void allowTestResourceJars()
+      throws Exception {
+    System.setProperty(ALLOWED_JAR_LOCATIONS_PROPERTY, getResourceDir().getPath());
+  }
+
+  @AfterMethod
+  public void clearAllowedJarLocations() {
+    System.clearProperty(ALLOWED_JAR_LOCATIONS_PROPERTY);
+  }
+
+  @Test
+  public void testDisabledWhenAllowedJarLocationsNotSet() {
+    System.clearProperty(ALLOWED_JAR_LOCATIONS_PROPERTY);
+    assertThrows(IllegalStateException.class,
+        () -> setupDecoder("sample.jar", SAMPLE_CLASS, getFieldsInSampleRecord()));
+    System.setProperty(ALLOWED_JAR_LOCATIONS_PROPERTY, " ");
+    assertThrows(IllegalStateException.class,
+        () -> setupDecoder("sample.jar", SAMPLE_CLASS, getFieldsInSampleRecord()));
+  }
+
+  @Test
+  public void testJarOutsideAllowedLocationsRejected()
+      throws Exception {
+    File resourceDir = getResourceDir();
+    File allowedDir = Files.createTempDirectory("allowed").toFile();
+    File siblingDir = new File(allowedDir.getPath() + "-sibling");
+    try {
+      System.setProperty(ALLOWED_JAR_LOCATIONS_PROPERTY, allowedDir.getPath() + ", s3://bucket/protobuf");
+      // Not under an allowed location
+      assertThrows(IllegalStateException.class,
+          () -> setupDecoder("sample.jar", SAMPLE_CLASS, getFieldsInSampleRecord()));
+      // Relative segments leaving the allowed location
+      assertThrows(IllegalStateException.class, () -> ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed(
+          allowedDir.toURI() + "../" + resourceDir.getName() + "/sample.jar"));
+      assertThrows(IllegalStateException.class,
+          () -> ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed("s3://bucket/protobuf/../other/sample.jar"));
+      assertThrows(IllegalStateException.class,
+          () -> ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed("s3://bucket/protobuf/%2e%2e/other/sample.jar"));
+      // Directory sharing the allowed location as a name prefix
+      assertThrows(IllegalStateException.class,
+          () -> ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed(new File(siblingDir, "sample.jar").getPath()));
+      assertThrows(IllegalStateException.class,
+          () -> ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed("s3://bucket/protobuf-other/sample.jar"));
+      // Different bucket or scheme
+      assertThrows(IllegalStateException.class,
+          () -> ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed("s3://other/protobuf/sample.jar"));
+      assertThrows(IllegalStateException.class,
+          () -> ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed("gs://bucket/protobuf/sample.jar"));
+      // Symbolic link leaving the allowed location
+      File link = new File(allowedDir, "link.jar");
+      Files.createSymbolicLink(link.toPath(), new File(resourceDir, "sample.jar").toPath());
+      assertThrows(IllegalStateException.class,
+          () -> ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed(link.getPath()));
+
+      // Allowed
+      ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed(new File(allowedDir, "sample.jar").getPath());
+      ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed(
+          new File(allowedDir, "nested/sample.jar").toURI().toString());
+      ProtoBufCodeGenMessageDecoder.checkJarLocationAllowed("s3://bucket/protobuf/nested/sample.jar");
+    } finally {
+      new File(allowedDir, "link.jar").delete();
+      allowedDir.delete();
+    }
+  }
+
+  private File getResourceDir()
+      throws Exception {
+    return new File(getClass().getClassLoader().getResource("sample.jar").toURI()).getParentFile();
+  }
+
   @Test
   public void testComplexClass()
       throws Exception {

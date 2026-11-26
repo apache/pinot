@@ -18,72 +18,32 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99;
 
-import org.apache.lucene.backward_codecs.lucene90.Lucene90PostingsFormat;
-import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
-import org.apache.lucene.codecs.PointsFormat;
-import org.apache.lucene.codecs.PostingsFormat;
-import org.apache.lucene.codecs.lucene90.Lucene90DocValuesFormat;
-import org.apache.lucene.codecs.lucene90.Lucene90PointsFormat;
-import org.apache.lucene.codecs.lucene912.Lucene912Codec;
-import org.apache.lucene.codecs.perfield.PerFieldDocValuesFormat;
+import org.apache.lucene.codecs.lucene104.Lucene104Codec;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
-import org.apache.lucene.codecs.perfield.PerFieldPostingsFormat;
 
 
-/// Extend the Lucene 9.5 index format
-/// The major change here is to allow custom: @link{org.apache.lucene.codecs.KnnVectorsFormat}
-///
-/// @see org.apache.lucene.codecs.lucene99 package documentation for file format details.
+/// Uses Lucene's standard codec with a configurable HNSW vector format.
+/// Legacy codec names are resolved by Lucene's backward codecs when reading.
 public class HnswCodec extends FilterCodec {
-
-  private final PostingsFormat _defaultPostingsFormat;
-  private final PostingsFormat _postingsFormat =
-      new PerFieldPostingsFormat() {
-        @Override
-        public PostingsFormat getPostingsFormatForField(String field) {
-          return HnswCodec.this.getPostingsFormatForField(field);
-        }
-      };
-
-  private final DocValuesFormat _defaultDVFormat;
-  private final DocValuesFormat _docValuesFormat =
-      new PerFieldDocValuesFormat() {
-        @Override
-        public DocValuesFormat getDocValuesFormatForField(String field) {
-          return HnswCodec.this.getDocValuesFormatForField(field);
-        }
-      };
-
-  private final KnnVectorsFormat _knnVectorsFormat =
-      new PerFieldKnnVectorsFormat() {
-        @Override
-        public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-          return HnswCodec.this.getKnnVectorsFormatForField(field);
-        }
-      };
-
   private final KnnVectorsFormat _defaultKnnVectorsFormat;
+  private final KnnVectorsFormat _knnVectorsFormat = new PerFieldKnnVectorsFormat() {
+    @Override
+    public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
+      return HnswCodec.this.getKnnVectorsFormatForField(field);
+    }
+  };
 
-  /// Instantiates a new codec, specifying the stored fields compression mode to use.
-  ///
-  /// @param mode stored fields compression mode to use for newly flushed/merged segments.
-  public HnswCodec(Lucene912Codec.Mode mode, KnnVectorsFormat defaultKnnVectorsFormat) {
-    super("Lucene99", new Lucene912Codec(mode));
+  /// Instantiates a codec with the given stored-fields compression mode and vector format.
+  public HnswCodec(Lucene104Codec.Mode mode, KnnVectorsFormat defaultKnnVectorsFormat) {
+    this(new Lucene104Codec(mode), defaultKnnVectorsFormat);
+  }
+
+  private HnswCodec(Lucene104Codec codec, KnnVectorsFormat defaultKnnVectorsFormat) {
+    // Persist the delegate's registered codec name so readers can open the index.
+    super(codec.getName(), codec);
     _defaultKnnVectorsFormat = defaultKnnVectorsFormat;
-    _defaultPostingsFormat = new Lucene90PostingsFormat();
-    _defaultDVFormat = new Lucene90DocValuesFormat();
-  }
-
-  @Override
-  public final PostingsFormat postingsFormat() {
-    return _postingsFormat;
-  }
-
-  @Override
-  public final PointsFormat pointsFormat() {
-    return new Lucene90PointsFormat();
   }
 
   @Override
@@ -91,39 +51,8 @@ public class HnswCodec extends FilterCodec {
     return _knnVectorsFormat;
   }
 
-  /// Returns the postings format that should be used for writing new segments of `field`.
-  ///
-  /// The default implementation always returns "Lucene90".
-  ///
-  /// **WARNING:** if you subclass, you are responsible for index backwards compatibility:
-  /// future version of Lucene are only guaranteed to be able to read the default implementation,
-  public PostingsFormat getPostingsFormatForField(String field) {
-    return _defaultPostingsFormat;
-  }
-
-  /// Returns the docvalues format that should be used for writing new segments of `field`
-  /// .
-  ///
-  /// The default implementation always returns "Lucene90".
-  ///
-  /// **WARNING:** if you subclass, you are responsible for index backwards compatibility:
-  /// future version of Lucene are only guaranteed to be able to read the default implementation.
-  public DocValuesFormat getDocValuesFormatForField(String field) {
-    return _defaultDVFormat;
-  }
-
-  /// Returns the vectors format that should be used for writing new segments of `field`
-  ///
-  /// The default implementation always returns "Lucene99".
-  ///
-  /// **WARNING:** if you subclass, you are responsible for index backwards compatibility:
-  /// future version of Lucene are only guaranteed to be able to read the default implementation.
+  /// Returns the vectors format for writing new segments of `field`.
   public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
     return _defaultKnnVectorsFormat;
-  }
-
-  @Override
-  public final DocValuesFormat docValuesFormat() {
-    return _docValuesFormat;
   }
 }

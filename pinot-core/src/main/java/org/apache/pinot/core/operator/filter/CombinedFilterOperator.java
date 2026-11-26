@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 
@@ -35,10 +36,10 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   private final BaseFilterOperator _mainFilterOperator;
   private final BaseFilterOperator _subFilterOperator;
   private final Map<String, String> _queryOptions;
-  private final boolean _restrictionPushdownEnabled;
+  private final AndRestrictionPushdown _restrictionPushdown;
 
   public CombinedFilterOperator(BaseFilterOperator mainFilterOperator, BaseFilterOperator subFilterOperator,
-      Map<String, String> queryOptions, boolean restrictionPushdownEnabled) {
+      Map<String, String> queryOptions, AndRestrictionPushdown restrictionPushdown) {
     // This filter operator does not support AND/OR/NOT operations.
     super(0, false);
     assert !mainFilterOperator.isResultEmpty() && !mainFilterOperator.isResultMatchingAll()
@@ -46,7 +47,7 @@ public class CombinedFilterOperator extends BaseFilterOperator {
     _mainFilterOperator = mainFilterOperator;
     _subFilterOperator = subFilterOperator;
     _queryOptions = queryOptions;
-    _restrictionPushdownEnabled = restrictionPushdownEnabled;
+    _restrictionPushdown = restrictionPushdown;
   }
 
   @Override
@@ -68,6 +69,6 @@ public class CombinedFilterOperator extends BaseFilterOperator {
     }
     BlockDocIdSet subFilterDocIdSet = _subFilterOperator.nextBlock().getBlockDocIdSet();
     return new AndDocIdSet(Arrays.asList(mainFilterDocIdSet, subFilterDocIdSet), _queryOptions,
-        _restrictionPushdownEnabled);
+        _restrictionPushdown);
   }
 }

@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
@@ -171,11 +172,11 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   /// Only for operators that override [#getNotFalses]. The default [#getNotFalses] reads [#getNulls], so an operator
   /// that keeps it would recurse; a leaf returns its UNKNOWN documents directly instead.
   ///
-  /// `restrictionPushdownEnabled` is the AND restriction push-down flag for the AND of the not-false and the not-true
+  /// `restrictionPushdown` is the AND restriction push-down for the AND of the not-false and the not-true
   /// documents. Without the push-down, a composite child of that AND (for example the NOT of an OR over a scan)
   /// evaluates its scans on the whole segment.
   protected BlockDocIdSet deriveNulls(@Nullable Map<String, String> queryOptions,
-      boolean restrictionPushdownEnabled) {
+      AndRestrictionPushdown restrictionPushdown) {
     BlockDocIdSet notFalses = getNotFalses();
     if (notFalses instanceof EmptyDocIdSet) {
       return EmptyDocIdSet.unscanned();
@@ -189,7 +190,7 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     }
     BlockDocIdSet notTrues = new NotDocIdSet(trues, _numDocs);
     return notFalses instanceof MatchAllDocIdSet ? notTrues
-        : new AndDocIdSet(List.of(notFalses, notTrues), queryOptions, restrictionPushdownEnabled);
+        : new AndDocIdSet(List.of(notFalses, notTrues), queryOptions, restrictionPushdown);
   }
 
   /// @return document IDs in which the predicate evaluates to false.

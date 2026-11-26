@@ -1,0 +1,72 @@
+{
+  "unnest_over_aggregate_test": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {
+            "name": "series",
+            "type": "STRING"
+          },
+          {
+            "name": "val",
+            "type": "INT"
+          }
+        ],
+        "inputs": [
+          [
+            "a",
+            10
+          ],
+          [
+            "a",
+            40
+          ],
+          [
+            "b",
+            100
+          ]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "UNNEST of an aggregate output column of a subquery",
+        "sql": "SELECT f.series, u.v FROM (SELECT series, ARRAY_AGG(val, 'INT') AS r FROM {tbl} GROUP BY series) f CROSS JOIN UNNEST(f.r) AS u(v) ORDER BY f.series, u.v",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [
+            "a",
+            10
+          ],
+          [
+            "a",
+            40
+          ],
+          [
+            "b",
+            100
+          ]
+        ],
+        "ignoreLiteMode": true,
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "UNNEST WITH ORDINALITY of an aggregate output column, with a filter on the element",
+        "sql": "SELECT f.series, u.v FROM (SELECT series, ARRAY_AGG(val, 'INT') AS r FROM {tbl} GROUP BY series) f CROSS JOIN UNNEST(f.r) WITH ORDINALITY AS u(v, o) WHERE u.v > 10 AND u.o >= 1 ORDER BY f.series, u.v",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [
+            "a",
+            40
+          ],
+          [
+            "b",
+            100
+          ]
+        ],
+        "ignoreLiteMode": true,
+        "ignoreV2Optimizer": true
+      }
+    ]
+  }
+}

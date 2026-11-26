@@ -26,10 +26,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.aggregation.function.TimeSeriesAggregationFunction;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -100,16 +104,18 @@ public class PhysicalTimeSeriesServerPlanVisitor {
   /// Create a transform expression, and link it with an aggregation function.
   @VisibleForTesting
   QueryContext compileQueryContext(LeafTimeSeriesPlanNode leafNode, TimeSeriesExecutionContext context) {
-    FilterContext filterContext =
-        RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(
-            leafNode.getEffectiveFilter(context.getInitialTimeBuckets())));
+    TimeBuckets timeBuckets = context.getInitialTimeBuckets();
+    Expression filter = CalciteSqlParser.compileToExpression(leafNode.getEffectiveFilter(timeBuckets));
+    rejectScriptFunctions(RequestContextUtils.getExpression(filter));
+    FilterContext filterContext = RequestContextUtils.getFilter(filter);
     List<ExpressionContext> groupByExpressions = leafNode.getGroupByExpressions().stream()
         .map(RequestContextUtils::getExpression).collect(Collectors.toList());
-    TimeBuckets timeBuckets = context.getInitialTimeBuckets();
+    groupByExpressions.forEach(PhysicalTimeSeriesServerPlanVisitor::rejectScriptFunctions);
     ExpressionContext rawTimeValuesInLong = RequestContextUtils.getExpression(leafNode.getTimeColumn());
     ExpressionContext aggregation = TimeSeriesAggregationFunction.create(context.getLanguage(),
         leafNode.getValueExpression(), rawTimeValuesInLong, leafNode.getTimeUnit(),
         leafNode.getOffsetSeconds() == null ? 0 : leafNode.getOffsetSeconds(), timeBuckets, leafNode.getAggInfo());
+    rejectScriptFunctions(aggregation);
     Map<String, String> queryOptions = new HashMap<>(Optional.ofNullable(leafNode.getQueryOptions())
             .orElseGet(Map::of));
     queryOptions.put(QueryOptionKey.TIMEOUT_MS, Long.toString(Math.max(0L, context.getRemainingTimeMs())));
@@ -122,6 +128,19 @@ public class PhysicalTimeSeriesServerPlanVisitor {
         .setAliasList(List.of())
         .setLimit(leafNode.getLimit())
         .build();
+  }
+
+  // Worker plans do not pass through the broker's SQL query script checks.
+  private static void rejectScriptFunctions(ExpressionContext expression) {
+    FunctionContext function = expression.getFunction();
+    if (function == null) {
+      return;
+    }
+    String canonicalName = RequestUtils.canonicalizeFunctionName(function.getFunctionName());
+    if (TransformFunctionType.GROOVY.getName().equals(canonicalName)) {
+      throw new IllegalArgumentException("Groovy functions are not supported in time-series worker plans");
+    }
+    function.getArguments().forEach(PhysicalTimeSeriesServerPlanVisitor::rejectScriptFunctions);
   }
 
   Map<String, String> getServerQueryRequestMetadataMap(TimeSeriesExecutionContext context) {

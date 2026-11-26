@@ -362,9 +362,9 @@ public class MailboxService {
   /// the sender starts sending data, and the receiver starts receiving the same without waiting for the OpChain to be
   /// registered. The ownership for the ReceivingMailbox hence lies with the MailboxService and not the OpChain.
   ///
-  /// We can safely release a receiving mailbox when all the data are received and processed by the OpChain. If there
-  /// might be data not received yet, we should not release the receiving mailbox to prevent a new receiving mailbox
-  /// being created.
+  /// We can safely release a receiving mailbox when its sender will not look it up again: after the sender has sent
+  /// its last block, or has been told that the mailbox takes no more blocks (see [ReceivingMailbox#isSenderFinished]).
+  /// Otherwise the sender could create a new receiving mailbox that nobody reads.
   public void releaseReceivingMailbox(ReceivingMailbox mailbox) {
     _receivingMailboxCache.invalidate(mailbox.getId());
   }

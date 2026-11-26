@@ -236,6 +236,10 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_TABLE_CONFIGS_PREFIX, resourceName);
   }
 
+  public static String getPropertyStorePathForUserConfigs() {
+    return PROPERTYSTORE_USER_CONFIGS_PREFIX;
+  }
+
   public static String constructPropertyStorePathForUserConfig(String resourceName) {
     return StringUtil.join("/", PROPERTYSTORE_USER_CONFIGS_PREFIX, resourceName);
   }

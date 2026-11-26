@@ -123,10 +123,16 @@ public interface BrokerRequestHandler {
     throw new UnsupportedOperationException("Handler does not support Time Series requests");
   }
 
-  /// Handle an explain request for time-series queries.
-  /// Returns a BrokerResponse containing the logical explain plan.
+  /// @deprecated Implement the overload accepting the requester identity and headers.
+  @Deprecated
   default BrokerResponse handleExplainTimeSeriesRequest(String lang, String rawQueryParamString,
       Map<String, String> queryParams) {
+    throw new UnsupportedOperationException("Handler does not support Time Series explain requests");
+  }
+
+  /// Returns the logical explain plan after authorizing the requester.
+  default BrokerResponse handleExplainTimeSeriesRequest(String lang, String rawQueryParamString,
+      Map<String, String> queryParams, @Nullable RequesterIdentity requesterIdentity, HttpHeaders httpHeaders) {
     throw new UnsupportedOperationException("Handler does not support Time Series explain requests");
   }
 

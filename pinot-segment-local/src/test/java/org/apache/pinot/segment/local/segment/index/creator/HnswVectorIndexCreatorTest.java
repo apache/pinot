@@ -24,10 +24,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -69,7 +67,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -116,11 +113,11 @@ public class HnswVectorIndexCreatorTest {
       throws IOException {
     HnswVectorsFormat mmapFormat = new HnswVectorsFormat(16, 100, 1024, INDEX_DIR.toPath());
     HnswVectorsFormat heapFormat = new HnswVectorsFormat(16, 100, 1024);
-    IOContext forcedMerge = new IOContext(new MergeInfo(4, 0, false, 1));
+    IOContext forcedMerge = IOContext.merge(new MergeInfo(4, 0, false, 1));
     assertFalse(usesHeapWriter(mmapFormat, forcedMerge));
     assertTrue(usesHeapWriter(heapFormat, forcedMerge));
     assertTrue(usesHeapWriter(mmapFormat, IOContext.DEFAULT));
-    assertTrue(usesHeapWriter(mmapFormat, new IOContext(new MergeInfo(4, 0, false, -1))));
+    assertTrue(usesHeapWriter(mmapFormat, IOContext.merge(new MergeInfo(4, 0, false, -1))));
   }
 
   @Test
@@ -128,7 +125,7 @@ public class HnswVectorIndexCreatorTest {
       throws IOException {
     Map<String, String> properties = new HashMap<>(Map.of("vectorDimension", "8", "buildThreads", "2",
         "concurrentMerge", "true"));
-    IOContext forcedMerge = new IOContext(new MergeInfo(4, 0, false, 1));
+    IOContext forcedMerge = IOContext.merge(new MergeInfo(4, 0, false, 1));
     try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
       for (String mmap : new String[]{null, "false", "true"}) {
         if (mmap != null) {
@@ -169,7 +166,8 @@ public class HnswVectorIndexCreatorTest {
     }
     MergedIndex heapIndex = mergeAndReadGraph("embeddingHeap", vectors, true);
     MergedIndex mmapIndex = mergeAndReadGraph("embeddingMmap", vectors, false);
-    assertEquals(mmapIndex.graph(), heapIndex.graph());
+    // Lucene can omit a heap-built graph on small leaves. The mmap graph must contain every indexed vector.
+    assertEquals(mmapIndex.graphSize(), vectors.length);
     assertEquals(mmapIndex.nearestDocs(), heapIndex.nearestDocs());
   }
 
@@ -194,7 +192,8 @@ public class HnswVectorIndexCreatorTest {
     }
     int[] nearestDocs = new int[vectors.length];
     try (HnswVectorIndexReader reader = new HnswVectorIndexReader(column, INDEX_DIR, vectors.length, config)) {
-      reader.setEfSearch(vectors.length);
+      // Compare the readers after exhaustive graph traversal, including visits to upper levels.
+      reader.setUseRelativeDistance(false);
       for (int i = 0; i < vectors.length; i++) {
         int[] matches = reader.getDocIds(vectors[i], 1).toArray();
         assertEquals(matches.length, 1);
@@ -207,26 +206,11 @@ public class HnswVectorIndexCreatorTest {
       SegmentReader segment = (SegmentReader) reader.leaves().getFirst().reader();
       PerFieldKnnVectorsFormat.FieldsReader fields = (PerFieldKnnVectorsFormat.FieldsReader) segment.getVectorReader();
       HnswGraph graph = ((HnswGraphProvider) fields.getFieldReader(column)).getGraph(column);
-      List<Map<Integer, List<Integer>>> levels = new ArrayList<>(graph.numLevels());
-      for (int level = 0; level < graph.numLevels(); level++) {
-        Map<Integer, List<Integer>> edges = new HashMap<>();
-        HnswGraph.NodesIterator nodes = graph.getNodesOnLevel(level);
-        while (nodes.hasNext()) {
-          int node = nodes.nextInt();
-          graph.seek(level, node);
-          List<Integer> neighbors = new ArrayList<>();
-          for (int neighbor = graph.nextNeighbor(); neighbor != NO_MORE_DOCS; neighbor = graph.nextNeighbor()) {
-            neighbors.add(neighbor);
-          }
-          edges.put(node, neighbors);
-        }
-        levels.add(edges);
-      }
-      return new MergedIndex(levels, nearestDocs);
+      return new MergedIndex(graph.size(), nearestDocs);
     }
   }
 
-  private record MergedIndex(List<Map<Integer, List<Integer>>> graph, int[] nearestDocs) {
+  private record MergedIndex(int graphSize, int[] nearestDocs) {
   }
 
   @Test
@@ -342,11 +326,11 @@ public class HnswVectorIndexCreatorTest {
 
   @DataProvider
   public Object[][] parallelBuilds() {
-    // buildThreads, forceMerge, concurrentMerge, parallelBuildMaxDocs: the last case outgrows the buffer and falls back
-    // to one writer
+    // buildThreads, forceMerge, concurrentMerge, mmapGraphOnMerge, parallelBuildMaxDocs
+    // The last case outgrows the buffer and falls back to one writer.
     return new Object[][]{
-        {1, true, false, 50_000}, {4, true, false, 50_000}, {4, true, true, 50_000}, {16, false, false, 50_000},
-        {3, false, false, 100}
+        {1, true, false, null, 50_000}, {4, true, false, null, 50_000}, {4, true, true, null, 50_000},
+        {4, true, false, "false", 50_000}, {16, false, false, null, 50_000}, {3, false, false, null, 100}
     };
   }
 
@@ -354,7 +338,7 @@ public class HnswVectorIndexCreatorTest {
   /// stored vector finds that row.
   @Test(dataProvider = "parallelBuilds")
   public void testParallelBuildKeepsDocIds(int buildThreads, boolean forceMerge, boolean concurrentMerge,
-      int parallelBuildMaxDocs)
+      String mmapGraphOnMerge, int parallelBuildMaxDocs)
       throws IOException {
     File indexDir = new File(INDEX_DIR, "parallel");
     FileUtils.forceMkdir(indexDir);
@@ -365,9 +349,13 @@ public class HnswVectorIndexCreatorTest {
     properties.put("buildThreads", String.valueOf(buildThreads));
     properties.put("forceMerge", String.valueOf(forceMerge));
     properties.put("concurrentMerge", String.valueOf(concurrentMerge));
+    if (mmapGraphOnMerge != null) {
+      properties.put(VectorIndexConfig.MMAP_GRAPH_ON_MERGE, mmapGraphOnMerge);
+    }
     properties.put("parallelBuildMaxDocs", String.valueOf(parallelBuildMaxDocs));
     VectorIndexConfig config = new VectorIndexConfig(properties);
-    int numDocs = 1000;
+    // Small enough for Lucene to skip building graphs unless the parallel writers explicitly request them.
+    int numDocs = 512;
     float[][] vectors = new float[numDocs][8];
     Random random = new Random(42);
     try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("bar", indexDir, config)) {
@@ -392,6 +380,18 @@ public class HnswVectorIndexCreatorTest {
       }
     }
     File index = new File(indexDir, "bar" + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    if (buildThreads > 1 && numDocs <= parallelBuildMaxDocs) {
+      try (Directory directory = FSDirectory.open(index.toPath());
+          DirectoryReader reader = DirectoryReader.open(directory)) {
+        for (var leaf : reader.leaves()) {
+          SegmentReader segment = (SegmentReader) leaf.reader();
+          PerFieldKnnVectorsFormat.FieldsReader fields =
+              (PerFieldKnnVectorsFormat.FieldsReader) segment.getVectorReader();
+          assertEquals(((HnswGraphProvider) fields.getFieldReader("bar")).getGraph("bar").size(),
+              segment.numDocs(), "Every parallel-build leaf should retain its HNSW graph");
+        }
+      }
+    }
     assertEquals(index.listFiles(File::isDirectory).length, 0, "Scratch directories must be removed after seal");
     assertEquals(indexDir.list().length, 3, "Expected only the index, its doc-id mapping and the sentinel");
   }

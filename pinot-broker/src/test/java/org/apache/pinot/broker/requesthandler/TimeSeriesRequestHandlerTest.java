@@ -21,6 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.broker.api.AccessControl;
@@ -28,6 +29,8 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -35,19 +38,24 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
+import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -76,9 +84,15 @@ public class TimeSeriesRequestHandlerTest {
     lenient().when(_tableSchema.hasColumn("colC")).thenReturn(true);
   }
 
-  @Test
-  public void testAccessDenialsKeepTheirErrorCode() {
+  @DataProvider
+  public Object[][] timeSeriesRequests() {
+    return new Object[][]{{2, false}, {0, false}, {2, true}};
+  }
+
+  @Test(dataProvider = "timeSeriesRequests")
+  public void testAccessDenialsKeepTheirErrorCode(int numBuckets, boolean explain) {
     PinotConfiguration config = new PinotConfiguration(Map.of(
+        CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH, true,
         PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey(), "test",
         PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey("test"),
         SimpleTimeSeriesBuilderFactory.class.getName()));
@@ -90,24 +104,49 @@ public class TimeSeriesRequestHandlerTest {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(access.authorize(identity)).thenReturn(new BasicAuthorizationResultImpl(false, "broker denial"),
         BasicAuthorizationResultImpl.success());
+    when(access.authorize(identity, Set.of("metrics_REALTIME", "other")))
+        .thenReturn(new TableAuthorizationResult(Set.of("other")), TableAuthorizationResult.success());
+    when(access.authorize(identity, Set.of("metrics"))).thenReturn(new TableAuthorizationResult(Set.of("metrics")));
+    when(access.authorize(identity, Set.of("other_OFFLINE"))).thenReturn(TableAuthorizationResult.success());
     when(access.authorize(headers, TargetType.TABLE, "metrics_REALTIME", Actions.Table.QUERY))
-        .thenReturn(new BasicAuthorizationResultImpl(false, "table denial"));
+        .thenReturn(BasicAuthorizationResultImpl.success());
+    when(access.authorize(headers, TargetType.TABLE, "other_OFFLINE", Actions.Table.QUERY))
+        .thenReturn(new BasicAuthorizationResultImpl(false, "table denial"), BasicAuthorizationResultImpl.success());
+    when(access.getRowColFilters(eq(identity), anyString())).thenReturn(TableRowColAccessResultImpl.unrestricted());
+    when(access.getRowColFilters(identity, "other_OFFLINE"))
+        .thenReturn(new TableRowColAccessResultImpl(List.of("region = 'US'")));
 
     try (MockedConstruction<TimeSeriesQueryEnvironment> environments =
         mockConstruction(TimeSeriesQueryEnvironment.class)) {
       TimeSeriesRequestHandler handler = new TimeSeriesRequestHandler(config, "broker", new BrokerRequestIdGenerator(),
           null, factory, null, null, null, null);
       TimeSeriesQueryEnvironment planner = environments.constructed().get(0);
-      when(planner.buildLogicalPlan(any())).thenReturn(new TimeSeriesLogicalPlanResult(_leafNode,
-          TimeBuckets.ofSeconds(0L, Duration.ofSeconds(1), 2)));
+      LeafTimeSeriesPlanNode otherLeaf = mock(LeafTimeSeriesPlanNode.class);
+      when(otherLeaf.getTableName()).thenReturn("other");
+      BaseTimeSeriesPlanNode root = mock(BaseTimeSeriesPlanNode.class);
+      when(root.getInputs()).thenReturn(List.of(_leafNode, otherLeaf));
+      when(planner.buildLogicalPlan(any())).thenReturn(new TimeSeriesLogicalPlanResult(root,
+          TimeBuckets.ofSeconds(0L, Duration.ofSeconds(1), numBuckets)));
+      when(planner.resolveAndAuthorizeTables(any(), any(), any())).thenAnswer(invocation -> {
+        invocation.<Consumer<List<String>>>getArgument(2).accept(List.of("metrics_REALTIME", "other_OFFLINE"));
+        return invocation.getArgument(0);
+      });
       when(planner.buildPhysicalPlan(any(), any(), any(), any())).thenAnswer(invocation -> {
-        invocation.<Consumer<List<String>>>getArgument(3).accept(List.of("metrics_REALTIME"));
+        planner.resolveAndAuthorizeTables(invocation.getArgument(2), invocation.getArgument(1),
+            invocation.getArgument(3));
         throw new AssertionError("Routing reached after table denial");
       });
 
-      for (String reason : List.of("broker denial", "table denial")) {
-        QueryException error = expectThrows(QueryException.class, () -> handler.handleTimeSeriesRequest("test", "",
-            Map.of("query", "metric", "start", "0", "end", "2"), mock(RequestContext.class), identity, headers));
+      Map<String, String> params = Map.of("query", "metric", "start", "0", "end", "2");
+      for (String reason : List.of("broker denial", "Authorization Failed for tables: [other]", "table denial",
+          "row filters")) {
+        QueryException error = expectThrows(QueryException.class, () -> {
+          if (explain) {
+            handler.handleExplainTimeSeriesRequest("test", "", params, identity, headers);
+          } else {
+            handler.handleTimeSeriesRequest("test", "", params, mock(RequestContext.class), identity, headers);
+          }
+        });
         assertEquals(error.getErrorCode(), QueryErrorCode.ACCESS_DENIED);
         assertTrue(error.getMessage().contains(reason), error.getMessage());
       }

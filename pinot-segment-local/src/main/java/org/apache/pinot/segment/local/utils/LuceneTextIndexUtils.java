@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.utils;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,6 +29,12 @@ import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
 import org.apache.lucene.queries.spans.SpanQuery;
 import org.apache.lucene.queries.spans.SpanTermQuery;
+import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.apache.lucene.queryparser.flexible.standard.StandardQueryParser;
+import org.apache.lucene.queryparser.flexible.standard.builders.RegexpQueryNodeBuilder;
+import org.apache.lucene.queryparser.flexible.standard.builders.StandardQueryTreeBuilder;
+import org.apache.lucene.queryparser.flexible.standard.nodes.RegexpQueryNode;
 import org.apache.lucene.search.AutomatonQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
@@ -39,11 +44,13 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.LeafCollector;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.search.Scorable;
 import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.search.WildcardQuery;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,7 +122,7 @@ public class LuceneTextIndexUtils {
     ArrayList<SpanQuery> spanQueryLst = new ArrayList<>();
     boolean prefixOrSuffixQueryFound = false;
     for (BooleanClause clause : ((BooleanQuery) query).clauses()) {
-      Query q = clause.getQuery();
+      Query q = clause.query();
       if (q instanceof WildcardQuery || q instanceof PrefixQuery) {
         prefixOrSuffixQueryFound = true;
         spanQueryLst.add(new SpanMultiTermQueryWrapper<>((AutomatonQuery) q));
@@ -171,22 +178,24 @@ public class LuceneTextIndexUtils {
 
     // Create parser instance and apply options
     try {
-      Class<?> parserClass = Class.forName(parserClassName);
       Object parser;
-
       if (parserClassName.equals(STANDARD_QUERY_PARSER_CLASS)) {
-        Constructor<?> constructor = parserClass.getConstructor();
-        parser = constructor.newInstance();
-        try {
-          Method setAnalyzerMethod = parserClass.getMethod("setAnalyzer", Analyzer.class);
-          setAnalyzerMethod.invoke(parser, analyzer);
-        } catch (Exception e) {
-          LOGGER.warn("Failed to set analyzer on StandardQueryParser: {}", e.getMessage());
-        }
+        StandardQueryParser standardParser = new StandardQueryParser(analyzer);
+        StandardQueryTreeBuilder builder = new StandardQueryTreeBuilder();
+        builder.setBuilder(RegexpQueryNode.class, new RegexpQueryNodeBuilder() {
+          @Override
+          public RegexpQuery build(QueryNode queryNode)
+              throws QueryNodeException {
+            RegexpQueryNode regexpNode = (RegexpQueryNode) queryNode;
+            LuceneRegexpAutomaton.validateConstructionBudget(regexpNode.textToBytesRef().utf8ToString());
+            return super.build(queryNode);
+          }
+        });
+        standardParser.setQueryBuilder(builder);
+        parser = standardParser;
       } else {
-        // CLASSIC and COMPLEX parsers use the standard (String, Analyzer) constructor
-        Constructor<?> constructor = parserClass.getConstructor(String.class, Analyzer.class);
-        parser = constructor.newInstance(column, analyzer);
+        parser = TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(parserClassName)
+            .newInstance(column, analyzer);
       }
 
       // Dynamically apply options using reflection

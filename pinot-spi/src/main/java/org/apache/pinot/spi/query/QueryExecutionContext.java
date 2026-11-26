@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.spi.query;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -64,8 +68,10 @@ public class QueryExecutionContext {
   private final String _instanceId;
   private final String _queryHash;
 
+  /// The tasks that are not done yet. A done task removes itself (see [#removeTask]), because a done [Future] keeps its
+  /// result, and this context can stay reachable after the query ends.
   @GuardedBy("this")
-  private final List<Future<?>> _tasks = new ArrayList<>();
+  private final Set<Future<?>> _tasks = Collections.newSetFromMap(new IdentityHashMap<>());
 
   private volatile TerminationException _terminateException;
 
@@ -210,13 +216,32 @@ public class QueryExecutionContext {
   }
 
   /// Adds a task to the execution context. If the query has been terminated, cancels the task immediately without
-  /// adding it to the context.
+  /// adding it to the context. A task that is already done is not added.
+  ///
+  /// The caller must call [#removeTask] once the task is done, so that this context does not keep the result of the
+  /// task reachable.
   public synchronized void addTask(Future<?> task) {
     if (_terminateException != null) {
       task.cancel(true);
-    } else {
+    } else if (!task.isDone()) {
       _tasks.add(task);
     }
+  }
+
+  /// Removes a task added with [#addTask]. Call it once the task is done.
+  ///
+  /// A done [Future] keeps its result, which can be large: for example the per-segment operators that a leaf stage
+  /// builds in parallel. This context stays reachable for as long as anything references a [QueryThreadContext] of the
+  /// query, which can be after the query ends.
+  public synchronized void removeTask(Future<?> task) {
+    _tasks.remove(task);
+  }
+
+  /// Returns the number of tasks that were added and not removed yet.
+  @JsonIgnore
+  @VisibleForTesting
+  public synchronized int getNumTasks() {
+    return _tasks.size();
   }
 
   /// Terminates the query execution with the given error code and message. Cancels and clears all the tasks.
@@ -225,10 +250,12 @@ public class QueryExecutionContext {
       return false;
     }
     _terminateException = new TerminationException(errorCode, message);
-    for (Future<?> task : _tasks) {
+    // Copy first, because a task can remove itself from _tasks when it is cancelled
+    List<Future<?>> tasks = new ArrayList<>(_tasks);
+    _tasks.clear();
+    for (Future<?> task : tasks) {
       task.cancel(true);
     }
-    _tasks.clear();
     return true;
   }
 

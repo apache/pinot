@@ -34,6 +34,7 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.Version;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -65,6 +66,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.SkipException;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
@@ -77,7 +79,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/// Exercises server loading with real Lucene 10 indexes and retained Pinot source values on Lucene 9.12.
+/// Exercises cross-version text index loading and recovery from retained Pinot source values.
 public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassCheckRule {
   private File _tempDir;
   private File _fixtures;
@@ -182,6 +184,33 @@ public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassChec
   @DataProvider
   public Object[][] multiColumnVersions() {
     return new Object[][]{{SegmentVersion.v1}, {SegmentVersion.v3}};
+  }
+
+  @Test(dataProvider = "multiColumnVersions")
+  public void testLoadingRetainsLucene912MultiColumnIndex(SegmentVersion version)
+      throws Exception {
+    Schema schema = schema(false);
+    TableConfig tableConfig = tableConfig(true, false, false);
+    File segmentDir = buildSegment(tableConfig, schema, version, false);
+    File fixtures = LuceneIndexTestUtils.extractLucene912Fixtures(new File(_tempDir, "lucene912"));
+    File luceneDir = SegmentDirectoryPaths.findTextIndexIndexFile(segmentDir,
+        MultiColumnTextIndexConstants.INDEX_DIR_NAME);
+    FileUtils.deleteDirectory(luceneDir);
+    FileUtils.copyDirectory(new File(fixtures, "multi"), luceneDir);
+
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory directory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap)) {
+      assertFalse(ImmutableSegmentLoader.needPreprocess(directory, loadingConfig));
+    }
+    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, loadingConfig, true);
+    try {
+      MultiColumnLuceneTextIndexReader reader = (MultiColumnLuceneTextIndexReader) segment.getMultiColumnTextIndex();
+      // The fixture's terms are absent from the forward index, so rebuilding would change these results.
+      assertEquals(reader.getDocIds("text", "\"legacy world\"", (String) null).toArray(), new int[]{1});
+      assertEquals(reader.getDocIds("other", "delta", (String) null).toArray(), new int[]{0});
+    } finally {
+      segment.destroy();
+    }
   }
 
   @Test(dataProvider = "multiColumnVersions")
@@ -469,6 +498,9 @@ public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassChec
 
   private void installLucene10(File segmentDir, SegmentVersion version, boolean multiColumn, boolean combined)
       throws Exception {
+    if (Version.LATEST.major != 9) {
+      throw new SkipException("Lucene 10 fixture exercises rollback recovery on Lucene 9 only");
+    }
     String column = multiColumn ? MultiColumnTextIndexConstants.INDEX_DIR_NAME : "text";
     File actualDirectory = SegmentDirectoryPaths.segmentDirectoryFor(segmentDir, version);
     File luceneDir = new File(actualDirectory, column + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);

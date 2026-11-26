@@ -138,6 +138,9 @@ public class PinotHintOptions {
     public static final String LEFT_DISTRIBUTION_TYPE = "left_distribution_type";
     public static final String RIGHT_DISTRIBUTION_TYPE = "right_distribution_type";
 
+    /// Keep consecutive broadcast inner joins in the same stage when the probe rows are already distributed.
+    public static final String FUSE_BROADCAST_JOINS = "fuse_broadcast_joins";
+
     /// Max rows allowed to build the right table hash collection.
     public static final String MAX_ROWS_IN_JOIN = "max_rows_in_join";
 

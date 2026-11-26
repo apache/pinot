@@ -26,7 +26,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.function.Consumer;
+import java.util.concurrent.FutureTask;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -310,23 +310,63 @@ public class QueryThreadContext implements AutoCloseable {
 
   /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
   /// state of the thread submitting the tasks. The [Future] of each task passed to `submit()` is registered for
-  /// cancellation when the query is terminated. Tasks passed to `execute()` are not registered.
+  /// cancellation when the query is terminated, until the task is done. Tasks passed to `execute()` are not registered.
   public static ExecutorService contextAwareExecutorService(ExecutorService executorService) {
     return contextAwareExecutorService(executorService, true);
   }
 
   /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
   /// state of the thread submitting the tasks.
+  ///
+  /// When tasks are registered for cancellation, `submit()` wraps each task in its own [FutureTask] and passes it to
+  /// `execute()` of the given executor, not to its `submit()`. This makes no difference for executors that implement
+  /// `submit()` as a [FutureTask] plus `execute()`, like `AbstractExecutorService`.
   /// @param registerTaskForCancellation If true, tasks passed to `submit()` are registered with
   ///                                    QueryExecutionContext.addTask() and will be cancelled (via Thread.interrupt())
   ///                                    when the query is terminated. Set to false for executors where interrupt could
   ///                                    cause corruption
   public static ExecutorService contextAwareExecutorService(ExecutorService executorService,
       boolean registerTaskForCancellation) {
-    Consumer<Future<?>> onSubmit = registerTaskForCancellation
-        ? future -> get().getExecutionContext().addTask(future)
-        : null;
-    return new DecoratorExecutorService(executorService, onSubmit) {
+    return new DecoratorExecutorService(executorService) {
+      @Override
+      public <T> Future<T> submit(Callable<T> task) {
+        if (!registerTaskForCancellation) {
+          return super.submit(task);
+        }
+        QueryExecutionContext executionContext = get().getExecutionContext();
+        return executeRegistered(new RegisteredTask<>(decorate(task), executionContext), executionContext);
+      }
+
+      @Override
+      public <T> Future<T> submit(Runnable task, T result) {
+        if (!registerTaskForCancellation) {
+          return super.submit(task, result);
+        }
+        QueryExecutionContext executionContext = get().getExecutionContext();
+        return executeRegistered(new RegisteredTask<>(decorate(task), result, executionContext), executionContext);
+      }
+
+      @Override
+      public Future<?> submit(Runnable task) {
+        return submit(task, null);
+      }
+
+      /// Registers the task before it is handed to the executor, so that it cannot finish before it is registered.
+      /// If the query is already terminated, [QueryExecutionContext#addTask] cancels the task and it does not run.
+      private <T> Future<T> executeRegistered(RegisteredTask<T> task, QueryExecutionContext executionContext) {
+        executionContext.addTask(task);
+        if (task.isCancelled()) {
+          return task;
+        }
+        try {
+          _executorService.execute(task);
+        } catch (RuntimeException e) {
+          executionContext.removeTask(task);
+          throw e;
+        }
+        return task;
+      }
+
       @Override
       protected <T> Callable<T> decorate(Callable<T> task) {
         // NOTE: When registerTaskForCancellation is false, the task may not come from query execution, in which case
@@ -365,6 +405,27 @@ public class QueryThreadContext implements AutoCloseable {
         }
       }
     };
+  }
+
+  /// A task registered with the [QueryExecutionContext] for cancellation. It removes itself from the context once it is
+  /// done, so that the context does not keep its result reachable.
+  private static final class RegisteredTask<T> extends FutureTask<T> {
+    private final QueryExecutionContext _executionContext;
+
+    RegisteredTask(Callable<T> callable, QueryExecutionContext executionContext) {
+      super(callable);
+      _executionContext = executionContext;
+    }
+
+    RegisteredTask(Runnable runnable, @Nullable T result, QueryExecutionContext executionContext) {
+      super(runnable, result);
+      _executionContext = executionContext;
+    }
+
+    @Override
+    protected void done() {
+      _executionContext.removeTask(this);
+    }
   }
 
   /// Checks if the query should be terminated.

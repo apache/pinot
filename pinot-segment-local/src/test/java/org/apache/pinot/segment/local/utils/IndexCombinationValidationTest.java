@@ -56,6 +56,7 @@ public class IndexCombinationValidationTest {
   private static final String INT_COL = "intCol";   // INT SV
   private static final String INT_MV_COL = "intMvCol"; // INT MV
   private static final String FLOAT_COL = "floatCol"; // FLOAT SV
+  private static final String BIG_DECIMAL_COL = "bigDecimalCol"; // BIG_DECIMAL SV
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .setSchemaName(TABLE_NAME)
@@ -63,6 +64,7 @@ public class IndexCombinationValidationTest {
       .addSingleValueDimension(INT_COL, DataType.INT)
       .addMultiValueDimension(INT_MV_COL, DataType.INT)
       .addSingleValueDimension(FLOAT_COL, DataType.FLOAT)
+      .addSingleValueDimension(BIG_DECIMAL_COL, DataType.BIG_DECIMAL)
       .build();
 
   // ----- helpers -----
@@ -346,6 +348,38 @@ public class IndexCombinationValidationTest {
     FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setRangeIndexColumns(List.of(STR_COL))
+        .setFieldConfigList(List.of(fc))
+        .build();
+    assertValid(tc);
+  }
+
+  @Test
+  public void testDictWithRangeIndexBigDecimalColumnPasses() {
+    // dict-encoded BIG_DECIMAL + range: the range index is built over dictionary ids
+    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setRangeIndexColumns(List.of(BIG_DECIMAL_COL))
+        .build();
+    assertValid(tc);
+  }
+
+  @Test
+  public void testRawWithRangeIndexBigDecimalColumnNoDictFails() {
+    // RAW BIG_DECIMAL + range without dict: BIG_DECIMAL is numeric, but neither range index creator supports raw
+    // BIG_DECIMAL values, so segment creation would fail
+    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(List.of(BIG_DECIMAL_COL))
+        .setRangeIndexColumns(List.of(BIG_DECIMAL_COL))
+        .build();
+    assertInvalid(tc, "Cannot create range index on BIG_DECIMAL column");
+  }
+
+  @Test
+  public void testRawWithRangeIndexBigDecimalColumnWithExplicitDictPasses() {
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("dictionary", JsonUtils.newObjectNode());
+    FieldConfig fc = new FieldConfig(BIG_DECIMAL_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
+    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setRangeIndexColumns(List.of(BIG_DECIMAL_COL))
         .setFieldConfigList(List.of(fc))
         .build();
     assertValid(tc);

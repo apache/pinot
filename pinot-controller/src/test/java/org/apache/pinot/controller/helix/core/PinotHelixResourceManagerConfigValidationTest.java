@@ -22,13 +22,17 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.DataUpdater;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.helix.FakePropertyStore;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
@@ -72,6 +76,23 @@ public class PinotHelixResourceManagerConfigValidationTest {
   @AfterMethod
   public void tearDown() {
     InstanceConfigValidatorRegistry.reset();
+  }
+
+  @Test
+  public void testBootstrapPasswordRequiredOnlyForEmptyUserStore()
+      throws Exception {
+    FakePropertyStore store = new FakePropertyStore();
+    setField("_propertyStore", store);
+    ControllerConf conf = new ControllerConf();
+    expectThrows(IllegalStateException.class, () -> _resourceManager.initUserACLConfig(conf));
+    conf.setInitAccessControlPassword("   ");
+    expectThrows(IllegalStateException.class, () -> _resourceManager.initUserACLConfig(conf));
+    assertTrue(ZKMetadataProvider.getAllUserName(store).isEmpty());
+
+    conf.setInitAccessControlPassword(UUID.randomUUID().toString());
+    _resourceManager.initUserACLConfig(conf);
+    assertEquals(ZKMetadataProvider.getAllUserName(store).size(), 3);
+    _resourceManager.initUserACLConfig(new ControllerConf());
   }
 
   @Test

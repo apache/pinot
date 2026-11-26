@@ -799,6 +799,9 @@ public class PinotQueryResourceTest {
         // Valid on a broker with CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY: the controller finds the tables and the
         // query reaches broker selection, which fails because no table exists in the cluster
         {"SET useMultistageEngine = 'true'; " + query, QueryErrorCode.TABLE_DOES_NOT_EXIST},
+        // Same, for a query that fails after the validation: with the column, HAVING compares an INT with 'late'
+        {"SET useMultistageEngine = 'true'; SELECT CASE WHEN col3 > 15 THEN 'late' ELSE 'on_time' END AS col3, "
+            + "COUNT(*) FROM a GROUP BY col3 HAVING col3 = 'late'", QueryErrorCode.TABLE_DOES_NOT_EXIST},
         // The query option is set explicitly, so the controller does not retry
         {"SET useMultistageEngine = 'true'; SET preferSelectAliasInGroupBy = false; " + query,
             QueryErrorCode.QUERY_VALIDATION},
@@ -813,6 +816,7 @@ public class PinotQueryResourceTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("a")
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING)
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING)
+        .addMetric("col3", FieldSpec.DataType.INT)
         .build();
     TableCache tableCache = new StaticTableCache(
         List.of(new TableConfigBuilder(TableType.OFFLINE).setTableName("a").build()), List.of(schema), null, false);

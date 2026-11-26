@@ -369,7 +369,9 @@ public class TransformFunctionFactory {
               throw new BadQueryRequestException(String.format("Unsupported function: %s", functionName));
             }
           }
-          transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
+          transformFunction = BitwiseTransformFunction.supports(functionInfo, argumentDataTypes)
+              ? new BitwiseTransformFunction(functionInfo.getMethod())
+              : new ScalarTransformFunctionWrapper(functionInfo);
         }
 
         try {

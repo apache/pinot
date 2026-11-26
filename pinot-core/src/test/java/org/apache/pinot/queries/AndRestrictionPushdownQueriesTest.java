@@ -32,7 +32,7 @@ import static org.testng.Assert.assertTrue;
 /// The shared `FILTER` is `col1 > x AND col3 BETWEEN y AND z AND col5 = 'gFuH' AND (col6 < w OR col11 NOT IN (..))
 /// AND daysSinceEpoch = d`, i.e. an OR containing scan-based predicates under an AND with index-based ones -- the
 /// shape from [issue 19339](https://github.com/apache/pinot/issues/19339). The push-down ships disabled, so this is
-/// the only coverage that runs a real query with it on.
+/// exercised here with `always` and with `streaming` for an unordered selection.
 public class AndRestrictionPushdownQueriesTest extends BaseSingleValueQueriesTest {
   private static final String AGGREGATION = "SELECT SUM(column1) FROM testTable";
   private static final String SELECTION = "SELECT column1, column5, column11 FROM testTable";
@@ -53,22 +53,35 @@ public class AndRestrictionPushdownQueriesTest extends BaseSingleValueQueriesTes
 
   @Test
   public void testPushdownKeepsTheSameRowsForASelectionQuery() {
-    // ALWAYS is the only mode that reaches a selection query: AUTO excludes it because it can stop at its LIMIT
-    assertRowsEqual(getBrokerResponse(withMode("always", SELECTION + FILTER)),
-        getBrokerResponse(withMode("never", SELECTION + FILTER)));
+    BrokerResponseNative disabled = getBrokerResponse(withMode("never", SELECTION + FILTER));
+    assertRowsEqual(getBrokerResponse(withMode("always", SELECTION + FILTER)), disabled);
+    assertRowsEqual(getBrokerResponse(withMode("streaming", SELECTION + FILTER)), disabled);
   }
 
+  /// A full-drain aggregate requested with STREAMING uses the eager path.
   @Test
-  public void testAutoLeavesSelectionQueriesAlone() {
+  public void testStreamingKeepsTheSameResultForAnAggregationQuery() {
+    BrokerResponseNative eager = getBrokerResponse(withMode("always", AGGREGATION + FILTER));
+    BrokerResponseNative streaming = getBrokerResponse(withMode("streaming", AGGREGATION + FILTER));
+    assertRowsEqual(streaming, eager);
+    assertEquals(streaming.getNumDocsScanned(), eager.getNumDocsScanned());
+    assertEquals(streaming.getNumEntriesScannedInFilter(), eager.getNumEntriesScannedInFilter());
+  }
+
+  /// Unordered selections without row-level security opt in to the streaming strategy explicitly.
+  @Test
+  public void testSelectionStreamingIsExplicit() {
     // A selection query stops at its LIMIT, so with several threads the number of segments it scans depends on timing.
     // One thread makes the entries scanned in the filter deterministic.
     String query = "SET " + QueryOptionKey.MAX_EXECUTION_THREADS + " = 1; " + SELECTION + FILTER;
     BrokerResponseNative auto = getBrokerResponse(withMode("auto", query));
+    BrokerResponseNative streaming = getBrokerResponse(withMode("streaming", query));
     BrokerResponseNative disabled = getBrokerResponse(withMode("never", query));
 
     assertRowsEqual(auto, disabled);
-    assertEquals(auto.getNumEntriesScannedInFilter(), disabled.getNumEntriesScannedInFilter(),
-        "AUTO must not push down for a selection query");
+    assertRowsEqual(streaming, disabled);
+    assertEquals(auto.getNumEntriesScannedInFilter(), disabled.getNumEntriesScannedInFilter());
+    assertTrue(streaming.getNumEntriesScannedInFilter() < disabled.getNumEntriesScannedInFilter());
   }
 
   @Test

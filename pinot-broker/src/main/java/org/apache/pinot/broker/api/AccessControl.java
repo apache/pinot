@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.api;
 
+import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
@@ -31,6 +32,7 @@ import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 @InterfaceAudience.Public
@@ -114,6 +116,21 @@ public interface AccessControl extends FineGrainedAccessControl {
   }
 
 
+  /// Authorizes the physical OFFLINE tables read by the single-stage `LOOKUP` function.
+  default TableAuthorizationResult authorizeLookupTables(RequesterIdentity requesterIdentity,
+      Set<String> offlineTableNames) {
+    return authorize(requesterIdentity, offlineTableNames);
+  }
+
+  /// Returns whether a row-level filter applies to the physical OFFLINE target of an authorized `LOOKUP`.
+  default boolean hasLookupTableRowFilters(RequesterIdentity requesterIdentity, String offlineTableName) {
+    String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
+    return getRowColFilters(requesterIdentity, offlineTableName).getRLSFilters()
+        .filter(filters -> !filters.isEmpty()).isPresent()
+        || getRowColFilters(requesterIdentity, rawTableName).getRLSFilters()
+            .filter(filters -> !filters.isEmpty()).isPresent();
+  }
+
   /// Verifies that the requester can delete rows from the table with a SQL `DELETE` statement. The broker calls it
   /// once the requester passed, in this order: [#authorize(RequesterIdentity)], [#authorize(RequesterIdentity, Set)]
   /// with the table as its only element (the WHERE clause of the statement reads it), the fine-grained
@@ -145,5 +162,21 @@ public interface AccessControl extends FineGrainedAccessControl {
   /// @return [TableRowColAccessResult] with the result of the access control check
   default TableRowColAccessResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
     return TableRowColAccessResultImpl.unrestricted();
+  }
+
+  /// Checks for row filters on a table the caller has already been authorized to access. For a typed table, also
+  /// check its raw name when authorized. Some providers only return filters for names the caller can access.
+  static boolean hasRowFilters(AccessControl accessControl, RequesterIdentity requesterIdentity, String tableName) {
+    if (hasRowFilters(accessControl.getRowColFilters(requesterIdentity, tableName))) {
+      return true;
+    }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    return !rawTableName.equals(tableName)
+        && accessControl.authorize(requesterIdentity, Set.of(rawTableName)).hasAccess()
+        && hasRowFilters(accessControl.getRowColFilters(requesterIdentity, rawTableName));
+  }
+
+  private static boolean hasRowFilters(TableRowColAccessResult filters) {
+    return !filters.getRLSFilters().orElse(List.of()).isEmpty();
   }
 }
