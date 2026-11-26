@@ -481,13 +481,15 @@ Data holders should not be named "Manager". Method names returning config object
 **C3.25 — Size the ZooKeeper cost of a Helix listener that runs on every instance**
 Helix prefetch is on by default. On each change, every listening process reads all znodes under the watched path.
 With L listening processes and N znodes, one change costs L × N ZK reads on the Helix event thread. A burst of
-changes, for example a scale-down, pays this cost for each change. If only the query path needs the data, read it
-on the broker and send it with the request. If every instance needs the listener, disable prefetch and read only
-the znode that changed. A full read on each child change still costs L × N for each instance that joins or
-leaves. On a child change, read the child names and only the instances that joined, or skip the instance types
-that the listener does not use. A diff of the names does not show an instance that was deleted and created
-again with the same name between two callbacks. If that case matters, compare the `cversion` of the parent
-znode with the number of changed names, and do a full read when they differ.
+changes, for example a scale-down, pays this cost for each change. If only the query path needs the data, read it on
+the broker and send it with the request. If every instance needs the listener, disable prefetch and batch mode, and
+read only the znode that changed. Batch mode is off by default, but a JVM system property can turn it on for every
+listener. Batch mode keeps only one queued CALLBACK event, so the listener does not see the other changed znodes. A
+full read on each child change still costs L × N for each instance that joins or leaves. On a child change, read the
+child names and only the instances that joined, or skip the instance types that the listener does not use. A diff of
+the names does not show an instance that was deleted and created again with the same name between two callbacks. If
+that case matters, compare the `cversion` of the parent znode with the number of changed names, and do a full read
+when they differ.
 - Trigger: Any PR that adds a Helix change listener (`add*ChangeListener`, `implements *ChangeListener`,
   `ClusterChangeHandler`) that runs on every server or broker, or a full read (`HelixHelper.getInstanceConfigs`,
   `getChildValues`) inside a change callback
@@ -504,9 +506,10 @@ public class PeerPortCache implements InstanceConfigChangeListener {
 }
 ```
 ```java
-// GOOD: prefetch off. A full read only at start. A config change reads one znode. A child change reads the
-// child names and the configs of the instances that joined.
+// GOOD: prefetch and batch mode off. A full read only at start. A config change reads one znode. A child
+// change reads the child names and the configs of the instances that joined.
 @PreFetch(enabled = false)
+@BatchMode(enabled = false)
 public class PeerPortCache implements InstanceConfigChangeListener {
   @Override
   public void onInstanceConfigChange(List<InstanceConfig> unused, NotificationContext context) {
