@@ -61,7 +61,7 @@ public class RlsFiltersRewriter implements QueryRewriter {
       return pinotQuery;
     }
 
-    Expression expression = CalciteSqlParser.compileToExpression(rowFilters);
+    Expression expression = compileRowFilter(rowFilters);
     Expression existingFilterExpression = pinotQuery.getFilterExpression();
     if (existingFilterExpression != null) {
       Expression combinedFilterExpression =
@@ -71,5 +71,14 @@ public class RlsFiltersRewriter implements QueryRewriter {
       pinotQuery.setFilterExpression(expression);
     }
     return pinotQuery;
+  }
+
+  /// Compiles a row filter that can be evaluated without reading another table.
+  public static Expression compileRowFilter(String rowFilters) {
+    Expression expression = CalciteSqlParser.compileToExpression(rowFilters);
+    if (RequestUtils.containsCrossTableFunction(expression)) {
+      throw new IllegalArgumentException("Cross-table functions are not supported in row filters");
+    }
+    return expression;
   }
 }

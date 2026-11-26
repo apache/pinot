@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils.request;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.calcite.sql.SqlDialect;
@@ -31,6 +32,10 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.request.RequestUtils.CrossTableFunction;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
@@ -44,6 +49,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class RequestUtilsTest {
@@ -145,6 +151,14 @@ public class RequestUtilsTest {
     assertEquals(result.getSqlType(), PinotSqlType.DQL);
     assertEquals(result.getSqlNode().toSqlString((SqlDialect) null).toString(),
         "SELECT `foo`\n" + "FROM `countries`\n" + "WHERE `bar` > 1");
+  }
+
+  @Test
+  public void testClientQueryOptionsRejectRowFilters() {
+    RequestUtils.validateClientQueryOptions(Map.of("timeoutMs", "100"));
+    QueryException exception = expectThrows(QueryException.class,
+        () -> RequestUtils.validateClientQueryOptions(Map.of(CommonConstants.RLS_FILTERS, "")));
+    assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_VALIDATION);
   }
 
   @DataProvider(name = "queryProvider")
@@ -269,6 +283,9 @@ public class RequestUtilsTest {
 
   @Test
   public void testIsCrossTableFunction() {
+    assertSame(RequestUtils.getCrossTableFunction("lookup"), CrossTableFunction.LOOKUP);
+    assertSame(RequestUtils.getCrossTableFunction("insubquery"), CrossTableFunction.IN_SUBQUERY);
+    assertSame(RequestUtils.getCrossTableFunction("inpartitionedsubquery"), CrossTableFunction.IN_PARTITIONED_SUBQUERY);
     // The names the parser leaves on a compiled call, see RequestUtils.canonicalizeFunctionName()
     String[] spellings = {
         "LOOKUP", "look_Up", "IN_SUBQUERY", "inSubquery", "IN_PARTITIONED_SUBQUERY", "In_Partitioned_Sub_Query"

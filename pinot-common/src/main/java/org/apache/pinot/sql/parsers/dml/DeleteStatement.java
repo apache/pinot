@@ -54,6 +54,7 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -136,23 +137,10 @@ public class DeleteStatement implements DataManipulationStatement {
     }
   };
 
-  /// Canonical names (upper case, without underscores) of the functions that read another table than the one the
-  /// statement deletes from, which the caller is not authorized to read. Upper case because the compiled function
-  /// names are lower-cased with the default locale, and lower-casing with a Turkish locale turns `I` into the dotless
-  /// `ı` (U+0131), which only an upper-case fold with [Locale#ROOT] maps back to `I`.
-  ///
-  /// Nothing derives this set from the function registries, so a function that reads another table must be added
-  /// here when it is defined: `lookUp` is `TransformFunctionType#LOOKUP` (with `LookupTransformFunction` in
-  /// pinot-core), `inSubquery` is rewritten by `BaseSingleStageBrokerRequestHandler#IN_SUBQUERY` in pinot-broker, and
-  /// `inPartitionedSubquery` by `ServerQueryExecutorV1Impl#IN_PARTITIONED_SUBQUERY` in pinot-core.
-  /// `RequestUtils#isCrossTableFunction(String)` keeps the same list in lower case for the single-stage broker's
-  /// row-level security check; add the function there too.
-  private static final Set<String> CROSS_TABLE_FUNCTIONS = Set.of("LOOKUP", "INSUBQUERY", "INPARTITIONEDSUBQUERY");
-
   /// Canonical names of the functions that run a script. Rejected because the broker's groovy policy
   /// (`pinot.broker.disable.query.groovy`, the per-table `queryConfig.disableGroovy` override and the static
   /// analyzer) only applies to queries, not to a `DELETE`, and the executor may run the predicate on another role.
-  /// Like [#CROSS_TABLE_FUNCTIONS], it is maintained by hand: `groovy` is `TransformFunctionType#GROOVY` (with
+  /// The set is maintained by hand: `groovy` is `TransformFunctionType#GROOVY` (with
   /// `GroovyTransformFunction` in pinot-core), and a new script function must be added here.
   private static final Set<String> SCRIPT_FUNCTIONS = Set.of("GROOVY");
 
@@ -391,8 +379,8 @@ public class DeleteStatement implements DataManipulationStatement {
   /// the functions that run a script, see [#SCRIPT_FUNCTIONS], the window functions, which
   /// [#PREDICATE_NODE_CHECKER] already rejects on the parsed node, and a `LIKE` with an escape character (a third or
   /// later operand) written as a function call, see [#LIKE_FUNCTIONS]. Function names are folded with
-  /// `toUpperCase(Locale.ROOT)`, see
-  /// [#CROSS_TABLE_FUNCTIONS], and a function name with non-ASCII characters is rejected outright: no supported
+  /// `toUpperCase(Locale.ROOT)` to recognize names compiled under a Turkish locale. The result is lower-cased for
+  /// [RequestUtils#isCrossTableFunction(String)]. A function name with non-ASCII characters is rejected: no supported
   /// function has one, and a look-alike spelling (e.g. with a dotless `ı`) may be resolved case-insensitively to the
   /// real function by an executor.
   private static void checkFunctions(Expression expression) {
@@ -402,7 +390,7 @@ public class DeleteStatement implements DataManipulationStatement {
     Function function = expression.getFunctionCall();
     String operator = function.getOperator();
     String functionName = operator.replace("_", "").toUpperCase(Locale.ROOT);
-    checkArgument(!CROSS_TABLE_FUNCTIONS.contains(functionName),
+    checkArgument(!RequestUtils.isCrossTableFunction(functionName.toLowerCase(Locale.ROOT)),
         "Unsupported WHERE clause in DELETE, %s reads another table", operator);
     checkArgument(!SCRIPT_FUNCTIONS.contains(functionName),
         "Unsupported WHERE clause in DELETE, %s is not supported in a DELETE predicate", operator);
