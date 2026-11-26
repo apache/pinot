@@ -57,7 +57,6 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPinotColumnDeclaration;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
-import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTableLike;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropTable;
 import org.apache.pinot.sql.parsers.parser.SqlPinotProperty;
@@ -74,7 +73,7 @@ import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
 /// ```
 ///   SQL String
 ///     → CalciteSqlParser (in pinot-common, generated parser)
-///     → SqlNode (one of SqlPinot{ShowTables,ShowMaterializedViews,CreateTable,CreateTableLike,ShowCreateTable,
+///     → SqlNode (one of SqlPinot{ShowTables,ShowMaterializedViews,CreateTable,ShowCreateTable,
 ///                                DropTable,CreateMaterializedView,ShowCreateMaterializedView,
 ///                                DropMaterializedView})
 ///     → ResolvedTableDefinition (column-list CREATE only)
@@ -193,9 +192,6 @@ public final class DdlCompiler {
     if (node instanceof SqlPinotCreateTable) {
       return compileCreate((SqlPinotCreateTable) node, ctx);
     }
-    if (node instanceof SqlPinotCreateTableLike) {
-      return compileCreateLike((SqlPinotCreateTableLike) node);
-    }
     if (node instanceof SqlPinotShowCreateTable) {
       return compileShowCreate((SqlPinotShowCreateTable) node);
     }
@@ -253,11 +249,17 @@ public final class DdlCompiler {
   // Table DDL: CREATE TABLE
   // -------------------------------------------------------------------------------------------
 
-  private static CompiledCreateTable compileCreate(SqlPinotCreateTable node, DdlCompileContext ctx) {
+  private static CompiledDdl compileCreate(SqlPinotCreateTable node, DdlCompileContext ctx) {
     if (node.getWithOptions() != null) {
       return compileCreateWithOptions(node, ctx);
     }
     QualifiedName name = parseQualifiedName(node.getName());
+    if (node.getLikeSource() != null) {
+      QualifiedName source = parseQualifiedName(node.getLikeSource());
+      TableType sourceType = node.getTableType() == null ? null : parseTableType(node.getTableType().toValue());
+      return new CompiledCreateTableLike(name._databaseName, name._tableName, source._databaseName, source._tableName,
+          sourceType, node.isIfNotExists());
+    }
     TableType tableType = parseTableType(node.getTableType().toValue());
 
     List<String> warnings = new ArrayList<>();
@@ -301,17 +303,9 @@ public final class DdlCompiler {
         resolved.isIfNotExists(), warnings);
   }
 
-  private static CompiledCreateTableLike compileCreateLike(SqlPinotCreateTableLike node) {
-    QualifiedName target = parseQualifiedName(node.getName());
-    QualifiedName source = parseQualifiedName(node.getSourceName());
-    TableType tableType = node.getTableType() == null ? null : parseTableType(node.getTableType().toValue());
-    return new CompiledCreateTableLike(target._databaseName, target._tableName,
-        source._databaseName, source._tableName, tableType, node.isIfNotExists());
-  }
-
   /// Compiles the options-defined `CREATE TABLE ... WITH (key = value, ...)` form by delegating
   /// to the registered [CreateTableWithOptionsHandler]. The compiler owns the parts common to
-  /// both CREATE TABLE forms — name/database resolution and option de-duplication — and the
+  /// CREATE TABLE forms, including name/database resolution, and de-duplicates options. The
   /// handler owns everything the options mean (schema derivation, table-config construction).
   private static CompiledCreateTable compileCreateWithOptions(SqlPinotCreateTable node, DdlCompileContext ctx) {
     QualifiedName name = parseQualifiedName(node.getName());

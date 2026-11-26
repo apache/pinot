@@ -304,6 +304,7 @@ public class PinotDdlRestletResource {
       ResourceUtils.checkPermissionAndAccess(TableNameBuilder.forType(candidate).tableNameWithType(targetName),
           httpRequest, headers, AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
     }
+    boolean ifNotExists = create.isIfNotExists();
     List<String> createdTables = new ArrayList<>(2);
     DdlExecutionResponse response = new DdlExecutionResponse()
         .setOperation(DdlOperation.CREATE_TABLE_LIKE)
@@ -311,9 +312,9 @@ public class PinotDdlRestletResource {
         .setTableName(targetName)
         .setSourceTableName(sourceName)
         .setDryRun(dryRun)
-        .setIfNotExists(create.isIfNotExists())
+        .setIfNotExists(ifNotExists)
         .setCreatedTables(createdTables);
-    Response existingTarget = existingCreateLikeTarget(create, targetName, response);
+    Response existingTarget = existingCreateLikeTarget(targetName, ifNotExists, response);
     if (existingTarget != null) {
       return existingTarget;
     }
@@ -337,28 +338,20 @@ public class PinotDdlRestletResource {
     if ((offline != null && offline.isMaterializedView()) || (realtime != null && realtime.isMaterializedView())) {
       throw badRequest("CREATE TABLE LIKE does not support a materialized view as its source: " + sourceName);
     }
-    Schema sourceSchema = readCreateLikeSchema(sourceName);
-    if (sourceSchema == null) {
+    Schema schema = readCreateLikeSchema(sourceName);
+    if (schema == null) {
       throw new ControllerApplicationException(LOGGER, "Source schema not found: " + sourceName,
           Response.Status.NOT_FOUND);
     }
 
-    TableConfigs copied;
-    try {
-      // TableConfig's copy constructor shares nested configs, maps, and lists. Deep-copy the
-      // entire bundle before renaming, tuning, or validating it.
-      copied = JsonUtils.stringToObject(
-          new TableConfigs(sourceName, sourceSchema, offline, realtime).toJsonString(), TableConfigs.class);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Failed to copy source table definition: " + sourceName,
-          Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
+    // The metadata provider deserializes a fresh schema and table configs for each read, so tuning
+    // and renaming this bundle only changes the destination definition.
+    TableConfigs copied = new TableConfigs(sourceName, schema, offline, realtime);
     copied.setTableName(targetName);
-    Schema schema = copied.getSchema();
     Schema storedSchema = readCreateLikeSchema(targetName);
     checkCreateLikeSchema(schema, storedSchema);
     validateCreateLikeConfigs(copied, storedSchema);
-    response.setTableConfigs(toJson(copied));
+    response.setTableConfigs(copied.toJsonObject());
     if (dryRun) {
       return Response.ok(response.setMessage("Dry run: validated CREATE TABLE LIKE without persisting.")).build();
     }
@@ -382,7 +375,7 @@ public class PinotDdlRestletResource {
         }
         schemaCreated = schema.equals(currentSchema);
       }
-      Response racedTarget = existingCreateLikeTarget(create, targetName, response);
+      Response racedTarget = existingCreateLikeTarget(targetName, ifNotExists, response);
       if (racedTarget != null) {
         return racedTarget;
       }
@@ -395,8 +388,8 @@ public class PinotDdlRestletResource {
       try {
         _pinotHelixResourceManager.addTable(firstConfig);
       } catch (TableAlreadyExistsException e) {
-        if (create.isIfNotExists()) {
-          Response existing = existingCreateLikeTarget(create, targetName, response);
+        if (ifNotExists) {
+          Response existing = existingCreateLikeTarget(targetName, true, response);
           if (existing != null) {
             return existing;
           }
@@ -426,7 +419,7 @@ public class PinotDdlRestletResource {
     if (!ZKMetadataProvider.isSchemaExists(store, rawTableName)) {
       return null;
     }
-    Schema schema = _pinotHelixResourceManager.getSchema(rawTableName);
+    Schema schema = ZKMetadataProvider.getSchema(store, rawTableName);
     if (schema == null && ZKMetadataProvider.isSchemaExists(store, rawTableName)) {
       throw new ControllerApplicationException(LOGGER, "Failed to read schema: " + rawTableName,
           Response.Status.INTERNAL_SERVER_ERROR);
@@ -441,9 +434,7 @@ public class PinotDdlRestletResource {
     if (!ZKMetadataProvider.isTableConfigExists(store, tableNameWithType)) {
       return null;
     }
-    TableConfig config = tableType == TableType.OFFLINE
-        ? _pinotHelixResourceManager.getOfflineTableConfig(rawTableName, false, false)
-        : _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName, false, false);
+    TableConfig config = ZKMetadataProvider.getTableConfig(store, tableNameWithType, false, false);
     if (config == null && ZKMetadataProvider.isTableConfigExists(store, tableNameWithType)) {
       throw new ControllerApplicationException(LOGGER, "Failed to read table config: " + tableNameWithType,
           Response.Status.INTERNAL_SERVER_ERROR);
@@ -452,8 +443,7 @@ public class PinotDdlRestletResource {
   }
 
   @Nullable
-  private Response existingCreateLikeTarget(CompiledCreateTableLike create, String targetName,
-      DdlExecutionResponse response) {
+  private Response existingCreateLikeTarget(String targetName, boolean ifNotExists, DdlExecutionResponse response) {
     if (ZKMetadataProvider.isLogicalTableExists(_pinotHelixResourceManager.getPropertyStore(), targetName)) {
       throw new ControllerApplicationException(LOGGER, "Logical table already exists: " + targetName,
           Response.Status.CONFLICT);
@@ -467,7 +457,7 @@ public class PinotDdlRestletResource {
         && !_pinotHelixResourceManager.hasRealtimeTable(targetName)) {
       return null;
     }
-    if (create.isIfNotExists()) {
+    if (ifNotExists) {
       return Response.ok(response.setTableConfigs(null)
           .setMessage("Table " + targetName + " already exists; CREATE IF NOT EXISTS is a no-op.")).build();
     }
@@ -511,8 +501,6 @@ public class PinotDdlRestletResource {
       if (copied.getOffline() != null && copied.getRealtime() != null) {
         TableConfigUtils.verifyHybridTableConfigs(copied.getTableName(), copied.getOffline(), copied.getRealtime());
       }
-    } catch (ControllerApplicationException e) {
-      throw e;
     } catch (IllegalArgumentException | IllegalStateException | ConfigValidationException e) {
       throw new ControllerApplicationException(LOGGER, "CREATE TABLE LIKE validation failed: " + e.getMessage(),
           Response.Status.BAD_REQUEST, e);

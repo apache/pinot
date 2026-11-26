@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,8 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.SimpleHttpErrorInfo;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -41,7 +44,6 @@ import org.apache.pinot.controller.api.resources.ddl.DdlExecutionRequest;
 import org.apache.pinot.controller.api.resources.ddl.DdlExecutionResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
-import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -54,13 +56,14 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.metadata.ZKMetadataProvider.constructPropertyStorePathForResourceConfig;
+import static org.apache.pinot.common.metadata.ZKMetadataProvider.constructPropertyStorePathForSchema;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -72,6 +75,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -127,6 +131,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       ingestionConfig.setStreamIngestionConfig(
           new StreamIngestionConfig(List.of(Map.of("stream.kafka.topic.name", "${LIKE_TOPIC}"))));
       fixture._realtime.setIngestionConfig(ingestionConfig);
+      fixture.storeConfig(fixture._realtime);
       String originalSchema = JsonUtils.objectToString(fixture._schema);
       String originalConfig = JsonUtils.objectToString(fixture._realtime);
       fixture._tuner.when(() -> TableConfigTunerUtils.applyTunerConfigs(any(), any(), any(), any()))
@@ -144,10 +149,10 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       assertEquals(copied.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().getFirst()
           .get("stream.kafka.topic.name"), "${LIKE_TOPIC}");
       assertEquals(copied.getIndexingConfig().getSortedColumn(), List.of("id"));
-      assertEquals(JsonUtils.objectToString(fixture._schema), originalSchema);
-      assertEquals(JsonUtils.objectToString(fixture._realtime), originalConfig);
+      assertEquals(JsonUtils.objectToString(ZKMetadataProvider.getSchema(fixture._store, "old")), originalSchema);
+      assertEquals(JsonUtils.objectToString(ZKMetadataProvider.getTableConfig(fixture._store, "old_REALTIME", false,
+          false)), originalConfig);
       assertEquals(body(response).getTableConfigs().get("schema").get("primaryKeyColumns").get(0).asText(), "id");
-      verify(fixture._manager).getRealtimeTableConfig("old", false, false);
     }
   }
 
@@ -182,7 +187,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       assertEquals(validatedTypes, EnumSet.of(TableType.OFFLINE, TableType.REALTIME));
       assertEquals(body(response).getTableConfigs().get("schema").get("description").asText(),
           "schema prepared by realtime tuner");
-      assertEquals(JsonUtils.objectToString(fixture._schema), originalSchema);
+      assertEquals(JsonUtils.objectToString(ZKMetadataProvider.getSchema(fixture._store, "old")), originalSchema);
     }
   }
 
@@ -204,6 +209,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       throws Exception {
     try (Fixture fixture = new Fixture("old", true, true)) {
       fixture._realtime.getValidationConfig().setTimeColumnName("otherTime");
+      fixture.storeConfig(fixture._realtime);
       fixture.assertStatus("CREATE TABLE copied_table LIKE old", 400);
       fixture.verifyNoWrites();
     }
@@ -243,7 +249,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       boolean offlineReadable = unreadableType == TableType.REALTIME;
       try (Fixture fixture = new Fixture("old", offlineReadable, !offlineReadable)) {
         String unreadableTable = "old_" + unreadableType;
-        String path = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(unreadableTable);
+        String path = constructPropertyStorePathForResourceConfig(unreadableTable);
         when(fixture._store.exists(path, AccessOption.PERSISTENT)).thenReturn(true);
         TableType readableType = offlineReadable ? TableType.OFFLINE : TableType.REALTIME;
         Response response = fixture.execute("CREATE TABLE copied_table LIKE old TYPE " + readableType, true);
@@ -265,7 +271,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
   public void malformedTargetConfigWithoutIdealStateFailsBeforeSchemaCreation()
       throws Exception {
     try (Fixture fixture = new Fixture("old", true, false)) {
-      String path = ZKMetadataProvider.constructPropertyStorePathForResourceConfig("copied_table_REALTIME");
+      String path = constructPropertyStorePathForResourceConfig("copied_table_REALTIME");
       when(fixture._store.exists(path, AccessOption.PERSISTENT)).thenReturn(true);
 
       fixture.assertStatus("CREATE TABLE IF NOT EXISTS copied_table LIKE old TYPE OFFLINE", 500);
@@ -278,8 +284,8 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       throws Exception {
     for (String name : List.of("old", "copied_table")) {
       try (Fixture fixture = new Fixture("old", true, false)) {
-        when(fixture._manager.getSchema(name)).thenReturn(null);
-        String path = ZKMetadataProvider.constructPropertyStorePathForSchema(name);
+        String path = constructPropertyStorePathForSchema(name);
+        when(fixture._store.get(path, null, AccessOption.PERSISTENT)).thenReturn(null);
         when(fixture._store.exists(path, AccessOption.PERSISTENT)).thenReturn(true);
         ControllerApplicationException failure = expectThrows(ControllerApplicationException.class,
             () -> fixture.execute("CREATE TABLE copied_table LIKE old", false));
@@ -334,9 +340,11 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       fixture.assertStatus("CREATE TABLE copied_table LIKE old", 409);
       verify(fixture._store, never()).exists(ZKMetadataProvider.constructPropertyStorePathForLogical("old"),
           AccessOption.PERSISTENT);
-      verify(fixture._manager, never()).getOfflineTableConfig("old", false, false);
-      verify(fixture._manager, never()).getRealtimeTableConfig("old", false, false);
-      verify(fixture._manager, never()).getSchema("old");
+      for (TableType type : TableType.values()) {
+        verify(fixture._store, never()).get(constructPropertyStorePathForResourceConfig("old_" + type), null,
+            AccessOption.PERSISTENT);
+      }
+      verify(fixture._store, never()).get(constructPropertyStorePathForSchema("old"), null, AccessOption.PERSISTENT);
     }
   }
 
@@ -358,7 +366,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
     try (Fixture fixture = new Fixture("old", true, false)) {
       TableConfig target = newConfig("copied_table", TableType.OFFLINE);
       fixture.storeConfig(target);
-      String path = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(target.getTableName());
+      String path = constructPropertyStorePathForResourceConfig(target.getTableName());
       when(fixture._store.exists(path, AccessOption.PERSISTENT)).thenReturn(false, true);
 
       Response response = fixture.execute("CREATE TABLE IF NOT EXISTS copied_table LIKE old", false);
@@ -450,6 +458,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       throws Exception {
     try (Fixture fixture = new Fixture("old", true, false)) {
       fixture._schema.getFieldSpecFor("id").setTransformFunction("Groovy(");
+      fixture.storeSchema(fixture._schema);
       when(fixture._resource._controllerConf.isDisableIngestionGroovy()).thenReturn(true);
       fixture._validation.when(() -> TableConfigValidationUtils.validateSchemaGroovy(any(), any()))
           .thenCallRealMethod();
@@ -497,8 +506,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
     try (Fixture fixture = new Fixture("old", true, false)) {
       fixture.deny("old_REALTIME");
       fixture.assertStatus("CREATE TABLE copied_table LIKE old", 403);
-      verify(fixture._manager, never()).getOfflineTableConfig("old", false, false);
-      verify(fixture._manager, never()).getRealtimeTableConfig("old", false, false);
+      verifyNoInteractions(fixture._store);
       fixture.verifyNoWrites();
 
       // An explicit selector needs permission only on that source variant.
@@ -512,8 +520,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
     try (Fixture fixture = new Fixture("old", true, false)) {
       fixture.deny("copied_table_REALTIME");
       fixture.assertStatus("CREATE TABLE copied_table LIKE old TYPE OFFLINE", 403);
-      verify(fixture._manager, never()).getOfflineTableConfig("copied_table", false, false);
-      verify(fixture._manager, never()).getRealtimeTableConfig("copied_table", false, false);
+      verifyNoInteractions(fixture._store);
       fixture.verifyNoWrites();
     }
   }
@@ -537,7 +544,7 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
     try (Fixture fixture = new Fixture("old", true, true)) {
       fixture.assertStatus("CREATE TABLE copied_table_OFFLINE LIKE old", 400);
       fixture.assertStatus("CREATE TABLE copied_table LIKE old_REALTIME", 400);
-      verify(fixture._manager, never()).getSchema(any());
+      verifyNoInteractions(fixture._store);
       fixture.verifyNoWrites();
     }
   }
@@ -592,7 +599,6 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
     private final Schema _schema;
     private final TableConfig _realtime;
     private final MockedStatic<TableConfigValidationUtils> _validation = mockStatic(TableConfigValidationUtils.class);
-    private final MockedStatic<PinotTableRestletResource> _tasks = mockStatic(PinotTableRestletResource.class);
     private final MockedStatic<TableConfigTunerUtils> _tuner = mockStatic(TableConfigTunerUtils.class);
 
     private Fixture(String source, boolean offline, boolean realtime)
@@ -600,7 +606,6 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
       _resource._pinotHelixResourceManager = _manager;
       when(_manager.getPropertyStore()).thenReturn(_store);
       _resource._pinotHelixTaskResourceManager = mock(PinotHelixTaskResourceManager.class);
-      _resource._pinotTaskManager = mock(PinotTaskManager.class);
       _resource._controllerConf = mock(ControllerConf.class);
       _resource._accessControlFactory = mock(AccessControlFactory.class);
       when(_resource._accessControlFactory.create()).thenReturn(new AccessControl() { });
@@ -626,22 +631,17 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
     }
 
     private void storeSchema(Schema schema, Schema... updates) {
-      String name = schema.getSchemaName();
-      when(_store.exists(ZKMetadataProvider.constructPropertyStorePathForSchema(name), AccessOption.PERSISTENT))
-          .thenReturn(true);
-      when(_manager.getSchema(name)).thenReturn(schema, updates);
+      String path = constructPropertyStorePathForSchema(schema.getSchemaName());
+      when(_store.exists(path, AccessOption.PERSISTENT)).thenReturn(true);
+      when(_store.get(path, null, AccessOption.PERSISTENT)).thenReturn(SchemaSerDeUtils.toZNRecord(schema),
+          Arrays.stream(updates).map(SchemaSerDeUtils::toZNRecord).toArray(ZNRecord[]::new));
     }
 
-    private void storeConfig(TableConfig config) {
-      String table = config.getTableName();
-      String path = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(table);
+    private void storeConfig(TableConfig config)
+        throws IOException {
+      String path = constructPropertyStorePathForResourceConfig(config.getTableName());
       when(_store.exists(path, AccessOption.PERSISTENT)).thenReturn(true);
-      String name = TableNameBuilder.extractRawTableName(table);
-      if (config.getTableType() == TableType.OFFLINE) {
-        when(_manager.getOfflineTableConfig(name, false, false)).thenReturn(config);
-      } else {
-        when(_manager.getRealtimeTableConfig(name, false, false)).thenReturn(config);
-      }
+      when(_store.get(path, null, AccessOption.PERSISTENT)).thenReturn(TableConfigSerDeUtils.toZNRecord(config));
     }
 
     private Response execute(String sql, boolean dryRun) {
@@ -672,7 +672,6 @@ public class PinotDdlRestletResourceCreateTableLikeUnitTest {
     @Override
     public void close() {
       _tuner.close();
-      _tasks.close();
       _validation.close();
     }
   }

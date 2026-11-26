@@ -59,9 +59,13 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 ///   )
 /// ```
 ///
-/// The two forms are mutually exclusive: [#getWithOptions] is non-null exactly for the
-/// options-defined form, in which case [#getColumns] / [#getProperties] are empty and
-/// [#getTableType] / [#getPrimaryKeyColumns] are null.
+/// The LIKE form copies an existing table and optionally selects a physical table type.
+/// ```
+///   CREATE TABLE [IF NOT EXISTS] [db.]name LIKE [db.]source [TYPE OFFLINE | REALTIME]
+/// ```
+///
+/// [#getWithOptions] supplies the option list for WITH and [#getLikeSource] supplies the source identifier for LIKE.
+/// Both return null for the column-list form.
 ///
 /// This is a parse-time AST node only. Semantic validation (data type recognition, role
 /// inference, property mapping) happens in `DdlCompiler` in the `pinot-sql-ddl` module.
@@ -78,20 +82,26 @@ public class SqlPinotCreateTable extends SqlCall {
   @Nullable private final SqlLiteral _tableType;
   private final SqlNodeList _properties;
   @Nullable private final SqlNodeList _withOptions;
+  @Nullable private final SqlIdentifier _likeSource;
 
   public SqlPinotCreateTable(SqlParserPos pos, SqlIdentifier name, boolean ifNotExists, SqlNodeList columns,
       @Nullable SqlNodeList primaryKeyColumns, SqlLiteral tableType, @Nullable SqlNodeList properties) {
-    this(pos, name, ifNotExists, columns, primaryKeyColumns, tableType, properties, null);
+    this(pos, name, ifNotExists, columns, primaryKeyColumns, tableType, properties, null, null);
   }
 
   /// Options-defined form: `CREATE TABLE [IF NOT EXISTS] [db.]name WITH (key = value, ...)`.
   public SqlPinotCreateTable(SqlParserPos pos, SqlIdentifier name, boolean ifNotExists, SqlNodeList withOptions) {
-    this(pos, name, ifNotExists, SqlNodeList.EMPTY, null, null, null, withOptions);
+    this(pos, name, ifNotExists, SqlNodeList.EMPTY, null, null, null, withOptions, null);
+  }
+
+  SqlPinotCreateTable(SqlParserPos pos, SqlIdentifier name, boolean ifNotExists, SqlIdentifier likeSource,
+      @Nullable SqlLiteral tableType) {
+    this(pos, name, ifNotExists, SqlNodeList.EMPTY, null, tableType, null, null, likeSource);
   }
 
   private SqlPinotCreateTable(SqlParserPos pos, SqlIdentifier name, boolean ifNotExists, SqlNodeList columns,
       @Nullable SqlNodeList primaryKeyColumns, @Nullable SqlLiteral tableType, @Nullable SqlNodeList properties,
-      @Nullable SqlNodeList withOptions) {
+      @Nullable SqlNodeList withOptions, @Nullable SqlIdentifier likeSource) {
     super(pos);
     _name = name;
     _ifNotExists = ifNotExists;
@@ -100,6 +110,7 @@ public class SqlPinotCreateTable extends SqlCall {
     _tableType = tableType;
     _properties = properties == null ? SqlNodeList.EMPTY : properties;
     _withOptions = withOptions;
+    _likeSource = likeSource;
   }
 
   public SqlIdentifier getName() {
@@ -119,7 +130,7 @@ public class SqlPinotCreateTable extends SqlCall {
     return _primaryKeyColumns;
   }
 
-  /// Null only for the options-defined (`WITH`) form.
+  /// Returns null for the options form and for a LIKE statement with no explicit TYPE.
   @Nullable
   public SqlLiteral getTableType() {
     return _tableType;
@@ -129,11 +140,16 @@ public class SqlPinotCreateTable extends SqlCall {
     return _properties;
   }
 
-  /// The `WITH (key = value, ...)` option list, or null for the column-list form. Non-null (even
+  /// The `WITH (key = value, ...)` option list, or null in other forms. Non-null (even
   /// when empty) means the statement was written in the options-defined form.
   @Nullable
   public SqlNodeList getWithOptions() {
     return _withOptions;
+  }
+
+  @Nullable
+  public SqlIdentifier getLikeSource() {
+    return _likeSource;
   }
 
   @Override
@@ -143,7 +159,10 @@ public class SqlPinotCreateTable extends SqlCall {
 
   @Override
   public List<SqlNode> getOperandList() {
-    // Fixed-arity list with null placeholder for absent optional operand, per Calcite SqlCall contract.
+    // LIKE appends its source after the six operands shared by the existing CREATE forms.
+    if (_likeSource != null) {
+      return Arrays.asList(_name, _columns, _primaryKeyColumns, _tableType, _properties, _withOptions, _likeSource);
+    }
     return Arrays.asList(_name, _columns, _primaryKeyColumns, _tableType, _properties, _withOptions);
   }
 
@@ -154,6 +173,15 @@ public class SqlPinotCreateTable extends SqlCall {
       writer.keyword("IF NOT EXISTS");
     }
     _name.unparse(writer, leftPrec, rightPrec);
+    if (_likeSource != null) {
+      writer.keyword("LIKE");
+      _likeSource.unparse(writer, leftPrec, rightPrec);
+      if (_tableType != null) {
+        writer.keyword("TYPE");
+        writer.keyword(_tableType.toValue());
+      }
+      return;
+    }
     if (_withOptions != null) {
       writer.keyword("WITH");
       SqlWriter.Frame withFrame = writer.startList("(", ")");

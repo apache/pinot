@@ -683,11 +683,10 @@ CREATE TABLE [IF NOT EXISTS] [db.]target
 LIKE [db.]source [TYPE OFFLINE | REALTIME];
 ```
 
-The parser's existing `CREATE TABLE` production emits a dedicated
-`SqlPinotCreateTableLike` node for this form. `DdlCompiler` produces a
-`CompiledCreateTableLike` with independent source and destination identifiers,
-the optional source type, and the existence flag. Compilation does not read the
-catalog. Execution uses the additive `CREATE_TABLE_LIKE` operation.
+The parser records the LIKE source on the existing `SqlPinotCreateTable` node.
+`DdlCompiler` produces a `CompiledCreateTableLike` with both table references,
+the optional source type, and the existence flag. The controller resolves the
+source definition when it executes the `CREATE_TABLE_LIKE` operation.
 
 Omitting `TYPE` copies every existing physical variant of the source: OFFLINE,
 REALTIME, or both for a hybrid. An explicit type selects only that variant and
@@ -706,13 +705,13 @@ permissions are required because any existing target variant blocks the operatio
 including when `TYPE` selects just one source variant. With no `TYPE`,
 both source candidates require READ permission, consistent with other untyped DDLs.
 
-LIKE reads source configs through the same getters as `GET /tableConfigs`, with
-variable substitution and decorators disabled. If a getter returns no definition
+LIKE reads source configs with variable substitution and decorators disabled,
+as in `GET /tableConfigs`. If a getter returns no definition
 for an existing config or schema during preflight, LIKE returns 500 before writing.
 The getters use the controller's standard legacy property-store fallback. Explicit
-`TYPE` reads only the selected variant. JSON deep copies preserve schema metadata,
-distinct per-variant settings, and symbolic
-`${VAR}` references. `TableConfigs.setTableName` changes structural table/schema
+`TYPE` reads only the selected variant. Each read deserializes a fresh definition,
+preserving schema metadata, per-variant settings, and symbolic `${VAR}` references.
+`TableConfigs.setTableName` changes structural table/schema
 names. Arbitrary config values such as stream topics, tenants, task settings, and
 explicit instance-partition references retain their values. Target tuning and the
 normal validation pipeline run before persistence, including validation of the

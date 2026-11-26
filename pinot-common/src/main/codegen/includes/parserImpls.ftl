@@ -282,7 +282,7 @@ SqlNode SqlPinotCreateTable() :
         <LIKE> sourceName = CompoundIdentifier()
         [ <TYPE> tableType = PinotTableTypeLiteral() ]
         {
-            return new SqlPinotCreateTableLike(pos, name, sourceName, ifNotExists, tableType);
+            return new SqlPinotCreateTable(pos, name, ifNotExists, sourceName, tableType);
         }
     |
         <WITH> withOptions = PinotWithOptionList()

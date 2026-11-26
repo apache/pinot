@@ -35,7 +35,7 @@ public final class CompiledCreateTableLike extends CompiledDdl {
   private final TableType _tableType;
   private final boolean _ifNotExists;
 
-  public CompiledCreateTableLike(@Nullable String databaseName, String rawTableName,
+  CompiledCreateTableLike(@Nullable String databaseName, String rawTableName,
       @Nullable String sourceDatabaseName, String sourceRawTableName, @Nullable TableType tableType,
       boolean ifNotExists) {
     super(DdlOperation.CREATE_TABLE_LIKE, databaseName, List.of());

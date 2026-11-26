@@ -26,7 +26,6 @@ import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import org.apache.pinot.sql.parsers.parser.SqlPinotColumnDeclaration;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
-import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTableLike;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropTable;
 import org.apache.pinot.sql.parsers.parser.SqlPinotProperty;
@@ -54,37 +53,39 @@ public class PinotDdlParserTest {
 
   @Test
   public void createTableLikeSelectsAllSourceVariantsByDefault() {
-    SqlPinotCreateTableLike node = parseCreateLike("CREATE TABLE new_table LIKE old_table");
+    SqlPinotCreateTable node = parseCreate("CREATE TABLE new_table LIKE old_table");
     assertEquals(node.getName().getSimple(), "new_table");
-    assertEquals(node.getSourceName().getSimple(), "old_table");
+    assertEquals(node.getLikeSource().getSimple(), "old_table");
     assertFalse(node.isIfNotExists());
     assertNull(node.getTableType());
   }
 
   @Test
   public void createTableLikeQualifiedNamesAndModifiersRoundTrip() {
-    SqlPinotCreateTableLike node = parseCreateLike(
+    SqlPinotCreateTable node = parseCreate(
         "CREATE TABLE IF NOT EXISTS \"Destination\".\"NewTable\" "
             + "LIKE \"Source\".\"OldTable\" TYPE OFFLINE");
     assertEquals(node.getName().names, List.of("Destination", "NewTable"));
-    assertEquals(node.getSourceName().names, List.of("Source", "OldTable"));
+    assertEquals(node.getLikeSource().names, List.of("Source", "OldTable"));
     assertTrue(node.isIfNotExists());
     assertEquals(node.getTableType().toValue(), "OFFLINE");
+    assertEquals(node.getOperandList().get(3), node.getTableType());
+    assertEquals(node.getOperandList().get(6), node.getLikeSource());
 
-    SqlPinotCreateTableLike reparsed = parseCreateLike(node.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
+    SqlPinotCreateTable reparsed = parseCreate(node.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
     assertEquals(reparsed.getName().names, node.getName().names);
-    assertEquals(reparsed.getSourceName().names, node.getSourceName().names);
+    assertEquals(reparsed.getLikeSource().names, node.getLikeSource().names);
     assertTrue(reparsed.isIfNotExists());
     assertEquals(reparsed.getTableType().toValue(), "OFFLINE");
   }
 
   @Test
   public void createTableLikeRealtimeAndUntypedRoundTrip() {
-    SqlPinotCreateTableLike realtime = parseCreateLike("create table new_table like old_table type realtime");
+    SqlPinotCreateTable realtime = parseCreate("create table new_table like old_table type realtime");
     assertEquals(realtime.getTableType().toValue(), "REALTIME");
-    SqlPinotCreateTableLike untyped = parseCreateLike("CREATE TABLE new_table LIKE old_table");
-    SqlPinotCreateTableLike reparsed = parseCreateLike(untyped.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
-    assertEquals(reparsed.getSourceName().getSimple(), "old_table");
+    SqlPinotCreateTable untyped = parseCreate("CREATE TABLE new_table LIKE old_table");
+    SqlPinotCreateTable reparsed = parseCreate(untyped.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
+    assertEquals(reparsed.getLikeSource().getSimple(), "old_table");
     assertNull(reparsed.getTableType());
     assertFalse(reparsed.isIfNotExists());
   }
@@ -231,10 +232,9 @@ public class PinotDdlParserTest {
 
   @Test
   public void classicCreateTableHasNullWithOptions() {
-    // getWithOptions() is the form discriminator: null means column-list form, non-null (even
-    // empty) means the WITH form was written.
     SqlPinotCreateTable node = parseCreate("CREATE TABLE events (id INT) TABLE_TYPE = OFFLINE");
     assertNull(node.getWithOptions());
+    assertEquals(node.getOperandList().size(), 6);
   }
 
   @Test
@@ -869,12 +869,6 @@ public class PinotDdlParserTest {
       fail("Expected SqlPinotCreateTable; got " + node.getClass().getSimpleName());
     }
     return (SqlPinotCreateTable) node;
-  }
-
-  private static SqlPinotCreateTableLike parseCreateLike(String sql) {
-    SqlNode node = parseSingle(sql);
-    assertTrue(node instanceof SqlPinotCreateTableLike, "Expected CREATE TABLE LIKE AST for: " + sql);
-    return (SqlPinotCreateTableLike) node;
   }
 
   private static SqlPinotDropTable parseDrop(String sql) {
