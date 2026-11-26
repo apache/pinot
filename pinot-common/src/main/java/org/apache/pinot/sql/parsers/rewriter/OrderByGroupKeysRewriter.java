@@ -79,6 +79,9 @@ public class OrderByGroupKeysRewriter implements QueryRewriter {
       }
       pinotQuery.setOrderByList(orderByList);
     }
+    // TODO: Also order a query without ORDER BY that has HAVING or a LIMIT at or above the threshold. It needs a
+    //       separate combine algorithm for a deterministic ordering, since ordered it costs much more in the existing
+    //       combines than as written.
     return pinotQuery;
   }
 
