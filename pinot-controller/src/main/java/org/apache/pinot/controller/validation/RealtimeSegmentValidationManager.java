@@ -34,6 +34,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
+import org.apache.pinot.common.utils.config.QuotaConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -41,6 +42,7 @@ import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTas
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -211,7 +213,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
     // if quota breach and pause flag is not in sync, update the IS
     if (shouldPauseForQuota) {
-      String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
+      // Report the effective limit, which may come from the server tenant's quota defaults
+      QuotaConfig quotaConfig = QuotaConfigUtils.getEffectiveStorageQuotaConfig(tableConfig,
+          _pinotHelixResourceManager::getTenantQuotaConfig);
+      String storageQuota = quotaConfig != null ? quotaConfig.getStorage() : "NA";
       // as quota is breached pause the consumption right away
       _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
           "Storage quota of " + storageQuota + " exceeded.");
