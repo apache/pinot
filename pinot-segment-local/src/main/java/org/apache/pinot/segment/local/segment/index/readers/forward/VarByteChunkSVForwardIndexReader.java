@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.function.ObjIntConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -146,6 +147,27 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
   @Override
   public String getMapEntryValueAsString(int docId, ChunkReaderContext context, PreparedMapKey key) {
     return MapUtils.deserializeMapEntryValueAsString(ByteBuffer.wrap(getBytes(docId, context)), key);
+  }
+
+  @Override
+  public void readBytesValues(int[] docIds, int from, int to, ObjIntConsumer<ByteBuffer> consumer,
+      ChunkReaderContext context) {
+    for (int i = from; i < to; i++) {
+      int docId = docIds[i];
+      int row = docId % _numDocsPerChunk;
+      ByteBuffer value;
+      if (_isCompressed) {
+        ByteBuffer chunk = getChunkBuffer(docId, context);
+        int start = chunk.getInt(row * ROW_OFFSET_SIZE);
+        value = chunk.slice(start, getValueEndOffset(row, chunk) - start);
+      } else {
+        int chunkId = docId / _numDocsPerChunk;
+        long chunkStart = getChunkPosition(chunkId);
+        long start = chunkStart + _dataBuffer.getInt(chunkStart + (long) row * ROW_OFFSET_SIZE);
+        value = _dataBuffer.toDirectByteBuffer(start, (int) (getValueEndOffset(chunkId, row, chunkStart) - start));
+      }
+      consumer.accept(value.asReadOnlyBuffer(), i);
+    }
   }
 
   /// Helper method to read BYTES value from the compressed index.

@@ -19,11 +19,13 @@
 package org.apache.pinot.core.common;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.ObjIntConsumer;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -198,6 +200,15 @@ public class DataBlockCache implements AutoCloseable {
       _dataFetcher.fetchStringValues(column, _docIds, _length, stringValues);
     }
     return stringValues;
+  }
+
+  public boolean isBytesBufferEnabled() {
+    return _dataFetcher.isBytesBufferEnabled();
+  }
+
+  /// Consume borrowed views without retaining them in the block cache.
+  public void forEachBytesValueSV(String column, int from, int to, ObjIntConsumer<ByteBuffer> consumer) {
+    _dataFetcher.forEachBytesValue(column, _docIds, from, to, consumer);
   }
 
   /// Get byte\[\] values for the given single-valued column.

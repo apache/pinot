@@ -19,6 +19,8 @@
 package org.apache.pinot.core.common;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.util.function.ObjIntConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -102,6 +104,20 @@ public interface BlockValSet {
   ///
   /// @return Array of byte\[\] values
   byte[][] getBytesValuesSV();
+
+  /// Whether the query opted into consuming serialized bitmap inputs through borrowed buffers.
+  default boolean isBytesBufferEnabled() {
+    return false;
+  }
+
+  /// Visits SV BYTES at block positions `[from, to)`. Views and objects backed by them must not escape the callback.
+  /// The callback receives the block position and must not initiate another read on this value set.
+  default void forEachBytesValueSV(int from, int to, ObjIntConsumer<ByteBuffer> consumer) {
+    byte[][] values = getBytesValuesSV();
+    for (int i = from; i < to; i++) {
+      consumer.accept(ByteBuffer.wrap(values[i]).asReadOnlyBuffer(), i);
+    }
+  }
 
   default int[] get32BitsMurmur3HashValuesSV() {
     throw new UnsupportedOperationException();
