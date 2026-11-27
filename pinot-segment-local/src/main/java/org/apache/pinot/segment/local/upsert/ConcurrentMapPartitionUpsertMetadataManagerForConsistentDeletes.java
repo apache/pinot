@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -74,6 +75,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   private final LazyRow _reusePreviousRow = new LazyRow();
   private final Map<String, Object> _reuseMergeResultHolder = new HashMap<>();
 
+  // Doc ids of the records that a failed add counted in the distinct segment counts, keyed by the segment. The add did
+  // not reach the other keys of the segment, so removing the segment discounts only the keys of these records.
+  private final Map<IndexSegment, MutableRoaringBitmap> _countedDocIdsOfFailedAdds = new ConcurrentHashMap<>();
+
   public ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(String tableNameWithType, int partitionId,
       UpsertContext context) {
     super(tableNameWithType, partitionId, context);
@@ -84,18 +89,32 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     return _primaryKeyToRecordLocationMap.size();
   }
 
+  /// De-duplicates the records by primary key before adding them, so that the segment counts each key once, the same
+  /// as removing the segment discounts each key once. When adding a new segment fails, keeps the doc ids of the records
+  /// the add counted, so that removing the segment discounts only their keys.
   @Override
   protected void doAddOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
       @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
-    if (_partialUpsertHandler != null) {
-      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
-    } else {
-      // for full upsert, we are de-duping primary key once here to make sure that we are not adding
-      // primary-key multiple times and subtracting just once in removeSegment.
-      // for partial-upsert, we call this method in base class.
-      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
+    if (oldSegment != null) {
+      addOrReplaceRecords(segment, validDocIds, queryableDocIds,
+          resolveComparisonTies(recordInfoIterator, _hashFunction), oldSegment, validDocIdsForOldSegment);
+      return;
     }
+    CountingRecordInfoIterator countingIterator = null;
+    try {
+      countingIterator = new CountingRecordInfoIterator(getDeduplicatedRecordInfos(recordInfoIterator, _hashFunction));
+      addOrReplaceRecords(segment, validDocIds, queryableDocIds, countingIterator, null, null);
+    } catch (Throwable t) {
+      _countedDocIdsOfFailedAdds.put(segment,
+          countingIterator != null ? countingIterator.getCountedDocIds() : new MutableRoaringBitmap());
+      throw t;
+    }
+  }
+
+  private void addOrReplaceRecords(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
+      @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
     String segmentName = segment.getSegmentName();
     segment.enableUpsert(this, validDocIds, queryableDocIds);
 
@@ -237,17 +256,28 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   }
 
   @Override
+  public void removeSegment(IndexSegment segment) {
+    super.removeSegment(segment);
+    // The removal skips a segment whose add failed because it is not tracked, so drop its counted doc ids here
+    _countedDocIdsOfFailedAdds.remove(segment);
+  }
+
+  @Override
   protected void doRemoveSegment(IndexSegment segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Removing {} segment: {}, current primary key count: {}",
         segment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, getNumPrimaryKeys());
     long startTimeMs = System.currentTimeMillis();
     // For ConsistentDeletes, we need to iterate over ALL docs in the segment (not just valid ones)
-    // to properly decrement distinctSegmentCount for every key that was ever in the segment
+    // to properly decrement distinctSegmentCount for every key that was ever in the segment. If adding the segment
+    // failed, only the docs it counted are iterated.
+    MutableRoaringBitmap countedDocIdsOfFailedAdd = _countedDocIdsOfFailedAdds.remove(segment);
     try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
       if (shouldRevertMetadataOnInconsistency(segment)) {
         revertAndRemoveSegment(segment,
             UpsertUtils.getRecordIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()));
+      } else if (countedDocIdsOfFailedAdd != null) {
+        removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, countedDocIdsOfFailedAdd));
       } else {
         removeSegment(segment,
             UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()));
@@ -596,6 +626,44 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
           return recordLocation;
         });
     return record;
+  }
+
+  /// Iterates over the de-duplicated records of a segment being added, and tracks how many of them the add counted.
+  /// The add processes a record before asking for the next one, so every record returned before the latest call to
+  /// [#hasNext()] is counted.
+  private static class CountingRecordInfoIterator implements Iterator<RecordInfo> {
+    private final Collection<RecordInfo> _recordInfos;
+    private final Iterator<RecordInfo> _iterator;
+    private int _numReturned;
+    private int _numCounted;
+
+    CountingRecordInfoIterator(Collection<RecordInfo> recordInfos) {
+      _recordInfos = recordInfos;
+      _iterator = recordInfos.iterator();
+    }
+
+    @Override
+    public boolean hasNext() {
+      _numCounted = _numReturned;
+      return _iterator.hasNext();
+    }
+
+    @Override
+    public RecordInfo next() {
+      RecordInfo recordInfo = _iterator.next();
+      _numReturned++;
+      return recordInfo;
+    }
+
+    /// Returns the doc ids of the counted records, which iterating the unmodified records again returns first.
+    MutableRoaringBitmap getCountedDocIds() {
+      MutableRoaringBitmap countedDocIds = new MutableRoaringBitmap();
+      Iterator<RecordInfo> iterator = _recordInfos.iterator();
+      for (int i = 0; i < _numCounted; i++) {
+        countedDocIds.add(iterator.next().getDocId());
+      }
+      return countedDocIds;
+    }
   }
 
   @VisibleForTesting

@@ -559,6 +559,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       } finally {
         releaseSegment(segmentDataManager);
       }
+    } else if (hasUninitializedUpsertMetadata(segmentDataManager)) {
+      // Rebuild regardless of the commit status: the reload replaces the local copy only for a completed segment.
+      reloadUninitializedUpsertSegment(segmentDataManager, zkMetadata, indexLoadingConfig);
     } else if (zkMetadata.getStatus().isCompleted()) {
       // For pauseless ingestion, the segment is marked ONLINE before it's built and before the COMMIT_END_METADATA
       // call completes.
