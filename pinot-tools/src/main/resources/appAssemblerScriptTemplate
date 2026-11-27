@@ -112,53 +112,124 @@ fi
 # $PLUGINS_DIR is semi-colon separated list of plugin directories, default to '"$BASEDIR"/plugins' if not set.
 # $PLUGINS_INCLUDE is semi-colon separated plugins name, e.g. pinot-avro;pinot-batch-ingestion-standalone. Default is not set, which means load all the plugin jars.
 # If the same plugin is found in multiple directories, it will only be picked up from the first directory it was found. The directories in $PLUGINS_DIR are traversed by their order.
+#
+# A plugin ships as a thin jar plus a pinot-plugin.classpath file listing the shared-store jars it
+# needs. Selecting a subset with $PLUGINS_INCLUDE therefore means taking each named plugin's jars
+# *and* the store entries its index names - the store as a whole is not per-plugin, so adding all
+# of it would defeat the selection. The whole store is added only when every built-in plugin is
+# loaded, after the jars of all directories, so that a jar in a custom plugin directory still wins
+# over a store jar with the same classes.
+# An index entry is relative to the nearest ancestor of the plugin directory that contains it, the
+# same rule as PluginManager, so a plugins directory can have its own plugin-libs/ next to it. If no
+# ancestor contains the entry, the launcher takes it from $BASEDIR.
+# Paths may contain spaces. The script uses only POSIX syntax, so that "sh pinot-admin.sh" works.
+
+# Appends one entry to $PLUGINS_CLASSPATH, once.
+add_to_plugins_classpath() {
+  case ":$PLUGINS_CLASSPATH:" in
+    *":$1:"*) ;;
+    *) PLUGINS_CLASSPATH=${PLUGINS_CLASSPATH:+$PLUGINS_CLASSPATH:}$1 ;;
+  esac
+}
+
+# Appends the shared-store jars that the pinot-plugin.classpath index $1 names.
+add_plugin_index() {
+  PLUGIN_INDEX_DIR=$(cd "$(dirname "$1")" && pwd)
+  # The index is a classpath fragment: entries separated by ':' and/or newlines. build-classpath
+  # writes no final newline, so the last entry is read when read fails but the variable is set.
+  while IFS= read -r PLUGIN_DEP || [ -n "$PLUGIN_DEP" ] ; do
+    [ -n "$PLUGIN_DEP" ] || continue
+    PLUGIN_DEP_DIR=${PLUGIN_INDEX_DIR%/*}
+    PLUGIN_DEP_JAR=
+    while [ -z "$PLUGIN_DEP_JAR" ] ; do
+      if [ -f "${PLUGIN_DEP_DIR:-/}/$PLUGIN_DEP" ] ; then
+        PLUGIN_DEP_JAR=${PLUGIN_DEP_DIR:-/}/$PLUGIN_DEP
+      elif [ -z "$PLUGIN_DEP_DIR" ] ; then
+        break
+      else
+        PLUGIN_DEP_DIR=${PLUGIN_DEP_DIR%/*}
+      fi
+    done
+    if [ -z "$PLUGIN_DEP_JAR" ] && [ -f "$BASEDIR/$PLUGIN_DEP" ] ; then
+      # A plugin in a custom directory can use the store of this installation.
+      PLUGIN_DEP_JAR=$BASEDIR/$PLUGIN_DEP
+    fi
+    if [ -n "$PLUGIN_DEP_JAR" ] ; then
+      add_to_plugins_classpath "$PLUGIN_DEP_JAR"
+    else
+      echo "Warning: $1 names $PLUGIN_DEP, which is not in any parent directory of $PLUGIN_INDEX_DIR or in $BASEDIR" 1>&2
+    fi
+  done <<EOF
+$(tr ':' '\n' < "$1")
+EOF
+}
+
+# Appends every file that "find $@" prints: the jars when $1 is "jar", the indexes otherwise.
+add_found_files() {
+  FOUND_KIND=$1
+  shift
+  while IFS= read -r FOUND_FILE ; do
+    [ -n "$FOUND_FILE" ] || continue
+    if [ "$FOUND_KIND" = jar ] ; then
+      add_to_plugins_classpath "$FOUND_FILE"
+    else
+      add_plugin_index "$FOUND_FILE"
+    fi
+  done <<EOF
+$(find "$@")
+EOF
+}
+
 if [ -z "$PLUGINS_CLASSPATH" ] ; then
   if [ -z "$PLUGINS_DIR" ] ; then
     PLUGINS_DIR="$BASEDIR"/plugins
   else
-    if [[ "$PLUGINS_DIR" = *,* ]]
-    then
+    case "$PLUGINS_DIR" in
+      *,*)
         echo "\$PLUGINS_DIR should use ; as the delimiter"
-        exit 1
-    fi
+        exit 1 ;;
+    esac
   fi
 
+  ALL_BUILT_IN_PLUGINS=false
+  BUILT_IN_PLUGINS_DIR=$(cd "$BASEDIR/plugins" 2>/dev/null && pwd -P)
   export IFS=';'
   for DIR in $PLUGINS_DIR; do
     if [ -d "$DIR" ] ; then
       unset IFS
       if [ -n "$PLUGINS_INCLUDE" ] ; then
-        if [[ "$PLUGINS_INCLUDE" = *,* ]]
-        then
+        case "$PLUGINS_INCLUDE" in
+          *,*)
             echo "\$PLUGINS_INCLUDE should use ; as the delimiter"
-            exit 1
-        fi
+            exit 1 ;;
+        esac
         export IFS=';'
-        for PLUGIN_JAR in $PLUGINS_INCLUDE; do
-            case "$PLUGIN_JAR" in
-              pinot-kafka-2.0|pinot-kafka-3.0) PLUGIN_JAR=pinot-kafka-4.0 ;;
+        for PLUGIN_NAME in $PLUGINS_INCLUDE; do
+            unset IFS
+            case "$PLUGIN_NAME" in
+              pinot-kafka-2.0|pinot-kafka-3.0) PLUGIN_NAME=pinot-kafka-4.0 ;;
             esac
-            PLUGIN_JAR_PATH=$(find "$DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
-            if [ -n "$PLUGINS_CLASSPATH" ] ; then
-              PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
-            else
-              PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
-            fi
+            add_found_files jar "$DIR" -path \*/"$PLUGIN_NAME"/\*.jar
+            add_found_files index "$DIR" -path \*/"$PLUGIN_NAME"/pinot-plugin.classpath
+            export IFS=';'
         done
         unset IFS
       else
-        PLUGIN_JARS=$(find "$DIR" -name \*.jar)
-        for PLUGIN_JAR in $PLUGIN_JARS ; do
-          if [ -n "$PLUGINS_CLASSPATH" ] ; then
-            PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR
-          else
-            PLUGINS_CLASSPATH=$PLUGIN_JAR
-          fi
-        done
+        add_found_files jar "$DIR" -name \*.jar
+        if [ -n "$BUILT_IN_PLUGINS_DIR" ] && [ "$(cd "$DIR" && pwd -P)" = "$BUILT_IN_PLUGINS_DIR" ] ; then
+          ALL_BUILT_IN_PLUGINS=true
+        else
+          # A custom plugin directory: only the store jars that its plugins' indexes name.
+          add_found_files index "$DIR" -name pinot-plugin.classpath
+        fi
       fi
     fi
+    export IFS=';'
   done
   unset IFS
+  if [ "$ALL_BUILT_IN_PLUGINS" = true ] && [ -d "$BASEDIR"/plugin-libs ] ; then
+    add_to_plugins_classpath "$BASEDIR/plugin-libs/*"
+  fi
 fi
 
 if [ -n "$PLUGINS_CLASSPATH" ] ; then

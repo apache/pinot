@@ -195,6 +195,39 @@ public class PluginManagerTest {
     }
   }
 
+  /// A thin plugin's index names shared-store jars relative to the distribution root, which is an ancestor of the
+  /// plugin directory at any depth. Entries are separated by ':' or newlines; a missing entry is skipped.
+  @Test
+  public void testIndexedJars()
+      throws IOException {
+    File dist = new File(_tempDir, "thin-dist");
+    File store = new File(dist, "plugin-libs");
+    store.mkdirs();
+    File depA = new File(store, "a-1.0.jar");
+    File depB = new File(store, "b-2.0.jar");
+    Files.write(depA.toPath(), new byte[0]);
+    Files.write(depB.toPath(), new byte[0]);
+    File nested = new File(dist, "plugins/pinot-input-format/pinot-x");
+    nested.mkdirs();
+    Files.writeString(new File(nested, PluginManager.PLUGIN_CLASSPATH_INDEX_FILE_NAME).toPath(),
+        "plugin-libs/a-1.0.jar:plugin-libs/missing.jar\nplugin-libs/b-2.0.jar\n");
+    assertEquals(PluginManager.indexedJars(nested), List.of(depA.getAbsoluteFile(), depB.getAbsoluteFile()));
+
+    File flat = new File(dist, "plugins/pinot-y");
+    flat.mkdirs();
+    Files.writeString(new File(flat, PluginManager.PLUGIN_CLASSPATH_INDEX_FILE_NAME).toPath(), "plugin-libs/b-2.0.jar");
+    assertEquals(PluginManager.indexedJars(flat), List.of(depB.getAbsoluteFile()));
+
+    // A relative plugins.dir, as in -Dplugins.dir=plugins with the distribution root as working directory.
+    File relative = new File(new File(System.getProperty("user.dir")).getAbsoluteFile().toPath()
+        .relativize(nested.getAbsoluteFile().toPath()).toString());
+    assertEquals(PluginManager.indexedJars(relative), List.of(depA.getAbsoluteFile(), depB.getAbsoluteFile()));
+
+    File fat = new File(dist, "plugins/pinot-z");
+    fat.mkdirs();
+    assertEquals(PluginManager.indexedJars(fat), List.of());
+  }
+
   @Test
   public void testBackwardCompatible() {
     Assert.assertEquals(PluginManager

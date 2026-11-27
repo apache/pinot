@@ -62,6 +62,9 @@ public class PluginManager {
   private static final PluginManager PLUGIN_MANAGER = new PluginManager();
   private static final String PINOT_REALMID = "pinot";
   private static final String PINOUT_PLUGIN_PROPERTIES_FILE_NAME = "pinot-plugin.properties";
+  /// Index of a plugin built with the thin-plugins profile: the jars of the shared `plugin-libs/` store
+  /// that the plugin needs, as paths relative to the distribution root, separated by ':' or newlines.
+  static final String PLUGIN_CLASSPATH_INDEX_FILE_NAME = "pinot-plugin.classpath";
 
   // For backward compatibility, this map holds a mapping from old plugins class name to its new class name.
   private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new ConcurrentHashMap<>() {
@@ -337,7 +340,8 @@ public class PluginManager {
       LOGGER.info("Successfully loaded plugin [{}] from jar files: {}", pluginName, Arrays.toString(urlList.toArray()));
     } else {
       LOGGER.info("Trying to load plugin [{}] from location [{}]", pluginName, directory);
-      Collection<File> jarFiles = FileUtils.listFiles(directory, new String[]{"jar"}, true);
+      Collection<File> jarFiles = new ArrayList<>(FileUtils.listFiles(directory, new String[]{"jar"}, true));
+      jarFiles.addAll(indexedJars(directory));
       Collection<URL> urlList = new ArrayList<>();
       for (File jarFile : jarFiles) {
         try {
@@ -352,6 +356,46 @@ public class PluginManager {
 
       LOGGER.info("Successfully loaded plugin [{}] from jar files: {}", pluginName, Arrays.toString(urlList.toArray()));
     }
+  }
+
+  /// The shared-store jars that the [#PLUGIN_CLASSPATH_INDEX_FILE_NAME] index of a plugin directory names, so that
+  /// a JVM started without the shell launcher (which puts them on the class path) can load a thin plugin. An entry
+  /// is relative to the distribution root: the nearest ancestor of the plugin directory that contains it. A plugin
+  /// without an index, such as a fat plugin jar, gets no extra jars.
+  @VisibleForTesting
+  static List<File> indexedJars(File pluginDirectory) {
+    Path index = pluginDirectory.toPath().resolve(PLUGIN_CLASSPATH_INDEX_FILE_NAME);
+    if (!Files.isRegularFile(index)) {
+      return List.of();
+    }
+    String content;
+    try {
+      content = Files.readString(index);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to read " + index, e);
+    }
+    List<File> jars = new ArrayList<>();
+    for (String entry : content.split("[:\\n]")) {
+      String path = entry.strip();
+      if (path.isEmpty()) {
+        continue;
+      }
+      Path jar = null;
+      // Absolute, so that a relative plugins.dir (such as "plugins") still reaches the distribution root.
+      Path pluginPath = pluginDirectory.toPath().toAbsolutePath().normalize();
+      for (Path dir = pluginPath.getParent(); dir != null && jar == null; dir = dir.getParent()) {
+        Path candidate = dir.resolve(path);
+        if (Files.isRegularFile(candidate)) {
+          jar = candidate;
+        }
+      }
+      if (jar != null) {
+        jars.add(jar.toFile());
+      } else {
+        LOGGER.warn("{} names {}, which does not exist in any parent directory of {}", index, path, pluginDirectory);
+      }
+    }
+    return jars;
   }
 
   private PluginClassLoader createClassLoader(Collection<URL> urlList) {

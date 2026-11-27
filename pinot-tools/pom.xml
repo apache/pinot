@@ -107,6 +107,14 @@
       <artifactId>pinot-kinesis</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- Keep this dependency here, before hadoop-common and tyrus-standalone-client. It brings pinot-common, and the
+         order decides which copy of a class pinot-all.jar gets: the shade plugin keeps the first one. tyrus embeds
+         Grizzly 4 and hadoop-common brings javax.servlet-api, while pinot-common needs Grizzly 2.4 and
+         jakarta.servlet-api. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-java-client</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-pulsar</artifactId>
@@ -196,10 +204,6 @@
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-java-client</artifactId>
     </dependency>
   </dependencies>
   <build>

@@ -56,6 +56,9 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   public static final String BASEDIR = "basedir";
   public static final String LOCAL_FILE_PREFIX = "local://";
   public static final String PINOT_MAIN_JAR_PREFIX = "pinot-all";
+  /// The shared dependency store and the per-plugin index of a thin-plugins distribution. See [#resolveDepsJars].
+  private static final String SHARED_PLUGIN_LIBS_DIR = "plugin-libs";
+  private static final String PLUGIN_CLASSPATH_INDEX = "pinot-plugin.classpath";
 
   @CommandLine.Option(names = {"-jobSpecFile", "-jobSpec"}, required = true, description = "Ingestion job spec file")
   private String _jobSpecFile;
@@ -117,6 +120,21 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
 
   public void setPropertyFile(String propertyFile) {
     _propertyFile = propertyFile;
+  }
+
+  @VisibleForTesting
+  void setSparkVersion(SparkType sparkVersion) {
+    _sparkVersion = sparkVersion;
+  }
+
+  @VisibleForTesting
+  void setPluginsToLoad(List<String> pluginsToLoad) {
+    _pluginsToLoad = pluginsToLoad;
+  }
+
+  @VisibleForTesting
+  void setPluginsToExclude(List<String> pluginsToExclude) {
+    _pluginsToExclude = pluginsToExclude;
   }
 
   public void setAuthProvider(AuthProvider authProvider) {
@@ -245,25 +263,46 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
 
   private void addDepsJarToDistributedCache(SparkLauncher sparkLauncher, String depsJarDir, List<String> extraClassPath)
       throws IOException {
-    if (depsJarDir != null) {
-      URI depsJarDirURI = URI.create(depsJarDir);
-      if (depsJarDirURI.getScheme() == null) {
-        depsJarDirURI = new File(depsJarDir).toURI();
-      }
-      PinotFS pinotFS = PinotFSFactory.create(depsJarDirURI.getScheme());
-      String[] files = pinotFS.listFiles(depsJarDirURI, true);
-      for (String file : files) {
-        if (!pinotFS.isDirectory(URI.create(file))) {
-          if (file.endsWith(".jar")) {
-            String parentDir = FilenameUtils.getName(file.substring(0, file.lastIndexOf('/')));
+    for (String jar : resolveDepsJars(depsJarDir)) {
+      addJarFilePath(sparkLauncher, extraClassPath, jar);
+    }
+  }
 
-            if (shouldLoadPlugin(parentDir)) {
-              addJarFilePath(sparkLauncher, extraClassPath, file);
-            }
-          }
-        }
+  /// The plugin jars under the Pinot installation to ship to the executors, honouring [#shouldLoadPlugin]. A plugin is
+  /// identified by the directory its jar sits in.
+  ///
+  /// Fails on a distribution built with the thin-plugins profile, that is, one with a shared `plugin-libs/` store or
+  /// a `pinot-plugin.classpath` index. The Spark ingestion jar relocates Jackson and Guava, and links against the
+  /// relocated copies in the `pinot-all` jar of the default distribution. The thin `pinot-all` does not relocate
+  /// them, so the job would fail with linkage errors on the executors. The check reads the listing that selects the
+  /// jars, so it covers local and remote (`s3://`, `hdfs://`) installations.
+  @VisibleForTesting
+  List<String> resolveDepsJars(String depsJarDir)
+      throws IOException {
+    List<String> jars = new ArrayList<>();
+    if (depsJarDir == null) {
+      return jars;
+    }
+    URI depsJarDirURI = URI.create(depsJarDir);
+    if (depsJarDirURI.getScheme() == null) {
+      depsJarDirURI = new File(depsJarDir).toURI();
+    }
+    PinotFS pinotFS = PinotFSFactory.create(depsJarDirURI.getScheme());
+    for (String file : pinotFS.listFiles(depsJarDirURI, true)) {
+      if (pinotFS.isDirectory(URI.create(file))) {
+        continue;
+      }
+      String parentDir = FilenameUtils.getName(file.substring(0, file.lastIndexOf('/')));
+      if (SHARED_PLUGIN_LIBS_DIR.equals(parentDir) || PLUGIN_CLASSPATH_INDEX.equals(FilenameUtils.getName(file))) {
+        throw new UnsupportedOperationException("Spark ingestion is not supported from a Pinot distribution built "
+            + "with the thin-plugins profile (" + depsJarDir + " contains " + file + "). Use a distribution built "
+            + "with the default profile.");
+      }
+      if (file.endsWith(".jar") && shouldLoadPlugin(parentDir)) {
+        jars.add(file);
       }
     }
+    return jars;
   }
 
   @VisibleForTesting

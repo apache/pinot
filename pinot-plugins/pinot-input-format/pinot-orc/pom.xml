@@ -32,13 +32,23 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <shade.phase.prop>package</shade.phase.prop>
+    <shade.phase.prop>${plugin.shade.phase}</shade.phase.prop>
   </properties>
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop.thirdparty</groupId>
+          <artifactId>hadoop-shaded-guava</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.curator</groupId>
+          <artifactId>curator-client</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <!-- Replace bcprov-jdk15on which is excluded from hadoop-common -->
     <dependency>
@@ -49,6 +59,12 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop.thirdparty</groupId>
+          <artifactId>hadoop-shaded-guava</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -79,6 +95,20 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
+    </dependency>
+    <!-- hadoop-shaded-guava embeds an old Guava. The dependencies that bring it in exclude it, and
+         this patched copy replaces it; see pinot-dependency-patches/pom.xml. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-patched-hadoop-shaded-guava</artifactId>
+      <scope>${hadoop.dependencies.scope}</scope>
+    </dependency>
+    <!-- curator-client embeds an old Guava. The dependencies that bring it in exclude it, and this
+         patched copy replaces it; see pinot-dependency-patches/pom.xml. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-patched-curator-client</artifactId>
+      <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
   </dependencies>
 

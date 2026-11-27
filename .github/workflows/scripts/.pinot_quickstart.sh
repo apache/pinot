@@ -101,12 +101,16 @@ jdk_version() {
 }
 JAVA_VER="$(jdk_version)"
 
-# Build
-echo "Building Pinot Using JDK ${JAVA_VER}"
+# Build. PINOT_DIST_LAYOUT=thin-plugins builds the distribution without plugin fat jars.
+PROFILES=bin-dist
+if [ "${PINOT_DIST_LAYOUT}" = "thin-plugins" ]; then
+  PROFILES=bin-dist,thin-plugins
+fi
+echo "Building Pinot Using JDK ${JAVA_VER} with profiles ${PROFILES}"
 PASS=0
 for i in $(seq 1 2)
 do
-  mvn clean install -B -ntp -T1C -DskipTests -Pbin-dist -Dmaven.javadoc.skip=true
+  mvn clean install -B -ntp -T1C -DskipTests -P${PROFILES} -Dmaven.javadoc.skip=true
   if [ $? -eq 0 ]; then
     PASS=1
     break;
@@ -114,6 +118,19 @@ do
 done
 if [ "${PASS}" != 1 ]; then
     exit 1;
+fi
+
+# Users also start the launchers with "sh bin/pinot-admin.sh", so they must parse as POSIX shell.
+# On Ubuntu, sh is dash.
+for SCRIPT in build/bin/*.sh; do
+  sh -n "${SCRIPT}" || { echo "${SCRIPT} does not parse with sh"; exit 1; }
+done
+
+# Check the layout and the class linkage of a thin distribution before starting it.
+if [ "${PINOT_DIST_LAYOUT}" = "thin-plugins" ]; then
+  java .github/workflows/scripts/thin-plugins/ThinDistributionCheck.java build \
+    --known .github/workflows/scripts/thin-plugins/known-linkage-problems.txt \
+    --descriptor pinot-distribution/pinot-assembly.xml || exit 1
 fi
 
 # Quickstart

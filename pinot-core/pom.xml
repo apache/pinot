@@ -31,6 +31,12 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <!-- The -shaded jar of the build-shaded-jar profile is for projects outside Pinot, so it relocates its
+         libraries in every build mode, including thin-plugins, like pinot-common. See shade.jackson.prefix
+         in the root pom. -->
+    <shade.jackson.prefix>${shade.prefix}.com.fasterxml.jackson</shade.jackson.prefix>
+    <shade.guava.prefix>${shade.prefix}.com.google.common</shade.guava.prefix>
+    <shade.scala.prefix>${shade.prefix}.org.scala-lang</shade.scala.prefix>
   </properties>
 
   <dependencies>

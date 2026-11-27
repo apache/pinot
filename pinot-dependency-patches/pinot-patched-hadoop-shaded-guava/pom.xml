@@ -1,0 +1,120 @@
+<?xml version="1.0"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<!--
+  org.apache.hadoop.thirdparty:hadoop-shaded-guava is Guava relocated into
+  org.apache.hadoop.thirdparty.com.google.common, plus a relocated copy of the Checker Framework
+  annotations. This module keeps the annotations and replaces the Guava classes with the managed
+  Guava, relocated into the same package.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>pinot-dependency-patches</artifactId>
+    <groupId>org.apache.pinot</groupId>
+    <version>1.7.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>pinot-patched-hadoop-shaded-guava</artifactId>
+  <name>Pinot Patched hadoop-shaded-guava</name>
+  <url>https://pinot.apache.org/</url>
+  <properties>
+    <pinot.root>${basedir}/../..</pinot.root>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.hadoop.thirdparty</groupId>
+      <artifactId>hadoop-shaded-guava</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <optional>true</optional>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>patch-dependency</id>
+            <configuration>
+              <artifactSet>
+                <includes>
+                  <include>org.apache.hadoop.thirdparty:hadoop-shaded-guava</include>
+                  <include>com.google.guava:guava</include>
+                  <include>com.google.guava:failureaccess</include>
+                </includes>
+              </artifactSet>
+              <filters combine.self="override">
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>module-info.class</exclude>
+                    <exclude>META-INF/versions/*/module-info.class</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>org.apache.hadoop.thirdparty:hadoop-shaded-guava</artifact>
+                  <excludes>
+                    <exclude>org/apache/hadoop/thirdparty/com/google/common/**</exclude>
+                    <exclude>org/apache/hadoop/thirdparty/com/google/thirdparty/**</exclude>
+                    <exclude>META-INF/versions/**/org/apache/hadoop/thirdparty/com/google/common/**</exclude>
+                    <exclude>META-INF/versions/**/org/apache/hadoop/thirdparty/com/google/thirdparty/**</exclude>
+                    <exclude>META-INF/maven/com.google.guava/**</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <relocations combine.self="override">
+                <relocation>
+                  <pattern>com.google.common</pattern>
+                  <shadedPattern>org.apache.hadoop.thirdparty.com.google.common</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>com.google.thirdparty</pattern>
+                  <shadedPattern>org.apache.hadoop.thirdparty.com.google.thirdparty</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.checkerframework</pattern>
+                  <shadedPattern>org.apache.hadoop.thirdparty.org.checkerframework</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
