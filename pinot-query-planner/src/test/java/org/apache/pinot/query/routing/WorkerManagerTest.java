@@ -1852,6 +1852,41 @@ public class WorkerManagerTest {
     }
   }
 
+  @DataProvider
+  public Object[][] useLeafServerForIntermediateStage() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "useLeafServerForIntermediateStage")
+  public void testSingletonJoinWithReplicatedLeaf(boolean useLeafServerForIntermediateStage) {
+    // A FULL join without equi keys runs on a single worker, which takes the branch of the intermediate assignment
+    // that used to return before the replicated leaf children got their workers.
+    // Table A is not hinted, so it is routed through its routing table: one segment on each of the 4 servers.
+    QueryEnvironment queryEnvironment = newColocatedJoinQueryEnvironment(
+        new ColocatedTableSpec(4, false).survivingSegments(List.of("a_seg0", "a_seg1", "a_seg2", "a_seg3")),
+        new ColocatedTableSpec(4, true));
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useLeafServerForIntermediateStage=" + useLeafServerForIntermediateStage + "; SELECT "
+            + COLOCATED_TABLE_A + ".col1, " + COLOCATED_TABLE_B + ".col3 FROM " + COLOCATED_TABLE_A + " FULL JOIN "
+            + COLOCATED_TABLE_B + " /*+ tableOptions(is_replicated='true') */ ON " + COLOCATED_TABLE_A + ".col3 > "
+            + COLOCATED_TABLE_B + ".col3")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      DispatchablePlanFragment joinFragment = joinFragment(dispatchableSubPlan);
+      assertEquals(joinFragment.getWorkerMetadataList().size(), 1);
+      // The replicated leaf gets exactly one worker, on the same server as the join, scanning the whole table once.
+      // More workers would each send the whole table to the single join worker and duplicate its rows.
+      DispatchablePlanFragment leafB = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_B);
+      assertEquals(leafB.getWorkerIdToSegmentsMap().keySet(), Set.of(0));
+      assertEquals(new HashSet<>(assignedSegments(leafB, 0)), Set.of("b_seg0", "b_seg1", "b_seg2", "b_seg3"));
+      assertEquals(workerIdToServer(leafB), workerIdToServer(joinFragment));
+      // The other side is not replicated and keeps its own assignment, with every segment scanned once.
+      DispatchablePlanFragment leafA = leafFragmentForTable(dispatchableSubPlan, COLOCATED_TABLE_A);
+      List<String> segmentsA = assignedSegments(leafA);
+      segmentsA.sort(null);
+      assertEquals(segmentsA, List.of("a_seg0", "a_seg1", "a_seg2", "a_seg3"));
+    }
+  }
+
   @Test
   public void testColocatedJoinReducedGroupWithReplicatedLeaf() {
     // The most common colocated shape: a partitioned fact table joined with a replicated dimension table over a local
@@ -2438,6 +2473,23 @@ public class WorkerManagerTest {
     DispatchablePlanFragment factLeaf = inputFragment(plan, dim1Join);
     assertEquals(factLeaf, leafFragmentForTable(plan, "fact"));
     assertEquals(workerIdToServer(dim1Join), workerIdToServer(factLeaf));
+  }
+
+  /// When the singleton stage runs on an instance that cannot scan segments, like a broker, its replicated leaf child
+  /// still gets a single worker, on one of the servers from [WorkerManager#getCandidateServersForReplicatedLeaf].
+  @Test
+  public void testSingletonJoinWithReplicatedLeafUsesReplicatedLeafServers() {
+    QueryServerInstance broker = new QueryServerInstance("Broker_localhost_9", "localhost", 9, 9);
+    DispatchableSubPlan plan = newLookupJoinQueryEnvironment(broker).planQuery(
+        "SELECT fact.col1, dim1.col3 FROM fact FULL JOIN dim1 /*+ tableOptions(is_replicated='true') */ "
+            + "ON fact.col3 > dim1.col3");
+    assertEquals(workerIdToServer(joinFragment(plan)), Map.of(0, broker.getInstanceId()));
+    DispatchablePlanFragment dim1Leaf = leafFragmentForTable(plan, "dim1");
+    assertEquals(dim1Leaf.getWorkerIdToSegmentsMap().keySet(), Set.of(0));
+    assertEquals(assignedSegments(dim1Leaf, 0), List.of("dim1_0"));
+    Set<String> factServers = new HashSet<>(workerIdToServer(leafFragmentForTable(plan, "fact")).values());
+    assertEquals(factServers.size(), 2);
+    assertTrue(factServers.contains(workerIdToServer(dim1Leaf).get(0)));
   }
 
   /// Builds a QueryEnvironment over the offline table "fact", with one segment on each of 2 servers, and the offline
