@@ -23,19 +23,22 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /// A block that contains data in row heap format.
-/// This means that the data is stored as list of rows, where each row is an array of objects and each object is a
-/// reference to the cell value.
+/// Each row is an array of objects and each object is a reference to the cell value. Rows are stored in a List
+/// or retained in an owned, finished table that can be consumed through [#getRowIterator()].
 /// This representation is expensive in terms of memory and should be avoided if possible, although it is used almost
 /// everytime a [org.apache.pinot.query.runtime.operator.MultiStageOperator] is used.
 ///
@@ -46,7 +49,11 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 /// we use [SerializedDataBlock].
 public class RowHeapDataBlock implements MseBlock.Data {
   private final DataSchema _dataSchema;
-  private final List<Object[]> _rows;
+  @Nullable
+  private volatile List<Object[]> _rows;
+  @Nullable
+  private Table _table;
+  private final int _numRows;
   /// This is a hack we created to support different hash exchange distributions.
   /// We should find a new way to keep this information that is more solid than the current one.
   /// This information is only set in [org.apache.pinot.query.runtime.operator.LeafOperator] and
@@ -76,12 +83,25 @@ public class RowHeapDataBlock implements MseBlock.Data {
       @Nullable AggregationFunction[] aggFunctions) {
     _dataSchema = dataSchema;
     _rows = rows;
+    _numRows = rows.size();
+    _aggFunctions = aggFunctions;
+  }
+
+  /// Creates a block that owns a finished table and exposes its existing row arrays through a cursor.
+  /// The table and its records must not be updated or finished again after handoff. The table remains reachable
+  /// until this block is released or [#getRows()] materializes the List fallback.
+  @SuppressWarnings("rawtypes")
+  public RowHeapDataBlock(Table table, DataSchema dataSchema, @Nullable AggregationFunction[] aggFunctions) {
+    _dataSchema = dataSchema;
+    _table = table;
+    _numRows = table.size();
     _aggFunctions = aggFunctions;
   }
 
   @Override
   public int getNumRows() {
-    return _rows.size();
+    List<Object[]> rows = _rows;
+    return rows != null ? rows.size() : _numRows;
   }
 
   @Override
@@ -89,10 +109,58 @@ public class RowHeapDataBlock implements MseBlock.Data {
     return _dataSchema;
   }
 
-  /// Returns the rows in the block.
+  /// Returns the rows in the block, materializing and caching a List for table-backed blocks.
   /// The returned list should be considered immutable.
   public List<Object[]> getRows() {
-    return _rows;
+    List<Object[]> rows = _rows;
+    if (rows != null) {
+      return rows;
+    }
+    synchronized (this) {
+      if (_rows == null) {
+        rows = new ArrayList<>(_numRows);
+        Iterator<Object[]> iterator = getRowIterator();
+        while (iterator.hasNext()) {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rows.size(), "RowHeapDataBlock#getRows");
+          rows.add(iterator.next());
+        }
+        _rows = rows;
+        _table = null;
+      }
+      return _rows;
+    }
+  }
+
+  /// Returns whether rows can still be consumed directly from the owned table, without a List fallback.
+  public boolean isTableBacked() {
+    return _rows == null;
+  }
+
+  /// Returns a fresh cursor over the owned row arrays. Row arrays and mutable aggregation results are shared
+  /// with [#getRows()], with the same ownership rules as a block constructed from a List.
+  public Iterator<Object[]> getRowIterator() {
+    List<Object[]> rows = _rows;
+    if (rows != null) {
+      return rows.iterator();
+    }
+    synchronized (this) {
+      if (_rows != null) {
+        return _rows.iterator();
+      }
+      assert _table != null;
+      Iterator<Record> records = _table.iterator();
+      return new Iterator<>() {
+        @Override
+        public boolean hasNext() {
+          return records.hasNext();
+        }
+
+        @Override
+        public Object[] next() {
+          return records.next().getValues();
+        }
+      };
+    }
   }
 
   @Deprecated
@@ -136,9 +204,11 @@ public class RowHeapDataBlock implements MseBlock.Data {
   public RowHeapDataBlock copyObjectColumns() {
     ColumnDataType[] storedTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedTypes.length;
-    List<Object[]> copiedRows = new ArrayList<>(_rows.size());
+    List<Object[]> copiedRows = new ArrayList<>(getNumRows());
     int numCellsProcessed = 0;
-    for (Object[] row : _rows) {
+    Iterator<Object[]> iterator = getRowIterator();
+    while (iterator.hasNext()) {
+      Object[] row = iterator.next();
       Object[] copiedRow = row.clone();
       for (int colId = 0; colId < numColumns; colId++) {
         Object value = copiedRow[colId];
@@ -162,7 +232,7 @@ public class RowHeapDataBlock implements MseBlock.Data {
   @Override
   public SerializedDataBlock asSerialized() {
     try {
-      return new SerializedDataBlock(DataBlockBuilder.buildFromRows(_rows, _dataSchema, _aggFunctions));
+      return new SerializedDataBlock(DataBlockBuilder.buildFromRows(getRows(), _dataSchema, _aggFunctions));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
