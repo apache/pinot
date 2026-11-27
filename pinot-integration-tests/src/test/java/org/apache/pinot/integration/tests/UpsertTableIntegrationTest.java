@@ -29,7 +29,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.client.ExecutionStats;
-import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -59,10 +58,10 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.GAME_SCORES_COLUMNS;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.GAME_SCORES_WINNERS;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.gameScoresRowsQuery;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
 
 
 /// Input data - Scores of players
@@ -84,6 +83,16 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
   public static final String PRIMARY_KEY_COL = "playerId";
   public static final String TIME_COL_NAME = "timestampInEpoch";
   public static final String UPSERT_SCHEMA_FILE_NAME = "upsert_table_test.schema";
+
+  /// Latest row per player in gameScores_large_csv (by timestampInEpoch); the file has no ties.
+  private static final List<Object> LARGE_FIXTURE_WINNER_100 =
+      List.of(100, "Zook", "counter-strike", 2938.44, 1680990763035L, false);
+  private static final List<Object> LARGE_FIXTURE_WINNER_101 =
+      List.of(101, "Suess", "counter-strike", 3692.52, 1681209805784L, false);
+  private static final List<Object> LARGE_FIXTURE_WINNER_102 =
+      List.of(102, "Clifford", "counter-strike", 4754.73, 1680558947954L, false);
+  private static final List<List<Object>> LARGE_FIXTURE_WINNERS =
+      List.of(LARGE_FIXTURE_WINNER_100, LARGE_FIXTURE_WINNER_101, LARGE_FIXTURE_WINNER_102);
 
   protected PinotTaskManager _taskManager;
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
@@ -111,7 +120,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    assertRows(gameScoresRowsQuery(getTableName()), GAME_SCORES_WINNERS);
 
     // Create partial upsert table schema
     Schema partialUpsertSchema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
@@ -169,13 +178,10 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     return 10;
   }
 
-  private long queryCountStarWithoutUpsert(String tableName) {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)")
-        .getResultSet(0).getLong(0);
-  }
-
-  private long queryCountStar(String tableName) {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getResultSet(0).getLong(0);
+  /// Every ingested row, including the ones upsert replaced or deleted.
+  private static String rawRowsQuery(String tableName) {
+    return "SELECT " + GAME_SCORES_COLUMNS + " FROM " + tableName
+        + " ORDER BY playerId, timestampInEpoch LIMIT 2000 OPTION(skipUpsert=true)";
   }
 
   @Override
@@ -188,7 +194,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
       // Query 10 times to get result from both servers (query should be distributed to both servers in a round-robin
       // fashion, but query more times to be more robust)
       for (int i = 0; i < 10; i++) {
-        if (queryCountStarWithoutUpsert(tableName) != expectedCountStarWithoutUpsertResult) {
+        if (getCurrentRawCountStarResult(tableName) != expectedCountStarWithoutUpsertResult) {
           return false;
         }
       }
@@ -244,31 +250,14 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     // Wait for all docs (12 with skipUpsert=true) to be loaded
     waitForAllDocsLoaded(tableName, 600_000L, 12);
 
-    // Query for number of records in the table - should only return 1
-    ResultSet rs = getPinotConnection().execute("SELECT * FROM " + tableName).getResultSet(0);
-    assertEquals(rs.getRowCount(), 1);
-
     // pk 101 - not deleted - only record available
-    int columnCount = rs.getColumnCount();
-    int playerIdColumnIndex = -1;
-    for (int i = 0; i < columnCount; i++) {
-      String columnName = rs.getColumnName(i);
-      if ("playerId".equalsIgnoreCase(columnName)) {
-        playerIdColumnIndex = i;
-        break;
-      }
-    }
-    assertNotEquals(playerIdColumnIndex, -1);
-    assertEquals(rs.getString(0, playerIdColumnIndex), "101");
+    assertRows(gameScoresRowsQuery(tableName), List.of(GAME_SCORES_WINNERS.get(1)));
 
     // Validate deleted records
-    rs = getPinotConnection().execute(
-        "SELECT playerId FROM " + tableName + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
-    assertEquals(rs.getRowCount(), 2);
-    for (int i = 0; i < rs.getRowCount(); i++) {
-      String playerId = rs.getString(i, 0);
-      assertTrue("100".equalsIgnoreCase(playerId) || "102".equalsIgnoreCase(playerId));
-    }
+    assertRows("SELECT " + GAME_SCORES_COLUMNS + " FROM " + tableName
+            + " WHERE deleted = true ORDER BY playerId LIMIT 100 OPTION(skipUpsert=true)",
+        List.of(List.of(100, "Zook", "counter-strike", 2050.0, 1681377200000L, true),
+            List.of(102, "Clifford", "counter-strike", 102.0, 1681254200000L, true)));
 
     // TEST 2: Revive a previously deleted primary key
     // Revive pk - 100 by adding a record with a newer timestamp
@@ -278,18 +267,17 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForAllDocsLoaded(tableName, 600_000L, 13);
 
     // Validate: pk is queryable and all columns are overwritten with new value
-    rs = getPinotConnection().execute("SELECT playerId, name, game FROM " + tableName + " WHERE playerId = 100")
-        .getResultSet(0);
-    assertEquals(rs.getRowCount(), 1);
-    assertEquals(rs.getInt(0, 0), 100);
-    assertEquals(rs.getString(0, 1), "Zook-New");
-    assertEquals(rs.getString(0, 2), "null");
+    assertRows(gameScoresRowsQuery(tableName), List.of(List.of(100, "Zook-New", "null", 0.0, 1684707335000L, false),
+        GAME_SCORES_WINNERS.get(1)));
 
-    // Validate: pk lineage still exists
-    rs = getPinotConnection().execute(
-        "SELECT playerId, name FROM " + tableName + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
-
-    assertTrue(rs.getRowCount() > 1);
+    // Validate: pk lineage still exists - the 3 fixture rows, the delete and the revive
+    assertRows("SELECT " + GAME_SCORES_COLUMNS + " FROM " + tableName
+            + " WHERE playerId = 100 ORDER BY timestampInEpoch LIMIT 100 OPTION(skipUpsert=true)",
+        List.of(List.of(100, "Zook", "counter-strike", 2001.9, 1571036400000L, false),
+            List.of(100, "Suess", "counter-strike", 12000.55, 1681256390000L, false),
+            List.of(100, "Zook", "counter-strike", 2050.0, 1681256400000L, false),
+            List.of(100, "Zook", "counter-strike", 2050.0, 1681377200000L, true),
+            List.of(100, "Zook-New", "null", 0.0, 1684707335000L, false)));
 
     // TEARDOWN
     dropRealtimeTable(tableName);
@@ -369,13 +357,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     pushCsvIntoKafka(records, kafkaTopicName, 0);
     waitForAllDocsLoaded(tableName, 600_000L, records.size());
 
-    ResultSet resultSet =
-        getPinotConnection().execute("SELECT score, bonus, total FROM " + tableName + " WHERE id = 1")
-            .getResultSet(0);
-    assertEquals(resultSet.getRowCount(), 1);
-    assertEquals(resultSet.getDouble(0, 0), 5.0, 0.01);
-    assertEquals(resultSet.getDouble(0, 1), 10.0, 0.01);
-    assertEquals(resultSet.getDouble(0, 2), 15.0, 0.01);
+    assertRows("SELECT id, score, bonus, total, " + TIME_COL_NAME + " FROM " + tableName + " ORDER BY id LIMIT 100",
+        List.of(List.of(1, 5.0, 10.0, 15.0, 2000L)));
     dropRealtimeTable(tableName);
   }
 
@@ -406,31 +389,15 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     // Wait for all docs (12 with skipUpsert=true) to be loaded
     waitForAllDocsLoaded(tableName, 600_000L, 12);
 
-    // Query for number of records in the table - should only return 1
-    ResultSet rs = getPinotConnection().execute("SELECT * FROM " + tableName).getResultSet(0);
-    assertEquals(rs.getRowCount(), 1);
-
-    // pk 101 - not deleted - only record available
-    int columnCount = rs.getColumnCount();
-    int playerIdColumnIndex = -1;
-    for (int i = 0; i < columnCount; i++) {
-      String columnName = rs.getColumnName(i);
-      if ("playerId".equalsIgnoreCase(columnName)) {
-        playerIdColumnIndex = i;
-        break;
-      }
-    }
-    assertNotEquals(playerIdColumnIndex, -1);
-    assertEquals(rs.getString(0, playerIdColumnIndex), "101");
+    // pk 101 - not deleted - only record available. Its score is the INCREMENT of the in-order rows
+    // (8038 + 9722 + 10311 + 12500.2); the out-of-order row at 1571036407201 is not merged.
+    List<Object> mergedRow101 = List.of(101, "Suess", List.of("counter-strike"), 40571.2, 1681258290000L, false);
+    assertRows(gameScoresRowsQuery(tableName), List.of(mergedRow101));
 
     // Validate deleted records
-    rs = getPinotConnection().execute(
-        "SELECT playerId FROM " + tableName + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
-    assertEquals(rs.getRowCount(), 2);
-    for (int i = 0; i < rs.getRowCount(); i++) {
-      String playerId = rs.getString(i, 0);
-      assertTrue("100".equalsIgnoreCase(playerId) || "102".equalsIgnoreCase(playerId));
-    }
+    assertRows("SELECT playerId, timestampInEpoch FROM " + tableName
+            + " WHERE deleted = true ORDER BY playerId LIMIT 100 OPTION(skipUpsert=true)",
+        List.of(List.of(100, 1681377200000L), List.of(102, 1681054200000L)));
 
     // TEST 2: Revive a previously deleted primary key
     // Revive pk - 100 by adding a record with a newer timestamp
@@ -439,19 +406,15 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     // Wait for the new record (13 with skipUpsert=true) to be indexed
     waitForAllDocsLoaded(tableName, 600_000L, 13);
 
-    // Validate: pk is queryable and all columns are overwritten with new value
-    rs = getPinotConnection().execute("SELECT playerId, name, game FROM " + tableName + " WHERE playerId = 100")
-        .getResultSet(0);
-    assertEquals(rs.getRowCount(), 1);
-    assertEquals(rs.getInt(0, 0), 100);
-    assertEquals(rs.getString(0, 1), "Zook");
-    assertEquals(rs.getString(0, 2), "[\"null\"]");
+    // Validate: pk is queryable and is not merged with the deleted row
+    assertRows(gameScoresRowsQuery(tableName),
+        List.of(List.of(100, "Zook", List.of("null"), 0.0, 1684707335000L, false), mergedRow101));
 
-    // Validate: pk lineage still exists
-    rs = getPinotConnection().execute(
-        "SELECT playerId, name FROM " + tableName + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
-
-    assertTrue(rs.getRowCount() > 1);
+    // Validate: pk lineage still exists - the 3 fixture rows, the delete and the revive
+    assertRows("SELECT timestampInEpoch, deleted FROM " + tableName
+            + " WHERE playerId = 100 ORDER BY timestampInEpoch LIMIT 100 OPTION(skipUpsert=true)",
+        List.of(List.of(1571036400000L, false), List.of(1681256390000L, false), List.of(1681256400000L, false),
+            List.of(1681377200000L, true), List.of(1684707335000L, false)));
   }
 
   @Test
@@ -518,8 +481,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     updateTableConfig(tableConfig);
 
     waitForAllDocsLoaded(tableName, 600_000L, 1000);
-    assertEquals(queryCountStar(tableName), 3);
-    assertEquals(getScore(tableName), 3692);
+    assertRows(gameScoresRowsQuery(tableName), LARGE_FIXTURE_WINNERS);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3, 2);
 
     // NOTE:
@@ -543,8 +505,9 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForTaskToComplete();
     // 2 segments should be compacted (351 rows -> 1 row; 500 rows -> 2 rows), 1 segment (149 rows) should be deleted
     waitForAllDocsLoaded(tableName, 600_000L, 3);
-    assertEquals(queryCountStar(tableName), 3);
-    assertEquals(getScore(tableName), 3692);
+    assertRows(gameScoresRowsQuery(tableName), LARGE_FIXTURE_WINNERS);
+    // Only the winners are left after compaction
+    assertRows(rawRowsQuery(tableName), LARGE_FIXTURE_WINNERS);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 4, 2);
   }
 
@@ -565,8 +528,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     updateTableConfig(tableConfig);
 
     waitForAllDocsLoaded(tableName, 600_000L, 1000);
-    assertEquals(queryCountStar(tableName), 3);
-    assertEquals(getScore(tableName), 3692);
+    assertRows(gameScoresRowsQuery(tableName), LARGE_FIXTURE_WINNERS);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
 
     // NOTE: When in-memory valid doc ids are used, no need to pause/resume consumption to trigger the snapshot.
@@ -578,8 +540,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForTaskToComplete();
     // 1 segment should be compacted (500 rows -> 2 rows)
     waitForAllDocsLoaded(tableName, 600_000L, 502);
-    assertEquals(queryCountStar(tableName), 3);
-    assertEquals(getScore(tableName), 3692);
+    assertRows(gameScoresRowsQuery(tableName), LARGE_FIXTURE_WINNERS);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
   }
 
@@ -600,8 +561,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     updateTableConfig(tableConfig);
 
     waitForAllDocsLoaded(tableName, 600_000L, 1000);
-    assertEquals(queryCountStar(tableName), 3);
-    assertEquals(getScore(tableName), 3692);
+    assertRows(gameScoresRowsQuery(tableName), LARGE_FIXTURE_WINNERS);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
 
     // Push data to delete 2 rows
@@ -609,7 +569,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
         "100,Zook,counter-strike,2050,1681377200000,true");
     pushCsvIntoKafka(deleteRecords, kafkaTopicName, 0);
     waitForAllDocsLoaded(tableName, 600_000L, 1002);
-    assertEquals(queryCountStar(tableName), 1);
+    assertRows(gameScoresRowsQuery(tableName), List.of(LARGE_FIXTURE_WINNER_101));
 
     // Force commit the segments to ensure the deleting rows are part of the committed segments
     getOrCreateAdminClient().getTableClient().forceCommit(tableName);
@@ -623,21 +583,10 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForTaskToComplete();
     // 1 segment should be compacted (351 rows -> 1 rows), 2 segments (500 rows, 151 rows) should be deleted
     waitForAllDocsLoaded(tableName, 600_000L, 1);
-    assertEquals(queryCountStar(tableName), 1);
-    assertEquals(getNumDeletedRows(tableName), 0);
-    assertEquals(getScore(tableName), 3692);
+    assertRows(gameScoresRowsQuery(tableName), List.of(LARGE_FIXTURE_WINNER_101));
+    // Only the winner is left after compaction, and none of the delete rows
+    assertRows(rawRowsQuery(tableName), List.of(LARGE_FIXTURE_WINNER_101));
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3, 2);
-  }
-
-  private long getScore(String tableName) {
-    return (long) getPinotConnection().execute("SELECT score FROM " + tableName + " WHERE playerId = 101")
-        .getResultSet(0).getFloat(0);
-  }
-
-  private long getNumDeletedRows(String tableName) {
-    return getPinotConnection().execute(
-            "SELECT COUNT(*) FROM " + tableName + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0)
-        .getLong(0);
   }
 
   private void waitForTaskToComplete() {

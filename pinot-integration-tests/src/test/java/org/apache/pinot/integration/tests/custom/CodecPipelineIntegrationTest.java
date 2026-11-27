@@ -930,7 +930,7 @@ public class CodecPipelineIntegrationTest extends CustomDataQueryClusterIntegrat
   @Test
   public void testStoredTableConfigCarriesEveryVariant() {
     // Read through the shared suite's controller: in suite mode this instance never started one.
-    TableConfig storedTableConfig = getSharedHelixResourceManager().getOfflineTableConfig(getTableName());
+    TableConfig storedTableConfig = getHelixResourceManager().getOfflineTableConfig(getTableName());
     assertNotNull(storedTableConfig, "Controller has no stored OFFLINE table config for " + getTableName());
     List<String> noDictionaryColumns = storedTableConfig.getIndexingConfig().getNoDictionaryColumns();
     assertNotNull(noDictionaryColumns, "Stored table config lost noDictionaryColumns");

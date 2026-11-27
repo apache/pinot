@@ -299,11 +299,14 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 1, 2, 3});
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 6);
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 1, 2, 3, 4, 5});
     assertTrue(segDir03.exists());
-    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{3, 4, 7});
   }
 
   @Test
@@ -379,14 +382,14 @@ public class BasePartitionUpsertMetadataManagerTest {
       upsertMetadataManager.doTakeSnapshot();
       assertEquals(segmentsTakenSnapshot.size(), 3);
       assertTrue(segDir01.exists());
-      assertEquals(seg01.loadDocIdsFromSnapshot(
-          V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
+      assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+          new int[]{0, 1, 2, 3});
       assertTrue(segDir02.exists());
-      assertEquals(seg02.loadDocIdsFromSnapshot(
-          V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 6);
+      assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+          new int[]{0, 1, 2, 3, 4, 5});
       assertTrue(segDir03.exists());
-      assertEquals(seg03.loadDocIdsFromSnapshot(
-          V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
+      assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+          new int[]{3, 4, 7});
     } finally {
       executor.shutdownNow();
     }
@@ -443,8 +446,10 @@ public class BasePartitionUpsertMetadataManagerTest {
     assertEquals(segmentsTakenSnapshot.get(0), "seg02");
     assertTrue(segmentsTakenSnapshot.contains("seg03"));
     assertFalse(new File(segDir01, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 6);
-    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 1, 2, 3, 4, 5});
+    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{3, 4, 7});
   }
 
   @Test
@@ -494,9 +499,11 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 1, 2, 3});
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 6);
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 1, 2, 3, 4, 5});
     assertTrue(segDir03.exists());
     assertNull(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
   }
@@ -550,11 +557,14 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 1, 2, 3});
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 6);
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 1, 2, 3, 4, 5});
     assertTrue(segDir03.exists());
-    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{3, 4, 7});
   }
 
   @Test
@@ -620,14 +630,14 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(
-        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 1, 2});
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(
-        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 2, 3, 5});
     assertTrue(segDir03.exists());
-    assertEquals(seg03.loadDocIdsFromSnapshot(
-        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 2);
+    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{3, 7});
   }
 
   @Test
@@ -713,14 +723,14 @@ public class BasePartitionUpsertMetadataManagerTest {
       upsertMetadataManager.doTakeSnapshot();
       assertEquals(segmentsTakenSnapshot.size(), 3);
       assertTrue(segDir01.exists());
-      assertEquals(seg01.loadDocIdsFromSnapshot(
-          V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
+      assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+          new int[]{0, 1, 2});
       assertTrue(segDir02.exists());
-      assertEquals(seg02.loadDocIdsFromSnapshot(
-          V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
+      assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+          new int[]{0, 2, 3, 5});
       assertTrue(segDir03.exists());
-      assertEquals(seg03.loadDocIdsFromSnapshot(
-          V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 2);
+      assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+          new int[]{3, 7});
     } finally {
       executor.shutdownNow();
     }
@@ -782,11 +792,11 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(
-        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 1, 2});
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(
-        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 2, 3, 5});
     assertTrue(segDir03.exists());
     assertNull(seg03.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
   }
@@ -849,15 +859,15 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(
-        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 1, 2});
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(
-        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{0, 2, 3, 5});
     assertTrue(segDir03.exists());
     // seg03 should have empty queryableDocIds snapshot due to all documents being deleted
-    assertEquals(seg03.loadDocIdsFromSnapshot(
-        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 0);
+    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).toArray(),
+        new int[]{});
   }
 
   @Test

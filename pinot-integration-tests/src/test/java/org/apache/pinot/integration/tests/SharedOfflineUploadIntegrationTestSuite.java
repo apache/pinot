@@ -61,7 +61,7 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends CustomData
       // These inherited fields are read directly by metadata-push tests and external-view helpers.
       _controllerConfig = getSharedControllerStarter().getConfig();
       _controllerBaseApiUrl = _controllerConfig.generateVipUrl();
-      _helixResourceManager = getSharedHelixResourceManager();
+      _helixResourceManager = getHelixResourceManager();
       initControllerRequestURLBuilder();
     }
   }
@@ -192,7 +192,7 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends CustomData
     if (_tables.isEmpty()) {
       for (String schema : List.copyOf(_schemas)) {
         failure = cleanUp(failure, () -> {
-          if (getSharedHelixResourceManager().getSchema(schema) != null) {
+          if (getHelixResourceManager().getSchema(schema) != null) {
             deleteSchema(schema);
           }
           _schemas.remove(schema);
@@ -248,7 +248,7 @@ public abstract class SharedOfflineUploadIntegrationTestSuite extends CustomData
     if (servers.isEmpty()) {
       throw new IllegalStateException("Expected at least one custom suite server while cleaning up an offline table");
     }
-    if (getSharedHelixResourceManager().getOfflineTableConfig(tableNameWithType) != null) {
+    if (getHelixResourceManager().getOfflineTableConfig(tableNameWithType) != null) {
       dropOfflineTable(tableNameWithType);
     }
     TestUtils.waitForCondition(ignored -> {

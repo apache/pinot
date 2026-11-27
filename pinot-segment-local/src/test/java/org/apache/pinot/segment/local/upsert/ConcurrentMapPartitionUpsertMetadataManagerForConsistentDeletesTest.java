@@ -1457,7 +1457,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     upsertMetadataManager.replaceSegment(immutableSegment, validDocIdsImmutable, null,
         getRecordInfoList(numRecords, primaryKeys, timestamps, null).iterator(), mutableSegment);
 
+    // Key 30 is not in the sealed segment, so it is reverted; keys 10 and 20 point to the sealed segment
     assertEquals(recordLocationMap.size(), 2);
+    assertEquals(validDocIdsImmutable.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
 
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
@@ -1499,7 +1501,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
 
     assertTrue(duration < 1000, "Immutable-to-immutable replacement should complete quickly, took: " + duration + "ms");
 
+    // Only key 10 is in the replacing segment; keys 20 and 30 go away with the replaced segment
     assertEquals(recordLocationMap.size(), 1);
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
+    checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, 1, HashFunction.NONE);
 
     upsertMetadataManager.stop();
     upsertMetadataManager.close();

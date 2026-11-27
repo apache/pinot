@@ -31,10 +31,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.metrics.MetricValueUtils;
@@ -71,6 +69,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -114,73 +113,13 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     createSchemaAndTable();
   }
 
-  @Test
-  public void testRebalance()
-      throws Exception {
-    populateTables();
-
-    verifyIdealState(5, NUM_SERVERS);
-
-    // setup the rebalance config
-    RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setDryRun(false);
-    rebalanceConfig.setMinAvailableReplicas(0);
-    rebalanceConfig.setIncludeConsuming(true);
-
-    // Add a new server
-    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
-
-    // Now we trigger a rebalance operation
-    TableConfig tableConfig = _resourceManager.getTableConfig(REALTIME_TABLE_NAME);
-    RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-
-    // Check the number of servers after rebalancing
-    int finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
-
-    // Check that a server has been added
-    assertEquals(finalServers, NUM_SERVERS + 1, "Rebalancing didn't correctly add the new server");
-
-    waitForRebalanceToComplete(rebalanceResult, 600_000L);
-    waitForAllDocsLoaded(600_000L);
-
-    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalServers);
-
-    // Add a new server
-    BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-
-    waitForRebalanceToComplete(rebalanceResult, 600_000L);
-    waitForAllDocsLoaded(600_000L);
-
-    // number of instances assigned can't be more than number of partitions for rf = 1
-    finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
-    assertEquals(finalServers, getNumKafkaPartitions(), "Rebalancing didn't correctly add the new server");
-    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, getNumKafkaPartitions());
-
-    _resourceManager.updateInstanceTags(serverStarter1.getInstanceId(), "", false);
-    _resourceManager.updateInstanceTags(serverStarter2.getInstanceId(), "", false);
-
-    rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setDowntime(true);
-
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-
-    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, NUM_SERVERS);
-
-    waitForRebalanceToComplete(rebalanceResult, 600_000L);
-    waitForAllDocsLoaded(600_000L);
-
-    serverStarter1.stop();
-    serverStarter2.stop();
-    // Re-init the static executor because stopping servers shuts it down; required for subsequent operations.
-    SegmentBuildTimeLeaseExtender.initExecutor();
-    TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful()
-            && _resourceManager.dropInstance(serverStarter2.getInstanceId()).isSuccessful(), 60_000L,
-        "Failed to drop servers");
+  @DataProvider
+  public Object[][] batchSizesPerServer() {
+    return new Object[][]{{RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER}, {1}};
   }
 
-  @Test
-  public void testRebalanceWithBatching()
+  @Test(dataProvider = "batchSizesPerServer")
+  public void testRebalance(int batchSizePerServer)
       throws Exception {
     populateTables();
 
@@ -191,7 +130,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     rebalanceConfig.setDryRun(false);
     rebalanceConfig.setMinAvailableReplicas(0);
     rebalanceConfig.setIncludeConsuming(true);
-    rebalanceConfig.setBatchSizePerServer(1);
+    rebalanceConfig.setBatchSizePerServer(batchSizePerServer);
 
     // Add a new server
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
@@ -233,7 +172,10 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, NUM_SERVERS);
 
+    // A rebalance with downtime returns once it replaces the IdealState, so wait for the ExternalView to catch up
+    // before checking the data: until then the moved segments are unavailable
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
+    waitForClusterStateSettled(REALTIME_TABLE_NAME, 5, 5, 60_000L);
     waitForAllDocsLoaded(600_000L);
 
     serverStarter1.stop();
@@ -451,6 +393,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     pushAvroIntoKafka(_avroFiles);
     waitForAllDocsLoaded(600_000L, 300);
+    assertLatestRowPerClientId();
 
     // Partial-upsert tables need PROTECTED consuming segment consistency mode for reload to force-commit
     // consuming segments; RESTRICTED skips force-commit and reload never completes. Set explicitly here
@@ -480,6 +423,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       // ExternalView catches up, sustained across a few samples.
       waitForClusterStateSettled(REALTIME_TABLE_NAME, 4, 5, 60_000L);
       verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
+      // The force-committed segments keep the latest row per key
+      assertLatestRowPerClientId();
     } finally {
       deleteClusterConfig(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE);
     }
@@ -562,50 +507,6 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     verifySegmentAssignment(idealState.getRecord().getMapFields(), numSegmentsExpected, numInstancesExpected);
   }
 
-  /// Waits until the cluster state has settled after a reload/rebalance:
-  ///
-  /// - IdealState has `expectedSegments` entries.
-  /// - No segment in IdealState has any instance in OFFLINE state.
-  /// - ExternalView equals IdealState (queries route via ExternalView, so this is required
-  ///   before asserting on IdealState).
-  ///
-  /// All conditions must hold for `stableSamples` consecutive polls, because IdealState can
-  /// transiently look correct between two intermediate states during force-commit +
-  /// new-consuming-segment creation.
-  protected void waitForClusterStateSettled(String tableNameWithType, int expectedSegments, int stableSamples,
-      long timeoutMs) {
-    AtomicInteger streak = new AtomicInteger(0);
-    TestUtils.waitForCondition(aVoid -> {
-      IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
-      if (idealState == null) {
-        streak.set(0);
-        return false;
-      }
-      Map<String, Map<String, String>> isMap = idealState.getRecord().getMapFields();
-      if (isMap.size() != expectedSegments) {
-        streak.set(0);
-        return false;
-      }
-      boolean anyOffline = isMap.values().stream()
-          .flatMap(m -> m.values().stream())
-          .anyMatch(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE::equals);
-      if (anyOffline) {
-        streak.set(0);
-        return false;
-      }
-      ExternalView externalView =
-          HelixHelper.getExternalViewForResource(_resourceManager.getHelixAdmin(),
-              _resourceManager.getHelixClusterName(), tableNameWithType);
-      if (externalView == null || !isMap.equals(externalView.getRecord().getMapFields())) {
-        streak.set(0);
-        return false;
-      }
-      return streak.incrementAndGet() >= stableSamples;
-    }, 200L, timeoutMs,
-        "Cluster state never settled to " + expectedSegments
-            + " segments with no OFFLINE and ExternalView == IdealState for table " + tableNameWithType);
-  }
-
   protected void populateTables()
       throws Exception {
     // Create and upload segments
@@ -673,7 +574,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getCurrentCountStarResultWithoutUpsert() == expectedCount;
+        return getCurrentRawCountStarResult(getTableName()) == expectedCount;
       } catch (Exception e) {
         return null;
       }
@@ -729,7 +630,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        boolean c1 = getCurrentCountStarResultWithoutUpsert() == getCountStarResultWithoutUpsert();
+        boolean c1 = getCurrentRawCountStarResult(getTableName()) == getCountStarResultWithoutUpsert();
         boolean c2 = getCurrentCountStarResult() == getCountStarResult();
         // verify there are no null rows
         boolean c3 =
@@ -739,11 +640,15 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
         return null;
       }
     }, 100L, timeoutMs, "Failed to load all documents");
+    assertLatestRowPerClientId();
   }
 
-  private long getCurrentCountStarResultWithoutUpsert() {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName() + " OPTION(skipUpsert=true)")
-        .getResultSet(0).getLong(0);
+  /// Every column is non-null and the default strategy is OVERWRITE, so the table serves, per clientId, the Avro
+  /// record with the largest DaysSinceEpoch. The streaming and the uploaded copies of a record are identical.
+  private void assertLatestRowPerClientId()
+      throws Exception {
+    assertLatestRowPerKey(getTableName(), _avroFiles, PRIMARY_KEY_COL, getTimeColumnName(),
+        List.of(PRIMARY_KEY_COL, "city", "description", "salary", getTimeColumnName()));
   }
 
   private long getCountStarResultWithoutUpsert() {

@@ -144,7 +144,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
 
     String refreshKey = MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX;
     Map<String, String> segmentRefreshTime = new HashMap<>();
-    for (SegmentZKMetadata metadata : getSharedHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
+    for (SegmentZKMetadata metadata : getHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
       Map<String, String> customMap = metadata.getCustomMap();
       assertTrue(customMap.containsKey(refreshKey));
       segmentRefreshTime.put(metadata.getSegmentName(), customMap.get(refreshKey));
@@ -155,7 +155,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
             .setTablesToSchedule(Set.of(offlineTableName))
             .setTasksToSchedule(Set.of(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
         getTaskManager());
-    for (SegmentZKMetadata metadata : getSharedHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
+    for (SegmentZKMetadata metadata : getHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
       Map<String, String> customMap = metadata.getCustomMap();
       assertTrue(customMap.containsKey(refreshKey));
       assertEquals(segmentRefreshTime.get(metadata.getSegmentName()), customMap.get(refreshKey));
@@ -215,7 +215,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
     assertEquals(postQuery(query).get("numEntriesScannedInFilter").asLong(), 0L);
 
     // Remove inverted index for flightNum, add for intCol
-    TableConfig tableConfig = getSharedHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
+    TableConfig tableConfig = getHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setInvertedIndexColumns(Arrays.asList(INT_COL, STRING_COL));
     updateTableConfig(tableConfig);
@@ -261,7 +261,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
     updateSchema(schema);
 
     // Add transform configs for the new columns
-    TableConfig tableConfig = getSharedHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
+    TableConfig tableConfig = getHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
     List<TransformConfig> transformConfigs = List.of(
         new TransformConfig("derivedLongCol", LONG_COL),
         new TransformConfig("derivedStringCol", STRING_COL));
@@ -282,7 +282,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
 
     // Verify refresh metadata is set
     String refreshKey = MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX;
-    for (SegmentZKMetadata metadata : getSharedHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
+    for (SegmentZKMetadata metadata : getHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
       assertTrue(metadata.getCustomMap().containsKey(refreshKey));
     }
 
@@ -305,7 +305,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
     Map<String, Long> segmentCrc = new HashMap<>();
-    for (SegmentZKMetadata metadata : getSharedHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
+    for (SegmentZKMetadata metadata : getHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
       segmentCrc.put(metadata.getSegmentName(), metadata.getCrc());
     }
 
@@ -320,7 +320,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
     waitForTaskToComplete();
 
     // CRCs should not change since no refresh was needed
-    for (SegmentZKMetadata metadata : getSharedHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
+    for (SegmentZKMetadata metadata : getHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
       assertEquals(segmentCrc.get(metadata.getSegmentName()), metadata.getCrc(), "CRC should not change");
     }
   }
@@ -330,7 +330,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
       throws Exception {
     // Update table config to use METADATA push mode and clear any leftover ingestion config
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
-    TableConfig tableConfig = getSharedHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
+    TableConfig tableConfig = getHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
     tableConfig.setTaskConfig(getRefreshSegmentMetadataPushTaskConfig());
     tableConfig.setIngestionConfig(null);
     updateTableConfig(tableConfig);
@@ -352,7 +352,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
 
     // Verify refresh metadata is set
     String refreshKey = MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX;
-    for (SegmentZKMetadata metadata : getSharedHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
+    for (SegmentZKMetadata metadata : getHelixResourceManager().getSegmentsZKMetadata(offlineTableName)) {
       assertTrue(metadata.getCustomMap().containsKey(refreshKey));
     }
 
@@ -370,7 +370,7 @@ public class RefreshSegmentMinionTest extends CustomDataQueryClusterIntegrationT
     // Reset schema and task config back to original
     schema = createSchema();
     forceUpdateSchema(schema);
-    tableConfig = getSharedHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
+    tableConfig = getHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
     tableConfig.setTaskConfig(getRefreshSegmentTaskConfig());
     updateTableConfig(tableConfig);
   }
