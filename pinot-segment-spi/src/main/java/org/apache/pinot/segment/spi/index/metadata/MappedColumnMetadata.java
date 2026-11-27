@@ -125,13 +125,26 @@ public final class MappedColumnMetadata implements ColumnMetadata {
   @Nullable
   @Override
   public Comparable<?> getMinValue() {
-    return bounds()._minimum;
+    return getFieldSpec().getDataType().getStoredType().isFixedWidth()
+        ? _store.value(_ordinal, true) : bounds()._minimum;
   }
 
   @Nullable
   @Override
   public Comparable<?> getMaxValue() {
-    return bounds()._maximum;
+    return getFieldSpec().getDataType().getStoredType().isFixedWidth()
+        ? _store.value(_ordinal, false) : bounds()._maximum;
+  }
+
+  /// Uses the mapped primitive bounds to rule out the given predicate range on a fixed-width column.
+  public boolean isOutsideFixedWidthRange(@Nullable Comparable<?> lowerBound, boolean lowerInclusive,
+      @Nullable Comparable<?> upperBound, boolean upperInclusive) {
+    return _store.isOutsideRange(_ordinal, lowerBound, lowerInclusive, upperBound, upperInclusive);
+  }
+
+  /// Uses one read of the mapped bounds to check all IN values on a fixed-width column.
+  public boolean isOutsideFixedWidthRange(List<? extends Comparable<?>> values) {
+    return _store.isOutsideValues(_ordinal, values);
   }
 
   private Bounds bounds() {

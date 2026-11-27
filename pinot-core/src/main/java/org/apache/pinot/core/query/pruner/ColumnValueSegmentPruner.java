@@ -32,7 +32,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// The `ColumnValueSegmentPruner` is the segment pruner that prunes segments based on the value inside the
@@ -75,7 +74,7 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     } else if (predicateType == Predicate.Type.IN) {
       return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues, query);
     } else if (predicateType == Predicate.Type.RANGE) {
-      return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache, query);
+      return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache, cachedValues, query);
     } else {
       return false;
     }
@@ -94,7 +93,8 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     ValueCache.CachedValue cachedValue = valueCache.get(eqPredicate, dataSourceMetadata.getDataType());
     // Check min/max value
-    if (!checkMinMaxRange(dataSourceMetadata, cachedValue.getComparableValue())) {
+    Comparable value = cachedValue.getComparableValue();
+    if (dataSourceMetadata.isOutsideMinMaxRange(value, true, value, true)) {
       return true;
     }
     // Check column partition
@@ -124,102 +124,23 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
         : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, query.getSchema()));
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-    List<ValueCache.CachedValue> cachedValues = valueCache.get(inPredicate, dataSourceMetadata.getDataType());
-    // Check min/max value
-    for (ValueCache.CachedValue value : cachedValues) {
-      if (checkMinMaxRange(dataSourceMetadata, value.getComparableValue())) {
-        return false;
-      }
-    }
-    return true;
+    return dataSourceMetadata.isOutsideMinMaxRange(
+        valueCache.getComparableValues(inPredicate, dataSourceMetadata.getDataType()));
   }
 
   /// For RANGE predicate, prune the segments based on:
   ///
   /// - Column min/max value
   private boolean pruneRangePredicate(IndexSegment segment, RangePredicate rangePredicate,
-      Map<String, DataSource> dataSourceCache, QueryContext query) {
+      Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext query) {
     String column = rangePredicate.getLhs().getIdentifier();
     DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column, query.getSchema())
         : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, query.getSchema()));
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
 
-    // Get lower/upper boundary value
-    DataType dataType = dataSourceMetadata.getDataType();
-    String lowerBound = rangePredicate.getLowerBound();
-    Comparable lowerBoundValue = null;
-    if (!lowerBound.equals(RangePredicate.UNBOUNDED)) {
-      lowerBoundValue = convertValue(lowerBound, dataType);
-    }
-    boolean lowerInclusive = rangePredicate.isLowerInclusive();
-    String upperBound = rangePredicate.getUpperBound();
-    Comparable upperBoundValue = null;
-    if (!upperBound.equals(RangePredicate.UNBOUNDED)) {
-      upperBoundValue = convertValue(upperBound, dataType);
-    }
-    boolean upperInclusive = rangePredicate.isUpperInclusive();
-
-    // Check if the range is valid
-    // TODO: This check should be performed on the broker
-    if (lowerBoundValue != null && upperBoundValue != null) {
-      if (lowerInclusive && upperInclusive) {
-        if (lowerBoundValue.compareTo(upperBoundValue) > 0) {
-          return true;
-        }
-      } else {
-        if (lowerBoundValue.compareTo(upperBoundValue) >= 0) {
-          return true;
-        }
-      }
-    }
-
-    // Check min/max value
-    Comparable minValue = dataSourceMetadata.getMinValue();
-    if (minValue != null) {
-      if (upperBoundValue != null) {
-        if (upperInclusive) {
-          if (upperBoundValue.compareTo(minValue) < 0) {
-            return true;
-          }
-        } else {
-          if (upperBoundValue.compareTo(minValue) <= 0) {
-            return true;
-          }
-        }
-      }
-    }
-    Comparable maxValue = dataSourceMetadata.getMaxValue();
-    if (maxValue != null) {
-      if (lowerBoundValue != null) {
-        if (lowerInclusive) {
-          if (lowerBoundValue.compareTo(maxValue) > 0) {
-            return true;
-          }
-        } else {
-          if (lowerBoundValue.compareTo(maxValue) >= 0) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  /// Returns `true` if the value is within the column's min/max value range, `false` otherwise.
-  private boolean checkMinMaxRange(DataSourceMetadata dataSourceMetadata, Comparable value) {
-    Comparable minValue = dataSourceMetadata.getMinValue();
-    if (minValue != null) {
-      if (value.compareTo(minValue) < 0) {
-        return false;
-      }
-    }
-    Comparable maxValue = dataSourceMetadata.getMaxValue();
-    if (maxValue != null) {
-      if (value.compareTo(maxValue) > 0) {
-        return false;
-      }
-    }
-    return true;
+    ValueCache.CachedRange range = valueCache.get(rangePredicate, dataSourceMetadata.getDataType());
+    return range.empty() || dataSourceMetadata.isOutsideMinMaxRange(
+        range.lower(), rangePredicate.isLowerInclusive(), range.upper(), rangePredicate.isUpperInclusive());
   }
 }

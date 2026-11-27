@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
@@ -256,15 +257,6 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
       return val;
     }
 
-    private List<CachedValue> add(InPredicate pred) {
-      List<CachedValue> vals = new ArrayList<>(pred.getValues().size());
-      for (String value : pred.getValues()) {
-        vals.add(new CachedValue(value));
-      }
-      _cache.put(pred, vals);
-      return vals;
-    }
-
     public CachedValue get(EqPredicate pred, DataType dt) {
       CachedValue cachedValue = (CachedValue) _cache.get(pred);
       if (cachedValue == null) {
@@ -275,14 +267,69 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
     }
 
     public List<CachedValue> get(InPredicate pred, DataType dt) {
-      List<CachedValue> cachedValues = (List<CachedValue>) _cache.get(pred);
-      if (cachedValues == null) {
-        cachedValues = add(pred);
+      return getInValues(pred, dt)._values;
+    }
+
+    List<Comparable<?>> getComparableValues(InPredicate pred, DataType dt) {
+      CachedInValues cached = getInValues(pred, dt);
+      if (cached._comparables == null) {
+        List<Comparable<?>> comparables = new ArrayList<>(cached._values.size());
+        for (CachedValue value : cached._values) {
+          comparables.add(value.getComparableValue());
+        }
+        cached._comparables = comparables;
       }
-      for (CachedValue cachedValue : cachedValues) {
-        cachedValue.ensureDataType(dt);
+      return cached._comparables;
+    }
+
+    private CachedInValues getInValues(InPredicate pred, DataType dt) {
+      CachedInValues cached = (CachedInValues) _cache.get(pred);
+      if (cached == null) {
+        cached = new CachedInValues(pred.getValues());
+        _cache.put(pred, cached);
       }
-      return cachedValues;
+      if (dt != cached._dataType) {
+        for (CachedValue value : cached._values) {
+          value.ensureDataType(dt);
+        }
+        cached._dataType = dt;
+        cached._comparables = null;
+      }
+      return cached;
+    }
+
+    CachedRange get(RangePredicate pred, DataType dt) {
+      CachedRange cached = (CachedRange) _cache.get(pred);
+      if (cached == null || cached.dataType() != dt) {
+        String lower = pred.getLowerBound();
+        String upper = pred.getUpperBound();
+        Comparable lowerValue = lower.equals(RangePredicate.UNBOUNDED) ? null : convertValue(lower, dt);
+        Comparable upperValue = upper.equals(RangePredicate.UNBOUNDED) ? null : convertValue(upper, dt);
+        // TODO: Range validation should be performed on the broker.
+        boolean empty = lowerValue != null && upperValue != null
+            && lowerValue.compareTo(upperValue) > (pred.isLowerInclusive() && pred.isUpperInclusive() ? 0 : -1);
+        cached = new CachedRange(dt, lowerValue, upperValue, empty);
+        _cache.put(pred, cached);
+      }
+      return cached;
+    }
+
+    record CachedRange(DataType dataType, @Nullable Comparable<?> lower, @Nullable Comparable<?> upper,
+                       boolean empty) {
+    }
+
+    private static class CachedInValues {
+      private final List<CachedValue> _values;
+      private DataType _dataType;
+      @Nullable
+      private List<Comparable<?>> _comparables;
+
+      private CachedInValues(List<String> values) {
+        _values = new ArrayList<>(values.size());
+        for (String value : values) {
+          _values.add(new CachedValue(value));
+        }
+      }
     }
 
     public static class CachedValue {
