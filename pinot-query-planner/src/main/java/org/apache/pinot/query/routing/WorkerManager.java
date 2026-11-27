@@ -58,6 +58,8 @@ import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
+import org.apache.pinot.query.planner.physical.v2.LeafStageSegmentFilter;
+import org.apache.pinot.query.planner.physical.v2.TableScanMetadata;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -76,7 +78,7 @@ import org.slf4j.LoggerFactory;
 ///
 /// It contains the logic to assign worker to a particular stages. If it is a leaf stage the logic fallback to
 /// how Pinot server assigned server and server-segment mapping.
-public class WorkerManager {
+public class WorkerManager implements LeafStageSegmentFilter {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerManager.class);
   private static final Random RANDOM = new Random();
   // default shuffle method in v2
@@ -1293,7 +1295,18 @@ public class WorkerManager {
   /// segment lists (or the whole map) on the metadata, rather than by editing them in place: part of what the
   /// assignment is built from is the broker's published partition metadata, shared across queries and read concurrently
   /// by other planning threads. What is handed over is nevertheless kept safe to edit in place.
+  ///
+  /// This hook is only called by the V1 worker assignment. The V2 physical optimizer calls
+  /// [#filterTableScanSegments(TableScanMetadata, Map)] instead, so an extension that must apply to both engines
+  /// overrides both.
   protected void filterLeafStageSegments(DispatchablePlanContext context, DispatchablePlanMetadata metadata) {
+  }
+
+  /// Extension point to filter the leaf-stage segments assigned by the V2 physical optimizer; no-op by default. See
+  /// [LeafStageSegmentFilter] for the contract an override must follow.
+  @Override
+  public TableScanMetadata filterTableScanSegments(TableScanMetadata metadata, Map<String, String> queryOptions) {
+    return metadata;
   }
 
   /// Extension point to filter the replicated leaf-stage segments; no-op by default.
