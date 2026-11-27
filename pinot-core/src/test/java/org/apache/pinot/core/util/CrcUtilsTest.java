@@ -28,22 +28,27 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -52,7 +57,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertThrows;
 
 
 public class CrcUtilsTest {
@@ -304,6 +311,63 @@ public class CrcUtilsTest {
           String.format("Data CRC should not be written for segment version %s when forward index is disabled",
               version));
     }
+  }
+
+  @Test
+  public void testDataCrcVersions()
+      throws Exception {
+    // A null is stored as the default value (0) in the forward index, so only the null vector tells these apart
+    SegmentMetadataImpl withNullV1 = buildNullableSegment(null, "withNullV1");
+    SegmentMetadataImpl withDefaultV1 = buildNullableSegment(0, "withDefaultV1");
+    SegmentMetadataImpl noNullV1 = buildNullableSegment(7, "noNullV1");
+    assertEquals(withNullV1.getDataCrcVersion(), V1Constants.DataCrc.VERSION_1);
+    assertEquals(withDefaultV1.getDataCrc(), withNullV1.getDataCrc());
+    // Version 1 segments keep the creation.meta layout from before versioning: CRC, creation time and data CRC
+    assertEquals(SegmentDirectoryPaths.findCreationMetaFile(withNullV1.getIndexDir()).length(), 3 * Long.BYTES);
+
+    CrcUtils.setDefaultDataCrcVersion(V1Constants.DataCrc.VERSION_2);
+    try {
+      SegmentMetadataImpl withNullV2 = buildNullableSegment(null, "withNullV2");
+      SegmentMetadataImpl withNullAgainV2 = buildNullableSegment(null, "withNullAgainV2");
+      SegmentMetadataImpl withDefaultV2 = buildNullableSegment(0, "withDefaultV2");
+      SegmentMetadataImpl noNullV2 = buildNullableSegment(7, "noNullV2");
+      assertEquals(withNullV2.getDataCrcVersion(), V1Constants.DataCrc.VERSION_2);
+      assertEquals(withNullAgainV2.getDataCrc(), withNullV2.getDataCrc());
+      assertNotEquals(withDefaultV2.getDataCrc(), withNullV2.getDataCrc());
+      // Without null vectors, version 2 matches version 1, so mixed-version replicas still match
+      assertEquals(noNullV2.getDataCrc(), noNullV1.getDataCrc());
+    } finally {
+      CrcUtils.setDefaultDataCrcVersion(V1Constants.DataCrc.VERSION_1);
+    }
+
+    assertThrows(IllegalArgumentException.class, () -> CrcUtils.setDefaultDataCrcVersion(3));
+  }
+
+  private SegmentMetadataImpl buildNullableSegment(@Nullable Integer secondDiscount, String segmentName)
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("id", DataType.INT)
+        .addMetric("discount", DataType.INT)
+        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNullHandlingEnabled(true).build();
+    List<GenericRow> rows = new ArrayList<>();
+    GenericRow first = new GenericRow();
+    first.putValue("id", 0);
+    first.putValue("discount", 5);
+    rows.add(first);
+    GenericRow second = new GenericRow();
+    second.putValue("id", 1);
+    second.putValue("discount", secondDiscount);
+    rows.add(second);
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(INDEX_DIR.getAbsolutePath());
+    config.setSegmentName(segmentName);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+    return new SegmentMetadataImpl(driver.getOutputDirectory());
   }
 
   /// Helper method to read the 'dataOnlyCrc' from the creation.meta file if it exists.
