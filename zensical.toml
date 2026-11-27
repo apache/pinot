@@ -1,0 +1,86 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Developer documentation for Apache Pinot, built with Zensical (https://zensical.org).
+#
+# The Markdown files under docs/dev are the source of truth. People and coding agents read them as raw Markdown, on
+# GitHub or in a checkout, so this file only enables features that render the same way without Zensical.
+# See docs/dev/contributing-to-dev-docs.md for the list of allowed features.
+#
+# Serve with live reload on http://localhost:8000 (with uv, or with Docker):
+#   uvx zensical==0.1.1 serve
+#   docker run --rm -it -p 8000:8000 -v "$(pwd)":/docs zensical/zensical:0.1.1
+# Build into ./site and fail on warnings (for example, broken links or anchors):
+#   uvx zensical==0.1.1 build --strict
+#   docker run --rm -v "$(pwd)":/docs zensical/zensical:0.1.1 build --strict
+# Keep the Zensical version the same here, in .github/workflows/pinot_dev_docs.yml and in
+# docs/dev/contributing-to-dev-docs.md.
+
+[project]
+site_name = "Apache Pinot Developer Documentation"
+site_description = "How Apache Pinot works internally, for contributors and coding agents."
+repo_name = "apache/pinot"
+repo_url = "https://github.com/apache/pinot"
+edit_uri = "edit/master/docs/dev/"
+docs_dir = "docs/dev"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Glossary" = "glossary.md" },
+  { "Query routing" = [
+    "routing/index.md",
+    { "Routing table" = "routing/routing-table.md" },
+    { "MSE worker assignment" = "routing/mse-worker-assignment.md" },
+  ] },
+  { "Contributing to these docs" = "contributing-to-dev-docs.md" },
+]
+
+[project.theme]
+features = [
+  "content.action.edit",
+  "content.code.copy",
+  "navigation.indexes",
+  "navigation.sections",
+  "navigation.tracking",
+  "search.highlight",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+# Only extensions whose source renders the same on GitHub. Do not add abbr auto_append, snippets, admonitions or
+# content tabs: raw Markdown readers do not see their output.
+[project.markdown_extensions]
+attr_list = {}
+footnotes = {}
+tables = {}
+toc.permalink = true
+pymdownx.highlight = {}
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]

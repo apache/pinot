@@ -13,6 +13,7 @@ Claude Code additionally exposes each skill as a slash command (`/<skill-name>`)
 | [`quickstart [mode]`](quickstart.md) | Build the required artifacts, launch a local Pinot quickstart, and verify readiness. | Depends on mode and build state |
 | [`bench-compare <Benchmark> [<ref>]`](bench-compare.md) | Run a `pinot-perf` JMH benchmark against a baseline ref and the current tree and diff the JMH tables. Uses a git worktree. | Budget set before running |
 | [`flaky-analyze <TestClass>`](flaky-analyze.md) | Pull recent CI failures for a test class, cluster by stack trace, propose a root-cause hypothesis. Investigation only. | 1–10min per 20 runs scanned |
+| [`verify-dev-doc <page or folder>`](verify-dev-doc.md) | Compare a `docs/dev/` page with the current code, correct it, and update `verified_at`. | 5–20min per page |
 
 Review skills (consumed by the [`code-reviewer`](../agents/code-reviewer.md) agent):
 
@@ -56,6 +57,12 @@ See [bench-compare.md](bench-compare.md) for baseline isolation, JMH invocation,
 ## `flaky-analyze`
 
 See [flaky-analyze.md](flaky-analyze.md) for GitHub Actions queries, failure markers, source inspection, and the total run budget. Investigation remains report-only.
+
+---
+
+## `verify-dev-doc`
+
+See [verify-dev-doc.md](verify-dev-doc.md) for the claim-by-claim comparison with the code and the site build.
 
 ---
 
