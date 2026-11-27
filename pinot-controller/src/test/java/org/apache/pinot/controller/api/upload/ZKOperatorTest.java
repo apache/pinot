@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -34,7 +33,6 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -346,19 +344,20 @@ public class ZKOperatorTest {
     assertNull(segmentMetadata.getStartOffset());
     assertNull(segmentMetadata.getEndOffset());
 
-    // Uploading a segment with LLC segment name but without start/end offset should fail
+    // Uploading a segment with LLC segment name but without start/end offset should success
     when(segmentMetadata.getName()).thenReturn(LLC_SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn(23456L);
-    try {
-      zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
+    zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,
           "downloadUrl", "downloadUrl", null, 10, true, true, mock(HttpHeaders.class));
-      fail();
-    } catch (ControllerApplicationException e) {
-      assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
-    }
-    assertNull(_resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME));
+
+    segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getStatus(), Status.UPLOADED);
+    assertNull(segmentZKMetadata.getStartOffset());
+    assertNull(segmentZKMetadata.getEndOffset());
 
     // Uploading a segment with LLC segment name and start/end offset should success
+    when(segmentMetadata.getCrc()).thenReturn(23454L);
     when(segmentMetadata.getStartOffset()).thenReturn("0");
     when(segmentMetadata.getEndOffset()).thenReturn("1234");
     zkOperator.completeSegmentOperations(REALTIME_TABLE_CONFIG, segmentMetadata, FileUploadType.SEGMENT, null, null,

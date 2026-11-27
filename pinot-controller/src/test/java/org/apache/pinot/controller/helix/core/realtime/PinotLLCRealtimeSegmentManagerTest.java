@@ -1002,6 +1002,53 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // makes the IS to ONLINE, but creates no new entries, because end of shard.
     testRepairs(segmentManager, Lists.newArrayList(1));
+
+    /*
+     * Missing offset cases: do not fabricate a new CONSUMING segment when startOffset/endOffset is null
+     */
+    segmentManager = new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+    setUpNewTable(segmentManager, 2, 5, 3);
+    instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+
+    // Partition 0: Uploaded LLC segment (Status.UPLOADED, ONLINE in IdealState) with null start/end offsets
+    String uploadedSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    SegmentZKMetadata uploadedMetadata = segmentManager._segmentZKMetadataMap.get(uploadedSegment);
+    uploadedMetadata.setStatus(Status.UPLOADED);
+    uploadedMetadata.setStartOffset(null);
+    uploadedMetadata.setEndOffset(null);
+    for (Map.Entry<String, String> entry : instanceStatesMap.get(uploadedSegment).entrySet()) {
+      entry.setValue(SegmentStateModel.ONLINE);
+    }
+
+    // Partition 1: OFFLINE LLC segment with null start/end offsets
+    String offlineSegment = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
+    SegmentZKMetadata offlineMetadata = segmentManager._segmentZKMetadataMap.get(offlineSegment);
+    offlineMetadata.setStartOffset(null);
+    offlineMetadata.setEndOffset(null);
+    turnNewConsumingSegmentOffline(instanceStatesMap, offlineSegment);
+
+    // Partition 2: Healthy partition CONSUMING segment went OFFLINE and should still be repaired normally
+    String healthyOfflineSegment = new LLCSegmentName(RAW_TABLE_NAME, 2, 0, CURRENT_TIME_MS).getSegmentName();
+    turnNewConsumingSegmentOffline(instanceStatesMap, healthyOfflineSegment);
+
+    segmentManager._exceededMaxSegmentCompletionTime = true;
+    segmentManager.ensureAllPartitionsConsuming();
+
+    // Partitions 0 and 1 must not create next CONSUMING segment; Partition 2 must still be repaired
+    assertEquals(segmentManager._segmentZKMetadataMap.size(), 4);
+    assertFalse(segmentManager._segmentZKMetadataMap.containsKey(
+            new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName()));
+    assertFalse(segmentManager._segmentZKMetadataMap.containsKey(
+            new LLCSegmentName(RAW_TABLE_NAME, 1, 1, CURRENT_TIME_MS).getSegmentName()));
+    for (String state : instanceStatesMap.get(uploadedSegment).values()) {
+      assertEquals(state, SegmentStateModel.ONLINE);
+    }
+    for (String state : instanceStatesMap.get(offlineSegment).values()) {
+      assertEquals(state, SegmentStateModel.OFFLINE);
+    }
+    String healthyNextSegment = new LLCSegmentName(RAW_TABLE_NAME, 2, 1, CURRENT_TIME_MS).getSegmentName();
+    assertTrue(segmentManager._segmentZKMetadataMap.containsKey(healthyNextSegment));
+    assertTrue(instanceStatesMap.get(healthyNextSegment).containsValue(SegmentStateModel.CONSUMING));
   }
 
   @Test
