@@ -39,6 +39,8 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -270,6 +272,44 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     // Close the metadata manager
     upsertMetadataManager.close();
+  }
+
+  /// A consuming segment is offloaded when it goes from CONSUMING to OFFLINE or DROPPED, for example when the table is
+  /// disabled or deleted, or when a rebalance moves the consuming segment. With metadata TTL the removal first checks
+  /// whether the segment is out of TTL, but a consuming segment has no column metadata to read its max comparison value
+  /// from.
+  @Test
+  public void testOffloadConsumingSegmentWithMetadataTTL()
+      throws IOException {
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    MutableSegmentImpl segment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(SEGMENT_SCHEMA, false, null, upsertMetadataManager, null);
+    try {
+      segment.index(createRow(1, 100), null);
+      segment.index(createRow(2, 110), null);
+      segment.index(createRow(1, 120), null);
+      assertEquals(recordLocationMap.size(), 2);
+      checkRecordLocation(recordLocationMap, 1, segment, 2, 120, HashFunction.NONE);
+      checkRecordLocation(recordLocationMap, 2, segment, 1, 110, HashFunction.NONE);
+
+      // The records are within TTL, so offloading the segment removes their primary keys
+      segment.offload();
+      assertTrue(recordLocationMap.isEmpty());
+    } finally {
+      segment.destroy();
+      upsertMetadataManager.stop();
+      upsertMetadataManager.close();
+    }
+  }
+
+  private static GenericRow createRow(int primaryKey, int comparisonValue) {
+    GenericRow row = new GenericRow();
+    row.putValue(PRIMARY_KEY_COLUMNS.get(0), primaryKey);
+    row.putValue(COMPARISON_COLUMNS.get(0), comparisonValue);
+    return row;
   }
 
   // Watermark must not advance before addSegment inserts rows, or a concurrent sweep can drop the incoming keys.
