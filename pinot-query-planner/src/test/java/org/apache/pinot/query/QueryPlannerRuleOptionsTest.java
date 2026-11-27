@@ -19,10 +19,16 @@
 package org.apache.pinot.query;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -34,6 +40,67 @@ import static org.testng.Assert.*;
 
 
 public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
+
+  @Test
+  public void testServerReturnFinalResultWithUnpartitionedGroups() {
+    // Table a is partitioned by col2. The same col1 group can appear on both workers.
+    String explain = "EXPLAIN PLAN FOR SELECT col1, COUNT(DISTINCT col2) FROM a GROUP BY col1";
+    String options = "SET usePhysicalOptimizer=true; ";
+    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    assertEquals(_queryEnvironment.explainQuery(options + "SET serverReturnFinalResult=true; " + explain, requestId),
+        _queryEnvironment.explainQuery(options + explain, requestId));
+  }
+
+  @Test
+  public void testServerReturnFinalResultWithPartitionedGroups() {
+    String table = "events_OFFLINE";
+    Schema schema = getSchemaBuilder("events").build();
+    schema.getFieldSpecFor("col2").setNotNull(true);
+    List<String> first = List.of("p0_1", "p0_2");
+    List<String> second = List.of("p1_1");
+    QueryEnvironment environment = getQueryEnvironment(3, 1, 2, Map.of(table, schema), Map.of(table, first),
+        Map.of(table, second), Map.of(table, Pair.of("col2", List.of(first, second))));
+    String option = "SET serverReturnFinalResult=true; ";
+    String query = "SELECT col2, col3, COUNT(DISTINCT col1) FROM events WHERE col3 > 0 GROUP BY col2, col3";
+    String explain = "EXPLAIN PLAN FOR ";
+    String directPlan = environment.explainQuery(option + explain + query, 0);
+    assertTrue(directPlan.contains("aggType=[DIRECT]"), directPlan);
+    assertFalse(directPlan.contains("aggType=[FINAL]"), directPlan);
+    DispatchablePlanFragment leaf = environment.planQuery(option + query).getQueryStagesWithoutRoot().first();
+    assertEquals(leaf.getWorkerIdToSegmentsMap().get(0).get("OFFLINE").stream().sorted().toList(), first);
+    assertEquals(leaf.getWorkerIdToSegmentsMap().get(1).get("OFFLINE"), second);
+
+    // Two independent local groups need a real hash exchange when joined. Their routes need only keep each
+    // group together, and need not send a key to the same worker as any other scan.
+    String join = option + "SET inferPartitionHint=true; "
+        + "WITH x AS (SELECT col2, COUNT(*) AS n FROM events GROUP BY col2) "
+        + "SELECT x.n, y.n FROM x JOIN (SELECT col2, MAX(col3) AS n FROM events GROUP BY col2) y ON x.col2=y.col2";
+    List<MailboxSendNode> sends = environment.planQuery(join).getQueryStagesWithoutRoot().stream()
+        .filter(stage -> stage.getTableName() != null)
+        .map(stage -> (MailboxSendNode) stage.getPlanFragment().getFragmentRoot())
+        .toList();
+    assertEquals(sends.size(), 2);
+    for (MailboxSendNode send : sends) {
+      assertEquals(send.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+      assertFalse(send.isPrePartitioned());
+    }
+
+    QueryEnvironment split = getQueryEnvironment(3, 1, 2, Map.of(table, schema), Map.of(table, List.of("p0_1")),
+        Map.of(table, List.of("p0_2", "p1_1")), Map.of(table, Pair.of("col2", List.of(first, second))));
+    assertTrue(split.explainQuery(option + explain + query, 0).contains("aggType=[FINAL]"));
+
+    for (String fallback : List.of(explain + query, option + "SET multiStageLeafLimit=5; " + explain + query,
+        explain + query.replace("events", "events /*+ tableOptions(_use_group_by_route='true') */"),
+        option + explain + "SELECT col1, COUNT(DISTINCT col2) FROM events GROUP BY col1",
+        option + explain + "SELECT lower(col2), COUNT(*) FROM events GROUP BY lower(col2)",
+        option + explain + query.replace("SELECT ",
+            "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='false') */ "))) {
+      String plan = environment.explainQuery(fallback, 0);
+      assertTrue(plan.contains("aggType=[FINAL]"), plan);
+    }
+    schema.getFieldSpecFor("col2").setNotNull(false);
+    assertTrue(environment.explainQuery(option + explain + query, 0).contains("aggType=[FINAL]"));
+  }
 
   private String explainQueryWithRuleDisabled(String query, String ruleToSkip) {
     SqlNodeAndOptions parsed = CalciteSqlParser.compileToSqlNodeAndOptions(query);

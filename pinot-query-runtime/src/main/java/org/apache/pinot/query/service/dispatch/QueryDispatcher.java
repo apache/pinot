@@ -851,6 +851,9 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   private static Map<String, String> prepareRequestMetadata(QueryExecutionContext executionContext,
       Map<String, String> queryOptions, Deadline deadline) {
     Map<String, String> requestMetadata = new HashMap<>(queryOptions);
+    // Older servers copy request metadata into every SSE leaf. The aggregate nodes specify each leaf's result type.
+    requestMetadata.remove(QueryOptionKey.SERVER_RETURN_FINAL_RESULT);
+    requestMetadata.remove(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED);
     requestMetadata.put(MetadataKeys.REQUEST_ID, Long.toString(executionContext.getRequestId()));
     requestMetadata.put(MetadataKeys.CORRELATION_ID, executionContext.getCid());
     requestMetadata.put(QueryOptionKey.TIMEOUT_MS, Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));

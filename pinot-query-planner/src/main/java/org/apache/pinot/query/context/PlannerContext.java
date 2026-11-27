@@ -35,6 +35,7 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.pinot.calcite.rex.SearchSealer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.planner.logical.SpoolMode;
@@ -64,6 +65,7 @@ public class PlannerContext implements AutoCloseable, Context {
   @Nullable
   private final PhysicalPlannerContext _physicalPlannerContext;
   private final SearchSealer _searchSealer;
+  private final Map<String, GroupByRoute> _groupByRoutes = new HashMap<>();
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
@@ -125,6 +127,14 @@ public class PlannerContext implements AutoCloseable, Context {
 
   public LogicalPlanner getRelTraitPlanner() {
     return _relTraitPlanner;
+  }
+
+  /// Ordinary OFFLINE routes whose segment assignments were verified for a direct leaf aggregate.
+  public Map<String, GroupByRoute> getGroupByRoutes() {
+    return _groupByRoutes;
+  }
+
+  public record GroupByRoute(String partitionColumn, RoutingTable route) {
   }
 
   public Map<String, String> getOptions() {

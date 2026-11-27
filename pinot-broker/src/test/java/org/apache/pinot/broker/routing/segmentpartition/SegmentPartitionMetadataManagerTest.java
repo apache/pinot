@@ -513,6 +513,52 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
             + tablePartitionReplicatedServersInfo.getPartitionsWithOnlyDeferredSegments());
   }
 
+  @Test
+  public void testPartitionFunctionChangeWithSamePartitionId() {
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+    ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
+    List<String> segments = List.of("a", "b");
+    for (String segment : segments) {
+      externalView.setState(segment, SERVER_0, ONLINE);
+    }
+    SegmentPartitionMetadataManager manager =
+        new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN, "Murmur3", 8, 0);
+    ZNRecord segmentA = partitionMetadata("a", "Murmur3", 8, 0, Map.of());
+    ZNRecord segmentB = partitionMetadata("b", "Murmur3", 8, 1, Map.of());
+    manager.init(idealState, externalView, segments, List.of(segmentA, segmentB));
+    assertTrue(manager.getTablePartitionInfo().hasConsistentPartitionFunction());
+
+    // A different seed can place the same key in another partition, even though both stored ids remain valid.
+    ZNRecord newSeed = partitionMetadata("b", "Murmur3", 8, 1, Map.of("seed", "1"));
+    manager.onAssignmentChange(idealState, externalView, Set.copyOf(segments), List.of("b"), List.of(newSeed));
+    assertFalse(manager.getTablePartitionInfo().hasConsistentPartitionFunction());
+    assertEquals(manager.getTablePartitionInfo().getSegmentsByPartition().get(1), List.of("b"));
+    manager.refreshSegment("b", segmentB);
+    assertTrue(manager.getTablePartitionInfo().hasConsistentPartitionFunction());
+  }
+
+  @Test
+  public void testUnrecordedPartitionNormalizer() {
+    for (int numPartitions : List.of(2, 8)) {
+      SegmentPartitionMetadataManager manager =
+          new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN, "HashCode", numPartitions, 0);
+      ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
+      externalView.setState("a", SERVER_0, ONLINE);
+      manager.init(new IdealState(OFFLINE_TABLE_NAME), externalView, List.of("a"),
+          List.of(partitionMetadata("a", "HashCode", numPartitions, 1, Map.of())));
+      assertEquals(manager.getTablePartitionInfo().hasConsistentPartitionFunction(),
+          numPartitions == 2);
+    }
+  }
+
+  private static ZNRecord partitionMetadata(String segment, String function, int numPartitions, int partitionId,
+      Map<String, String> config) {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(segment);
+    metadata.setPartitionMetadata(new SegmentPartitionMetadata(Map.of(PARTITION_COLUMN,
+        new ColumnPartitionMetadata(function, numPartitions, Set.of(partitionId), config))));
+    return metadata.toZNRecord();
+  }
+
   /// An assignment change that changes neither the segments, their partitions nor their online servers must keep the
   /// published objects, while a change of the online servers must only replace the replicated servers info.
   @Test

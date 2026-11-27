@@ -19,8 +19,10 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Context;
@@ -40,6 +42,7 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Union;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
@@ -69,10 +72,18 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalMvAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
+import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -295,15 +306,91 @@ public class PinotAggregateExchangeNodeInsertRule {
     if (withinGroupCollation != null || (hasGroupBy && Boolean.parseBoolean(
         hintOptions.get(PinotHintOptions.AggregateOptions.IS_SKIP_LEAF_STAGE_GROUP_BY)))) {
       return createPlanWithExchangeDirectAggregation(call, aggRel, withinGroupCollation, collations, limit);
-    } else if (hasGroupBy && Boolean.parseBoolean(
-        hintOptions.get(PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS))) {
-      return new PinotLogicalAggregate(aggRel, aggRel.getInput(), buildAggCalls(aggRel, AggType.DIRECT, false),
-          AggType.DIRECT, false, collations, limit);
-    } else {
-      boolean leafReturnFinalResult =
-          Boolean.parseBoolean(hintOptions.get(PinotHintOptions.AggregateOptions.IS_LEAF_RETURN_FINAL_RESULT));
-      return createPlanWithLeafExchangeFinalAggregate(aggRel, leafReturnFinalResult, collations, limit);
     }
+    RelNode directInput = null;
+    if (hasGroupBy && Boolean.parseBoolean(
+        hintOptions.get(PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS))) {
+      directInput = aggRel.getInput();
+    } else if (hasGroupBy && hintOptions.isEmpty()) {
+      Context context = call.getPlanner().getContext();
+      PlannerContext planner = context != null ? context.unwrap(PlannerContext.class) : null;
+      if (planner != null && QueryOptionsUtils.isServerReturnFinalResult(planner.getOptions())
+          && !QueryOptionsUtils.isMultiClusterRoutingEnabled(planner.getOptions(), false)
+          && !planner.getOptions().containsKey(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT)
+          && !planner.getOptions().containsKey(QueryOptionKey.TABLE_SAMPLER)
+          && !planner.getOptions().containsKey(QueryOptionKey.ROUTING_OPTIONS)
+          && planner.getEnvConfig().getWorkerManager() != null) {
+        directInput = partitionedGroupByInput(aggRel.getInput(), aggRel.getGroupSet(), planner);
+      }
+    }
+    if (directInput != null) {
+      return new PinotLogicalAggregate(aggRel, directInput, buildAggCalls(aggRel, AggType.DIRECT, false),
+          AggType.DIRECT, false, collations, limit);
+    }
+    boolean leafReturnFinalResult =
+        Boolean.parseBoolean(hintOptions.get(PinotHintOptions.AggregateOptions.IS_LEAF_RETURN_FINAL_RESULT));
+    return createPlanWithLeafExchangeFinalAggregate(aggRel, leafReturnFinalResult, collations, limit);
+  }
+
+  /// Trace unmodified grouping columns through the leaf and give its scan the exact partition routing that
+  /// makes the aggregate direct. Grouping on a transformation of the partition column cannot establish colocation.
+  @Nullable
+  private static RelNode partitionedGroupByInput(RelNode input, ImmutableBitSet keys, PlannerContext planner) {
+    RelNode node = PinotRuleUtils.unboxRel(input);
+    if (node instanceof Project project) {
+      ImmutableBitSet.Builder refs = ImmutableBitSet.builder();
+      for (int key : keys) {
+        if (project.getProjects().get(key) instanceof RexInputRef ref) {
+          refs.set(ref.getIndex());
+        }
+      }
+      keys = refs.build();
+    } else if (node instanceof TableScan scan) {
+      if (PinotHintStrategyTable.getHint(scan, PinotHintOptions.TABLE_HINT_OPTIONS) != null) {
+        return null;
+      }
+      String tableName = planner.getEnvConfig().getTableCache()
+          .getActualTableName(RelToPlanNodeConverter.getTableNameFromTableScan(scan));
+      if (tableName == null) {
+        return null;
+      }
+      Schema schema = planner.getEnvConfig().getTableCache().getSchema(TableNameBuilder.extractRawTableName(tableName));
+      if (schema == null) {
+        return null;
+      }
+      // Hashing the ingested value must agree with grouping the stored value. Null sentinels and decimal
+      // representations can differ between segments even when SQL considers the group keys equal.
+      Set<String> groupColumns = new HashSet<>();
+      for (int key : keys) {
+        String column = scan.getRowType().getFieldNames().get(key);
+        FieldSpec field = schema.getFieldSpecFor(column);
+        if (field != null && field.isSingleValueField() && field.isNotNull()
+            && (field.getDataType() == FieldSpec.DataType.INT || field.getDataType() == FieldSpec.DataType.LONG
+            || field.getDataType() == FieldSpec.DataType.STRING)) {
+          groupColumns.add(column);
+        }
+      }
+      if (groupColumns.isEmpty()) {
+        return null;
+      }
+      WorkerManager workerManager = planner.getEnvConfig().getWorkerManager();
+      try {
+        if (!workerManager.hasPartitionedGroupByRoute(tableName, groupColumns, planner)) {
+          return null;
+        }
+      } catch (RuntimeException e) {
+        LOGGER.debug("Could not verify GROUP BY routing for {}", tableName, e);
+        return null;
+      }
+      List<RelHint> hints = new ArrayList<>(scan.getHints());
+      hints.add(RelHint.builder(PinotHintOptions.TABLE_HINT_OPTIONS)
+          .hintOption(PinotHintStrategyTable.GROUP_BY_ROUTE, "true").build());
+      return scan.withHints(hints);
+    } else if (!(node instanceof Filter)) {
+      return null;
+    }
+    RelNode child = keys.isEmpty() ? null : partitionedGroupByInput(node.getInput(0), keys, planner);
+    return child != null ? node.copy(node.getTraitSet(), List.of(child)) : null;
   }
 
   /// Splits a `GROUP BY ARRAY_TO_MV(expr)` aggregate into LEAF [PinotLogicalMvAggregate] + EXCHANGE + FINAL:

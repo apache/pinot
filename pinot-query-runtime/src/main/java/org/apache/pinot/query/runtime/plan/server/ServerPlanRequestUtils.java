@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -58,7 +57,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
@@ -270,16 +268,16 @@ public class ServerPlanRequestUtils {
 
   /// Helper method to update query options.
   private static void updateQueryOptions(PinotQuery pinotQuery, OpChainExecutionContext executionContext) {
-    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
-    if (queryOptions != null) {
-      queryOptions.putAll(executionContext.getOpChainMetadata());
-    } else {
-      queryOptions = new HashMap<>(executionContext.getOpChainMetadata());
-      pinotQuery.setQueryOptions(queryOptions);
-    }
-    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
+    // Older brokers can forward both SSE options. Only the aggregate plan knows the type expected by the next stage.
+    executionContext.getOpChainMetadata().forEach((key, value) -> {
+      if (!key.equals(QueryOptionKey.SERVER_RETURN_FINAL_RESULT)
+          && !key.equals(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED)) {
+        pinotQuery.putToQueryOptions(key, value);
+      }
+    });
+    pinotQuery.putToQueryOptions(QueryOptionKey.TIMEOUT_MS,
         Long.toString(executionContext.getActiveDeadlineMs() - System.currentTimeMillis()));
-    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS,
+    pinotQuery.putToQueryOptions(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS,
         Long.toString(executionContext.getPassiveDeadlineMs() - executionContext.getActiveDeadlineMs()));
   }
 

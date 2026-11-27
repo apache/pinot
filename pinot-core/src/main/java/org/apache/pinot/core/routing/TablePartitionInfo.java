@@ -29,15 +29,24 @@ public class TablePartitionInfo {
   private final int _numPartitions;
   private final List<List<String>> _segmentsByPartition;
   private final List<String> _segmentsWithInvalidPartition;
+  private final boolean _hasConsistentPartitionFunction;
 
   public TablePartitionInfo(String tableNameWithType, String partitionColumn, String partitionFunctionName,
       int numPartitions, List<List<String>> segmentsByPartition, List<String> segmentsWithInvalidPartition) {
+    this(tableNameWithType, partitionColumn, partitionFunctionName, numPartitions, segmentsByPartition,
+        segmentsWithInvalidPartition, false);
+  }
+
+  public TablePartitionInfo(String tableNameWithType, String partitionColumn, String partitionFunctionName,
+      int numPartitions, List<List<String>> segmentsByPartition, List<String> segmentsWithInvalidPartition,
+      boolean hasConsistentPartitionFunction) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
     _numPartitions = numPartitions;
     _segmentsByPartition = segmentsByPartition;
     _segmentsWithInvalidPartition = segmentsWithInvalidPartition;
+    _hasConsistentPartitionFunction = hasConsistentPartitionFunction;
   }
 
   public String getTableNameWithType() {
@@ -58,6 +67,11 @@ public class TablePartitionInfo {
 
   public List<List<String>> getSegmentsByPartition() {
     return _segmentsByPartition;
+  }
+
+  /// Whether every segment has a valid partition and its recorded settings establish the same effective function.
+  public boolean hasConsistentPartitionFunction() {
+    return _hasConsistentPartitionFunction;
   }
 
   public List<String> getSegmentsWithInvalidPartition() {

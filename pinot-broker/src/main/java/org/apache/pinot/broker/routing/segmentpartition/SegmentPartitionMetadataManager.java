@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
@@ -37,6 +38,12 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.partition.function.ByteArrayPartitionFunction;
+import org.apache.pinot.common.partition.function.FnvPartitionFunction;
+import org.apache.pinot.common.partition.function.HashCodePartitionFunction;
+import org.apache.pinot.common.partition.function.ModuloPartitionFunction;
+import org.apache.pinot.common.partition.function.Murmur3PartitionFunction;
+import org.apache.pinot.common.partition.function.MurmurPartitionFunction;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
@@ -111,7 +118,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     for (int i = 0; i < numSegments; i++) {
       String segment = onlineSegments.get(i);
       ZNRecord znRecord = znRecords.get(i);
-      SegmentInfo segmentInfo = new SegmentInfo(getPartitionId(segment, znRecord), getCreationTimeMs(znRecord),
+      SegmentInfo segmentInfo = new SegmentInfo(getPartitionInfo(segment, znRecord), getCreationTimeMs(znRecord),
           getOnlineServers(externalView.getStateMap(segment), onlineServersCache),
           getOnlineServers(idealState.getInstanceStateMap(segment), onlineServersCache));
       _segmentInfoMap.put(segment, segmentInfo);
@@ -119,27 +126,18 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     computeAllTablePartitionInfo();
   }
 
-  private int getPartitionId(String segment, @Nullable ZNRecord znRecord) {
-    SegmentPartitionInfo segmentPartitionInfo =
+  private SegmentPartitionInfo getPartitionInfo(String segment, @Nullable ZNRecord znRecord) {
+    SegmentPartitionInfo info =
         SegmentPartitionUtils.extractPartitionInfo(_tableNameWithType, _partitionColumn, segment, znRecord);
-    if (segmentPartitionInfo == null || segmentPartitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
-      return INVALID_PARTITION_ID;
+    if (info == null || !_partitionColumn.equals(info.getPartitionColumn())) {
+      return SegmentPartitionUtils.INVALID_PARTITION_INFO;
     }
-    if (!_partitionColumn.equals(segmentPartitionInfo.getPartitionColumn())) {
-      return INVALID_PARTITION_ID;
+    PartitionFunction function = info.getPartitionFunction();
+    if (!_partitionFunctionName.equalsIgnoreCase(function.getName()) || _numPartitions != function.getNumPartitions()
+        || info.getPartitions().size() != 1) {
+      return SegmentPartitionUtils.INVALID_PARTITION_INFO;
     }
-    PartitionFunction partitionFunction = segmentPartitionInfo.getPartitionFunction();
-    if (!_partitionFunctionName.equalsIgnoreCase(partitionFunction.getName())) {
-      return INVALID_PARTITION_ID;
-    }
-    if (_numPartitions != partitionFunction.getNumPartitions()) {
-      return INVALID_PARTITION_ID;
-    }
-    Set<Integer> partitions = segmentPartitionInfo.getPartitions();
-    if (partitions.size() != 1) {
-      return INVALID_PARTITION_ID;
-    }
-    return partitions.iterator().next();
+    return info;
   }
 
   private static long getCreationTimeMs(@Nullable ZNRecord znRecord) {
@@ -201,7 +199,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
     // Both published objects are recomputed only when their inputs change: TablePartitionInfo depends on the segments
-    // and their partition ids, TablePartitionReplicatedServersInfo also depends on the online servers of each segment
+    // and their partition metadata, TablePartitionReplicatedServersInfo also depends on their online servers
     // and on the clock (see _nextNewSegmentExpirationTimeMs).
     boolean partitionsChanged = false;
     // Set when the online (external view) or assigned (ideal state) servers of a segment change: either can decide
@@ -214,17 +212,15 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     for (int i = 0; i < numSegments; i++) {
       String segment = pulledSegments.get(i);
       ZNRecord znRecord = znRecords.get(i);
-      int partitionId = getPartitionId(segment, znRecord);
+      SegmentPartitionInfo partitionInfo = getPartitionInfo(segment, znRecord);
       long creationTimeMs = getCreationTimeMs(znRecord);
       SegmentInfo segmentInfo = _segmentInfoMap.get(segment);
       if (segmentInfo == null) {
-        _segmentInfoMap.put(segment, new SegmentInfo(partitionId, creationTimeMs,
+        _segmentInfoMap.put(segment, new SegmentInfo(partitionInfo, creationTimeMs,
             getOnlineServers(externalView.getStateMap(segment), onlineServersCache),
             getOnlineServers(idealState.getInstanceStateMap(segment), onlineServersCache)));
         partitionsChanged = true;
-      } else if (segmentInfo._partitionId != partitionId || segmentInfo._creationTimeMs != creationTimeMs) {
-        segmentInfo._partitionId = partitionId;
-        segmentInfo._creationTimeMs = creationTimeMs;
+      } else if (segmentInfo.updateMetadata(partitionInfo, creationTimeMs)) {
         partitionsChanged = true;
       }
     }
@@ -236,7 +232,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
         // NOTE: This should not happen, but we still handle it gracefully by adding an invalid SegmentInfo
         LOGGER.error("Failed to find segment info for segment: {} in table: {} while handling assignment change",
             segment, _tableNameWithType);
-        segmentInfo = new SegmentInfo(INVALID_PARTITION_ID, INVALID_CREATION_TIME_MS,
+        segmentInfo = new SegmentInfo(SegmentPartitionUtils.INVALID_PARTITION_INFO, INVALID_CREATION_TIME_MS,
             getOnlineServers(instanceStateMap, onlineServersCache),
             getOnlineServers(idealState.getInstanceStateMap(segment), onlineServersCache));
         _segmentInfoMap.put(segment, segmentInfo);
@@ -265,18 +261,17 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
 
   @Override
   public synchronized void refreshSegment(String segment, @Nullable ZNRecord znRecord) {
-    int partitionId = getPartitionId(segment, znRecord);
+    SegmentPartitionInfo partitionInfo = getPartitionInfo(segment, znRecord);
     long pushTimeMs = getCreationTimeMs(znRecord);
     SegmentInfo segmentInfo = _segmentInfoMap.get(segment);
     if (segmentInfo == null) {
       // NOTE: This should not happen, but we still handle it gracefully by adding an invalid SegmentInfo
       LOGGER.error("Failed to find segment info for segment: {} in table: {} while handling segment refresh", segment,
           _tableNameWithType);
-      segmentInfo = new SegmentInfo(partitionId, pushTimeMs, List.of(), List.of());
+      segmentInfo = new SegmentInfo(partitionInfo, pushTimeMs, List.of(), List.of());
       _segmentInfoMap.put(segment, segmentInfo);
     } else {
-      segmentInfo._partitionId = partitionId;
-      segmentInfo._creationTimeMs = pushTimeMs;
+      segmentInfo.updateMetadata(partitionInfo, pushTimeMs);
     }
     computeAllTablePartitionInfo();
   }
@@ -306,7 +301,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       String segment = entry.getKey();
       SegmentInfo segmentInfo = entry.getValue();
       int partitionId = segmentInfo._partitionId;
-      if (partitionId == INVALID_PARTITION_ID || partitionId >= _numPartitions) {
+      if (partitionId < 0 || partitionId >= _numPartitions) {
         segmentsWithInvalidPartition.add(segment);
         continue;
       }
@@ -455,11 +450,18 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       segmentsByPartition.add(new ArrayList<>());
     }
     List<String> segmentsWithInvalidPartition = new ArrayList<>();
+    PartitionFunction commonFunction = null;
+    boolean consistent = !_segmentInfoMap.isEmpty();
     for (Map.Entry<String, SegmentInfo> entry : _segmentInfoMap.entrySet()) {
       String segment = entry.getKey();
       SegmentInfo segmentInfo = entry.getValue();
+      PartitionFunction function = segmentInfo._partitionFunction;
+      if (commonFunction == null) {
+        commonFunction = function;
+      }
+      consistent = consistent && function != null && function.equals(commonFunction);
       int partitionId = segmentInfo._partitionId;
-      if (partitionId == INVALID_PARTITION_ID) {
+      if (partitionId < 0) {
         segmentsWithInvalidPartition.add(segment);
       } else if (partitionId < segmentsByPartition.size()) {
         segmentsByPartition.get(partitionId).add(segment);
@@ -477,22 +479,57 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     }
     _tablePartitionInfo =
         new TablePartitionInfo(_tableNameWithType, _partitionColumn, _partitionFunctionName, _numPartitions,
-            segmentsByPartition, segmentsWithInvalidPartition);
+            segmentsByPartition, segmentsWithInvalidPartition, consistent && segmentsWithInvalidPartition.isEmpty());
   }
 
   private static class SegmentInfo {
     int _partitionId;
+    @Nullable
+    PartitionFunction _partitionFunction;
     long _creationTimeMs;
     List<String> _onlineServers;
     /// Servers the ideal state assigns the segment to in ONLINE or CONSUMING state; empty when the ideal state does
     /// not list it, or lists it only in other states (e.g. OFFLINE while it is being dropped).
     List<String> _assignedServers;
 
-    SegmentInfo(int partitionId, long creationTimeMs, List<String> onlineServers, List<String> assignedServers) {
-      _partitionId = partitionId;
-      _creationTimeMs = creationTimeMs;
+    SegmentInfo(SegmentPartitionInfo partitionInfo, long creationTimeMs, List<String> onlineServers,
+        List<String> assignedServers) {
+      updateMetadata(partitionInfo, creationTimeMs);
       _onlineServers = onlineServers;
       _assignedServers = assignedServers;
+    }
+
+    private boolean updateMetadata(SegmentPartitionInfo info, long creationTimeMs) {
+      int partitionId = info == SegmentPartitionUtils.INVALID_PARTITION_INFO
+          ? INVALID_PARTITION_ID
+          : info.getPartitions().iterator().next();
+      PartitionFunction function = comparableFunction(info.getPartitionFunction());
+      boolean changed = _partitionId != partitionId || _creationTimeMs != creationTimeMs
+          || !Objects.equals(_partitionFunction, function);
+      _partitionId = partitionId;
+      _partitionFunction = function;
+      _creationTimeMs = creationTimeMs;
+      return changed;
+    }
+
+    /// These built-ins persist their hash settings and implement value equality. HashCode, Modulo and ByteArray
+    /// historically omitted their normalizer from segment metadata. For at most two partitions every normalizer
+    /// gives the same valid id (parity for two), so that missing setting cannot change group placement.
+    @Nullable
+    private static PartitionFunction comparableFunction(@Nullable PartitionFunction function) {
+      if (function == null) {
+        return null;
+      }
+      Class<?> type = function.getClass();
+      if (type == MurmurPartitionFunction.class || type == Murmur3PartitionFunction.class
+          || type == FnvPartitionFunction.class) {
+        return function;
+      }
+      if (function.getNumPartitions() <= 2 && (type == HashCodePartitionFunction.class
+          || type == ModuloPartitionFunction.class || type == ByteArrayPartitionFunction.class)) {
+        return function;
+      }
+      return null;
     }
 
     /// Whether every server the ideal state assigns the segment to has it online, i.e. it is not still coming up.

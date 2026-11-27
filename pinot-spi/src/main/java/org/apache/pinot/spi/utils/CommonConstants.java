@@ -1085,6 +1085,8 @@ public class CommonConstants {
 
         // Can be applied to aggregation and group-by queries to ask servers to directly return final results instead of
         // intermediate results for aggregations.
+        // For GROUP BY, each complete group must be served by one server. MSE can use a direct leaf aggregate
+        // when it verifies group placement. Each leaf's result type is determined by the plan.
         public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
         // Can be applied to group-by queries to ask servers to directly return final results instead of intermediate
         // results for aggregations. Different from SERVER_RETURN_FINAL_RESULT, this option should be used when the
