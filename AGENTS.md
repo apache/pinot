@@ -100,6 +100,8 @@ compiler warning checks are needed. Fix failures within the authorized scope; do
 - Segment/index changes usually live under `pinot-segment-local` and
   `pinot-segment-spi`.
 - Config or API changes should update relevant configs and docs where applicable.
+- Before you add a Helix change listener that runs on every server or broker, estimate its ZooKeeper cost. See
+  `kb/code-review-principles.md` C3.25.
 
 ## Reference docs
 - `README.md` for build and quickstart details.

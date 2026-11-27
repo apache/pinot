@@ -478,6 +478,57 @@ Not per-method arguments. Keep method signatures clean.
 Data holders should not be named "Manager". Method names returning config objects should include "Config" suffix.
 - Trigger: Any PR introducing new classes or renaming existing ones
 
+**C3.25 — Size the ZooKeeper cost of a Helix listener that runs on every instance**
+Helix prefetch is on by default. On each change, every listening process reads all znodes under the watched path.
+With L listening processes and N znodes, one change costs L × N ZK reads on the Helix event thread. A burst of
+changes, for example a scale-down, pays this cost for each change. If only the query path needs the data, read it on
+the broker and send it with the request. If every instance needs the listener, disable prefetch and batch mode, and
+read only the znode that changed. Batch mode is off by default, but a JVM system property can turn it on for every
+listener. Batch mode keeps only one queued CALLBACK event, so the listener does not see the other changed znodes. A
+full read on each child change still costs L × N for each instance that joins or leaves. On a child change, read the
+child names and only the instances that joined, or skip the instance types that the listener does not use. A diff of
+the names does not show an instance that was deleted and created again with the same name between two callbacks. If
+that case matters, compare the `cversion` of the parent znode with the number of changed names, and do a full read
+when they differ.
+- Trigger: Any PR that adds a Helix change listener (`add*ChangeListener`, `implements *ChangeListener`,
+  `ClusterChangeHandler`) that runs on every server or broker, or a full read (`HelixHelper.getInstanceConfigs`,
+  `getChildValues`) inside a change callback
+- Example: `ServerMailboxChannelRefreshHandler` skips the server config reads when only non-server instances
+  join or leave ([apache/pinot#20107](https://github.com/apache/pinot/pull/20107)).
+
+```java
+// BAD: runs on every server. Each InstanceConfig change makes every server read all InstanceConfigs.
+public class PeerPortCache implements InstanceConfigChangeListener {
+  @Override
+  public void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
+    _ports = buildPortMap(instanceConfigs); // Helix read all N InstanceConfigs to build this list
+  }
+}
+```
+```java
+// GOOD: prefetch and batch mode off. A full read only at start. A config change reads one znode. A child
+// change reads the child names and the configs of the instances that joined.
+@PreFetch(enabled = false)
+@BatchMode(enabled = false)
+public class PeerPortCache implements InstanceConfigChangeListener {
+  @Override
+  public void onInstanceConfigChange(List<InstanceConfig> unused, NotificationContext context) {
+    if (context.getType() == NotificationContext.Type.INIT) {
+      reloadAll();
+    } else if (context.getIsChildChange()) {
+      Set<String> instances = new HashSet<>(readInstanceNames()); // one ZK read
+      Set<String> joined = new HashSet<>(instances);
+      joined.removeAll(_knownInstances);
+      _knownInstances = instances;
+      _ports.keySet().retainAll(instances);
+      joined.forEach(this::reload);
+    } else if (context.getType() == NotificationContext.Type.CALLBACK) {
+      reload(context.getPathChanged());
+    }
+  }
+}
+```
+
 ### MINOR
 
 **C3.17 — ForwardIndexConfig pattern is canonical**
@@ -1304,10 +1355,10 @@ Approve the immediate fix while deferring broader design to separate threads.
 |--------|----------|-------|-------|-------|
 | 1. Configuration & Backward Compat | 5 | 7 | 4 | 16 |
 | 2. State Management & Concurrency | 6 | 7 | 3 | 16 |
-| 3. Code Architecture & Module Design | 5 | 11 | 8 | 24 |
+| 3. Code Architecture & Module Design | 5 | 12 | 8 | 25 |
 | 4. Performance & Efficiency | 2 | 16 | 4 | 22 |
 | 5. Correctness & Safety | 9 | 16 | 3 | 28 |
 | 6. Testing Strategies | 2 | 7 | 9 | 18 |
 | 7. Naming & API Design | 1 | 9 | 15 | 25 |
 | 8. Process & Scope | 2 | 10 | 8 | 20 |
-| **Total** | **32** | **83** | **54** | **169** |
+| **Total** | **32** | **84** | **54** | **170** |
