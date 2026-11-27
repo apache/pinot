@@ -295,6 +295,72 @@
         "outputs": [],
         "expectedException": ".*ARRAY_TO_MV found in PROJECT in the intermediate stage.*ARRAY_TO_MV is supported only.*",
         "ignoreV2Optimizer": true
+      },
+      {
+        "description": "HAVING on nested CAST(ARRAY_TO_MV(intMv) AS VARCHAR) group key stays above aggregate and does not leak other elements of matching rows",
+        "sql": "SELECT CAST(ARRAY_TO_MV(intMv) AS VARCHAR), COUNT(*) FROM {tbl} GROUP BY CAST(ARRAY_TO_MV(intMv) AS VARCHAR) HAVING CAST(ARRAY_TO_MV(intMv) AS VARCHAR) = '2'",
+        "outputs": [["2", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Outer WHERE on nested CAST(ARRAY_TO_MV(intMv) AS VARCHAR) group key stays above aggregate",
+        "sql": "SELECT k_str, cnt FROM (SELECT CAST(ARRAY_TO_MV(intMv) AS VARCHAR) AS k_str, COUNT(*) AS cnt FROM {tbl} GROUP BY CAST(ARRAY_TO_MV(intMv) AS VARCHAR)) WHERE k_str = '2'",
+        "outputs": [["2", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Mixed SV and MV HAVING on plain scan splits SV conjunct below aggregate and keeps MV conjunct above",
+        "sql": "SELECT ARRAY_TO_MV(strMv), grp, COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv), grp HAVING ARRAY_TO_MV(strMv) = 'b' AND grp = 'g1'",
+        "outputs": [["b", "g1", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Mixed SV and MV HAVING above self-join splits SV conjunct below aggregate and keeps MV conjunct above",
+        "sql": "SELECT ARRAY_TO_MV(t1.strMv), t2.grp, COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k GROUP BY ARRAY_TO_MV(t1.strMv), t2.grp HAVING ARRAY_TO_MV(t1.strMv) = 'a' AND t2.grp = 'g2'",
+        "outputs": [["a", "g2", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Positive IN HAVING on plain scan with pre-filter copy",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) IN ('b', 'c')",
+        "outputs": [["b", 2], ["c", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Positive BETWEEN HAVING on plain scan with pre-filter copy",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) BETWEEN 'b' AND 'c'",
+        "outputs": [["b", 2], ["c", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Positive OR HAVING on same MV key on plain scan with pre-filter copy",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) = 'b' OR ARRAY_TO_MV(strMv) = 'c'",
+        "outputs": [["b", 2], ["c", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Positive reversed literal HAVING merged with existing WHERE and aggregate HAVING on plain scan",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} WHERE sv > 0 GROUP BY ARRAY_TO_MV(strMv) HAVING 'b' = ARRAY_TO_MV(strMv) AND COUNT(*) > 1",
+        "outputs": [["b", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Positive range comparison HAVING on INT MV column with pre-filter copy",
+        "sql": "SELECT ARRAY_TO_MV(intMv), COUNT(*), SUM(sv) FROM {tbl} GROUP BY ARRAY_TO_MV(intMv) HAVING ARRAY_TO_MV(intMv) > 1",
+        "outputs": [[2, 2, 3], [3, 2, -2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Negated <> HAVING on plain scan does not copy unsafe pre-filter and still counts rows containing excluded element",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) <> 'a'",
+        "outputs": [["b", 2], ["c", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Negated NOT IN HAVING on plain scan does not copy unsafe pre-filter",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) NOT IN ('a', 'c')",
+        "outputs": [["b", 2]],
+        "ignoreV2Optimizer": true
       }
     ]
   },
@@ -375,6 +441,24 @@
         "sql": "SET enableNullHandling=true; SELECT ARRAY_TO_MV(t1.strMv), COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k WHERE COALESCE(ARRAY_TO_MV(t1.strMv), 'x') = 'a' GROUP BY ARRAY_TO_MV(t1.strMv)",
         "outputs": [],
         "expectedException": ".*Caught exception while doing operator.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "IS NULL HAVING on nullable MV key keeps only the null group without copying an unsafe pre-filter",
+        "sql": "SET enableNullHandling=true; SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) IS NULL",
+        "outputs": [[null, 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "IS NOT NULL HAVING on nullable MV key keeps only non-null groups",
+        "sql": "SET enableNullHandling=true; SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) IS NOT NULL",
+        "outputs": [["a", 2], ["b", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Positive = HAVING on nullable MV key with pre-filter copy",
+        "sql": "SET enableNullHandling=true; SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) = 'b'",
+        "outputs": [["b", 1]],
         "ignoreV2Optimizer": true
       }
     ]

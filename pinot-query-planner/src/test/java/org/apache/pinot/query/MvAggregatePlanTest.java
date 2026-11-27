@@ -218,6 +218,113 @@ public class MvAggregatePlanTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testNestedMvKeyFilterStaysAboveAggregateWithoutPreFilter() {
+    // Nested MV group keys (LOWER, CAST) must keep HAVING / outer WHERE strictly above Aggregate,
+    // and must NOT copy a leaf pre-filter below Aggregate.
+    for (String query : List.of(
+        "EXPLAIN PLAN FOR SELECT LOWER(ARRAY_TO_MV(mcol1)), COUNT(*) FROM e "
+            + "GROUP BY LOWER(ARRAY_TO_MV(mcol1)) HAVING LOWER(ARRAY_TO_MV(mcol1)) = 'b'",
+        "EXPLAIN PLAN FOR SELECT k, cnt FROM (SELECT LOWER(ARRAY_TO_MV(mcol1)) AS k, COUNT(*) AS cnt "
+            + "FROM e GROUP BY LOWER(ARRAY_TO_MV(mcol1))) WHERE k = 'b'",
+        "EXPLAIN PLAN FOR SELECT CAST(ARRAY_TO_MV(mcol2) AS VARCHAR), COUNT(*) FROM e "
+            + "GROUP BY CAST(ARRAY_TO_MV(mcol2) AS VARCHAR) HAVING CAST(ARRAY_TO_MV(mcol2) AS VARCHAR) = 'b'")) {
+      String plan = explain(query);
+      assertTrue(plan.indexOf("'b'") < plan.indexOf("Aggregate"), plan);
+      assertTrue(plan.lastIndexOf("'b'") < plan.indexOf("Aggregate"), plan);
+    }
+  }
+
+  @Test
+  public void testMixedSvAndMvHavingSplitsConjuncts() {
+    // Above a join: SV conjunct a.col2 = 'y' is pushed below Aggregate (into table a's scan), while MV conjunct
+    // stays strictly above Aggregate.
+    String joinPlan = explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1), a.col2, COUNT(*) FROM e JOIN a "
+        + "ON e.col1 = a.col1 GROUP BY ARRAY_TO_MV(e.mcol1), a.col2 "
+        + "HAVING ARRAY_TO_MV(e.mcol1) = 'x' AND a.col2 = 'y'");
+    assertTrue(joinPlan.contains(MV_AGGREGATE), joinPlan);
+    assertTrue(joinPlan.lastIndexOf("'x'") < joinPlan.indexOf(MV_AGGREGATE), joinPlan);
+    assertTrue(joinPlan.lastIndexOf("'y'") > joinPlan.lastIndexOf("Aggregate"), joinPlan);
+    assertTrue(joinPlan.lastIndexOf("LogicalFilter") > joinPlan.indexOf("Join"), joinPlan);
+
+    // On a scan: SV conjunct col2 = 'y' is pushed into the leaf filter (not kept in the top LogicalFilter),
+    // while MV conjunct stays above Aggregate and is also copied as a merged leaf pre-filter.
+    String scanPlan = explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), col2, COUNT(*) FROM e "
+        + "GROUP BY ARRAY_TO_MV(mcol1), col2 HAVING ARRAY_TO_MV(mcol1) = 'x' AND col2 = 'y'");
+    assertTrue(scanPlan.indexOf("'x'") < scanPlan.indexOf("Aggregate"), scanPlan);
+    assertTrue(scanPlan.lastIndexOf("'x'") > scanPlan.lastIndexOf("Aggregate"), scanPlan);
+    assertTrue(scanPlan.lastIndexOf("'y'") > scanPlan.lastIndexOf("Aggregate"), scanPlan);
+  }
+
+  @Test
+  public void testPositiveLeafHavingCopiesPreFilterBelowProject() {
+    // Sound positive predicates on bare ARRAY_TO_MV(col) over a table scan keep the post-aggregate filter
+    // AND inject a pre-filter directly over TableScan (below Project), without triggering constant pull-up.
+    for (String having : List.of(
+        "ARRAY_TO_MV(mcol1) = 'b'",
+        "'b' = ARRAY_TO_MV(mcol1)",
+        "ARRAY_TO_MV(mcol1) IN ('b', 'c')",
+        "ARRAY_TO_MV(mcol1) BETWEEN 'b' AND 'c'",
+        "ARRAY_TO_MV(mcol1) = 'b' OR ARRAY_TO_MV(mcol1) = 'c'")) {
+      String plan = explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e "
+          + "GROUP BY ARRAY_TO_MV(mcol1) HAVING " + having);
+      // Filter remains above Aggregate.
+      assertTrue(plan.indexOf("LogicalFilter") < plan.indexOf("Aggregate"), plan);
+      // Pre-filter is copied below Project onto TableScan.
+      assertTrue(plan.lastIndexOf("LogicalFilter") > plan.lastIndexOf("LogicalProject"), plan);
+      assertTrue(plan.lastIndexOf("'b'") > plan.lastIndexOf("LogicalProject"), plan);
+      // AggregateProjectPullUpConstantsRule must NOT drop the MV group key.
+      assertTrue(plan.contains("group=[{0}]"), plan);
+    }
+
+    // 2-key GROUP BY exercises AggregateProjectPullUpConstantsRule (which skips 1-key aggregates):
+    // copying ARRAY_TO_MV(mcol1) = 'b' below Project must NOT cause the MV key to be pulled up as a constant.
+    String twoKeyPlan = explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), col2, COUNT(*) FROM e "
+        + "GROUP BY ARRAY_TO_MV(mcol1), col2 HAVING ARRAY_TO_MV(mcol1) = 'b'");
+    assertTrue(twoKeyPlan.indexOf("'b'") < twoKeyPlan.indexOf("Aggregate"), twoKeyPlan);
+    assertTrue(twoKeyPlan.lastIndexOf("'b'") > twoKeyPlan.lastIndexOf("LogicalProject"), twoKeyPlan);
+    assertTrue(twoKeyPlan.contains("group=[{0, 1}]"), twoKeyPlan);
+
+    // Merges with an existing WHERE clause into a single leaf LogicalFilter.
+    String mergedPlan = explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e "
+        + "WHERE col2 = 'a' GROUP BY ARRAY_TO_MV(mcol1) HAVING ARRAY_TO_MV(mcol1) = 'b' AND COUNT(*) > 1");
+    assertTrue(mergedPlan.indexOf("'b'") < mergedPlan.indexOf("Aggregate"), mergedPlan);
+    assertTrue(mergedPlan.lastIndexOf("'b'") > mergedPlan.lastIndexOf("LogicalProject"), mergedPlan);
+    assertTrue(mergedPlan.indexOf("'a'") > mergedPlan.lastIndexOf("LogicalProject"), mergedPlan);
+    int afterProject = mergedPlan.lastIndexOf("LogicalProject");
+    String leafTail = mergedPlan.substring(afterProject);
+    assertTrue(leafTail.indexOf("LogicalFilter") == leafTail.lastIndexOf("LogicalFilter"),
+        "Expected a single merged leaf LogicalFilter, got:\n" + mergedPlan);
+  }
+
+  @Test
+  public void testUnsoundPredicatesDoNotCopyPreFilter() {
+    for (String query : List.of(
+        "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e "
+            + "GROUP BY ARRAY_TO_MV(mcol1) HAVING ARRAY_TO_MV(mcol1) <> 'b'",
+        "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e "
+            + "GROUP BY ARRAY_TO_MV(mcol1) HAVING ARRAY_TO_MV(mcol1) NOT IN ('b', 'c')",
+        "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM f "
+            + "GROUP BY ARRAY_TO_MV(mcol1) HAVING ARRAY_TO_MV(mcol1) IS NULL",
+        "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM f "
+            + "GROUP BY ARRAY_TO_MV(mcol1) HAVING ARRAY_TO_MV(mcol1) IS NOT NULL",
+        "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e "
+            + "GROUP BY ARRAY_TO_MV(mcol1) HAVING LOWER(ARRAY_TO_MV(mcol1)) = 'b'",
+        "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), col2, COUNT(*) FROM e "
+            + "GROUP BY ARRAY_TO_MV(mcol1), col2 HAVING ARRAY_TO_MV(mcol1) = col2")) {
+      String plan = explain(query);
+      assertTrue(plan.lastIndexOf("LogicalFilter") < plan.indexOf("Aggregate"), plan);
+    }
+  }
+
+  @Test
+  public void testSkipMvAggregatePreFilterRuleOption() {
+    String plan = explain("SET skipPlannerRules='MvAggregatePreFilter'; EXPLAIN PLAN FOR "
+        + "SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1) HAVING ARRAY_TO_MV(mcol1) = 'b'");
+    assertTrue(plan.indexOf("'b'") < plan.indexOf("Aggregate"), plan);
+    assertTrue(plan.lastIndexOf("'b'") < plan.indexOf("Aggregate"), plan);
+  }
+
   private static String getFullMessage(Throwable t) {
     StringBuilder sb = new StringBuilder();
     for (Throwable cause = t; cause != null; cause = cause.getCause()) {

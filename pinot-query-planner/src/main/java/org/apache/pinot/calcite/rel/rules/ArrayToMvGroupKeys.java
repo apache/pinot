@@ -20,6 +20,7 @@ package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Filter;
@@ -121,5 +122,49 @@ public final class ArrayToMvGroupKeys {
       return false;
     }
     return call.getOperands().get(0).getType().getSqlTypeName() == SqlTypeName.ARRAY;
+  }
+
+  /// Returns whether `expression` is or contains a call to `ARRAY_TO_MV`.
+  public static boolean containsArrayToMv(RexNode expression) {
+    if (!(expression instanceof RexCall)) {
+      return false;
+    }
+    RexCall call = (RexCall) expression;
+    if (call.getOperator() == PinotOperatorTable.ARRAY_TO_MV) {
+      return true;
+    }
+    for (RexNode operand : call.getOperands()) {
+      if (containsArrayToMv(operand)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Returns whether column `column` of `node` contains a call to `ARRAY_TO_MV` anywhere in its defining expression,
+  /// walking through `Filter` and `Project` chains.
+  ///
+  /// Unlike [#isArrayToMvColumn], this returns `true` for nested expressions such as `LOWER(ARRAY_TO_MV(col))`,
+  /// `CAST(ARRAY_TO_MV(col) AS VARCHAR)`, `COALESCE(ARRAY_TO_MV(col), 'none')`, or `LOWER(x)` where `x` is defined as
+  /// `ARRAY_TO_MV(col)` in an underlying `Project`.
+  public static boolean containsArrayToMvColumn(RelNode node, int column) {
+    node = PinotRuleUtils.unboxRel(node);
+    if (node instanceof Filter) {
+      return containsArrayToMvColumn(node.getInput(0), column);
+    }
+    if (!(node instanceof Project)) {
+      return false;
+    }
+    RexNode expression = ((Project) node).getProjects().get(column);
+    if (containsArrayToMv(expression)) {
+      return true;
+    }
+    RelNode input = node.getInput(0);
+    for (int inputCol : RelOptUtil.InputFinder.bits(expression)) {
+      if (containsArrayToMvColumn(input, inputCol)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

@@ -21,10 +21,7 @@ package org.apache.pinot.calcite.rel.rules;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.rules.ProjectJoinTransposeRule;
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 
 
 /// Similar to [ProjectJoinTransposeRule] but do not transpose project into right side of lookup join.
@@ -37,7 +34,7 @@ import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 /// TODO: Allow transposing project into left side of lookup join.
 public class PinotProjectJoinTransposeRule extends ProjectJoinTransposeRule {
   private static final Config CONFIG = Config.DEFAULT.withPreserveExprCondition(
-      expr -> Config.DEFAULT.preserveExprCondition().test(expr) && !containsArrayToMv(expr));
+      expr -> Config.DEFAULT.preserveExprCondition().test(expr) && !ArrayToMvGroupKeys.containsArrayToMv(expr));
 
   public static final PinotProjectJoinTransposeRule INSTANCE = new PinotProjectJoinTransposeRule(CONFIG);
 
@@ -53,21 +50,5 @@ public class PinotProjectJoinTransposeRule extends ProjectJoinTransposeRule {
   public boolean matches(RelOptRuleCall call) {
     Join join = call.rel(1);
     return !PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join);
-  }
-
-  static boolean containsArrayToMv(RexNode expr) {
-    if (!(expr instanceof RexCall)) {
-      return false;
-    }
-    RexCall call = (RexCall) expr;
-    if (call.getOperator() == PinotOperatorTable.ARRAY_TO_MV) {
-      return true;
-    }
-    for (RexNode operand : call.getOperands()) {
-      if (containsArrayToMv(operand)) {
-        return true;
-      }
-    }
-    return false;
   }
 }
