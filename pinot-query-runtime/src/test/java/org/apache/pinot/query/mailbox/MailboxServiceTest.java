@@ -26,6 +26,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
@@ -39,6 +43,7 @@ import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -83,6 +88,47 @@ public class MailboxServiceTest {
   @BeforeTest
   public void setUpStats() {
     _stats = new StatMap<>(MailboxSendOperator.StatKey.class);
+  }
+
+  /// A receiving mailbox that no operator ever read is counted as an orphan when the cache drops it, which is how data
+  /// that reached the wrong instance, or arrived after its query ended, shows. A broker counts in the broker metrics.
+  @Test
+  public void testOrphanedReceivingMailboxesAreCounted() {
+    ServerMetrics.deregister();
+    ServerMetrics.register(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    BrokerMetrics.register(new BrokerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    try {
+      long serverOrphans = serverMeterCount();
+      ReceivingMailbox read = _mailboxService2.getReceivingMailbox(newMailboxId());
+      read.registeredReader(() -> {
+      });
+      _mailboxService2.onReceivingMailboxEvicted(read.getId(), read);
+      assertEquals(serverMeterCount(), serverOrphans);
+
+      ReceivingMailbox neverRead = _mailboxService2.getReceivingMailbox(newMailboxId());
+      _mailboxService2.onReceivingMailboxEvicted(neverRead.getId(), neverRead);
+      assertEquals(serverMeterCount(), serverOrphans + 1);
+
+      long brokerOrphans = brokerMeterCount();
+      ReceivingMailbox neverReadOnBroker = _mailboxService1.getReceivingMailbox(newMailboxId());
+      _mailboxService1.onReceivingMailboxEvicted(neverReadOnBroker.getId(), neverReadOnBroker);
+      assertEquals(brokerMeterCount(), brokerOrphans + 1);
+      assertEquals(serverMeterCount(), serverOrphans + 1);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  private String newMailboxId() {
+    return MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+  }
+
+  private static long serverMeterCount() {
+    return ServerMetrics.get().getMeteredValue(ServerMeter.MULTI_STAGE_ORPHANED_RECEIVING_MAILBOXES).count();
+  }
+
+  private static long brokerMeterCount() {
+    return BrokerMetrics.get().getMeteredValue(BrokerMeter.MULTI_STAGE_ORPHANED_RECEIVING_MAILBOXES).count();
   }
 
   @Test

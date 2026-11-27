@@ -65,18 +65,16 @@ public class MailboxService {
   ///
   /// We use a cache to ensure the receiving mailbox are not leaked in the cases where the corresponding OpChain is
   /// either never registered or died before the sender finished sending data.
+  ///
+  /// A mailbox that no operator ever read is an orphan: either its blocks were meant for another instance and reached
+  /// this one through a stale connection of the sender, or they arrived after the query had ended here. Orphans are
+  /// counted when they are evicted, at least [#DANGLING_RECEIVING_MAILBOX_EXPIRY_SECONDS] after the last stream for
+  /// them opened (the cache drops expired entries only when it is used again).
   private final Cache<String, ReceivingMailbox> _receivingMailboxCache =
       CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY_SECONDS, TimeUnit.SECONDS)
           .removalListener((RemovalListener<String, ReceivingMailbox>) notification -> {
             if (notification.wasEvicted()) {
-              ReceivingMailbox receivingMailbox = notification.getValue();
-              int numPendingBlocks = receivingMailbox.getNumPendingBlocks();
-              if (numPendingBlocks > 0) {
-                LOGGER.warn("Evicting dangling receiving mailbox: {} with {} pending blocks", notification.getKey(),
-                    numPendingBlocks);
-              }
-              // In case there is a leak, we should cancel the mailbox to unblock any waiters and release resources.
-              receivingMailbox.cancel();
+              onReceivingMailboxEvicted(notification.getKey(), notification.getValue());
             }
           }).build();
 
@@ -367,6 +365,34 @@ public class MailboxService {
   /// Otherwise the sender could create a new receiving mailbox that nobody reads.
   public void releaseReceivingMailbox(ReceivingMailbox mailbox) {
     _receivingMailboxCache.invalidate(mailbox.getId());
+  }
+
+  @VisibleForTesting
+  void onReceivingMailboxEvicted(String mailboxId, ReceivingMailbox receivingMailbox) {
+    int numPendingBlocks = receivingMailbox.getNumPendingBlocks();
+    boolean neverRead = !receivingMailbox.hasReader();
+    if (neverRead) {
+      recordOrphanedReceivingMailbox();
+    }
+    if (numPendingBlocks > 0) {
+      LOGGER.warn("Evicting dangling receiving mailbox: {} with {} pending blocks{}", mailboxId, numPendingBlocks,
+          neverRead ? ", never read: possibly the blocks were for another instance" : "");
+    }
+    // In case there is a leak, we should cancel the mailbox to unblock any waiters and release resources.
+    receivingMailbox.cancel();
+  }
+
+  private void recordOrphanedReceivingMailbox() {
+    switch (_instanceType) {
+      case BROKER:
+        BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.MULTI_STAGE_ORPHANED_RECEIVING_MAILBOXES, 1L);
+        break;
+      case SERVER:
+        MseMetrics.get().addMeteredGlobalValue(MseMeter.ORPHANED_RECEIVING_MAILBOXES, 1L);
+        break;
+      default:
+        break;
+    }
   }
 
   private static Duration getIdleTimeout(PinotConfiguration config) {

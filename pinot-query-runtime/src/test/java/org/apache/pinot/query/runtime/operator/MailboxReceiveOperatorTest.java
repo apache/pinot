@@ -128,6 +128,27 @@ public class MailboxReceiveOperatorTest {
     }
   }
 
+  /// A timeout names the senders whose end of stream never arrived, so that one lost stream (for example sent to the
+  /// wrong server) can be traced to its sender instead of to the whole child stage.
+  @Test
+  public void shouldNameMissingSendersOnTimeout() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.getId()).thenReturn(MAILBOX_ID_1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    when(_mailbox2.getId()).thenReturn(MAILBOX_ID_2);
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.eosWithEmptyStats());
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED,
+        System.currentTimeMillis() + 100L)) {
+      MseBlock block = operator.nextBlock();
+      assertTrue(block.isError());
+      String errorMessage = ((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.EXECUTION_TIMEOUT);
+      assertNotNull(errorMessage);
+      assertTrue(errorMessage.endsWith(
+          "waiting for data from child stage 1 (no end of stream from 1 of 2 senders: worker 0 on localhost:1234)"),
+          errorMessage);
+    }
+  }
+
   @Test
   public void shouldReceiveEosDirectlyFromSender() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
