@@ -62,6 +62,8 @@ public final class RestrictedScanDocIdIterator implements BlockDocIdIterator {
   private int _cursor;
   private int _limit;
   private boolean _closed;
+  private Runnable _chunkCheckpoint =
+      () -> QueryThreadContext.checkTerminationAndSampleUsage("RestrictedScanDocIdIterator");
 
   /// @param candidateDocIdIterator the candidate document ids, in ascending order
   /// @param scanDocIdIterators the scans to apply to every chunk, in order. Not empty.
@@ -84,6 +86,12 @@ public final class RestrictedScanDocIdIterator implements BlockDocIdIterator {
     _candidateDocIdIterator = candidateDocIdIterator;
     _scanDocIdIterators = scanDocIdIterators.toArray(new ScanBasedDocIdIterator[0]);
     _buffer = new int[MAX_CHUNK_SIZE];
+  }
+
+  /// Installs the owning operator's checkpoint, which must also check query termination and sample usage.
+  /// Called before reading the iterator. The checkpoint runs after every scanned chunk, even one with no matches.
+  public void setChunkCheckpoint(Runnable chunkCheckpoint) {
+    _chunkCheckpoint = chunkCheckpoint;
   }
 
   @Override
@@ -146,7 +154,7 @@ public final class RestrictedScanDocIdIterator implements BlockDocIdIterator {
         }
       }
       // A run of chunks without any match can take long, so let the query be killed in between
-      QueryThreadContext.checkTerminationAndSampleUsage("RestrictedScanDocIdIterator");
+      _chunkCheckpoint.run();
       if (numMatchingDocIds > 0) {
         _cursor = 0;
         _limit = numMatchingDocIds;
