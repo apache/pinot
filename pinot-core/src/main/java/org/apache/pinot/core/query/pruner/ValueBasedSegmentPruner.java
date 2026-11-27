@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -38,6 +39,7 @@ import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilt
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -290,6 +292,9 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
       private boolean _hashed = false;
       private long _hash1;
       private long _hash2;
+      private boolean _hasLegacyHash;
+      private long _legacyHash1;
+      private long _legacyHash2;
       private DataType _dt;
       private Comparable _comparableValue;
 
@@ -316,13 +321,35 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
 
       public boolean mightBeContained(BloomFilterReader bloomFilter) {
         if (!_hashed) {
-          GuavaBloomFilterReaderUtils.Hash128AsLongs hash128AsLongs =
-              GuavaBloomFilterReaderUtils.hashAsLongs(_comparableValue.toString());
-          _hash1 = hash128AsLongs.getHash1();
-          _hash2 = hash128AsLongs.getHash2();
-          _hashed = true;
+          hash();
         }
-        return bloomFilter.mightContain(_hash1, _hash2);
+        return bloomFilter.mightContain(_hash1, _hash2)
+            || (_hasLegacyHash && bloomFilter.mightContain(_legacyHash1, _legacyHash2));
+      }
+
+      private void hash() {
+        String value;
+        _hasLegacyHash = false;
+        if (_comparableValue instanceof BigDecimal) {
+          BigDecimal decimal = (BigDecimal) _comparableValue;
+          value = BloomFilterCreator.toBloomFilterString(decimal);
+          // Segments created before BIG_DECIMAL values were normalized for the bloom filter hold the scientific form
+          // of the value (e.g. 1E-7), so keep matching it.
+          String legacyValue = decimal.stripTrailingZeros().toString();
+          if (!legacyValue.equals(value)) {
+            GuavaBloomFilterReaderUtils.Hash128AsLongs legacyHash =
+                GuavaBloomFilterReaderUtils.hashAsLongs(legacyValue);
+            _legacyHash1 = legacyHash.getHash1();
+            _legacyHash2 = legacyHash.getHash2();
+            _hasLegacyHash = true;
+          }
+        } else {
+          value = _comparableValue.toString();
+        }
+        GuavaBloomFilterReaderUtils.Hash128AsLongs hash128AsLongs = GuavaBloomFilterReaderUtils.hashAsLongs(value);
+        _hash1 = hash128AsLongs.getHash1();
+        _hash2 = hash128AsLongs.getHash2();
+        _hashed = true;
       }
     }
   }

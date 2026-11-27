@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -29,25 +30,33 @@ public interface BloomFilterCreator extends IndexCreator {
 
   FieldSpec.DataType getDataType();
 
+  /// Returns the string that represents a BIG_DECIMAL value in the bloom filter. Numerically equal values can have
+  /// different string forms (`1.50` vs `1.5`, `100` vs `1E+2`), so the value is normalized the same way on the
+  /// creation side and on the query side.
+  static String toBloomFilterString(BigDecimal value) {
+    return value.stripTrailingZeros().toPlainString();
+  }
+
   @Override
   default void add(Object value, int dictId) {
-    if (getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
-      add(BytesUtils.toHexString((byte[]) value));
-    } else {
-      add(value.toString());
-    }
+    add(valueToString(value));
   }
 
   @Override
   default void add(Object[] values, @Nullable int[] dictIds) {
-    if (getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
-      for (Object value : values) {
-        add(BytesUtils.toHexString((byte[]) value));
-      }
-    } else {
-      for (Object value : values) {
-        add(value.toString());
-      }
+    for (Object value : values) {
+      add(valueToString(value));
+    }
+  }
+
+  private String valueToString(Object value) {
+    switch (getDataType().getStoredType()) {
+      case BYTES:
+        return BytesUtils.toHexString((byte[]) value);
+      case BIG_DECIMAL:
+        return toBloomFilterString((BigDecimal) value);
+      default:
+        return value.toString();
     }
   }
 
