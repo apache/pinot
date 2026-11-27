@@ -35,6 +35,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.utils.PinotDataType.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -127,6 +128,47 @@ public class PinotDataTypeTest {
     }
   }
 
+  /// The MV source type is inferred from the first element only, so a mixed-type array such as JSON
+  /// [1.5, 2] (BigDecimal, Integer) must convert each element by its own type instead of casting every
+  /// element to the first element's type.
+  @Test
+  public void testToStringArrayWithMixedTypes() {
+    // First element BigDecimal: casting the Integer element to BigDecimal used to throw ClassCastException.
+    assertEquals(STRING_ARRAY.convert(new Object[]{new BigDecimal("1.5"), 2}, BIG_DECIMAL_ARRAY),
+        new String[]{"1.5", "2"});
+    // First element Integer: the BigDecimal element must still use toPlainString(), not the exponent form
+    // produced by the permissive value.toString() of the inferred source type.
+    assertEquals(STRING_ARRAY.convert(new Object[]{2, new BigDecimal("1E+7")}, INT_ARRAY),
+        new String[]{"2", "10000000"});
+    assertEquals(STRING_ARRAY.convert(new Object[]{new BigDecimal("1E+7"), new BigDecimal("0.0")},
+        BIG_DECIMAL_ARRAY), new String[]{"10000000", "0.0"});
+  }
+
+  @Test
+  public void testToBigDecimalArrayWithMixedNumbers() {
+    BigDecimal decimal = new BigDecimal("1.50");
+    Object[] decimalFirst = {decimal, 2, 9_007_199_254_740_993L};
+    Object[] integerFirst = {2, decimal};
+    BigDecimal[] decimals = {decimal, BigDecimal.ONE};
+
+    assertEquals(BIG_DECIMAL_ARRAY.convert(decimalFirst, BIG_DECIMAL_ARRAY),
+        new BigDecimal[]{decimal, BigDecimal.valueOf(2), new BigDecimal("9007199254740993")});
+    assertEquals(BIG_DECIMAL_ARRAY.convert(integerFirst, INT_ARRAY), new BigDecimal[]{BigDecimal.valueOf(2), decimal});
+    assertSame(BIG_DECIMAL_ARRAY.toBigDecimalArray(decimalFirst)[0], decimal);
+    assertSame(BIG_DECIMAL_ARRAY.convert(decimals, BIG_DECIMAL_ARRAY), decimals);
+  }
+
+  @Test
+  public void testToBigDecimalArrayWithNumericString() {
+    BigDecimal decimal = new BigDecimal("1.50");
+    assertEquals(BIG_DECIMAL_ARRAY.toBigDecimalArray(new Object[]{decimal, "2.75"}),
+        new BigDecimal[]{decimal, new BigDecimal("2.75")});
+    assertThrows(NumberFormatException.class,
+        () -> BIG_DECIMAL_ARRAY.toBigDecimalArray(new Object[]{decimal, "bad"}));
+    assertThrows(NumberFormatException.class,
+        () -> BIG_DECIMAL_ARRAY.toBigDecimalArray(new Object[]{decimal, " 2.75 "}));
+  }
+
   @DataProvider
   public Object[][] numberFormatConversionErrors() {
     return new Object[][] {
@@ -203,6 +245,27 @@ public class PinotDataTypeTest {
 
     assertEquals(BOOLEAN.convert("true", JSON), true);
     assertEquals(BOOLEAN.convert("false", JSON), false);
+  }
+
+  /// JSON floats are decoded as BigDecimal, whose equals() is scale-sensitive: BigDecimal("0.0") must still
+  /// convert to boolean false, like numeric zero of every other type.
+  @Test
+  public void testBigDecimalToBoolean() {
+    assertEquals(BOOLEAN.convert(new BigDecimal("0.0"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("-0.0"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("0.00"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("0E+3"), BIG_DECIMAL), false);
+    assertEquals(BOOLEAN.convert(new BigDecimal("0.1"), BIG_DECIMAL), true);
+    assertEquals(BOOLEAN.convert(new BigDecimal("-1"), BIG_DECIMAL), true);
+    // Non-zero even though doubleValue() would underflow to 0.0
+    assertEquals(BOOLEAN.convert(new BigDecimal("1E-400"), BIG_DECIMAL), true);
+
+    // Mixed-type MV array: the source type is inferred from the first element, so the Integer element is
+    // converted through BIG_DECIMAL as well and must not throw ClassCastException.
+    assertEquals(BOOLEAN_ARRAY.convert(new Object[]{new BigDecimal("0.0"), 1}, BIG_DECIMAL_ARRAY),
+        new Boolean[]{false, true});
+    assertEquals(PRIMITIVE_BOOLEAN_ARRAY.convert(new Object[]{new BigDecimal("0.0"), 1}, BIG_DECIMAL_ARRAY),
+        new boolean[]{false, true});
   }
 
   @Test

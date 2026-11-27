@@ -58,6 +58,7 @@ import static org.testng.Assert.assertTrue;
 
 public class JsonUtilsTest {
   private static final String JSON_FILE = "json_util_test.json";
+  private static final String PRECISE_DECIMAL = "12345678901234567890.12345678901234567890";
 
   /// The parse-once index path: `flattenParsed(parsedValue)` must produce the same flattened records as the old
   /// serialize-then-reparse path (the records are a set, so order is ignored). Covers diverse leaf types - including
@@ -585,6 +586,25 @@ public class JsonUtilsTest {
       assertEquals(flattenedRecord2.get(".addresses..country"), "ca");
       assertEquals(flattenedRecord2.get(".addresses..street"), "second st");
     }
+  }
+
+  @Test
+  public void testMapParsingWithBigDecimalPreservesDecimalPrecision()
+      throws Exception {
+    String json = "{\"decimalMetric\":" + PRECISE_DECIMAL + ",\"nested\":{\"value\":" + PRECISE_DECIMAL + "}}";
+
+    byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+    Map<String, Object> stringMap = JsonUtils.stringToMapWithBigDecimal(json);
+    Map<String, Object> bytesMap = JsonUtils.bytesToMapWithBigDecimal(jsonBytes);
+    Map<String, Object> offsetBytesMap = JsonUtils.bytesToMapWithBigDecimal(jsonBytes, 0, jsonBytes.length);
+
+    BigDecimal expectedValue = new BigDecimal(PRECISE_DECIMAL);
+    assertEquals(stringMap.get("decimalMetric"), expectedValue);
+    assertEquals(((Map<?, ?>) stringMap.get("nested")).get("value"), expectedValue);
+    assertEquals(bytesMap.get("decimalMetric"), expectedValue);
+    assertEquals(((Map<?, ?>) bytesMap.get("nested")).get("value"), expectedValue);
+    assertEquals(offsetBytesMap.get("decimalMetric"), expectedValue);
+    assertEquals(((Map<?, ?>) offsetBytesMap.get("nested")).get("value"), expectedValue);
   }
 
   @Test

@@ -20,15 +20,18 @@ package org.apache.pinot.segment.local.segment.creator.impl;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.plugin.inputformat.json.JSONRecordReader;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReaderFactory;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -50,6 +53,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -107,6 +111,47 @@ public class SegmentColumnarIndexCreatorTest implements PinotBuffersAfterClassCh
   @DataProvider
   public Object[][] forwardIndexEncodings() {
     return new Object[][]{{EncodingType.DICTIONARY}, {EncodingType.RAW}};
+  }
+
+  @Test(dataProvider = "forwardIndexEncodings")
+  public void testMixedJsonBigDecimalArray(EncodingType encoding)
+      throws Exception {
+    File inputFile = new File(TEMP_DIR, "decimal-arrays-" + encoding.name() + ".json");
+    FileUtils.writeStringToFile(inputFile, """
+        {"v":[1.50,2]}
+        {"v":[9007199254740993,null,0.12345678901234567890123456789,9223372036854775809]}
+        {"v":[1.50,"2.75"]}
+        """, UTF_8);
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension("v", DataType.BIG_DECIMAL).build();
+    FieldConfig fieldConfig = new FieldConfig.Builder("v").withEncodingType(encoding).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test")
+        .setFieldConfigList(List.of(fieldConfig)).build();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setSegmentName("decimal-arrays-" + encoding.name());
+    config.setOutDir(TEMP_DIR.getPath());
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    try (JSONRecordReader reader = new JSONRecordReader()) {
+      reader.init(inputFile, schema.getPhysicalColumnNames(), null);
+      driver.init(config, reader);
+      driver.build();
+    }
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(driver.getOutputDirectory(), ReadMode.heap);
+    try (PinotSegmentRecordReader reader = new PinotSegmentRecordReader()) {
+      assertEquals(segment.getDataSource("v").getForwardIndex().isDictionaryEncoded(),
+          encoding == EncodingType.DICTIONARY);
+      reader.init(segment);
+      assertTrue(reader.hasNext());
+      assertEquals(reader.next().getValue("v"), new BigDecimal[]{new BigDecimal("1.5"), BigDecimal.valueOf(2)});
+      assertTrue(reader.hasNext());
+      assertEquals(reader.next().getValue("v"), new BigDecimal[]{new BigDecimal("9007199254740993"),
+          new BigDecimal("0.12345678901234567890123456789"), new BigDecimal("9223372036854775809")});
+      assertTrue(reader.hasNext());
+      assertEquals(reader.next().getValue("v"), new BigDecimal[]{new BigDecimal("1.5"), new BigDecimal("2.75")});
+      assertFalse(reader.hasNext());
+    } finally {
+      segment.destroy();
+    }
   }
 
   @Test(dataProvider = "forwardIndexEncodings")
