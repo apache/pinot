@@ -28,7 +28,7 @@ from
       and r_name = 'AMERICA'
       and s_nationkey = n2.n_nationkey
       and o_orderdate between '1995-01-01'
-      and '1997-01-01'
+      and '1996-12-31'
       and p_type = 'ECONOMY ANODIZED STEEL'
   ) as all_nations
 group by
