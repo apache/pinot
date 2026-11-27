@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import javax.net.ssl.SSLContext;
 import nl.altindag.ssl.SSLFactory;
@@ -240,6 +241,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
+  @Nullable
+  private ContinuousJfrStarter _continuousJfrStarter;
   protected MaterializedViewConsistencyManager _materializedViewConsistencyManager;
 
   @Override
@@ -829,7 +832,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _serviceStatusCallbackList.add(generateResourceUtilizationCheckerStatusCallback());
     }
 
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _continuousJfrStarter = new ContinuousJfrStarter(_helixParticipantInstanceId);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_continuousJfrStarter);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         ConsumingSegmentConsistencyModeListener.getInstance());
     LOGGER.info("Registered ConsumingSegmentConsistencyModeListener as cluster config change listener");
@@ -1199,6 +1203,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   @Override
   public void stop() {
+    if (_continuousJfrStarter != null) {
+      _continuousJfrStarter.close();
+    }
     switch (_controllerMode) {
       case DUAL:
         stopPinotController();
