@@ -37,6 +37,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -44,6 +46,7 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -73,6 +76,27 @@ public class ColumnValueSegmentPrunerTest {
     properties.put(ColumnValueSegmentPruner.IN_PREDICATE_THRESHOLD, 5);
     PinotConfiguration configuration = new PinotConfiguration(properties);
     PRUNER.init(configuration);
+  }
+
+  @Test
+  public void testRangePruningUsesRepairedDictionaryBounds()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("column", DataType.INT, Integer.MIN_VALUE).build();
+    MutableSegmentImpl segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(), Set.of(),
+        Set.of(), false, false, true);
+    try {
+      MutableSegmentImplTestUtils.failNextForwardIndexWrite(segment, "column");
+      GenericRow row = new GenericRow();
+      row.putValue("column", 42);
+      segment.index(row, null);
+
+      assertEquals(segment.getRecord(0, new GenericRow()).getValue("column"), Integer.MIN_VALUE);
+      assertFalse(runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE column < 0"));
+      assertTrue(runPruner(segment, "SELECT COUNT(*) FROM testTable WHERE column > 100"));
+    } finally {
+      segment.destroy();
+    }
   }
 
   @Test

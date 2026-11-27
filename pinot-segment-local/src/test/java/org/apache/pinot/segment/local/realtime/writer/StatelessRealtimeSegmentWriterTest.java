@@ -22,6 +22,7 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,7 +46,13 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -81,9 +88,10 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
-/// Tests how [StatelessRealtimeSegmentWriter] consumes and stops consuming.
+/// Tests how [StatelessRealtimeSegmentWriter] consumes, stops consuming, and handles `index()` failures.
 public class StatelessRealtimeSegmentWriterTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String STREAM_TYPE = "test";
@@ -121,6 +129,103 @@ public class StatelessRealtimeSegmentWriterTest {
       assertThat(writer.isSuccess()).isFalse();
       assertThat(writer.getConsumptionException()).hasMessageStartingWith("Consumption stopped at offset");
     }
+  }
+
+  // A published-then-rethrown index() must not abort stateless consumption (issue #16316).
+  @Test
+  public void testCapacityFillingRepairDoesNotAbort()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("json", DataType.STRING).build();
+    String segmentName = "testTable__0__0__0";
+    Path consumerDir = Files.createTempDirectory("capacity-repair-consumer");
+    RealtimeSegmentConfig config = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(RAW_TABLE_NAME + "_REALTIME").setSegmentName(segmentName)
+        .setStreamName(STREAM_TYPE).setSchema(schema).setCapacity(1)
+        .setIndex("json", StandardIndexes.json(), new JsonIndexConfig())
+        .setSegmentZKMetadata(new SegmentZKMetadata(segmentName))
+        .setConsumerDir(consumerDir.toString())
+        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setStatsHistory(mock(RealtimeSegmentStatsHistory.class)).setContinueOnError(false).build();
+    MutableSegmentImpl segment = new MutableSegmentImpl(config, null);
+    try {
+      GenericRow row = new GenericRow();
+      row.putValue("json", "{truncated");
+      StatelessRealtimeSegmentWriter.indexTransformedRow(segment, row, null);
+      assertEquals(segment.getNumDocsIndexed(), 1);
+      assertFalse(segment.canTakeMoreRows());
+      assertTrue(segment.canAddMore(), "Only row-count capacity should have been reached");
+    } finally {
+      segment.destroy();
+      FileUtils.deleteDirectory(consumerDir.toFile());
+    }
+  }
+
+  @Test
+  public void testPublishedAggregateRepairDoesNotAbort()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("dim", DataType.INT).addMetric("metric", DataType.LONG).build();
+    MutableSegmentImpl segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of("metric"),
+        Set.of(), Set.of(), true, false, false);
+    try {
+      GenericRow seed = new GenericRow();
+      seed.putValue("dim", Integer.MIN_VALUE);
+      seed.putValue("metric", 10L);
+      StatelessRealtimeSegmentWriter.indexTransformedRow(segment, seed, null);
+      GenericRow repaired = new GenericRow();
+      repaired.putValue("dim", "not-an-int");
+      repaired.putValue("metric", 3L);
+      Exception failure = null;
+      try {
+        StatelessRealtimeSegmentWriter.indexTransformedRow(segment, repaired, null);
+      } catch (Exception e) {
+        failure = e;
+      }
+      assertEquals(segment.getNumDocsIndexed(), 1);
+      assertEquals(segment.getRecord(0, new GenericRow()).getValue("metric"), 13L,
+          "the repaired row was applied to the existing default-dimension group");
+      assertFalse(segment.hasUnrecoverableIndexingFailure());
+      assertNull(failure, "a completed aggregate repair must not abort stateless consumption");
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  @Test
+  public void testPublishedRepairDoesNotAbort()
+      throws Exception {
+    MutableSegmentImpl segment = mock(MutableSegmentImpl.class);
+    when(segment.wasLastIndexingOperationPublished()).thenReturn(true);
+    when(segment.canAddMore()).thenReturn(true);
+    when(segment.canTakeMoreRows()).thenReturn(true);
+    when(segment.index(any(), any())).thenThrow(new RuntimeException("repaired then rethrown"));
+    StatelessRealtimeSegmentWriter.indexTransformedRow(segment, new GenericRow(), mock(StreamMessageMetadata.class));
+  }
+
+  @Test
+  public void testUnpublishedFailureRethrows()
+      throws Exception {
+    MutableSegmentImpl segment = mock(MutableSegmentImpl.class);
+    when(segment.canAddMore()).thenReturn(true);
+    when(segment.index(any(), any())).thenThrow(new RuntimeException("failed before mutation"));
+    expectThrows(RuntimeException.class,
+        () -> StatelessRealtimeSegmentWriter.indexTransformedRow(segment, new GenericRow(),
+            mock(StreamMessageMetadata.class)));
+  }
+
+  @Test
+  public void testTerminalPublishedRepairRethrows()
+      throws Exception {
+    MutableSegmentImpl segment = mock(MutableSegmentImpl.class);
+    when(segment.wasLastIndexingOperationPublished()).thenReturn(true);
+    when(segment.canAddMore()).thenReturn(false);
+    when(segment.canTakeMoreRows()).thenReturn(false);
+    when(segment.hasUnrecoverableIndexingFailure()).thenReturn(true);
+    when(segment.index(any(), any())).thenThrow(new RuntimeException("unrecoverable"));
+    expectThrows(RuntimeException.class,
+        () -> StatelessRealtimeSegmentWriter.indexTransformedRow(segment, new GenericRow(),
+            mock(StreamMessageMetadata.class)));
   }
 
   @BeforeClass

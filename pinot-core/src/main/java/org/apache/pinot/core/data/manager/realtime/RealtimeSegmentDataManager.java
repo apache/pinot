@@ -878,28 +878,39 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           for (GenericRow transformedRow : transformedRows) {
             try {
               canTakeMore = _realtimeSegment.index(transformedRow, metadata);
-              indexedMessageCount++;
-              _lastRowMetadata = metadata;
-              _lastConsumedTimestampMs = System.currentTimeMillis();
-              realtimeRowsConsumedMeter =
-                  _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
-                      realtimeRowsConsumedMeter);
-              _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
-
-              int recordSerializedValueLength = _lastRowMetadata.getRecordSerializedSize();
-              if (recordSerializedValueLength > 0) {
-                realtimeBytesIngestedMeter =
-                    _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_CONSUMED,
-                        recordSerializedValueLength, realtimeBytesIngestedMeter);
-                _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
-              }
             } catch (Exception e) {
-              _numRowsErrored++;
-              _numBytesDropped += rowSizeInBytes;
               String errorMessage =
                   "Caught exception while indexing the record at offset: " + offset + " , row: " + transformedRow;
               _segmentLogger.error(errorMessage, e);
               _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+              // continueOnError=false finishes a repairable row, then rethrows. Count a completed row as consumed.
+              boolean published = _realtimeSegment.wasLastIndexingOperationPublished();
+              if (!published) {
+                _numRowsErrored++;
+                _numBytesDropped += rowSizeInBytes;
+              }
+              if (_realtimeSegment.hasUnrecoverableIndexingFailure()) {
+                throw new RuntimeException(errorMessage, e);
+              }
+              canTakeMore = _realtimeSegment.canTakeMoreRows();
+              if (!published) {
+                continue;
+              }
+            }
+            indexedMessageCount++;
+            _lastRowMetadata = metadata;
+            _lastConsumedTimestampMs = System.currentTimeMillis();
+            realtimeRowsConsumedMeter =
+                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
+                    realtimeRowsConsumedMeter);
+            _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
+
+            int recordSerializedValueLength = metadata.getRecordSerializedSize();
+            if (recordSerializedValueLength > 0) {
+              realtimeBytesIngestedMeter =
+                  _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_CONSUMED,
+                      recordSerializedValueLength, realtimeBytesIngestedMeter);
+              _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
             }
           }
         }
@@ -2359,7 +2370,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .setTextIndexConfig(consumingIndexLoadingConfig.getMultiColTextIndexConfig())
         .setDropRecordOnPartitionMismatch(ingestionConfig != null
             && ingestionConfig.getStreamIngestionConfig() != null
-            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
+            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch())
+        .setContinueOnError(ingestionConfig != null && ingestionConfig.isContinueOnError());
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);

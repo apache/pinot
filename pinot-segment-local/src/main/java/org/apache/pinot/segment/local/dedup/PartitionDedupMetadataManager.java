@@ -55,6 +55,19 @@ public interface PartitionDedupMetadataManager extends Closeable {
   /// Remove the expired primary keys from the metadata when TTL is enabled.
   void removeExpiredPrimaryKeys();
 
+  /// Whether this implementation supports checking presence without claiming the key. Existing plugins retain
+  /// their check-before-write contract unless they explicitly opt into deferred key publication.
+  default boolean supportsRecordPresenceCheck() {
+    return false;
+  }
+
+  /// Returns true if the primary key is already present and within TTL, without inserting the key.
+  /// Called only when [#supportsRecordPresenceCheck] returns true. Implementations opting in must override this
+  /// method so a failed physical write cannot leave a ghost key that drops a later retry.
+  default boolean isRecordPresent(DedupRecordInfo dedupRecordInfo) {
+    throw new UnsupportedOperationException("Dedup metadata manager does not support presence checks");
+  }
+
   /// Add the primary key to the given segment to the dedup metadata if it is absent and within the retention time.
   /// Returns true if the key was already present, i.e., the new record associated with the given
   /// [DedupRecordInfo] is a duplicate and should be skipped/dropped.
