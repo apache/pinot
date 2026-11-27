@@ -134,6 +134,41 @@ public interface TextIndexReader extends IndexReader {
             + getClass().getSimpleName());
   }
 
+  /// Per-query relevance scorer that computes scores on demand for each block of Pinot document IDs.
+  ///
+  /// Not thread-safe: like transform functions, one instance serves one segment on a single thread.
+  /// Implementations must hold no closeable or pooled resources because transform functions have no close hook.
+  @FunctionalInterface
+  interface DocScorer {
+    /// Writes the relevance score of `docIds[0 .. length - 1]` into `scores[0 .. length - 1]`.
+    /// Non-matching documents receive `0.0`.
+    ///
+    /// @param docIds Pinot document IDs for the current block (only indices `[0, length)` are read)
+    /// @param length number of documents in the block
+    /// @param scores output array of length at least `length`
+    void scoreDocs(int[] docIds, int length, double[] scores);
+  }
+
+  /// Creates a block-level [DocScorer] for `searchQuery`, avoiding materializing scores for the entire segment
+  /// when only a subset of documents is requested.
+  ///
+  /// The default implementation eagerly calls [#getDocScores(String, String, TextScoreStats)] so existing
+  /// implementations keep their current behavior.
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @param globalStats corpus statistics to score with, or `null` to use this index's statistics
+  /// @return a single-threaded, resource-free [DocScorer] for this segment
+  default DocScorer createDocScorer(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    Int2FloatMap scores = getDocScores(searchQuery, optionsString, globalStats);
+    return (docIds, length, output) -> {
+      for (int i = 0; i < length; i++) {
+        output[i] = scores.getOrDefault(docIds[i], 0f);
+      }
+    };
+  }
+
   /// Returns this index's statistics for the terms of `searchQuery`, parsed and analyzed exactly as
   /// [#getDocScores(String, String)] parses it: per queried field the collection statistics, and per query term its
   /// document frequency and total term frequency. Merging the result of every segment gives the statistics of

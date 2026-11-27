@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -41,10 +40,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// `TEXT_MATCH` to test membership. Scoring requires a per-row index on a single-valued STRING column.
 /// Queries with row-level security filters cannot use index-wide scores.
 ///
-/// The index is searched once per segment, on the first block, and the doc id to score map is reused for the
-/// remaining blocks of that segment. The map holds every document of the segment that matches the search query,
-/// regardless of how selective the query's filter is, so its size grows with the number of matches (roughly 10 bytes
-/// per match): a broad search query under a narrow filter still scores every match.
+/// A per-segment [TextIndexReader.DocScorer] is created lazily on the first non-empty block and scores only the
+/// document IDs present in each incoming [ValueBlock], avoiding materializing a segment-wide score map for selective
+/// filters, `LIMIT` queries, or second-pass `ORDER BY ... LIMIT` scoring.
 ///
 /// By default scores use per-segment term statistics (IDF, average field length), so they rank documents correctly
 /// within a segment but are only approximately comparable across segments.
@@ -71,7 +69,7 @@ public class TextScoreTransformFunction extends BaseTransformFunction {
   @Nullable
   private TextScoreStats _globalStats;
   @Nullable
-  private Int2FloatMap _scores;
+  private TextIndexReader.DocScorer _docScorer;
 
   @Override
   public String getName() {
@@ -144,21 +142,20 @@ public class TextScoreTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initDoubleValuesSV(length);
-    Int2FloatMap scores = getScores();
-    int[] docIds = valueBlock.getDocIds();
-    for (int i = 0; i < length; i++) {
-      _doubleValuesSV[i] = scores.getOrDefault(docIds[i], 0f);
+    if (length == 0) {
+      return _doubleValuesSV;
     }
+    getDocScorer().scoreDocs(valueBlock.getDocIds(), length, _doubleValuesSV);
     return _doubleValuesSV;
   }
 
-  private Int2FloatMap getScores() {
-    if (_scores == null) {
-      _scores = _multiColumnName != null
-          ? ((MultiColumnTextIndexReader) _textIndexReader).getDocScores(_multiColumnName, _searchQuery, _options,
-          _globalStats)
-          : _textIndexReader.getDocScores(_searchQuery, _options, _globalStats);
+  private TextIndexReader.DocScorer getDocScorer() {
+    if (_docScorer == null) {
+      _docScorer = _multiColumnName != null
+          ? ((MultiColumnTextIndexReader) _textIndexReader).createDocScorer(_multiColumnName, _searchQuery, _options,
+              _globalStats)
+          : _textIndexReader.createDocScorer(_searchQuery, _options, _globalStats);
     }
-    return _scores;
+    return _docScorer;
   }
 }

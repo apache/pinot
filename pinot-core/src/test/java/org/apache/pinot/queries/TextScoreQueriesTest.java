@@ -227,6 +227,54 @@ public class TextScoreQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testSelectiveFiltersLimitAndDescendingOrderMatchFullScanScores() {
+    for (String column : List.of(TITLE_COL, DESCR_COL)) {
+      Map<Integer, Double> fullUsbScores = scoresById(column, "usb");
+      Map<Integer, Double> fullPhraseScores = scoresById(column, "\"usb charger\"");
+
+      // Narrow selective filter (single doc and multi-doc IN)
+      BrokerResponseNative narrowResponse = getBrokerResponse(
+          "SELECT id, TEXT_SCORE(" + column + ", 'usb') FROM products WHERE id IN (0, 2, 4) LIMIT 100");
+      assertTrue(narrowResponse.getExceptions().isEmpty(), narrowResponse.getExceptions().toString());
+      assertEquals(narrowResponse.getResultTable().getRows().size(), 3 * 4);
+      for (Object[] row : narrowResponse.getResultTable().getRows()) {
+        int id = (Integer) row[0];
+        assertEquals((Double) row[1], fullUsbScores.get(id), 0.0, column + " narrow id=" + id);
+      }
+
+      // Unfiltered LIMIT query
+      BrokerResponseNative limitResponse = getBrokerResponse(
+          "SELECT id, TEXT_SCORE(" + column + ", 'usb') FROM products LIMIT 2");
+      assertTrue(limitResponse.getExceptions().isEmpty(), limitResponse.getExceptions().toString());
+      assertEquals(limitResponse.getResultTable().getRows().size(), 2);
+      for (Object[] row : limitResponse.getResultTable().getRows()) {
+        int id = (Integer) row[0];
+        assertEquals((Double) row[1], fullUsbScores.get(id), 0.0, column + " limit id=" + id);
+      }
+
+      // Descending ORDER BY ... LIMIT (exercises ReverseDocIdSetOperator / Phase-2 scoring)
+      BrokerResponseNative descResponse = getBrokerResponse(
+          "SELECT id, TEXT_SCORE(" + column + ", 'usb') FROM products ORDER BY id DESC LIMIT 4");
+      assertTrue(descResponse.getExceptions().isEmpty(), descResponse.getExceptions().toString());
+      assertEquals(descResponse.getResultTable().getRows().size(), 4);
+      for (Object[] row : descResponse.getResultTable().getRows()) {
+        int id = (Integer) row[0];
+        assertEquals((Double) row[1], fullUsbScores.get(id), 0.0, column + " desc id=" + id);
+      }
+
+      // Expression filter (ExpressionFilterOperator) + phrase query (TwoPhaseIterator)
+      BrokerResponseNative exprResponse = getBrokerResponse(
+          "SELECT id, TEXT_SCORE(" + column + ", '\"usb charger\"') FROM products WHERE MOD(id, 2) = 0 LIMIT 100");
+      assertTrue(exprResponse.getExceptions().isEmpty(), exprResponse.getExceptions().toString());
+      assertEquals(exprResponse.getResultTable().getRows().size(), 3 * 4);
+      for (Object[] row : exprResponse.getResultTable().getRows()) {
+        int id = (Integer) row[0];
+        assertEquals((Double) row[1], fullPhraseScores.get(id), 0.0, column + " expr phrase id=" + id);
+      }
+    }
+  }
+
+  @Test
   public void testColumnWithoutTextIndexIsRejected() {
     BadQueryRequestException e = expectThrows(BadQueryRequestException.class,
         () -> getBrokerResponse("SELECT TEXT_SCORE(id, 'usb') FROM products"));

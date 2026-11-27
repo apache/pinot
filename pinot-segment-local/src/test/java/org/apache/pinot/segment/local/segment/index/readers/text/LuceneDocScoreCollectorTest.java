@@ -72,6 +72,43 @@ public class LuceneDocScoreCollectorTest {
         LuceneDocScoreCollector cancelled = LuceneDocScoreCollector.forConsumingSegment();
         cancelled.markShouldCancel();
         expectThrows(CancellationException.class, () -> cancelled.collectScores(searcher, query));
+
+        // Filtered collection: contiguous range, sparse sorted, unsorted with duplicates, single, empty
+        Int2FloatMap contiguous = new LuceneDocScoreCollector(docId -> 9 - docId,
+            LuceneDocScoreCollector.allowedDocIdsPredicate(new int[]{0, 1, 2, 3}, 4)).collectScores(searcher, query);
+        assertEquals(contiguous.keySet(), Set.of(1, 3));
+        assertEquals(contiguous.get(1), scores.get(1));
+        assertEquals(contiguous.get(3), scores.get(3));
+
+        Int2FloatMap sparse = new LuceneDocScoreCollector(docId -> 9 - docId,
+            LuceneDocScoreCollector.allowedDocIdsPredicate(new int[]{2, 5, 9}, 3)).collectScores(searcher, query);
+        assertEquals(sparse.keySet(), Set.of(5, 9));
+        assertEquals(sparse.get(5), scores.get(5));
+        assertEquals(sparse.get(9), scores.get(9));
+
+        Int2FloatMap unsortedWithDuplicates = LuceneDocScoreCollector.forConsumingSegment(
+            LuceneDocScoreCollector.allowedDocIdsPredicate(new int[]{9, 3, 3, 2}, 4)).collectScores(searcher, query);
+        assertEquals(unsortedWithDuplicates.keySet(), Set.of(3, 9));
+        assertEquals(unsortedWithDuplicates.get(3), scores.get(3));
+        assertEquals(unsortedWithDuplicates.get(9), scores.get(9));
+
+        Int2FloatMap single = LuceneDocScoreCollector.forConsumingSegment(
+            LuceneDocScoreCollector.allowedDocIdsPredicate(new int[]{7}, 1)).collectScores(searcher, query);
+        assertEquals(single.keySet(), Set.of(7));
+        assertEquals(single.get(7), scores.get(7));
+
+        Int2FloatMap empty = LuceneDocScoreCollector.forConsumingSegment(
+            LuceneDocScoreCollector.allowedDocIdsPredicate(new int[]{1, 3}, 0)).collectScores(searcher, query);
+        assertEquals(empty.keySet(), Set.of());
+
+        // copyIfShared=true must isolate non-contiguous sorted arrays from caller buffer mutation
+        int[] sharedBuffer = {2, 5, 9};
+        var isolatedPredicate = LuceneDocScoreCollector.allowedDocIdsPredicate(sharedBuffer, 3, true);
+        sharedBuffer[1] = -1;
+        sharedBuffer[2] = -1;
+        Int2FloatMap isolated =
+            new LuceneDocScoreCollector(docId -> 9 - docId, isolatedPredicate).collectScores(searcher, query);
+        assertEquals(isolated.keySet(), Set.of(5, 9));
       }
     }
   }

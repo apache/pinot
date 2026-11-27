@@ -84,6 +84,20 @@ public interface MultiColumnTextIndexReader extends TextIndexReader {
             + getClass().getSimpleName());
   }
 
+  /// Column-aware counterpart of [TextIndexReader#createDocScorer(String, String, TextScoreStats)].
+  ///
+  /// The default implementation eagerly calls [#getDocScores(String, String, String, TextScoreStats)] so existing
+  /// implementations keep their current behavior.
+  default DocScorer createDocScorer(String column, String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    Int2FloatMap scores = getDocScores(column, searchQuery, optionsString, globalStats);
+    return (docIds, length, output) -> {
+      for (int i = 0; i < length; i++) {
+        output[i] = scores.getOrDefault(docIds[i], 0f);
+      }
+    };
+  }
+
   /// Column-aware counterpart of [TextIndexReader#getTextScoreStats].
   default TextScoreStats getTextScoreStats(String column, String searchQuery, @Nullable String optionsString) {
     throw new UnsupportedOperationException(
@@ -98,6 +112,12 @@ public interface MultiColumnTextIndexReader extends TextIndexReader {
 
   @Override
   default Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    throw new UnsupportedOperationException("Multi-column text index requires column name to score!");
+  }
+
+  @Override
+  default DocScorer createDocScorer(String searchQuery, @Nullable String optionsString,
       @Nullable TextScoreStats globalStats) {
     throw new UnsupportedOperationException("Multi-column text index requires column name to score!");
   }

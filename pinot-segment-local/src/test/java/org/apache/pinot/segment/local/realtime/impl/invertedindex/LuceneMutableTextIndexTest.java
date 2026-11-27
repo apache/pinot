@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.booleans.BooleanArrayList;
 import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -42,6 +43,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.utils.LuceneIndexTestUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -316,6 +318,26 @@ public class LuceneMutableTextIndexTest {
       assertTrue(scores.get(0) > scores.get(1));
       // Non-matching documents are absent and read as 0
       assertEquals(scores.get(4), 0f);
+
+      // Verify lazy createDocScorer matches getDocScores across Block 1 (filtered) and Block 2 (cached eager)
+      TextIndexReader.DocScorer scorer = index.createDocScorer("usb", null, null);
+      double[] block1Out = {99.0, 99.0, 99.0};
+      scorer.scoreDocs(new int[]{0, 2, 4}, 3, block1Out);
+      assertEquals(block1Out, new double[]{scores.get(0), scores.get(2), 0.0});
+
+      double[] block2Out = {99.0, 99.0, 99.0, 99.0};
+      scorer.scoreDocs(new int[]{3, 1, 1, 99}, 4, block2Out);
+      assertEquals(block2Out, new double[]{scores.get(3), scores.get(1), scores.get(1), 0.0});
+
+      // Verify global stats parity through createDocScorer
+      TextScoreStats stats = index.getTextScoreStats("usb", null);
+      TextIndexReader.DocScorer globalScorer = index.createDocScorer("usb", null, stats);
+      double[] globalOut = new double[5];
+      Arrays.fill(globalOut, -1.0);
+      globalScorer.scoreDocs(new int[]{4, 3, 2, 1, 0}, 5, globalOut);
+      for (int i = 0; i < 5; i++) {
+        assertEquals(globalOut[i], (double) scores.get(4 - i), 0.0);
+      }
     } finally {
       index.close();
     }
@@ -348,6 +370,22 @@ public class LuceneMutableTextIndexTest {
       TextScoreStats stats = index.getTextScoreStats("title", "usb", null);
       assertEquals(index.getDocScores("title", "usb", null, stats), scores,
           "A segment's own statistics must reproduce its per-segment scores");
+
+      // Verify lazy createDocScorer on multi-column consuming index across Block 1 (filtered) and Block 2 (eager)
+      TextIndexReader.DocScorer titleScorer = index.createDocScorer("title", "usb", null, null);
+      double[] block1Out = {99.0, 99.0, 99.0};
+      titleScorer.scoreDocs(new int[]{0, 2, 4}, 3, block1Out);
+      assertEquals(block1Out, new double[]{scores.get(0), scores.get(2), 0.0});
+
+      double[] block2Out = {99.0, 99.0, 99.0};
+      titleScorer.scoreDocs(new int[]{3, 1, 4}, 3, block2Out);
+      assertEquals(block2Out, new double[]{scores.get(3), scores.get(1), 0.0});
+
+      Int2FloatMap bodyScores = index.getDocScores("body", "usb", (String) null);
+      TextIndexReader.DocScorer bodyScorer = index.createDocScorer("body", "usb", null, null);
+      double[] bodyOut = {99.0, 99.0};
+      bodyScorer.scoreDocs(new int[]{0, 4}, 2, bodyOut);
+      assertEquals(bodyOut, new double[]{0.0, bodyScores.get(4)});
     } finally {
       index.close();
     }

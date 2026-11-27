@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.function.IntPredicate;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -68,6 +69,8 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiColumnRealtimeLuceneTextIndex.class);
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
       RealtimeLuceneTextIndexSearcherPool.getInstance();
+  /// Matches DocIdSetPlanNode.MAX_DOC_PER_CALL (pinot-segment-local does not depend on pinot-core).
+  private static final int MAX_SELECTIVE_BLOCK_SIZE = 10_000;
   private final MultiColumnLuceneTextIndexCreator _indexCreator;
   private SearcherManager _searcherManager;
   private Analyzer _analyzer;
@@ -266,8 +269,52 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
   @Override
   public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString,
       @Nullable TextScoreStats globalStats) {
+    return collectDocScores(column, searchQuery, optionsString, globalStats, null);
+  }
+
+  /// Returns a resource-free [DocScorer] that never holds a [SearcherManager] lease across blocks.
+  ///
+  /// Query parsing and validation happen on the first non-empty block inside a single `SEARCHER_POOL` round-trip.
+  /// Selective single-block queries (`length < MAX_SELECTIVE_BLOCK_SIZE`) run a filtered [LuceneDocScoreCollector]
+  /// with an owned copy of non-contiguous docIds so a cancelled/timed-out query thread cannot race with the pool
+  /// thread. Full blocks (Pinot's `DocIdSetOperator` only emits Block 2+ after a full 10,000-doc Block 1) or any
+  /// Block 2+ fall back to cached eager [#getDocScores] from a single consistent searcher snapshot.
+  @Override
+  public DocScorer createDocScorer(String column, String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    return new DocScorer() {
+      private int _blocksScored = 0;
+      @Nullable
+      private Int2FloatMap _eagerScores;
+
+      @Override
+      public void scoreDocs(int[] docIds, int length, double[] scores) {
+        if (length <= 0) {
+          return;
+        }
+        _blocksScored++;
+        if (_eagerScores == null && _blocksScored == 1 && length < MAX_SELECTIVE_BLOCK_SIZE) {
+          Int2FloatMap blockScores = collectDocScores(column, searchQuery, optionsString, globalStats,
+              LuceneDocScoreCollector.allowedDocIdsPredicate(docIds, length, true));
+          for (int i = 0; i < length; i++) {
+            scores[i] = blockScores.getOrDefault(docIds[i], 0f);
+          }
+          return;
+        }
+        if (_eagerScores == null) {
+          _eagerScores = getDocScores(column, searchQuery, optionsString, globalStats);
+        }
+        for (int i = 0; i < length; i++) {
+          scores[i] = _eagerScores.getOrDefault(docIds[i], 0f);
+        }
+      }
+    };
+  }
+
+  private Int2FloatMap collectDocScores(String column, String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats, @Nullable IntPredicate allowedPinotDocIds) {
     // Created here so an interrupted query thread can cancel the search it stops waiting for
-    LuceneDocScoreCollector collector = LuceneDocScoreCollector.forConsumingSegment();
+    LuceneDocScoreCollector collector = LuceneDocScoreCollector.forConsumingSegment(allowedPinotDocIds);
     return runOnSearcherPool(() -> {
       Query query = parseQuery(column, searchQuery, optionsString);
       IndexSearcher acquiredSearcher = _searcherManager.acquire();
