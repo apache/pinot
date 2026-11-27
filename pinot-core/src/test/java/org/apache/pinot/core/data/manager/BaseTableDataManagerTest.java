@@ -62,6 +62,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -85,6 +86,8 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -453,6 +456,75 @@ public class BaseTableDataManagerTest {
       assertTrue(reloaded.isMapped());
       assertEquals(reloaded.getCustomMap().get("serverReload"), "fresh");
       assertEquals(markedLoads.get(), startupLoads + 1);
+    }
+  }
+
+  @Test
+  public void testReloadRestoresDerivedColumnAfterReplacementIndexWriteFails()
+      throws Exception {
+    String derivedColumn = "derived";
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension(STRING_COLUMN, DataType.STRING).addMetric(LONG_COLUMN, DataType.LONG)
+        .addMetric(derivedColumn, DataType.LONG).build();
+    IngestionConfig ingestion = new IngestionConfig();
+    String originalExpression = "plus(col2, 1)";
+    ingestion.setTransformConfigs(List.of(new TransformConfig(derivedColumn, originalExpression)));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setIngestionConfig(ingestion).build();
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
+    zkMetadata.setCrc(getCRC(indexDir));
+    BaseTableDataManager manager = spy(createTableManager());
+    seedZKMetadata(manager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> new IndexLoadingConfig(tableConfig, schema)).when(manager).fetchIndexLoadingConfig();
+    manager.addNewOnlineSegment(zkMetadata, new IndexLoadingConfig(tableConfig, schema));
+    ImmutableSegment original = (ImmutableSegment) manager.getSegmentDataManager(SEGMENT_NAME).getSegment();
+    assertEquals(original.getSegmentMetadata().getColumnMetadataFor(derivedColumn).getTransformFunction(),
+        originalExpression);
+
+    String updatedExpression = "plus(col2, 2)";
+    ingestion.setTransformConfigs(List.of(new TransformConfig(derivedColumn, updatedExpression)));
+    SegmentDirectoryLoader realLoader = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader();
+    IOException indexFailure = new IOException("Injected failure publishing the replacement forward index");
+    SegmentDirectoryLoader failingLoader = (uri, context) -> {
+      SegmentDirectory directory = spy(realLoader.load(uri, context));
+      doAnswer(invocation -> {
+        SegmentDirectory.Writer writer = spy((SegmentDirectory.Writer) invocation.callRealMethod());
+        doThrow(indexFailure).when(writer).newIndexFor(eq(derivedColumn), eq(StandardIndexes.forward()), anyLong());
+        return writer;
+      }).when(directory).createWriter();
+      return directory;
+    };
+
+    try (MockedStatic<SegmentDirectoryLoaderRegistry> registry =
+        mockStatic(SegmentDirectoryLoaderRegistry.class, CALLS_REAL_METHODS)) {
+      registry.when(SegmentDirectoryLoaderRegistry::getDefaultSegmentDirectoryLoader).thenReturn(failingLoader);
+      assertSame(expectThrows(IOException.class, () -> manager.reloadSegment(SEGMENT_NAME, false, null)), indexFailure);
+    }
+    assertSame(manager.getSegmentDataManager(SEGMENT_NAME).getSegment(), original);
+    assertEquals(new SegmentMetadataImpl(indexDir).getColumnMetadataFor(derivedColumn).getTransformFunction(),
+        originalExpression);
+    assertDerivedValuesOnDisk(indexDir, derivedColumn, 1);
+
+    manager.reloadSegment(SEGMENT_NAME, false, null);
+    assertEquals(new SegmentMetadataImpl(indexDir).getColumnMetadataFor(derivedColumn).getTransformFunction(),
+        updatedExpression);
+    assertDerivedValuesOnDisk(indexDir, derivedColumn, 2);
+  }
+
+  private static void assertDerivedValuesOnDisk(File indexDir, String input, long increment)
+      throws Exception {
+    try (PinotSegmentRecordReader reader = new PinotSegmentRecordReader()) {
+      reader.init(indexDir, null, null, false, null);
+      GenericRow row = new GenericRow();
+      for (int doc = 0; doc < 5; doc++) {
+        assertTrue(reader.hasNext());
+        reader.next(row);
+        assertEquals(((Number) row.getValue(input)).longValue(),
+            ((Number) row.getValue(LONG_COLUMN)).longValue() + increment);
+        row.clear();
+      }
+      assertFalse(reader.hasNext());
     }
   }
 

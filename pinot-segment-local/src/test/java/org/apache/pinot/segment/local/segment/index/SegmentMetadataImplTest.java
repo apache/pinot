@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -39,6 +40,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32C;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -52,6 +54,7 @@ import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -87,6 +90,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -314,26 +318,40 @@ public class SegmentMetadataImplTest {
     }
   }
 
-  @Test
-  public void testDetachedMappedMetadataPreservesServingColumnsAfterClose()
+  @DataProvider
+  public Object[][] transformProvenance() {
+    return new Object[][]{
+        {"Groovy({x + '😀'.length()}, x)", 2, Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32])},
+        {"plus(x, 1)", 1, null},
+        {null, 1, null},
+        {null, 2, null},
+        {null, 999, null},
+        {null, ColumnMetadata.UNAVAILABLE, null}
+    };
+  }
+
+  @Test(dataProvider = "transformProvenance")
+  public void testDetachedMappedMetadataPreservesServingColumnsAfterClose(@Nullable String transformFunction,
+      int provenanceVersion, @Nullable String fingerprint)
       throws Exception {
     new SegmentV1V2ToV3FormatConverter().convert(_segmentDirectory);
+    SegmentMetadataImpl eager = new SegmentMetadataImpl(_segmentDirectory);
+    String removedColumn = eager.getPhysicalColumnNames().stream()
+        .filter(column -> !column.equals(eager.getTimeColumn())).findFirst().orElseThrow();
+    String retainedColumn = eager.getPhysicalColumnNames().stream()
+        .filter(column -> !column.equals(removedColumn)).findFirst().orElseThrow();
+    setTransformProvenance(retainedColumn, transformFunction, provenanceVersion, fingerprint);
     SegmentMetadataImpl detached;
-    String retainedColumn;
     int retainedCardinality;
     Map<IndexType<?, ?, ?>, Long> retainedIndexSizes;
     long retainedCrc;
     long retainedCreationTime;
-    String removedColumn;
     String virtualColumn = "virtualMetadataTest";
     File movedDirectory = new File(INDEX_DIR, _segmentDirectory.getName() + "-moved");
     try {
       try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
-        removedColumn = mapped.getPhysicalColumnNames().stream()
-            .filter(column -> !column.equals(mapped.getTimeColumn())).findFirst().orElseThrow();
-        retainedColumn = mapped.getPhysicalColumnNames().stream()
-            .filter(column -> !column.equals(removedColumn)).findFirst().orElseThrow();
         ColumnMetadata retainedMetadata = mapped.getColumnMetadataFor(retainedColumn);
+        assertTransformProvenance(retainedMetadata, transformFunction, provenanceVersion, fingerprint);
         retainedCardinality = retainedMetadata.getCardinality();
         retainedIndexSizes = ((MappedColumnMetadata) retainedMetadata).getIndexSizeMap();
         assertFalse(retainedIndexSizes.isEmpty());
@@ -358,6 +376,8 @@ public class SegmentMetadataImplTest {
       assertNotNull(detached.getSchema().getFieldSpecFor(virtualColumn));
       assertEquals(detached.getColumnMetadataFor(virtualColumn).getCardinality(), 1);
       assertEquals(detached.getColumnMetadataFor(retainedColumn).getCardinality(), retainedCardinality);
+      assertTransformProvenance(detached.getColumnMetadataFor(retainedColumn), transformFunction, provenanceVersion,
+          fingerprint);
       assertEquals(((ColumnMetadataImpl) detached.getColumnMetadataFor(retainedColumn)).getIndexSizeMap(),
           retainedIndexSizes);
       assertEquals(detached.getCrc(), retainedCrc);
@@ -369,6 +389,61 @@ public class SegmentMetadataImplTest {
         Files.move(movedDirectory.toPath(), _segmentDirectory.toPath());
       }
     }
+  }
+
+  @Test(dataProvider = "transformProvenance")
+  public void testMappedMetadataPreservesProvenanceAcrossVersionRebuild(@Nullable String transformFunction,
+      int provenanceVersion, @Nullable String fingerprint)
+      throws Exception {
+    String column = "daysSinceEpoch";
+    setTransformProvenance(column, transformFunction, provenanceVersion, fingerprint);
+    File properties = SegmentDirectoryPaths.findMetadataFile(_segmentDirectory);
+    byte[] canonicalMetadata = Files.readAllBytes(properties.toPath());
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertTransformProvenance(mapped.getColumnMetadataFor(column), transformFunction, provenanceVersion, fingerprint);
+    }
+
+    File sidecar = new File(_segmentDirectory, "segment_metadata.bin");
+    byte[] unsupportedVersion = Files.readAllBytes(sidecar.toPath());
+    ByteBuffer header = ByteBuffer.wrap(unsupportedVersion).order(ByteOrder.BIG_ENDIAN);
+    header.putInt(4, 1);
+    header.putInt(40, sidecarCrc(unsupportedVersion));
+    Files.write(sidecar.toPath(), unsupportedVersion);
+    // Rebuild from canonical properties without losing the distinction between known absence and legacy provenance.
+    try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(_segmentDirectory)) {
+      assertTransformProvenance(mapped.getColumnMetadataFor(column), transformFunction, provenanceVersion, fingerprint);
+    }
+    assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 2);
+    assertEquals(Files.readAllBytes(properties.toPath()), canonicalMetadata);
+  }
+
+  private void setTransformProvenance(String column, @Nullable String transformFunction, int provenanceVersion,
+      @Nullable String fingerprint)
+      throws Exception {
+    File properties = SegmentDirectoryPaths.findMetadataFile(_segmentDirectory);
+    PropertiesConfiguration config = CommonsConfigurationUtils.fromFile(properties);
+    for (String key : List.of(Column.TRANSFORM_FUNCTION, Column.TRANSFORM_FUNCTION_BASE64,
+        Column.TRANSFORM_FUNCTION_PROVENANCE_VERSION, Column.TRANSFORM_FUNCTION_FINGERPRINT)) {
+      config.clearProperty(Column.getKeyFor(column, key));
+    }
+    if (transformFunction != null) {
+      config.setProperty(Column.getKeyFor(column, Column.TRANSFORM_FUNCTION_BASE64),
+          Base64.getEncoder().encodeToString(transformFunction.getBytes(StandardCharsets.UTF_8)));
+    }
+    if (provenanceVersion != ColumnMetadata.UNAVAILABLE) {
+      config.setProperty(Column.getKeyFor(column, Column.TRANSFORM_FUNCTION_PROVENANCE_VERSION), provenanceVersion);
+    }
+    if (fingerprint != null) {
+      config.setProperty(Column.getKeyFor(column, Column.TRANSFORM_FUNCTION_FINGERPRINT), fingerprint);
+    }
+    CommonsConfigurationUtils.saveToFile(config, properties);
+  }
+
+  private static void assertTransformProvenance(ColumnMetadata metadata, @Nullable String transformFunction,
+      int provenanceVersion, @Nullable String fingerprint) {
+    assertEquals(metadata.getTransformFunction(), transformFunction);
+    assertEquals(metadata.getTransformFunctionProvenanceVersion(), provenanceVersion);
+    assertEquals(metadata.getTransformFunctionFingerprint(), fingerprint);
   }
 
   @Test
@@ -654,16 +729,17 @@ public class SegmentMetadataImplTest {
           assertEquals(mapped.getSchema(), eager.getSchema());
         }
       }
-      // An unsupported sidecar version must rebuild from canonical metadata.
+      // An unsupported sidecar version, such as a version 1 file without transform provenance, must rebuild from
+      // canonical metadata.
       byte[] unsupportedVersion = Files.readAllBytes(sidecar.toPath());
       ByteBuffer header = ByteBuffer.wrap(unsupportedVersion).order(ByteOrder.BIG_ENDIAN);
-      header.putInt(4, 2);
+      header.putInt(4, 1);
       header.putInt(40, sidecarCrc(unsupportedVersion));
       Files.write(sidecar.toPath(), unsupportedVersion);
       try (SegmentMetadataImpl mapped = SegmentMetadataImpl.loadMapped(segmentDir)) {
         assertEquals(mapped.getSchema(), eager.getSchema());
       }
-      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 1);
+      assertEquals(ByteBuffer.wrap(Files.readAllBytes(sidecar.toPath())).order(ByteOrder.BIG_ENDIAN).getInt(4), 2);
     } finally {
       FileUtils.deleteQuietly(segmentDir);
     }

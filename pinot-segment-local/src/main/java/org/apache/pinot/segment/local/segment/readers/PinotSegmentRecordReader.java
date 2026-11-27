@@ -155,7 +155,8 @@ public class PinotSegmentRecordReader implements RecordReader {
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while loading the segment from: " + indexDir, e);
     }
-    init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues, primaryKeyColumns);
+    init(indexSegment, true, CollectionUtils.isEmpty(fieldsToRead) ? null : fieldsToRead, null, sortOrder,
+        skipDefaultNullValues, primaryKeyColumns);
   }
 
   /// Initializes the record reader from an index directory with an option to skip column-level secondary indexes.
@@ -186,6 +187,12 @@ public class PinotSegmentRecordReader implements RecordReader {
     init(indexSegment, false, null, null, null, false, null);
   }
 
+  /// Initializes the reader from an already loaded segment while restricting record replay to the requested fields.
+  /// This is used by RefreshSegment to omit changed derived outputs so the ingestion pipeline recomputes them.
+  public void initWithFieldsToRead(IndexSegment indexSegment, Set<String> fieldsToRead) {
+    init(indexSegment, false, fieldsToRead, null, null, false, null);
+  }
+
   /// Initializes the record reader from a mutable segment with optional sorted document ids.
   ///
   /// @param mutableSegment Mutable segment
@@ -198,7 +205,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   ///
   /// @param indexSegment Index segment to read from
   /// @param destroySegmentOnClose Whether to destroy the segment when closing the record reader
-  /// @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+  /// @param fieldsToRead The fields to read from the segment. If null, reads all fields
   /// @param sortedDocIds Array of sorted document ids
   /// @param sortOrder List of sorted columns
   /// @param skipDefaultNullValues Whether to skip putting default null values into the record
@@ -216,7 +223,7 @@ public class PinotSegmentRecordReader implements RecordReader {
       _openStructDataSources = new HashMap<>();
       _openStructMapValueReaders = new HashMap<>();
       Set<String> columnsInSegment = _indexSegment.getPhysicalColumnNames();
-      if (CollectionUtils.isEmpty(fieldsToRead)) {
+      if (fieldsToRead == null) {
         for (String column : columnsInSegment) {
           addColumnReader(column);
         }
