@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.parquet;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
@@ -60,7 +61,14 @@ public class ParquetAvroRecordReader implements RecordReader {
     }
     _recordExtractor = new ParquetAvroRecordExtractor(ParquetUtils.getUnsignedInt32FieldNames(_dataFilePath));
     _recordExtractor.init(fieldsToRead, extractorConfig);
-    _nextRecord = _parquetReader.read();
+    _nextRecord = readNextRecord();
+  }
+
+  @VisibleForTesting
+  @Nullable
+  GenericRecord readNextRecord()
+      throws IOException {
+    return _parquetReader.read();
   }
 
   @Override
@@ -71,15 +79,27 @@ public class ParquetAvroRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
+    Throwable extractFailure = null;
     try {
       // Data parsing: extract current record into GenericRow.
       _recordExtractor.extract(_nextRecord, reuse);
+    } catch (Throwable t) {
+      extractFailure = t;
+      throw t;
     } finally {
       // Advance even if extraction fails and the caller skips the rejected record.
-      try {
-        _nextRecord = _parquetReader.read();
-      } catch (IOException e) {
-        throw new RecordFetchException("Failed to read next Parquet Avro record", e);
+      if (!(extractFailure instanceof Error)) {
+        try {
+          _nextRecord = readNextRecord();
+        } catch (Exception e) {
+          RecordFetchException fetchException = e instanceof RecordFetchException
+              ? (RecordFetchException) e
+              : new RecordFetchException("Failed to read next Parquet Avro record", e);
+          if (extractFailure != null) {
+            fetchException.addSuppressed(extractFailure);
+          }
+          throw fetchException;
+        }
       }
     }
     return reuse;
@@ -90,7 +110,7 @@ public class ParquetAvroRecordReader implements RecordReader {
       throws IOException {
     _parquetReader.close();
     _parquetReader = ParquetUtils.getParquetAvroReader(_dataFilePath);
-    _nextRecord = _parquetReader.read();
+    _nextRecord = readNextRecord();
   }
 
   @Override
