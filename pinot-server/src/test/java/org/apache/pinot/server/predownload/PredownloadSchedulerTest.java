@@ -301,7 +301,7 @@ public class PredownloadSchedulerTest {
             return untaredFile;
           });
       try (MockedStatic<TarCompressionUtils> tarCompressionUtilsMockedStatic = mockStatic(TarCompressionUtils.class)) {
-        tarCompressionUtilsMockedStatic.when(() -> TarCompressionUtils.untar(any(File.class), any(File.class)))
+        tarCompressionUtilsMockedStatic.when(() -> TarCompressionUtils.untarDurably(any(File.class), any(File.class)))
             .thenAnswer(invocation -> {
               File untaredFile = new File(testFolder, "untared");
               if (!untaredFile.exists() && !untaredFile.mkdirs()) {
@@ -538,7 +538,7 @@ public class PredownloadSchedulerTest {
           .thenAnswer(inv -> null);
 
       try (MockedStatic<TarCompressionUtils> tarMock = mockStatic(TarCompressionUtils.class)) {
-        tarMock.when(() -> TarCompressionUtils.untar(any(File.class), any(File.class)))
+        tarMock.when(() -> TarCompressionUtils.untarDurably(any(File.class), any(File.class)))
             .thenAnswer(inv -> {
               File untarDir = new File(testFolder, "untared_peer");
               untarDir.mkdirs();
@@ -730,7 +730,7 @@ public class PredownloadSchedulerTest {
               () -> SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(anyString(), any(File.class), anyString()))
           .thenAnswer(inv -> null);
       try (MockedStatic<TarCompressionUtils> tarMock = mockStatic(TarCompressionUtils.class)) {
-        tarMock.when(() -> TarCompressionUtils.untar(any(File.class), any(File.class)))
+        tarMock.when(() -> TarCompressionUtils.untarDurably(any(File.class), any(File.class)))
             .thenAnswer(inv -> {
               File untarDir = new File(testFolder, "untared");
               untarDir.mkdirs();
@@ -786,7 +786,7 @@ public class PredownloadSchedulerTest {
           .thenAnswer(inv -> null);
 
       try (MockedStatic<TarCompressionUtils> tarMock = mockStatic(TarCompressionUtils.class)) {
-        tarMock.when(() -> TarCompressionUtils.untar(any(File.class), any(File.class)))
+        tarMock.when(() -> TarCompressionUtils.untarDurably(any(File.class), any(File.class)))
             .thenAnswer(inv -> {
               File untarDir = new File(testFolder, "untared_peer");
               untarDir.mkdirs();
