@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -925,6 +926,56 @@ public class BrokerRoutingManagerTest {
         .thenReturn(idealState.getRecord());
     when(_zkDataAccessor.get(eq(externalViewPath), any(), eq(AccessOption.PERSISTENT)))
         .thenReturn(new ExternalView(TEST_TABLE).getRecord());
+  }
+
+  @Test
+  public void testPendingSegmentMetadataRetriesEvenWithUnchangedAssignmentVersions()
+      throws Exception {
+    assertPendingMetadataRefresh(false);
+  }
+
+  @Test
+  public void testSamplerPendingSegmentMetadataAlsoRequestsAssignmentRefresh()
+      throws Exception {
+    assertPendingMetadataRefresh(true);
+  }
+
+  private void assertPendingMetadataRefresh(boolean sampler)
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    InstanceSelector pendingSelector = sampler ? mock(InstanceSelector.class) : instanceSelector;
+    AtomicBoolean pending = new AtomicBoolean(true);
+    when(pendingSelector.hasPendingSegmentMetadata()).thenAnswer(invocation -> pending.get());
+    doAnswer(invocation -> {
+      pending.set(false);
+      return null;
+    }).when(pendingSelector).onAssignmentChange(any(), any(), any());
+    Map<String, ?> samplerInfos = sampler ? Map.of("sampler", createSamplerInfo(pendingSelector)) : Map.of();
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, samplerInfos, instanceSelector, false));
+    String idealStatePath = "/IDEALSTATES/" + TEST_TABLE;
+    String externalViewPath = "/EXTERNALVIEW/" + TEST_TABLE;
+    Stat unchanged = new Stat();
+    unchanged.setVersion(1);
+    when(_zkDataAccessor.getStats(eq(List.of(idealStatePath)), eq(AccessOption.PERSISTENT)))
+        .thenReturn(new Stat[]{unchanged});
+    when(_zkDataAccessor.getStats(eq(List.of(externalViewPath)), eq(AccessOption.PERSISTENT)))
+        .thenReturn(new Stat[]{unchanged});
+    when(_zkDataAccessor.get(eq(idealStatePath), any(), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      ((Stat) invocation.getArgument(1)).setVersion(1);
+      return createIdealState(true).getRecord();
+    });
+    when(_zkDataAccessor.get(eq(externalViewPath), any(), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      ((Stat) invocation.getArgument(1)).setVersion(1);
+      return new ExternalView(TEST_TABLE).getRecord();
+    });
+
+    _routingManager.processSegmentAssignmentChangeInternal();
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verify(pendingSelector, times(1)).onAssignmentChange(any(), any(), any());
+    verify(_zkDataAccessor, times(1)).get(eq(idealStatePath), any(), eq(AccessOption.PERSISTENT));
+    verify(_zkDataAccessor, times(1)).get(eq(externalViewPath), any(), eq(AccessOption.PERSISTENT));
+    assertFalse(pending.get());
   }
 
   private static IdealState createIdealState(boolean enabled) {

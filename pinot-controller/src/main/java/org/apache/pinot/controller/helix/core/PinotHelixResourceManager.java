@@ -98,6 +98,7 @@ import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
+import org.apache.pinot.common.assignment.ReplicateModeAssignmentUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
@@ -426,7 +427,8 @@ public class PinotHelixResourceManager {
   protected SegmentDeletionManager createSegmentDeletionManager(String dataDir, HelixAdmin helixAdmin,
       String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
     return new SegmentDeletionManager(dataDir, helixAdmin, helixClusterName, propertyStore,
-        deletedSegmentsRetentionInDays, _controllerConf != null && _controllerConf.isDeletedSegmentsPreserveMetadata());
+        deletedSegmentsRetentionInDays, _controllerConf != null && _controllerConf.isDeletedSegmentsPreserveMetadata(),
+        _controllerConf != null ? _controllerConf.generateVipUrl() : null);
   }
 
   /// Get the Helix manager.
@@ -1533,8 +1535,10 @@ public class PinotHelixResourceManager {
           }
         }
       }
-      // The instances of the partition assignment are in use although they might host no segment
-      if (CollectionUtils.containsAny(taggedInstances, PartitionAssignmentUtils.getAllInstances(tableIdealState))) {
+      // Partition assignments and replicate-mode candidates are in use although they might host no segment.
+      if (CollectionUtils.containsAny(taggedInstances, PartitionAssignmentUtils.getAllInstances(tableIdealState))
+          || CollectionUtils.containsAny(taggedInstances,
+              ReplicateModeAssignmentUtils.getAllInstances(tableIdealState))) {
         return false;
       }
     }
@@ -4273,15 +4277,15 @@ public class PinotHelixResourceManager {
   }
 
   /// Returns whether the given instance is in the given IdealState: it is assigned a partition (a segment of a table),
-  /// or it is in the partition assignment of a table (see [PartitionAssignmentUtils]), whose new segments are assigned
-  /// to the instances of their partition.
+  /// or it is in the partition assignment or replicate-mode replica candidates of a table, even if it hosts no segment.
   private static boolean isInstanceInIdealState(IdealState idealState, String instanceName) {
     for (String partition : idealState.getPartitionSet()) {
       if (idealState.getInstanceSet(partition).contains(instanceName)) {
         return true;
       }
     }
-    return PartitionAssignmentUtils.getAllInstances(idealState).contains(instanceName);
+    return PartitionAssignmentUtils.getAllInstances(idealState).contains(instanceName)
+        || ReplicateModeAssignmentUtils.getAllInstances(idealState).contains(instanceName);
   }
 
   /// Restores previous tags for a drained minion instance if applicable.

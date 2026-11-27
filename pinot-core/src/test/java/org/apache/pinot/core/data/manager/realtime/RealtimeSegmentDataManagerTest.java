@@ -84,6 +84,7 @@ import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -108,6 +109,7 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -145,6 +147,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 // TODO Re-write this test using the stream abstraction
@@ -198,6 +201,33 @@ public class RealtimeSegmentDataManagerTest {
   private FakeRealtimeSegmentDataManager createFakeSegmentManager()
       throws Exception {
     return createFakeSegmentManager(false, new TimeSupplier(), null, null, null);
+  }
+
+  @Test
+  public void testReplicateReplayDisablesKafkaOffsetResetWithoutMutatingTableConfig() {
+    Map<String, String> config = Map.of("streamType", "kafka", "stream.kafka.topic.name", "topic",
+        "stream.kafka.consumer.factory.class.name", FakeStreamConsumerFactory.class.getName(),
+        "stream.kafka.decoder.class.name", FakeStreamMessageDecoder.class.getName(), "auto.offset.reset", "latest");
+    assertEquals(RealtimeSegmentDataManager.createConsumptionStreamConfig(REALTIME_TABLE_NAME, config, false)
+        .getStreamConfigsMap().get("auto.offset.reset"), "latest");
+    assertEquals(RealtimeSegmentDataManager.createConsumptionStreamConfig(REALTIME_TABLE_NAME, config, true)
+        .getStreamConfigsMap().get("auto.offset.reset"), "none");
+    assertEquals(config.get("auto.offset.reset"), "latest");
+  }
+
+  @Test
+  public void testReplicateReplayStopsBeforeProcessingDataLossBatch()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createFakeSegmentManager()) {
+      MessageBatch batch = mock(MessageBatch.class);
+      when(batch.hasDataLoss()).thenReturn(true);
+      segment.reportDataLoss(batch); // Native mode continues to report the loss without changing its behavior.
+      Field metadataField = RealtimeSegmentDataManager.class.getDeclaredField("_segmentZKMetadata");
+      metadataField.setAccessible(true);
+      ((SegmentZKMetadata) metadataField.get(segment)).setReplicateMode(true);
+      expectThrows(IllegalStateException.class, () -> segment.reportDataLoss(batch));
+      assertEquals(segment.getCurrentOffset().toString(), START_OFFSET.toString());
+    }
   }
 
   @Test
@@ -669,7 +699,15 @@ public class RealtimeSegmentDataManagerTest {
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig,
       ServerMetrics serverMetrics)
       throws Exception {
+    return createFakeSegmentManager(noUpsert, timeSupplier, maxRows, maxDuration, tableConfig, serverMetrics, false);
+  }
+
+  private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
+      @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig,
+      ServerMetrics serverMetrics, boolean replicateMode)
+      throws Exception {
     SegmentZKMetadata segmentZKMetadata = createZkMetadata();
+    segmentZKMetadata.setReplicateMode(replicateMode);
     if (tableConfig == null) {
       tableConfig = createTableConfig();
     }
@@ -1425,6 +1463,351 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  @DataProvider
+  public Object[][] replicateParallelPolicies() {
+    List<Object[]> policies = new LinkedList<>();
+    for (boolean pauseless : List.of(false, true)) {
+      policies.add(new Object[]{pauseless, null});
+      for (ParallelSegmentConsumptionPolicy policy : ParallelSegmentConsumptionPolicy.values()) {
+        policies.add(new Object[]{pauseless, policy});
+      }
+    }
+    return policies.toArray(Object[][]::new);
+  }
+
+  @Test(dataProvider = "replicateParallelPolicies")
+  public void testReplicateSnapshotRetainsPermitThroughBuildDownloadAndOffload(boolean pauseless,
+      @Nullable ParallelSegmentConsumptionPolicy policy)
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(pauseless, policy)) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segment.getConsumerSemaphoreAcquired().set(true);
+      segment._releaseSemaphoreOnBuild = true;
+      segment._useRealDownloadAndReplace = true;
+      // Table config does not enable replicate mode: the immutable segment snapshot must control the policy.
+      Assert.assertFalse(segment.shouldReleaseSemaphoreBeforeBuild());
+      segment.buildSegmentInternal(false);
+      assertEquals(semaphore.availablePermits(), 0);
+
+      segment.downloadSegmentAndReplace(crcMetadata(START_OFFSET_VALUE + 100, 12345L));
+      verify(segment._tableDataManager).downloadAndReplaceConsumingSegment(any());
+      assertEquals(semaphore.availablePermits(), 0);
+      segment.offload();
+      assertEquals(semaphore.availablePermits(), 0, "Old mutable query references may still exist after offload");
+      segment.destroy();
+      assertEquals(semaphore.availablePermits(), 1);
+      segment.destroy();
+      assertEquals(semaphore.availablePermits(), 1, "Destroy must release the partition permit only once");
+    }
+  }
+
+  @Test
+  public void testReplicatePermitWaitsForLastOldMutableQueryReference()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(false,
+        ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS)) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segment.getConsumerSemaphoreAcquired().set(true);
+      Assert.assertTrue(segment.increaseReferenceCount());
+      RealtimeTableDataManager referenceOwner = new RealtimeTableDataManager(new Semaphore(1)) {
+        @Override
+        protected void closeSegment(SegmentDataManager manager) {
+          manager.destroy();
+        }
+      };
+
+      segment.offload();
+      referenceOwner.releaseSegment(segment); // Drop the serving map's reference after its immutable replacement.
+      assertEquals(segment.getReferenceCount(), 1);
+      assertEquals(semaphore.availablePermits(), 0);
+      referenceOwner.releaseSegment(segment); // Last query using the superseded mutable interval completes.
+      assertEquals(segment.getReferenceCount(), 0);
+      assertEquals(semaphore.availablePermits(), 1);
+    }
+  }
+
+  @Test
+  public void testReplicateDestroyFailureStillReleasesPermit()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(false, null)) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      Assert.assertTrue(semaphore.tryAcquire());
+      segment.getConsumerSemaphoreAcquired().set(true);
+      MutableSegmentImpl mutable = spy((MutableSegmentImpl) segment.getSegment());
+      doAnswer(invocation -> {
+        invocation.callRealMethod();
+        throw new IllegalStateException("destroy failed");
+      }).when(mutable).destroy();
+      segment.setRealtimeSegment(mutable);
+
+      expectThrows(IllegalStateException.class, segment::destroy);
+
+      assertEquals(semaphore.availablePermits(), 1);
+    }
+  }
+
+  private FakeRealtimeSegmentDataManager createReplicateConsumer(boolean pauseless,
+      @Nullable ParallelSegmentConsumptionPolicy policy)
+      throws Exception {
+    _partitionGroupIdToConsumerCoordinatorMap.remove(PARTITION_GROUP_ID);
+    return createFakeSegmentManager(true, new TimeSupplier(), null, null,
+        createTableConfigWithStreamIngestion(pauseless, policy),
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), true);
+  }
+
+  @Test(dataProvider = "replicateParallelPolicies")
+  public void testFixedReplicateRangeReleaseRespectsPauselessAndParallelPolicy(boolean pauseless,
+      @Nullable ParallelSegmentConsumptionPolicy policy)
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(pauseless, policy)) {
+      Semaphore semaphore = acquireConsumerPermit(segment);
+      long endOffset = START_OFFSET_VALUE + 100;
+      segment.setCurrentOffset(endOffset);
+      SegmentZKMetadata metadata = fixedReplicateRange(segment, endOffset);
+      boolean allowed = pauseless && (policy == null || policy.isAllowedDuringBuild());
+
+      assertEquals(segment.tryReleaseReplicatePermitForFixedRange(metadata), allowed);
+      assertEquals(segment.isStreamConsumerClosed(), allowed);
+      assertEquals(semaphore.availablePermits(), allowed ? 1 : 0);
+      assertFalse(segment.tryReleaseReplicatePermitForFixedRange(metadata), "A permit can only be released once");
+      segment.offload();
+      assertEquals(semaphore.availablePermits(), allowed ? 1 : 0);
+      segment.destroy();
+      segment.destroy();
+      assertEquals(semaphore.availablePermits(), 1);
+    }
+  }
+
+  @Test(dataProvider = "replicateParallelPolicies")
+  public void testFixedReplicateRangeDownloadRespectsPauselessAndParallelPolicy(boolean pauseless,
+      @Nullable ParallelSegmentConsumptionPolicy policy)
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(pauseless, policy)) {
+      Semaphore semaphore = acquireConsumerPermit(segment);
+      long endOffset = START_OFFSET_VALUE + 100;
+      segment.setCurrentOffset(endOffset);
+      segment._state.set(segment, RealtimeSegmentDataManager.State.ERROR);
+      segment._useRealDownloadAndReplace = true;
+      SegmentZKMetadata metadata = fixedReplicateRange(segment, endOffset);
+      metadata.setStatus(Status.DONE);
+
+      segment.goOnlineFromConsuming(metadata);
+
+      boolean allowed = pauseless && (policy == null || policy.isAllowedDuringDownload());
+      verify(segment._tableDataManager).downloadAndReplaceConsumingSegment(metadata);
+      assertEquals(semaphore.availablePermits(), allowed ? 1 : 0);
+      segment.offload();
+      assertEquals(semaphore.availablePermits(), allowed ? 1 : 0);
+      segment.destroy();
+      segment.destroy();
+      assertEquals(semaphore.availablePermits(), 1);
+    }
+  }
+
+  @Test
+  public void testFixedBuildOnlyReleaseIsNotReacquiredForDownloadFallback()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment =
+        createReplicateConsumer(true, ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY)) {
+      Semaphore semaphore = acquireConsumerPermit(segment);
+      long endOffset = START_OFFSET_VALUE + 100;
+      segment.setCurrentOffset(endOffset);
+      SegmentZKMetadata metadata = fixedReplicateRange(segment, endOffset);
+      assertTrue(segment.tryReleaseReplicatePermitForFixedRange(metadata));
+      segment._useRealDownloadAndReplace = true;
+
+      segment.downloadSegmentAndReplace(metadata);
+
+      verify(segment._tableDataManager).downloadAndReplaceConsumingSegment(metadata);
+      assertEquals(semaphore.availablePermits(), 1);
+      segment._stubConsumeLoop = false;
+      expectThrows(IllegalStateException.class, segment::consumeLoop);
+      segment.offload();
+      segment.destroy();
+      assertEquals(semaphore.availablePermits(), 1);
+    }
+  }
+
+  @DataProvider
+  public Object[][] unsafeReplicateFixedRanges() {
+    return new Object[][]{{"behind"}, {"ahead"}, {"missing"}, {"inProgress"}, {"wrongCreation"}, {"wrongStart"},
+        {"wrongName"}, {"notReplicate"}, {"noEnd"}, {"shutdown"}, {"replaced"}};
+  }
+
+  @Test(dataProvider = "unsafeReplicateFixedRanges")
+  public void testUnprovenReplicateRangeRetainsPermit(String reason)
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(true, null)) {
+      Semaphore semaphore = acquireConsumerPermit(segment);
+      long endOffset = START_OFFSET_VALUE + 100;
+      segment.setCurrentOffset(endOffset);
+      SegmentZKMetadata metadata = fixedReplicateRange(segment, endOffset);
+      switch (reason) {
+        case "behind" -> segment.setCurrentOffset(endOffset - 1);
+        case "ahead" -> segment.setCurrentOffset(endOffset + 1);
+        case "missing" -> metadata = null;
+        case "inProgress" -> metadata.setStatus(Status.IN_PROGRESS);
+        case "wrongCreation" -> metadata.setCreationTime(metadata.getCreationTime() + 1);
+        case "wrongStart" -> metadata.setStartOffset(Long.toString(START_OFFSET_VALUE + 1));
+        case "wrongName" -> metadata = new SegmentZKMetadata("another-segment");
+        case "notReplicate" -> metadata.setReplicateMode(false);
+        case "noEnd" -> metadata.setEndOffset(null);
+        case "shutdown" -> when(segment._tableDataManager.isShutDown()).thenReturn(true);
+        case "replaced" -> when(segment._tableDataManager.getSegmentDataManager(SEGMENT_NAME_STR))
+            .thenReturn(mock(SegmentDataManager.class));
+        default -> throw new IllegalArgumentException(reason);
+      }
+
+      assertFalse(segment.tryReleaseReplicatePermitForFixedRange(metadata));
+      assertFalse(segment.isStreamConsumerClosed());
+      segment.offload();
+      assertEquals(semaphore.availablePermits(), 0);
+      segment.destroy();
+      assertEquals(semaphore.availablePermits(), 1);
+    }
+  }
+
+  @Test
+  public void testSuccessfulPauselessStartReleasesBeforeCachedBuildAndOldQueryReferencesDrain()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(true, null)) {
+      Semaphore semaphore = acquireConsumerPermit(segment);
+      long endOffset = START_OFFSET_VALUE + 100;
+      segment.setCurrentOffset(endOffset);
+      File builtTar = segment.invokeBuildForCommit(5000L).getSegmentTarFile();
+      assertEquals(semaphore.availablePermits(), 0, "A local tar alone does not confirm a fixed range");
+      assertTrue(segment.increaseReferenceCount());
+      setCommitStartResponse(segment, SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
+
+      assertTrue(segment.invokeStartSegmentCommit());
+      assertEquals(semaphore.availablePermits(), 1, "The successor must not wait for old mutable query references");
+      assertEquals(segment.getReferenceCount(), 2);
+      assertEquals(_partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getUnsealedRelease()
+          .stoppedAtOffset().toString(), Long.toString(endOffset));
+      segment._buildSegmentCalled = false;
+      assertEquals(segment.invokeBuildForCommit(5000L).getSegmentTarFile(), builtTar);
+      assertFalse(segment._buildSegmentCalled, "The already built tar should be reused");
+      assertEquals(semaphore.availablePermits(), 1);
+
+      RealtimeTableDataManager referenceOwner = new RealtimeTableDataManager(new Semaphore(1)) {
+        @Override
+        protected void closeSegment(SegmentDataManager manager) {
+          manager.destroy();
+        }
+      };
+      segment.offload();
+      referenceOwner.releaseSegment(segment);
+      assertEquals(segment.getReferenceCount(), 1);
+      referenceOwner.releaseSegment(segment);
+      assertEquals(semaphore.availablePermits(), 1, "Destruction must not release an already returned permit");
+    }
+  }
+
+  @Test
+  public void testFailedPauselessStartDoesNotReleaseOrBuild()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(true, null)) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      segment._state.set(segment, RealtimeSegmentDataManager.State.HOLDING);
+      segment._responses.add(protocolResponse(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT,
+          START_OFFSET_VALUE));
+      setCommitStartResponse(segment, SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
+
+      segment.createPartitionConsumer().run();
+
+      assertEquals(semaphore.availablePermits(), 0);
+      assertFalse(segment._buildSegmentCalled);
+      assertFalse(segment.isStreamConsumerClosed());
+    }
+  }
+
+  @Test
+  public void testFrozenPauselessCommitRetryCannotCatchUpOrRestartConsumption()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(true, null)) {
+      Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+      long endOffset = START_OFFSET_VALUE + 100;
+      segment.setCurrentOffset(endOffset);
+      segment._state.set(segment, RealtimeSegmentDataManager.State.HOLDING);
+      segment._commitSegmentResult = false;
+      segment._responses.add(protocolResponse(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT, endOffset));
+      segment._responses.add(
+          protocolResponse(SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP, endOffset + 1));
+      setCommitStartResponse(segment, SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
+
+      segment.createPartitionConsumer().run();
+
+      assertTrue(segment._commitSegmentCalled);
+      assertEquals(segment._state.get(segment), RealtimeSegmentDataManager.State.ERROR);
+      assertEquals(segment.getCurrentOffset().toString(), Long.toString(endOffset));
+      assertEquals(semaphore.availablePermits(), 1);
+      assertTrue(segment._consumeOffsets.isEmpty());
+      segment._stubConsumeLoop = false;
+      expectThrows(IllegalStateException.class, segment::consumeLoop);
+      expectThrows(IllegalStateException.class, segment::invokeRealStartConsumption);
+      expectThrows(IllegalStateException.class, () -> segment.createPartitionConsumer().run());
+      assertEquals(semaphore.availablePermits(), 1, "A frozen consumer must not acquire the permit again");
+    }
+  }
+
+  @Test
+  public void testKeepResolvesFixedRangeBeforeBuilding()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(true, null)) {
+      Semaphore semaphore = acquireConsumerPermit(segment);
+      long endOffset = START_OFFSET_VALUE + 100;
+      segment.setCurrentOffset(endOffset);
+      when(segment._tableDataManager.fetchZKMetadataNullable(SEGMENT_NAME_STR))
+          .thenReturn(fixedReplicateRange(segment, endOffset));
+      segment._useRealBuildAndReplace = true;
+
+      assertTrue(segment.buildSegmentAndReplace(null));
+
+      verify(segment._tableDataManager).fetchZKMetadataNullable(SEGMENT_NAME_STR);
+      assertEquals(segment._permitsAtBuild, 1);
+      assertEquals(semaphore.availablePermits(), 1);
+    }
+  }
+
+  @DataProvider
+  public Object[][] fixedRangeOnlineOffsets() {
+    return new Object[][]{{-1}, {0}, {1}};
+  }
+
+  @Test(dataProvider = "fixedRangeOnlineOffsets")
+  public void testOnlineTransitionReleasesOnlyAfterExactFixedRangeCatchup(int offsetDifference)
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segment = createReplicateConsumer(true, null)) {
+      Semaphore semaphore = acquireConsumerPermit(segment);
+      long endOffset = START_OFFSET_VALUE + 100;
+      segment.setCurrentOffset(endOffset + offsetDifference);
+      segment._state.set(segment, RealtimeSegmentDataManager.State.HOLDING);
+      segment._stopWaitTimeMs = 0;
+      segment._useRealBuildAndReplace = true;
+      segment._useRealDownloadAndReplace = true;
+      if (offsetDifference < 0) {
+        segment._consumeOffsets.add(new LongMsgOffset(endOffset));
+      }
+      SegmentZKMetadata metadata = fixedReplicateRange(segment, endOffset);
+      metadata.setStatus(Status.DONE);
+
+      segment.goOnlineFromConsuming(metadata);
+
+      if (offsetDifference <= 0) {
+        assertEquals(segment._permitsAtBuild, 1);
+        assertEquals(semaphore.availablePermits(), 1);
+        if (offsetDifference < 0) {
+          assertEquals(segment._permitsDuringConsume, 0, "Catch-up must finish while retaining the permit");
+        }
+      } else {
+        assertTrue(segment._downloadAndReplaceCalled);
+        assertEquals(semaphore.availablePermits(), 0, "An overshot mutable must wait until destruction");
+      }
+    }
+  }
+
   private static void awaitStartupWait(Thread consumerThread) {
     TestUtils.waitForCondition(ignored -> consumerThread.getState() == Thread.State.WAITING
         || consumerThread.getState() == Thread.State.TIMED_WAITING, 10, 2000,
@@ -1495,6 +1878,37 @@ public class RealtimeSegmentDataManagerTest {
     void replacePredecessor(RealtimeSegmentDataManager predecessor, ImmutableSegmentDataManager replacement) {
       replaceUpsertSegment(predecessor.getSegmentName(), predecessor, replacement, _partition);
     }
+  }
+
+  private Semaphore acquireConsumerPermit(FakeRealtimeSegmentDataManager segment) {
+    Semaphore semaphore = _partitionGroupIdToConsumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore();
+    assertTrue(semaphore.tryAcquire());
+    segment.getConsumerSemaphoreAcquired().set(true);
+    return semaphore;
+  }
+
+  private SegmentZKMetadata fixedReplicateRange(FakeRealtimeSegmentDataManager segment, long endOffset) {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
+    metadata.setReplicateMode(true);
+    metadata.setCreationTime(segment._initialMetadata.getCreationTime());
+    metadata.setStartOffset(START_OFFSET.toString());
+    metadata.setEndOffset(Long.toString(endOffset));
+    metadata.setStatus(Status.COMMITTING);
+    return metadata;
+  }
+
+  private void setCommitStartResponse(FakeRealtimeSegmentDataManager segment,
+      SegmentCompletionProtocol.ControllerResponseStatus status)
+      throws Exception {
+    ServerSegmentCompletionProtocolHandler handler = mock(ServerSegmentCompletionProtocolHandler.class);
+    when(handler.segmentCommitStart(any(), anyInt())).thenReturn(protocolResponse(status, START_OFFSET_VALUE));
+    segment.setProtocolHandler(handler);
+  }
+
+  private SegmentCompletionProtocol.Response protocolResponse(SegmentCompletionProtocol.ControllerResponseStatus status,
+      long offset) {
+    return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
+        .withStatus(status).withStreamPartitionMsgOffset(Long.toString(offset)));
   }
 
   @Test
@@ -3186,7 +3600,10 @@ public class RealtimeSegmentDataManagerTest {
     // Offsets posted with segmentConsumed(), which the real postSegmentConsumedMsg() reads from getCurrentOffset()
     public List<Long> _postedOffsets = new ArrayList<>();
     public boolean _commitSegmentCalled = false;
+    public boolean _commitSegmentResult = true;
     public boolean _buildSegmentCalled = false;
+    public int _permitsAtBuild = -1;
+    public int _permitsDuringConsume = -1;
     public boolean _failSegmentBuild = false;
     public boolean _buildAndReplaceCalled = false;
     public boolean _failDownloadAndReplace = false;
@@ -3202,6 +3619,7 @@ public class RealtimeSegmentDataManagerTest {
     public boolean _stubConsumeLoop = true;
     private final CountDownLatch _consumeLoopStarted = new CountDownLatch(1);
     public RealtimeTableDataManager _tableDataManager;
+    private final SegmentZKMetadata _initialMetadata;
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
     // Requested decode retry backoffs, not slept. If _decodeRetrySleepStarted is set, backoff number
@@ -3240,6 +3658,7 @@ public class RealtimeSegmentDataManagerTest {
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
           consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null, ready);
       _tableDataManager = realtimeTableDataManager;
+      _initialMetadata = segmentZKMetadata;
       _state = RealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = RealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
@@ -3274,6 +3693,24 @@ public class RealtimeSegmentDataManagerTest {
       Field partitionGroupConsumerField = RealtimeSegmentDataManager.class.getDeclaredField("_partitionGroupConsumer");
       partitionGroupConsumerField.setAccessible(true);
       partitionGroupConsumerField.set(this, partitionGroupConsumer);
+    }
+
+    public void setProtocolHandler(ServerSegmentCompletionProtocolHandler protocolHandler)
+        throws Exception {
+      Field field = RealtimeSegmentDataManager.class.getDeclaredField("_protocolHandler");
+      field.setAccessible(true);
+      field.set(this, protocolHandler);
+    }
+
+    public boolean invokeStartSegmentCommit()
+        throws Exception {
+      Method method = RealtimeSegmentDataManager.class.getDeclaredMethod("startSegmentCommit");
+      method.setAccessible(true);
+      return (boolean) method.invoke(this);
+    }
+
+    public void invokeRealStartConsumption() {
+      super.startConsumption();
     }
 
     /// Replaces the upsert metadata manager, which the constructor always leaves null.
@@ -3342,6 +3779,7 @@ public class RealtimeSegmentDataManagerTest {
         throws Exception {
       _consumeLoopStarted.countDown();
       if (_stubConsumeLoop) {
+        _permitsDuringConsume = _consumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore().availablePermits();
         if (_throwExceptionFromConsume) {
           throw new PermanentConsumerException(new Throwable("Offset out of range"));
         }
@@ -3466,6 +3904,7 @@ public class RealtimeSegmentDataManagerTest {
       if (_releaseSemaphoreOnBuild && shouldReleaseSemaphoreBeforeBuild()) {
         closeStreamConsumerAndReleaseSemaphore();
       }
+      _permitsAtBuild = _consumerCoordinatorMap.get(PARTITION_GROUP_ID).getSemaphore().availablePermits();
       if (_failSegmentBuild) {
         try {
           _segmentBuildFailedWithDeterministicError.set(this, true);
@@ -3490,7 +3929,7 @@ public class RealtimeSegmentDataManagerTest {
     protected boolean commitSegment(String controllerVipUrl) {
       terminateLoopIfNecessary();
       _commitSegmentCalled = true;
-      return true;
+      return _commitSegmentResult;
     }
 
     @Override

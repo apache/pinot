@@ -25,13 +25,10 @@ import java.io.Closeable;
 import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -40,14 +37,15 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
 import org.apache.pinot.segment.local.realtime.DecodeRetryTracker;
+import org.apache.pinot.segment.local.realtime.RealtimeIngestionRecordProcessor;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
-import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.segment.local.utils.IngestionUtils.PartitioningListener;
+import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -55,31 +53,32 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamDataDecoder;
-import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.stream.StreamDataDecoderResult;
 import org.apache.pinot.spi.stream.StreamMessage;
-import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.spi.utils.retry.RetryPolicies;
-import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
+///
+/// Record transformation, indexing, NULL handling and aggregation follow normal realtime consumption. Transform
+/// and indexing errors skip affected rows; terminal decode errors stop only when stopOnDecodeError is enabled.
+/// Processing outcomes are counted per reconstruction and logged when consumption finishes. The consumer thread
+/// owns record processing; callers must stop it before building or closing the writer.
 ///
 /// A batch that reports data loss (records between the requested offset and the batch were deleted from the stream
 /// before they could be replayed) fails the replay before anything from it is indexed: the replayed segment would
@@ -107,6 +106,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   private final String _segmentName;
   private final String _tableNameWithType;
   private final int _partitionGroupId;
+  private final int _streamPartitionId;
+  private final boolean _strictRecovery;
   private final SegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final Schema _schema;
@@ -125,7 +126,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   private final StreamPartitionMsgOffset _endOffset;
   private volatile StreamPartitionMsgOffset _currentOffset;
   private final int _fetchTimeoutMs;
-  private final TransformPipeline _transformPipeline;
+  private final RealtimeIngestionRecordProcessor _recordProcessor;
+  private final IngestionRecordListener _ingestionRecordListener = new IngestionRecordListener();
   private volatile boolean _isSuccess = false;
   private volatile Throwable _consumptionException;
   // Set by stopConsumption() to end the consumption at the next batch, even if the stream ignores the interrupt
@@ -144,14 +146,18 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     _tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(llcSegmentName.getTableName());
     _segmentZKMetadata = segmentZKMetadata;
     _tableConfig = indexLoadingConfig.getTableConfig();
-    _schema = indexLoadingConfig.getSchema();
+    _strictRecovery = segmentZKMetadata.isReplicateMode();
+    Preconditions.checkState(!_strictRecovery || (!_tableConfig.isUpsertEnabled() && !_tableConfig.isDedupEnabled()),
+        "Replicate-mode recovery only supports append-only tables");
+    _schema = SchemaUtils.prepareRealtimeSegmentSchema(_tableConfig, indexLoadingConfig.getSchema(), segmentZKMetadata);
     String tableDataDir = indexLoadingConfig.getTableDataDir() == null ? FileUtils.getTempDirectory().getAbsolutePath()
         : indexLoadingConfig.getTableDataDir();
     File reingestionDir = new File(tableDataDir, "reingestion");
+    String attemptId = UUID.randomUUID().toString();
     _resourceTmpDir =
-        new File(reingestionDir, RESOURCE_TMP_DIR_PREFIX + _segmentName + "_" + System.currentTimeMillis());
+        new File(reingestionDir, RESOURCE_TMP_DIR_PREFIX + _segmentName + "_" + attemptId);
     _resourceDataDir =
-        new File(reingestionDir, RESOURCE_DATA_DIR_PREFIX + _segmentName + "_" + System.currentTimeMillis());
+        new File(reingestionDir, RESOURCE_DATA_DIR_PREFIX + _segmentName + "_" + attemptId);
     FileUtils.deleteQuietly(_resourceTmpDir);
     FileUtils.deleteQuietly(_resourceDataDir);
     FileUtils.forceMkdir(_resourceTmpDir);
@@ -159,26 +165,31 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
     _logger = LoggerFactory.getLogger(StatelessRealtimeSegmentWriter.class.getName() + "_" + _segmentName);
 
-    _streamConfig = IngestionConfigUtils.getFirstStreamConfig(_tableConfig);
+    _streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_tableConfig, _partitionGroupId);
+    _streamConfig = IngestionUtils.createConsumptionStreamConfig(_tableNameWithType,
+        IngestionConfigUtils.getStreamConfigMap(_tableConfig, _partitionGroupId), _strictRecovery);
 
     StreamPartitionMsgOffsetFactory offsetFactory =
         StreamConsumerFactoryProvider.create(_streamConfig).createStreamMsgOffsetFactory();
     _startOffset = offsetFactory.create(segmentZKMetadata.getStartOffset());
     _endOffset = offsetFactory.create(segmentZKMetadata.getEndOffset());
+    Preconditions.checkArgument(_startOffset.compareTo(_endOffset) <= 0,
+        "Invalid replay interval: [%s, %s)", _startOffset, _endOffset);
 
     String clientId = getClientId();
     _consumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
-    _partitionMetadataProvider = _consumerFactory.createPartitionMetadataProvider(clientId, _partitionGroupId);
+    _partitionMetadataProvider = _consumerFactory.createPartitionMetadataProvider(clientId, _streamPartitionId);
 
     // Create a simple PartitionGroupConsumptionStatus
     PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
-        new PartitionGroupConsumptionStatus(_partitionGroupId, 0, _startOffset, null, null);
+        new PartitionGroupConsumptionStatus(_partitionGroupId, _streamPartitionId, llcSegmentName.getSequenceNumber(),
+            _startOffset, _endOffset,
+            segmentZKMetadata.getStatus() != null ? segmentZKMetadata.getStatus().toString() : null);
 
     _consumer = _consumerFactory.createPartitionGroupConsumer(clientId, partitionGroupConsumptionStatus);
 
     // Initialize decoder
-    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
-    _decoder = createDecoder(fieldsToRead);
+    _decoder = IngestionUtils.createStreamDecoder(_streamConfig, _tableConfig, _schema, _logger).decoder();
 
     // Fetch capacity from indexLoadingConfig or use default
     int capacity = _streamConfig.getFlushThresholdRows();
@@ -205,8 +216,9 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         .setAvgNumMultiValues(avgNumMultiValues)
         .setSegmentZKMetadata(_segmentZKMetadata)
         .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation())
-        .setMemoryManager(new MmapMemoryManager(FileUtils.getTempDirectory().getAbsolutePath(), _segmentName, null))
+        .setMemoryManager(new MmapMemoryManager(_resourceDataDir.getAbsolutePath(), _segmentName, null))
         .setStatsHistory(statsHistory)
+        .setIngestionSemantics(_tableConfig)
         .setConsumerDir(_resourceDataDir.getAbsolutePath())
         .setDropRecordOnPartitionMismatch(ingestionConfig != null
             && ingestionConfig.getStreamIngestionConfig() != null
@@ -216,11 +228,67 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
     _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
 
-    _transformPipeline = new TransformPipeline(_tableConfig, _schema);
+    _recordProcessor = new RealtimeIngestionRecordProcessor(new TransformPipeline(_tableConfig, _schema),
+        _realtimeSegment, RealtimeIngestionRecordProcessor.parseStopOnDecodeErrorConfig(_streamConfig, _logger),
+        _ingestionRecordListener);
 
     // Initialize fetch timeout
     _fetchTimeoutMs =
         _streamConfig.getFetchTimeoutMillis() > 0 ? _streamConfig.getFetchTimeoutMillis() : DEFAULT_FETCH_TIMEOUT_MS;
+  }
+
+  /// Tracks this reconstruction separately from live ingestion metrics, which must not count replayed rows again.
+  private final class IngestionRecordListener implements RealtimeIngestionRecordProcessor.Listener {
+    private long _numRowsIndexed;
+    private long _numDecodeErrors;
+    private long _numTransformErrors;
+    private long _numIndexErrors;
+    private long _numRowsFiltered;
+    private long _numIncompleteRows;
+    private long _numRowsSanitized;
+
+    @Override
+    public void onDecodeError(Exception exception, StreamMessageMetadata metadata, boolean fatal) {
+      _numDecodeErrors++;
+      _logger.warn("Failed to decode message at offset {} (fatal: {})", metadata.getOffset(), fatal, exception);
+    }
+
+    @Override
+    public void onTransformError(GenericRow row, StreamMessageMetadata metadata, Exception exception) {
+      _numTransformErrors++;
+      _logger.warn("Failed to transform record at offset {}", metadata.getOffset(), exception);
+    }
+
+    @Override
+    public void onIndexError(GenericRow row, StreamMessageMetadata metadata, Exception exception) {
+      _numIndexErrors++;
+      _logger.warn("Failed to index record at offset {}", metadata.getOffset(), exception);
+    }
+
+    @Override
+    public void onTransformResult(TransformPipeline.Result result, StreamMessageMetadata metadata) {
+      _numRowsFiltered += result.getSkippedRowCount();
+      _numIncompleteRows += result.getIncompleteRowCount();
+      _numRowsSanitized += result.getSanitizedRowCount();
+    }
+
+    @Override
+    public void onRowIndexed(GenericRow row, StreamMessageMetadata metadata) {
+      _numRowsIndexed++;
+    }
+  }
+
+  /// An immutable snapshot of reconstruction outcomes. Read after consumption is done.
+  @VisibleForTesting
+  record IngestionStats(long indexedRows, long decodeErrors, long transformErrors, long indexErrors,
+                        long filteredRows, long incompleteRows, long sanitizedRows) {
+  }
+
+  @VisibleForTesting
+  IngestionStats getIngestionStats() {
+    IngestionRecordListener listener = _ingestionRecordListener;
+    return new IngestionStats(listener._numRowsIndexed, listener._numDecodeErrors, listener._numTransformErrors,
+        listener._numIndexErrors, listener._numRowsFiltered, listener._numIncompleteRows, listener._numRowsSanitized);
   }
 
   private String getClientId() {
@@ -231,40 +299,6 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     // Start the consumer thread
     _consumerThread = new Thread(new PartitionConsumer(), _segmentName);
     _consumerThread.start();
-  }
-
-  private StreamDataDecoder createDecoder(Set<String> fieldsToRead)
-      throws Exception {
-    AtomicReference<StreamDataDecoder> localStreamDataDecoder = new AtomicReference<>();
-    RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f);
-    retryPolicy.attempt(() -> {
-      try {
-        StreamMessageDecoder streamMessageDecoder = createMessageDecoder(fieldsToRead);
-        boolean isKeyBytesType = StreamDataDecoderImpl.isKeyBytesType(_schema);
-        localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder, isKeyBytesType));
-        return true;
-      } catch (Exception e) {
-        _logger.warn("Failed to create StreamMessageDecoder. Retrying...", e);
-        return false;
-      }
-    });
-    return localStreamDataDecoder.get();
-  }
-
-  /// Creates a [StreamMessageDecoder] using properties in [StreamConfig].
-  ///
-  /// @param fieldsToRead The fields to read from the source stream
-  /// @return The initialized StreamMessageDecoder
-  private StreamMessageDecoder createMessageDecoder(Set<String> fieldsToRead) {
-    String decoderClass = _streamConfig.getDecoderClass();
-    try {
-      StreamMessageDecoder decoder = PluginManager.get().createInstance(decoderClass);
-      decoder.init(fieldsToRead, _streamConfig, _tableConfig, _schema);
-      return decoder;
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while creating StreamMessageDecoder from stream config: " + _streamConfig, e);
-    }
   }
 
   /// Returns whether to fetch and decode the message at `offset` again after a retriable decode failure, reporting it
@@ -290,6 +324,15 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     @Override
     public void run() {
       try {
+        if (_strictRecovery) {
+          Preconditions.checkState(_partitionMetadataProvider != null,
+              "Cannot validate retained replay interval for segment: %s", _segmentName);
+          StreamPartitionMsgOffset smallestOffset = _partitionMetadataProvider.fetchStreamPartitionOffset(
+              OffsetCriteria.SMALLEST_OFFSET_CRITERIA, _fetchTimeoutMs);
+          Preconditions.checkState(smallestOffset.compareTo(_startOffset) <= 0,
+              "Replay start offset: %s is no longer retained; earliest available: %s for segment: %s",
+              _startOffset, smallestOffset, _segmentName);
+        }
         _consumer.start(_startOffset);
         _logger.info("Created new consumer thread {} for {}", _consumerThread, this);
         _currentOffset = _startOffset;
@@ -310,6 +353,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
               + "rebuilt from it. Restore the range from another source, or delete the segment to accept the loss",
               _currentOffset, _endOffset);
           if (messageBatch.getUnfilteredMessageCount() == 0) {
+            Preconditions.checkState(!_strictRecovery || !messageBatch.isEndOfPartitionGroup(),
+                "Stream ended before replay reached end offset: %s for segment: %s", _endOffset, _segmentName);
             // Poll again from the same offset (see the class Javadoc)
             continue;
           }
@@ -336,17 +381,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
               break;
             }
             decodeRetryTracker.onMessageDone();
-            if (decodedResult.getException() == null) {
-              // Index message
-              GenericRow row = decodedResult.getResult();
-              assert row != null;
-              TransformPipeline.Result result = _transformPipeline.processRow(row);
-              for (GenericRow transformedRow : result.getTransformedRows()) {
-                _realtimeSegment.index(transformedRow, metadata);
-              }
-            } else {
-              _logger.warn("Failed to decode message at offset {}: {}", _currentOffset, decodedResult.getException());
-            }
+            _recordProcessor.process(decodedResult, metadata);
             currentMessageFetchOffset = metadata.getNextOffset();
           }
 
@@ -363,18 +398,22 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
             continue;
           }
           _currentOffset = messageBatch.getOffsetOfNextBatch();
+          Preconditions.checkState(!_strictRecovery || !messageBatch.isEndOfPartitionGroup()
+                  || _currentOffset.compareTo(_endOffset) >= 0,
+              "Stream ended before replay reached end offset: %s for segment: %s", _endOffset, _segmentName);
         }
         _isSuccess = true;
       } catch (Exception e) {
         _logger.error("Exception in consumer thread", e);
         _consumptionException = e;
-        throw new RuntimeException(e);
       } finally {
         try {
           _consumer.close();
         } catch (Exception e) {
           _logger.warn("Failed to close consumer", e);
         }
+        _logger.info("Re-ingestion finished (success: {}, offset: {}, end offset: {}): {}",
+            _isSuccess, _currentOffset, _endOffset, getIngestionStats());
         _isDoneConsuming.set(true);
       }
     }
@@ -389,7 +428,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
   public void stopConsumption() {
     _shouldStop = true;
-    if (_consumerThread.isAlive()) {
+    if (_consumerThread != null && _consumerThread.isAlive()) {
       _consumerThread.interrupt();
       // Wait even if interrupted, so that the segment is not destroyed while the consumer thread is still indexing
       Uninterruptibles.joinUninterruptibly(_consumerThread);
@@ -410,6 +449,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   }
 
   public File buildSegment() {
+    Preconditions.checkState(!_strictRecovery || _isSuccess, "Cannot build an incomplete replay of segment: %s",
+        _segmentName);
     _logger.info("Building segment from {} to {}", _startOffset, _endOffset);
     long startTimeMs = now();
     try {
@@ -470,66 +511,30 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     return System.currentTimeMillis();
   }
 
-  /*
-   * set the following partition parameters in RT segment config builder:
-   *  - partition column
-   *  - partition function
-   *  - partition group id
-   */
   private void setPartitionParameters(RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder,
       @Nullable SegmentPartitionConfig segmentPartitionConfig) {
-    if (segmentPartitionConfig != null) {
-      Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-      if (columnPartitionMap.size() == 1) {
-        Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
-        String partitionColumn = entry.getKey();
-        ColumnPartitionConfig columnPartitionConfig = entry.getValue();
-        String partitionFunctionName = columnPartitionConfig.getFunctionName();
-
-        // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning and emit a
-        //       metric when they don't match, but use the one from the stream. The mismatch could happen when the
-        //       stream partitions are changed, but the table config has not been updated to reflect the change.
-        //       In such case, picking the number of partitions from the stream can keep the segment properly
-        //       partitioned as long as the partition function is not changed.
-        int numPartitions = columnPartitionConfig.getNumPartitions();
-        try {
-          // TODO: currentPartitionGroupConsumptionStatus should be fetched from idealState + segmentZkMetadata,
-          //  so that we get back accurate partitionGroups info
-          //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
-          //  a single partition
-          //  Fix this before opening support for partitioning in Kinesis
-          int numPartitionGroups =
-              _partitionMetadataProvider.computePartitionGroupMetadata(getClientId(), _streamConfig,
-                  List.of(), /*maxWaitTimeMs=*/5000).size();
-
-          if (numPartitionGroups != numPartitions) {
-            _logger.info(
-                "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
-                    + "using number of stream " + "partitions", numPartitionGroups, numPartitions);
-            numPartitions = numPartitionGroups;
+    IngestionUtils.configureRealtimePartitioning(realtimeSegmentConfigBuilder, segmentPartitionConfig,
+        _partitionGroupId, _partitionMetadataProvider, 5000, _logger, new PartitioningListener() {
+          @Override
+          public void onPartitionCountMismatch(int configuredCount, int streamCount) {
+            _logger.info("Stream partition count {} differs from configured count {}; using stream count",
+                streamCount, configuredCount);
           }
-        } catch (Exception e) {
-          _logger.warn("Failed to get number of stream partitions in 5s, "
-              + "using number of partitions in the partition config: {}", numPartitions, e);
-          createPartitionMetadataProvider("Timeout getting number of stream partitions");
-        }
 
-        realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
-        realtimeSegmentConfigBuilder.setPartitionFunction(
-            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
-                columnPartitionConfig.getFunctionConfig()));
-        realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
-      } else {
-        _logger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());
-      }
-    }
+          @Override
+          public void onPartitionCountFetchFailure(int configuredCount, Exception exception) {
+            _logger.warn("Failed to get number of stream partitions in 5s; using configured count: {}",
+                configuredCount, exception);
+            createPartitionMetadataProvider("Timeout getting number of stream partitions");
+          }
+        });
   }
 
   /// Creates a new stream metadata provider
   private void createPartitionMetadataProvider(String reason) {
     closePartitionMetadataProvider();
     _logger.info("Creating new partition metadata provider, reason: {}", reason);
-    _partitionMetadataProvider = _consumerFactory.createPartitionMetadataProvider(getClientId(), _partitionGroupId);
+    _partitionMetadataProvider = _consumerFactory.createPartitionMetadataProvider(getClientId(), _streamPartitionId);
   }
 
   private void closePartitionMetadataProvider() {
@@ -545,6 +550,14 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   @Override
   public void close() {
     stopConsumption();
+    if (_consumerThread == null) {
+      try {
+        _consumer.close();
+      } catch (Exception e) {
+        _logger.warn("Could not close stream consumer", e);
+      }
+    }
+    closePartitionMetadataProvider();
     _realtimeSegment.destroy();
     FileUtils.deleteQuietly(_resourceTmpDir);
     FileUtils.deleteQuietly(_resourceDataDir);

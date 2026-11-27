@@ -20,10 +20,18 @@ package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.MapMaker;
+import com.google.common.util.concurrent.Striped;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.assignment.ReplicateModeAssignmentUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -31,12 +39,15 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionFSM.RecoveryStatus;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -56,6 +67,10 @@ public class SegmentCompletionManager {
   private final HelixManager _helixManager;
   // A map that holds the FSM for each segment.
   private final Map<String, SegmentCompletionFSM> _fsmMap = new ConcurrentHashMap<>();
+  // Weak identity keys retain the mode while any request still holds the FSM, even after conditional map cleanup.
+  // Removing a name-keyed mode entry with its FSM would let an already admitted stale request bypass membership.
+  private final Map<SegmentCompletionFSM, Boolean> _replicateModeFsms = new MapMaker().weakKeys().makeMap();
+  private final Striped<Lock> _segmentCompletionLocks = Striped.lock(1024);
   private final Map<String, Long> _commitTimeMap = new ConcurrentHashMap<>();
   private final PinotLLCRealtimeSegmentManager _segmentManager;
   private final ControllerMetrics _controllerMetrics;
@@ -116,12 +131,20 @@ public class SegmentCompletionManager {
     return _controllerMetrics;
   }
 
-  private SegmentCompletionFSM lookupOrCreateFsm(LLCSegmentName llcSegmentName, String msgType) {
+  /// Observes a locally known completion attempt without creating an FSM or reading ZooKeeper. Absence only means
+  /// that this Controller has no local attempt; recovery must still inspect persisted segment state.
+  public RecoveryStatus getRecoveryStatus(String segmentName) {
+    SegmentCompletionFSM fsm = _fsmMap.get(segmentName);
+    return fsm != null ? fsm.getRecoveryStatus() : RecoveryStatus.NO_ACTIVE_COMMIT;
+  }
+
+  private SegmentCompletionFSM lookupOrCreateFsm(LLCSegmentName llcSegmentName, String msgType,
+      @Nullable SegmentZKMetadata metadata) {
     String segmentName = llcSegmentName.getSegmentName();
     // Look up without locking first. computeIfAbsent() can lock the hash bin even when the key is present, so it can
     // wait for the creation of another segment's FSM, which reads ZooKeeper.
     SegmentCompletionFSM fsm = _fsmMap.get(segmentName);
-    return fsm != null ? fsm : _fsmMap.computeIfAbsent(segmentName, k -> createFsm(llcSegmentName, msgType));
+    return fsm != null ? fsm : _fsmMap.computeIfAbsent(segmentName, k -> createFsm(llcSegmentName, msgType, metadata));
   }
 
   /// Parses an offset reported for the segment with the offset factory of its FSM, so that a request for an existing
@@ -135,10 +158,12 @@ public class SegmentCompletionManager {
     return factory.create(offset);
   }
 
-  private SegmentCompletionFSM createFsm(LLCSegmentName llcSegmentName, String msgType) {
+  private SegmentCompletionFSM createFsm(LLCSegmentName llcSegmentName, String msgType,
+      @Nullable SegmentZKMetadata metadata) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
-    SegmentZKMetadata segmentMetadata = _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName, null);
+    SegmentZKMetadata segmentMetadata = metadata != null ? metadata
+        : _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName, null);
 
     TableConfig tableConfig = _segmentManager.getTableConfig(realtimeTableName);
     String factoryName;
@@ -156,168 +181,311 @@ public class SegmentCompletionManager {
     SegmentCompletionFSM fsm =
         SegmentCompletionFSMFactory.createFSM(factoryName, this, _segmentManager, llcSegmentName, segmentMetadata);
     fsm.transitionToInitialState(msgType);
+    if (segmentMetadata.isReplicateMode()) {
+      _replicateModeFsms.put(fsm, true);
+    }
 
     LOGGER.info("Created FSM {}", fsm);
     return fsm;
   }
 
-  /// This method is to be called when a server calls in with the segmentConsumed() API, reporting an offset in the
-  /// stream
-  /// that it currently has (i.e. next offset that it will consume, if it continues to consume).
-  public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params reqParams) {
-    final String segmentNameStr = reqParams.getSegmentName();
-    final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    final String tableName = segmentName.getTableName();
-    if (!isLeader(tableName) || !_helixManager.isConnected()) {
-      return SegmentCompletionProtocol.RESP_NOT_LEADER;
-    }
-    final String instanceId = reqParams.getInstanceId();
-    final String stopReason = reqParams.getReason();
-
-    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
-    SegmentCompletionFSM fsm = null;
+  /// Serializes local replicate-mode admission and assignment changes. Recovery performs its final validation and
+  /// CAS inside this operation. Locks are bounded and reentrant; accepted commitEnd I/O runs outside the gate because
+  /// that exact attempt may legitimately finish after reassignment. This does not replace ZooKeeper version checks.
+  public <T> T withSegmentCompletionLock(String segmentName, Supplier<T> operation) {
+    Lock lock = _segmentCompletionLocks.get(segmentName);
+    lock.lock();
     try {
-      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED);
-      StreamPartitionMsgOffset offset = parseOffset(fsm, segmentName, reqParams.getStreamPartitionMsgOffset());
-      response = fsm.segmentConsumed(instanceId, offset, stopReason);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception in segmentConsumed for segment {}", segmentNameStr, e);
+      return operation.get();
+    } finally {
+      lock.unlock();
     }
-    if (fsm != null && fsm.isDone()) {
-      LOGGER.info("Removing FSM (if present):{}", fsm.toString());
-      _fsmMap.remove(segmentNameStr);
-    }
-    return response;
   }
 
-  /// This method is to be called when a server calls in with the segmentCommit() API. The server sends in the segment
-  /// along with the API, but it is the caller's responsibility to save the segment after this call (and before the
-  /// segmentCommitEnd() call).
-  ///
-  /// If successful, this method will return Response.COMMIT_CONTINUE, in which case, the caller should save the
-  /// incoming segment and then call segmentCommitEnd().
-  ///
-  /// Otherwise, this method will return a protocol response to be returned to the client right away (without saving the
-  /// incoming segment).
-  public SegmentCompletionProtocol.Response segmentCommitStart(
-      final SegmentCompletionProtocol.Request.Params reqParams) {
-    final String segmentNameStr = reqParams.getSegmentName();
-    final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    final String tableName = segmentName.getTableName();
-    if (!isLeader(tableName) || !_helixManager.isConnected()) {
-      return SegmentCompletionProtocol.RESP_NOT_LEADER;
-    }
-    SegmentCompletionFSM fsm = null;
-    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
-    try {
-      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitStart(reqParams);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception in segmentCommitStart for segment {}", segmentNameStr, e);
-    }
-    if (fsm != null && fsm.isDone()) {
-      LOGGER.info("Removing FSM (if present):{}", fsm.toString());
-      _fsmMap.remove(segmentNameStr);
-    }
-    return response;
+  public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params params) {
+    LLCSegmentName name = new LLCSegmentName(params.getSegmentName());
+    return processRequest(params, RequestKind.CONSUMED, fsm -> fsm.segmentConsumed(params.getInstanceId(),
+        parseOffset(fsm, name, params.getStreamPartitionMsgOffset()), params.getReason()));
   }
 
-  public SegmentCompletionProtocol.Response extendBuildTime(final SegmentCompletionProtocol.Request.Params reqParams) {
-    final String segmentNameStr = reqParams.getSegmentName();
-    final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    final String tableName = segmentName.getTableName();
-    if (!isLeader(tableName) || !_helixManager.isConnected()) {
-      return SegmentCompletionProtocol.RESP_NOT_LEADER;
-    }
-    final String instanceId = reqParams.getInstanceId();
-    final int extTimeSec = reqParams.getExtraTimeSec();
-    SegmentCompletionFSM fsm = null;
-    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
-    try {
-      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      StreamPartitionMsgOffset offset = parseOffset(fsm, segmentName, reqParams.getStreamPartitionMsgOffset());
-      response = fsm.extendBuildTime(instanceId, offset, extTimeSec);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception in extendBuildTime for segment {}", segmentNameStr, e);
-    }
-    if (fsm != null && fsm.isDone()) {
-      LOGGER.info("Removing FSM (if present):{}", fsm.toString());
-      _fsmMap.remove(segmentNameStr);
-    }
-    return response;
+  public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params params) {
+    return processRequest(params, RequestKind.COMMIT_START, fsm -> fsm.segmentCommitStart(params));
   }
 
-  public SegmentCompletionProtocol.Response reduceSegmentSizeAndReset(
-      SegmentCompletionProtocol.Request.Params reqParams) {
-    String segmentName = reqParams.getSegmentName();
-    SegmentCompletionFSM fsm = _fsmMap.get(segmentName);
-    if (fsm != null && fsm.isImmutableSegmentCreated()) {
-      // In this case, other replica already starts committing the segment. It is a false alert.
-      LOGGER.warn("Segment {} cannot build is a false alert", segmentName);
+  public SegmentCompletionProtocol.Response extendBuildTime(SegmentCompletionProtocol.Request.Params params) {
+    LLCSegmentName name = new LLCSegmentName(params.getSegmentName());
+    return processRequest(params, RequestKind.EXTEND, fsm -> fsm.extendBuildTime(params.getInstanceId(),
+        parseOffset(fsm, name, params.getStreamPartitionMsgOffset()), params.getExtraTimeSec()));
+  }
+
+  public SegmentCompletionProtocol.Response reduceSegmentSizeAndReset(SegmentCompletionProtocol.Request.Params params) {
+    return processRequest(params, RequestKind.RESET, fsm -> {
+      if (fsm != null && fsm.isImmutableSegmentCreated()) {
+        LOGGER.warn("Segment {} cannot build is a false alert", params.getSegmentName());
+        return SegmentCompletionProtocol.RESP_DISCARD;
+      }
+      _segmentManager.reduceSegmentSizeAndReset(new LLCSegmentName(params.getSegmentName()), params.getNumRows());
+      removeFsm(params.getSegmentName(), fsm);
+      return SegmentCompletionProtocol.RESP_PROCESSED;
+    });
+  }
+
+  public SegmentCompletionProtocol.Response segmentStoppedConsuming(SegmentCompletionProtocol.Request.Params params) {
+    LLCSegmentName name = new LLCSegmentName(params.getSegmentName());
+    return processRequest(params, RequestKind.STOPPED, fsm -> fsm.stoppedConsuming(params.getInstanceId(),
+        parseOffset(fsm, name, params.getStreamPartitionMsgOffset()), params.getReason()));
+  }
+
+  /// Completes an existing accepted attempt. A stale server cannot create an FSM to regain commit authorization.
+  /// Once metadata is DONE, a matching retry succeeds without republishing files or changing the selected artifact.
+  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params params,
+      CommittingSegmentDescriptor descriptor) {
+    LLCSegmentName name = new LLCSegmentName(params.getSegmentName());
+    if (!isLeader(name.getTableName()) || !_helixManager.isConnected()) {
+      return SegmentCompletionProtocol.RESP_NOT_LEADER;
+    }
+    try {
+      SegmentCompletionFSM existing = _fsmMap.get(name.getSegmentName());
+      SegmentZKMetadata metadata = existing == null ? getSegmentMetadata(name) : null;
+      if (!isReplicateMode(existing, metadata)) {
+        return invokeFsm(name, RequestKind.COMMIT_END, metadata, fsm -> fsm.segmentCommitEnd(params, descriptor));
+      }
+      CommitEndAdmission admission = withSegmentCompletionLock(name.getSegmentName(), () -> {
+        if (!isLeader(name.getTableName()) || !_helixManager.isConnected()) {
+          return new CommitEndAdmission(null, SegmentCompletionProtocol.RESP_NOT_LEADER);
+        }
+        SegmentZKMetadata currentMetadata = getSegmentMetadata(name);
+        if (currentMetadata == null || !currentMetadata.isReplicateMode()) {
+          return new CommitEndAdmission(null, SegmentCompletionProtocol.RESP_FAILED);
+        }
+        if (currentMetadata.getStatus() == Status.DONE) {
+          return new CommitEndAdmission(null,
+              completedResponse(name, currentMetadata, params, RequestKind.COMMIT_END, descriptor));
+        }
+        SegmentCompletionFSM fsm = _fsmMap.get(name.getSegmentName());
+        if (fsm == null || !fsm.isAcceptedCommitter(params.getInstanceId(), params.getStreamPartitionMsgOffset())) {
+          return new CommitEndAdmission(null, SegmentCompletionProtocol.RESP_FAILED);
+        }
+        return new CommitEndAdmission(fsm, null);
+      });
+      if (admission.response() != null) {
+        return admission.response();
+      }
+      SegmentCompletionFSM fsm = admission.fsm();
+      try {
+        return fsm.segmentCommitEnd(params, descriptor);
+      } finally {
+        if (fsm.isDone()) {
+          removeFsm(name.getSegmentName(), fsm);
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception in segmentCommitEnd for segment {}", name.getSegmentName(), e);
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+  }
+
+  private SegmentCompletionProtocol.Response processRequest(SegmentCompletionProtocol.Request.Params params,
+      RequestKind kind, Function<SegmentCompletionFSM, SegmentCompletionProtocol.Response> operation) {
+    LLCSegmentName name = new LLCSegmentName(params.getSegmentName());
+    // Preserve the ordinary reset endpoint's existing behavior; replicate-mode resets are checked inside the gate.
+    if (kind != RequestKind.RESET && (!isLeader(name.getTableName()) || !_helixManager.isConnected())) {
+      return SegmentCompletionProtocol.RESP_NOT_LEADER;
+    }
+    try {
+      SegmentCompletionFSM existing = _fsmMap.get(name.getSegmentName());
+      SegmentZKMetadata metadata = existing == null ? getSegmentMetadata(name) : null;
+      if (!isReplicateMode(existing, metadata)) {
+        return invokeFsm(name, kind, metadata, operation);
+      }
+      return withFsmAdmissionLock(name.getSegmentName(), () -> {
+        if (!isLeader(name.getTableName()) || !_helixManager.isConnected()) {
+          return SegmentCompletionProtocol.RESP_NOT_LEADER;
+        }
+        SegmentZKMetadata currentMetadata = getSegmentMetadata(name);
+        if (currentMetadata == null || !currentMetadata.isReplicateMode()) {
+          return SegmentCompletionProtocol.RESP_FAILED;
+        }
+        if (currentMetadata.getStatus() == Status.DONE) {
+          return completedResponse(name, currentMetadata, params, kind, null);
+        }
+        SegmentCompletionFSM fsm = _fsmMap.get(name.getSegmentName());
+        if (!isCurrentMember(name, currentMetadata, params, kind, fsm)) {
+          if (kind == RequestKind.STOPPED) {
+            return SegmentCompletionProtocol.RESP_PROCESSED;
+          }
+          return kind == RequestKind.CONSUMED || kind == RequestKind.RESET
+              ? SegmentCompletionProtocol.RESP_DISCARD : SegmentCompletionProtocol.RESP_FAILED;
+        }
+        return invokeFsm(name, kind, currentMetadata, operation);
+      });
+    } catch (Exception e) {
+      LOGGER.error("Caught exception processing {} for segment {}", kind, name.getSegmentName(), e);
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+  }
+
+  /// Never hold the assignment gate while waiting for an existing FSM's commit monitor. Once both are held, verify
+  /// that cleanup did not replace that FSM while we waited. Recovery uses only the gate and nonblocking observations.
+  private SegmentCompletionProtocol.Response withFsmAdmissionLock(String segmentName,
+      Supplier<SegmentCompletionProtocol.Response> operation) {
+    while (true) {
+      SegmentCompletionFSM expected = _fsmMap.get(segmentName);
+      SegmentCompletionProtocol.Response response;
+      if (expected == null) {
+        response = withSegmentCompletionLock(segmentName,
+            () -> _fsmMap.get(segmentName) == null ? operation.get() : null);
+      } else {
+        synchronized (expected) {
+          response = withSegmentCompletionLock(segmentName,
+              () -> _fsmMap.get(segmentName) == expected ? operation.get() : null);
+        }
+      }
+      if (response != null) {
+        return response;
+      }
+    }
+  }
+
+  private boolean isCurrentMember(LLCSegmentName name, SegmentZKMetadata metadata,
+      SegmentCompletionProtocol.Request.Params params, RequestKind kind, @Nullable SegmentCompletionFSM fsm) {
+    IdealState idealState =
+        _segmentManager.getIdealState(TableNameBuilder.REALTIME.tableNameWithType(name.getTableName()));
+    if (idealState == null) {
+      return false;
+    }
+    Map<String, String> assignment = idealState.getInstanceStateMap(name.getSegmentName());
+    if (assignment == null || assignment.size() != 1) {
+      return false;
+    }
+    String state = assignment.get(params.getInstanceId());
+    if (metadata.getStatus() == Status.IN_PROGRESS) {
+      return SegmentStateModel.CONSUMING.equals(state) && params.getInstanceId().equals(
+          ReplicateModeAssignmentUtils.getLeader(idealState, name.getPartitionGroupId()));
+    }
+    if (metadata.getStatus() != Status.COMMITTING || metadata.getEndOffset() == null) {
+      return false;
+    }
+    boolean consumingOwner = SegmentStateModel.CONSUMING.equals(state);
+    if (consumingOwner) {
+      // Commit start persists COMMITTING before publishing the successor and the old segment's ONLINE assignment.
+      // A failure in that window must let its current owner resume the native commit-start protocol.
+      if ((kind != RequestKind.CONSUMED && kind != RequestKind.COMMIT_START) || !params.getInstanceId().equals(
+          ReplicateModeAssignmentUtils.getLeader(idealState, name.getPartitionGroupId()))) {
+        return false;
+      }
+    } else if (!SegmentStateModel.ONLINE.equals(state)) {
+      return false;
+    }
+    if (kind != RequestKind.CONSUMED && kind != RequestKind.COMMIT_START && kind != RequestKind.EXTEND) {
+      return false;
+    }
+    StreamPartitionMsgOffsetFactory factory = fsm != null ? fsm.getStreamPartitionMsgOffsetFactory() : null;
+    if (factory == null) {
+      factory = getStreamPartitionMsgOffsetFactory(name);
+    }
+    if (factory.create(params.getStreamPartitionMsgOffset()).compareTo(factory.create(metadata.getEndOffset())) != 0) {
+      return false;
+    }
+    // Pauseless uploading belongs to this segment's sole ONLINE owner. The newer consuming segment can already
+    // have another partition leader after an explicit rebalance; that must not revoke this uploader's lease.
+    if (!consumingOwner && (kind == RequestKind.COMMIT_START || kind == RequestKind.EXTEND) && fsm != null
+        && fsm.isAcceptedCommitter(params.getInstanceId(), params.getStreamPartitionMsgOffset())) {
+      return true;
+    }
+    // A Controller restart loses its FSM, while this segment's owner may still have the complete built segment.
+    // Resume native commit start only for its exact persisted range; an old nonmember cannot regain authorization.
+    if (kind == RequestKind.CONSUMED || kind == RequestKind.COMMIT_START) {
+      return !_segmentManager.isExceededMaxSegmentCompletionTime(
+          TableNameBuilder.REALTIME.tableNameWithType(name.getTableName()), name.getSegmentName(), getCurrentTimeMs());
+    }
+    return false;
+  }
+
+  private SegmentCompletionProtocol.Response completedResponse(LLCSegmentName name, SegmentZKMetadata metadata,
+      SegmentCompletionProtocol.Request.Params params, RequestKind kind,
+      @Nullable CommittingSegmentDescriptor descriptor) {
+    if (kind == RequestKind.STOPPED) {
+      return SegmentCompletionProtocol.RESP_PROCESSED;
+    }
+    if (kind == RequestKind.RESET || kind == RequestKind.CONSUMED || kind == RequestKind.COMMIT_START) {
+      // KEEP makes the Server install a local build without checking the authoritative artifact's CRC.
       return SegmentCompletionProtocol.RESP_DISCARD;
     }
-    _segmentManager.reduceSegmentSizeAndReset(new LLCSegmentName(reqParams.getSegmentName()), reqParams.getNumRows());
-    _fsmMap.remove(segmentName);
-    return SegmentCompletionProtocol.RESP_PROCESSED;
+    if (kind == RequestKind.EXTEND) {
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+    StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(name);
+    boolean matches = metadata.getEndOffset() != null
+        && factory.create(params.getStreamPartitionMsgOffset()).compareTo(factory.create(metadata.getEndOffset())) == 0;
+    return matches && descriptor != null && descriptor.getSegmentMetadata() != null && metadata.getCrc() >= 0
+        && descriptor.getSegmentMetadata().getCrc() == metadata.getCrc()
+        ? SegmentCompletionProtocol.RESP_COMMIT_SUCCESS : SegmentCompletionProtocol.RESP_FAILED;
   }
 
-  /// This method is to be called when a server reports that it has stopped consuming a real-time segment.
-  ///
-  /// @return
-  public SegmentCompletionProtocol.Response segmentStoppedConsuming(
-      SegmentCompletionProtocol.Request.Params reqParams) {
-    final String segmentNameStr = reqParams.getSegmentName();
-    final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    final String tableName = segmentName.getTableName();
-    if (!isLeader(tableName) || !_helixManager.isConnected()) {
-      return SegmentCompletionProtocol.RESP_NOT_LEADER;
-    }
-    final String instanceId = reqParams.getInstanceId();
-    final String reason = reqParams.getReason();
-    SegmentCompletionFSM fsm = null;
-    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
-    try {
-      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING);
-      StreamPartitionMsgOffset offset = parseOffset(fsm, segmentName, reqParams.getStreamPartitionMsgOffset());
-      response = fsm.stoppedConsuming(instanceId, offset, reason);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception in segmentStoppedConsuming for segment {}", segmentNameStr, e);
-    }
-    if (fsm != null && fsm.isDone()) {
-      LOGGER.info("Removing FSM (if present):{}", fsm.toString());
-      _fsmMap.remove(segmentNameStr);
-    }
-    return response;
+  private boolean isReplicateMode(@Nullable SegmentCompletionFSM fsm, @Nullable SegmentZKMetadata metadata) {
+    return fsm != null ? _replicateModeFsms.containsKey(fsm) : metadata != null && metadata.isReplicateMode();
   }
 
-  /// This method is to be called when the segment sent in by the server has been saved locally in the correct path that
-  /// is downloadable by the servers.
-  ///
-  /// It returns a response code to be sent back to the client.
-  ///
-  /// If the response code is not COMMIT_SUCCESS, then the caller may remove the segment that has been saved.
-  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
-      CommittingSegmentDescriptor committingSegmentDescriptor) {
-    final String segmentNameStr = reqParams.getSegmentName();
-    final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    final String tableName = segmentName.getTableName();
-    if (!isLeader(tableName) || !_helixManager.isConnected()) {
-      return SegmentCompletionProtocol.RESP_NOT_LEADER;
-    }
-    SegmentCompletionFSM fsm = null;
-    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
-    try {
-      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitEnd(reqParams, committingSegmentDescriptor);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception in segmentCommitEnd for segment {}", segmentNameStr, e);
-    }
-    if (fsm != null && fsm.isDone()) {
-      LOGGER.info("Removing FSM (if present):{}", fsm.toString());
-      _fsmMap.remove(segmentNameStr);
-    }
+  @Nullable
+  private SegmentZKMetadata getSegmentMetadata(LLCSegmentName name) {
+    return _segmentManager.getSegmentZKMetadata(TableNameBuilder.REALTIME.tableNameWithType(name.getTableName()),
+        name.getSegmentName(), null);
+  }
 
-    return response;
+  private SegmentCompletionProtocol.Response invokeFsm(LLCSegmentName name, RequestKind kind,
+      @Nullable SegmentZKMetadata metadata,
+      Function<SegmentCompletionFSM, SegmentCompletionProtocol.Response> operation) {
+    if (kind != RequestKind.RESET && metadata != null && metadata.isReplicateMode()
+        && _fsmMap.get(name.getSegmentName()) == null) {
+      // Replicate-mode callers hold the segment gate. Own the new FSM's monitor before publishing it: otherwise
+      // another request could acquire the published monitor and wait for our gate while we wait for its monitor.
+      SegmentCompletionFSM created = createFsm(name, kind._messageType, metadata);
+      synchronized (created) {
+        Preconditions.checkState(_fsmMap.putIfAbsent(name.getSegmentName(), created) == null,
+            "Completion FSM changed while holding the admission gate for segment: %s", name.getSegmentName());
+        return invokeAndCleanUp(name.getSegmentName(), created, operation);
+      }
+    }
+    SegmentCompletionFSM fsm = kind == RequestKind.RESET ? _fsmMap.get(name.getSegmentName())
+        : lookupOrCreateFsm(name, kind._messageType, metadata);
+    return invokeAndCleanUp(name.getSegmentName(), fsm, operation);
+  }
+
+  private SegmentCompletionProtocol.Response invokeAndCleanUp(String segmentName, @Nullable SegmentCompletionFSM fsm,
+      Function<SegmentCompletionFSM, SegmentCompletionProtocol.Response> operation) {
+    try {
+      return operation.apply(fsm);
+    } finally {
+      if (fsm != null && fsm.isDone()) {
+        removeFsm(segmentName, fsm);
+      }
+    }
+  }
+
+  private void removeFsm(String name, @Nullable SegmentCompletionFSM fsm) {
+    if (fsm != null && _fsmMap.remove(name, fsm)) {
+      LOGGER.info("Removed FSM: {}", fsm);
+    }
+  }
+
+  private enum RequestKind {
+    CONSUMED(SegmentCompletionProtocol.MSG_TYPE_CONSUMED),
+    COMMIT_START(SegmentCompletionProtocol.MSG_TYPE_COMMIT),
+    COMMIT_END(SegmentCompletionProtocol.MSG_TYPE_COMMIT),
+    EXTEND(SegmentCompletionProtocol.MSG_TYPE_COMMIT),
+    STOPPED(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING),
+    RESET(SegmentCompletionProtocol.MSG_TYPE_COMMIT);
+
+    private final String _messageType;
+
+    RequestKind(String messageType) {
+      _messageType = messageType;
+    }
+  }
+
+  private record CommitEndAdmission(@Nullable SegmentCompletionFSM fsm,
+                                    @Nullable SegmentCompletionProtocol.Response response) {
   }
 
   @VisibleForTesting

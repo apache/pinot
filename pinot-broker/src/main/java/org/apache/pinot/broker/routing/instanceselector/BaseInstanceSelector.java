@@ -22,11 +22,11 @@ import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -38,6 +38,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -122,6 +123,10 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   protected volatile SegmentStates _segmentStates;
   protected Map<String, ServerInstance> _enabledServerStore;
 
+  // Only touched under the caller's routing-update lock. Unknown realtime segment modes use ready replicas while
+  // their immutable metadata snapshot is retried; query threads never access this map or read ZooKeeper.
+  private final Object2LongOpenHashMap<String> _pendingSegmentMetadata = new Object2LongOpenHashMap<>();
+
   @Override
   public void init(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
@@ -165,6 +170,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   /// Returns a map from new segment to their creation time based on the ZK metadata.
   Object2LongOpenHashMap<String> getNewSegmentCreationTimeMapFromZK(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
+    _pendingSegmentMetadata.clear();
     List<String> potentialNewSegments = new ArrayList<>();
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
@@ -177,21 +183,27 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
 
     Object2LongOpenHashMap<String> newSegmentCreationTimeMap = new Object2LongOpenHashMap<>();
     long currentTimeMs = _clock.millis();
-    String segmentZKMetadataPathPrefix =
-        ZKMetadataProvider.constructPropertyStorePathForResource(_tableNameWithType) + "/";
-    List<String> segmentZKMetadataPaths = new ArrayList<>(potentialNewSegments.size());
-    for (String segment : potentialNewSegments) {
-      segmentZKMetadataPaths.add(segmentZKMetadataPathPrefix + segment);
-    }
-    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    for (ZNRecord record : znRecords) {
-      if (record == null) {
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, _tableNameWithType, potentialNewSegments, null);
+    Set<String> resolvedSegments = new HashSet<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      if (segmentZKMetadata == null) {
         continue;
       }
-      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(record);
+      resolvedSegments.add(segmentZKMetadata.getSegmentName());
+      if (segmentZKMetadata.isReplicateMode()) {
+        // Replicate-mode followers must finish loading before serving a completed segment. Treat the segment as
+        // old for routing from first sight, including Broker startup during replica expansion.
+        continue;
+      }
       long creationTimeMs = SegmentUtils.getSegmentCreationTimeMs(segmentZKMetadata);
       if (InstanceSelector.isNewSegment(creationTimeMs, currentTimeMs, _newSegmentExpirationTimeInSeconds * 1000)) {
         newSegmentCreationTimeMap.put(segmentZKMetadata.getSegmentName(), creationTimeMs);
+      }
+    }
+    for (String segment : potentialNewSegments) {
+      if (isRealtimeLlcSegment(segment) && !resolvedSegments.contains(segment)) {
+        _pendingSegmentMetadata.put(segment, currentTimeMs);
       }
     }
     LOGGER.info(NEW_SEGMENTS_MARKER,
@@ -368,6 +380,11 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     updateSegmentStates(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
   }
 
+  @Override
+  public boolean hasPendingSegmentMetadata() {
+    return !_pendingSegmentMetadata.isEmpty();
+  }
+
   /// Returns a map from new segment to their creation time based on the existing in-memory states.
   Object2LongOpenHashMap<String> getNewSegmentCreationTimeMapFromExistingStates(IdealState idealState,
       ExternalView externalView, Set<String> onlineSegments) {
@@ -376,6 +393,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
     SegmentGroups segmentGroups = _segmentStates._segmentGroups;
+    _pendingSegmentMetadata.keySet().retainAll(onlineSegments);
+    Object2LongOpenHashMap<String> segmentsToResolve = new Object2LongOpenHashMap<>();
     for (String segment : onlineSegments) {
       long creationTimeMs = 0;
       long previousCreationTimeMs = segmentGroups._newSegmentCreationTimeMap.getLong(segment);
@@ -385,22 +404,68 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
             _newSegmentExpirationTimeInSeconds * 1000)) {
           creationTimeMs = previousCreationTimeMs;
         }
+      } else if (_pendingSegmentMetadata.containsKey(segment)) {
+        creationTimeMs = _pendingSegmentMetadata.getLong(segment);
       } else if (segmentGroups._segmentToGroupId.getInt(segment) == SegmentStates.UNKNOWN_SEGMENT) {
         // This is the first time we see this segment, use the current time as the creation time
         creationTimeMs = currentTimeMs;
       }
       // For recently created segment, check if it is qualified as new segment
-      if (creationTimeMs > 0) {
+      boolean potentialNew = false;
+      if (InstanceSelector.isNewSegment(creationTimeMs, currentTimeMs, _newSegmentExpirationTimeInSeconds * 1000)) {
         assert idealStateAssignment.containsKey(segment);
         if (isPotentialNewSegment(idealStateAssignment.get(segment), externalViewAssignment.get(segment))) {
-          newSegmentCreationTimeMap.put(segment, creationTimeMs);
+          potentialNew = true;
+          if (isRealtimeLlcSegment(segment) && (previousCreationTimeMs == 0
+              || _pendingSegmentMetadata.containsKey(segment))) {
+            segmentsToResolve.put(segment, creationTimeMs);
+          } else {
+            newSegmentCreationTimeMap.put(segment, creationTimeMs);
+          }
         }
       }
+      if (!potentialNew) {
+        _pendingSegmentMetadata.removeLong(segment);
+      }
     }
+    resolveNewSegmentModes(segmentsToResolve, newSegmentCreationTimeMap);
     LOGGER.info(NEW_SEGMENTS_MARKER,
         "Got {} new segments: {} for table: {} by processing existing states, current time: {}",
         newSegmentCreationTimeMap.size(), newSegmentCreationTimeMap, _tableNameWithType, currentTimeMs);
     return newSegmentCreationTimeMap;
+  }
+
+  private boolean isRealtimeLlcSegment(String segment) {
+    return TableNameBuilder.isRealtimeTableResource(_tableNameWithType) && LLCSegmentName.of(segment) != null;
+  }
+
+  /// Resolves mode only for first-seen or unresolved realtime segments, not every historical assignment. Explicit
+  /// false retains native optional routing; true uses ordinary IS/EV candidates. Missing metadata remains ready-only
+  /// and is retried by later native refreshes, even if no assignment version changes in the meantime.
+  private void resolveNewSegmentModes(Object2LongOpenHashMap<String> segmentsToResolve,
+      Object2LongOpenHashMap<String> newSegmentCreationTimeMap) {
+    if (segmentsToResolve.isEmpty()) {
+      return;
+    }
+    _pendingSegmentMetadata.putAll(segmentsToResolve);
+    List<String> segmentNames = new ArrayList<>(segmentsToResolve.keySet());
+    try {
+      List<SegmentZKMetadata> metadataList =
+          ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, _tableNameWithType, segmentNames, null);
+      for (SegmentZKMetadata metadata : metadataList) {
+        if (metadata == null || !segmentsToResolve.containsKey(metadata.getSegmentName())) {
+          continue;
+        }
+        String segment = metadata.getSegmentName();
+        _pendingSegmentMetadata.removeLong(segment);
+        if (!metadata.isReplicateMode()) {
+          newSegmentCreationTimeMap.put(segment, segmentsToResolve.getLong(segment));
+        }
+      }
+    } catch (RuntimeException e) {
+      LOGGER.warn("Failed to resolve new segment modes for table: {}; keeping only ready routing candidates",
+          _tableNameWithType, e);
+    }
   }
 
   @Override

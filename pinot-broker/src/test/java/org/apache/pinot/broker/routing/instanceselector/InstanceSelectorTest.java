@@ -188,6 +188,11 @@ public class InstanceSelectorTest {
   public void setUp() {
     _mutableClock = new TestClock(Instant.now(), ZoneId.systemDefault());
     _mocks = MockitoAnnotations.openMocks(this);
+    // Missing metadata retains one null result per requested path, matching the native batch-read contract.
+    when(_propertyStore.get(anyList(), any(), anyInt(), anyBoolean())).thenAnswer(invocation -> {
+      List<String> paths = invocation.getArgument(0);
+      return new ArrayList<>(Collections.nCopies(paths.size(), null));
+    });
     when(_brokerRequest.getPinotQuery()).thenReturn(_pinotQuery);
     when(_pinotQuery.getQueryOptions()).thenReturn(null);
     when(_tableConfig.getTableName()).thenReturn(TABLE_NAME);

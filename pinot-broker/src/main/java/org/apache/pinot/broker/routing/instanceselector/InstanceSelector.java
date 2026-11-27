@@ -60,6 +60,12 @@ public interface InstanceSelector {
   /// [org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector]).
   void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments);
 
+  /// Whether a later assignment refresh must retry unresolved segment metadata even if IS/EV versions are unchanged.
+  /// This is queried by the routing manager under the same table lock used for assignment updates.
+  default boolean hasPendingSegmentMetadata() {
+    return false;
+  }
+
   /// Selects the server instances for the given segments queried by the given broker request, returns the segments to
   /// query on each selected server instance and the unavailable segments (no enabled instance or all enabled instances
   /// are in ERROR state).

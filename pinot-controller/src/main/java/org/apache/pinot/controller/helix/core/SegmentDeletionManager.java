@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,17 +53,20 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.controller.util.SegmentArtifactUtils;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.impl.SegmentDeletionEventDetails;
 import org.apache.pinot.materializedview.consistency.MaterializedViewConsistencyManager;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,21 +103,37 @@ public class SegmentDeletionManager {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final long _defaultDeletedSegmentsRetentionMs;
   private final boolean _preserveDeletedSegmentMetadata;
+  @Nullable
+  private final String _controllerVipUrl;
   private volatile MaterializedViewConsistencyManager _materializedViewConsistencyManager;
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
-    this(dataDir, helixAdmin, helixClusterName, propertyStore, deletedSegmentsRetentionInDays, false);
+    this(dataDir, helixAdmin, helixClusterName, propertyStore, deletedSegmentsRetentionInDays, false, null);
   }
 
   public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays,
       boolean preserveDeletedSegmentMetadata) {
+    this(dataDir, helixAdmin, helixClusterName, propertyStore, deletedSegmentsRetentionInDays,
+        preserveDeletedSegmentMetadata, null);
+  }
+
+  public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays,
+      @Nullable String controllerVipUrl) {
+    this(dataDir, helixAdmin, helixClusterName, propertyStore, deletedSegmentsRetentionInDays, false, controllerVipUrl);
+  }
+
+  public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays,
+      boolean preserveDeletedSegmentMetadata, @Nullable String controllerVipUrl) {
     _dataDir = dataDir;
     _helixAdmin = helixAdmin;
     _helixClusterName = helixClusterName;
     _propertyStore = propertyStore;
     _defaultDeletedSegmentsRetentionMs = TimeUnit.DAYS.toMillis(deletedSegmentsRetentionInDays);
+    _controllerVipUrl = controllerVipUrl;
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -213,12 +233,19 @@ public class SegmentDeletionManager {
       PinotSegmentLifecycleEventListenerManager.getInstance()
           .notifyListeners(new SegmentDeletionEventDetails(tableName, segmentsToDelete));
 
+      // Immutable commit/replay files have a different name from the logical segment. Capture their selected URI
+      // before deleting the only durable pointer to them. Unselected attempts are handled by orphan retention.
+      Map<String, URI> selectedArtifacts = getSelectedArtifacts(tableName, segmentsToDelete);
       deletedSegments = deleteSegmentsFromPropertyStore(tableName, segmentsToDelete);
 
       // Best effort remove segments from deep store.
       // If this fails (e.g. controller crashes, deep store unavailable), future runs of RetentionManager
       // will attempt to delete orphan deep store entries. Check getSegmentsToDeleteFromDeepstore()
-      removeSegmentsFromStoreInBatch(tableName, deletedSegments, deletedSegmentsRetentionMs);
+      Set<String> conventionalSegments = new LinkedHashSet<>(deletedSegments);
+      conventionalSegments.removeAll(selectedArtifacts.keySet());
+      removeSegmentsFromStoreInBatch(tableName, conventionalSegments, deletedSegmentsRetentionMs);
+      selectedArtifacts.keySet().retainAll(deletedSegments);
+      removeSegmentFilesFromStoreInBatch(tableName, selectedArtifacts, deletedSegmentsRetentionMs);
     }
 
     Set<String> segmentsToRetryLater = new HashSet<>(segmentIds);
@@ -310,6 +337,49 @@ public class SegmentDeletionManager {
       return;
     }
 
+    Map<String, URI> selectedArtifacts = getSelectedArtifacts(tableNameWithType, segments);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    for (String segmentId : segments) {
+      if (!selectedArtifacts.containsKey(segmentId)) {
+        URI fileToDelete = getFileToDeleteURI(rawTableName, segmentId);
+        if (fileToDelete != null) {
+          selectedArtifacts.put(segmentId, fileToDelete);
+        }
+      }
+    }
+    removeSegmentFilesFromStoreInBatch(tableNameWithType, selectedArtifacts, deletedSegmentsRetentionMs);
+  }
+
+  private Map<String, URI> getSelectedArtifacts(String tableNameWithType, Collection<String> segments) {
+    Map<String, URI> selectedArtifacts = new LinkedHashMap<>();
+    if (_dataDir == null) {
+      return selectedArtifacts;
+    }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    for (String segmentId : segments) {
+      try {
+        SegmentZKMetadata metadata =
+            ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentId);
+        URI selectedUri = metadata != null
+            ? SegmentArtifactUtils.getOwnedArtifactUri(_dataDir, rawTableName, metadata, _controllerVipUrl)
+            : null;
+        if (selectedUri != null) {
+          selectedArtifacts.put(segmentId, selectedUri);
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Could not resolve selected artifact for segment: {} of table: {}", segmentId,
+            tableNameWithType, e);
+      }
+    }
+    return selectedArtifacts;
+  }
+
+  private void removeSegmentFilesFromStoreInBatch(String tableNameWithType, Map<String, URI> segmentFiles,
+      @Nullable Long deletedSegmentsRetentionMs) {
+    if (segmentFiles.isEmpty()) {
+      return;
+    }
+
     long retentionMs =
         (deletedSegmentsRetentionMs == null) ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -318,10 +388,16 @@ public class SegmentDeletionManager {
     List<URI> metadataFilesToDelete = new ArrayList<>();
 
     PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_dataDir).getScheme());
+    boolean hasImmutableArtifact = segmentFiles.values().stream().anyMatch(uri ->
+        SegmentArtifactUtils.getLogicalSegmentName(URIUtils.decode(URIUtils.getLastPart(uri.toString()))) != null);
+    Set<URI> companionReferences = hasImmutableArtifact ? getCompanionArtifactReferences(tableNameWithType) : Set.of();
 
-    for (String segmentId : segments) {
-      URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
-      if (fileToDeleteURI == null) {
+    for (Map.Entry<String, URI> entry : segmentFiles.entrySet()) {
+      String segmentId = entry.getKey();
+      URI fileToDeleteURI = entry.getValue();
+      if (SegmentArtifactUtils.getLogicalSegmentName(URIUtils.decode(URIUtils.getLastPart(fileToDeleteURI.toString())))
+          != null && (companionReferences == null || companionReferences.contains(fileToDeleteURI.normalize()))) {
+        LOGGER.info("Retaining shared or unverified segment artifact: {}", fileToDeleteURI);
         continue;
       }
       if (retentionMs <= 0) {
@@ -334,7 +410,7 @@ public class SegmentDeletionManager {
       // moveSegmentsToDeletedDir); otherwise it is deleted.
       if (retentionMs <= 0 || !_preserveDeletedSegmentMetadata) {
         try {
-          metadataFilesToDelete.add(SegmentPushUtils.generateSegmentMetadataURI(fileToDeleteURI.toString(), segmentId));
+          metadataFilesToDelete.add(getSegmentMetadataURI(fileToDeleteURI, segmentId));
         } catch (URISyntaxException e) {
           LOGGER.warn("Could not generate segment metadata URI for segment: {}", segmentId, e);
         }
@@ -352,6 +428,46 @@ public class SegmentDeletionManager {
       }
     } catch (IOException e) {
       LOGGER.warn("Could not delete segment/metadata files", e);
+    }
+  }
+
+  /// The two typed tables share a deep-store directory. A selected artifact can also be referenced by a companion
+  /// table segment under another logical name; uncertain inventory reads must keep the artifact.
+  @Nullable
+  private Set<URI> getCompanionArtifactReferences(String tableNameWithType) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    TableType companionType = TableNameBuilder.isRealtimeTableResource(tableNameWithType)
+        ? TableType.OFFLINE
+        : TableType.REALTIME;
+    String companionTable = TableNameBuilder.forType(companionType).tableNameWithType(rawTableName);
+    String parentPath = ZKMetadataProvider.constructPropertyStorePathForResource(companionTable);
+    try {
+      List<String> segmentNames = _propertyStore.getChildNames(parentPath, AccessOption.PERSISTENT);
+      if (segmentNames == null) {
+        List<Stat> parentStats = new ArrayList<>(1);
+        _propertyStore.get(List.of(parentPath), parentStats, AccessOption.PERSISTENT, true);
+        // The parent may legitimately have null data. Only an absent Stat proves it is missing.
+        return parentStats.size() == 1 && parentStats.get(0) == null ? Set.of() : null;
+      }
+      Set<URI> references = new HashSet<>();
+      if (!segmentNames.isEmpty()) {
+        List<SegmentZKMetadata> metadataList =
+            ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, companionTable, segmentNames, null, true);
+        for (SegmentZKMetadata metadata : metadataList) {
+          if (metadata == null) {
+            return null;
+          }
+          URI referencedUri = SegmentArtifactUtils.resolveOwnedArtifactUri(_dataDir, rawTableName,
+              metadata.getDownloadUrl(), _controllerVipUrl);
+          if (referencedUri != null) {
+            references.add(referencedUri.normalize());
+          }
+        }
+      }
+      return references;
+    } catch (Exception e) {
+      LOGGER.warn("Could not verify artifact references from companion table: {}", companionTable, e);
+      return null;
     }
   }
 
@@ -394,7 +510,7 @@ public class SegmentDeletionManager {
       String rawTableName, String retentionSuffix) {
     // Same retention suffix as the archived segment so both expire together; the separate root cannot collide with it.
     try {
-      URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(segmentFileUri.toString(), segmentId);
+      URI segmentMetadataUri = getSegmentMetadataURI(segmentFileUri, segmentId);
       if (!pinotFS.exists(segmentMetadataUri)) {
         return;
       }
@@ -414,6 +530,15 @@ public class SegmentDeletionManager {
     }
   }
 
+
+  /// Immutable attempts have attempt-scoped metadata as well. A logical-name sidecar can belong to a different
+  /// live artifact, so deleting an attempt must never fall back to that conventional sidecar.
+  private static URI getSegmentMetadataURI(URI segmentFileUri, String segmentId)
+      throws URISyntaxException {
+    String fileName = URIUtils.decode(URIUtils.getLastPart(segmentFileUri.toString()));
+    String metadataName = SegmentArtifactUtils.getLogicalSegmentName(fileName) != null ? fileName : segmentId;
+    return SegmentPushUtils.generateSegmentMetadataURI(segmentFileUri.toString(), metadataName);
+  }
 
   /// Retrieves the URI for segment deletion by checking two possible segment file variants in deep store.
   /// Looks for the segment file in two formats:

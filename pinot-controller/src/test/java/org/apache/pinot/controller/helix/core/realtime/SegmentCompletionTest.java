@@ -20,9 +20,12 @@ package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Field;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.assignment.ReplicateModeAssignmentUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -39,6 +42,7 @@ import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
@@ -128,6 +132,23 @@ public class SegmentCompletionTest {
     Field fsmMapField = SegmentCompletionManager.class.getDeclaredField("_fsmMap");
     fsmMapField.setAccessible(true);
     _fsmMap = (Map<String, Object>) fsmMapField.get(_segmentCompletionMgr);
+  }
+
+  @Test
+  public void testReplicateModeCommitsWithoutWaitingForFollowers() {
+    _segmentManager._segmentMetadata.setReplicateMode(true);
+    Request.Params params = new Request.Params().withInstanceId(S_1)
+        .withStreamPartitionMsgOffset(_s1Offset.toString()).withSegmentName(_segmentNameStr)
+        .withReason(SegmentCompletionProtocol.REASON_TIME_LIMIT);
+    // A time-limit flush must commit immediately, without waiting for reports from the two non-consuming followers.
+    assertEquals(_segmentCompletionMgr.segmentConsumed(params).getStatus(), ControllerResponseStatus.COMMIT);
+    assertEquals(_segmentManager._segmentMetadata.getNumReplicas(), 3);
+    assertEquals(_segmentCompletionMgr.segmentCommitStart(params).getStatus(),
+        ControllerResponseStatus.COMMIT_CONTINUE);
+    params.withSegmentLocation("file:/replicate/segment.commit.fixture");
+    assertEquals(_segmentCompletionMgr.segmentCommitEnd(params,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params)).getStatus(),
+        ControllerResponseStatus.COMMIT_SUCCESS);
   }
 
   @Test
@@ -1429,6 +1450,16 @@ public class SegmentCompletionTest {
     @Override
     public SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, Stat stat) {
       return _segmentMetadata;
+    }
+
+    @Override
+    public IdealState getIdealState(String realtimeTableName) {
+      IdealState idealState = new IdealState(realtimeTableName);
+      ReplicateModeAssignmentUtils.setAssignment(idealState,
+          new LLCSegmentName(_segmentMetadata.getSegmentName()).getPartitionGroupId(), S_1, List.of(S_1, S_2, S_3));
+      idealState.setInstanceStateMap(_segmentMetadata.getSegmentName(),
+          Map.of(S_1, SegmentStateModel.CONSUMING));
+      return idealState;
     }
 
     @Override

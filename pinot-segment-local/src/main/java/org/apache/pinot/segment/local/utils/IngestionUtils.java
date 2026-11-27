@@ -22,16 +22,19 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -41,7 +44,10 @@ import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenera
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -61,10 +67,20 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamDataDecoder;
+import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
+import org.slf4j.Logger;
 
 
 /// Helper methods for ingestion
@@ -336,5 +352,101 @@ public final class IngestionUtils {
       result.add(StringUtils.splitByWholeSeparator(field, delimiter)[0]);
     }
     return result;
+  }
+
+  /// A replicate-mode Kafka consumer must fail on missing offsets instead of silently skipping its saved range.
+  public static StreamConfig createConsumptionStreamConfig(String tableName, Map<String, String> streamConfigMap,
+      boolean replicateMode) {
+    if (!replicateMode || !"kafka".equals(streamConfigMap.get(StreamConfigProperties.STREAM_TYPE))) {
+      return new StreamConfig(tableName, streamConfigMap);
+    }
+    Map<String, String> consumptionConfig = new HashMap<>(streamConfigMap);
+    consumptionConfig.put("auto.offset.reset", "none");
+    return new StreamConfig(tableName, consumptionConfig);
+  }
+
+  /// Configures the column partition function using the full stream partition count, even when consumption selects a
+  /// subset of partitions. Callbacks preserve each driver's reporting and metadata-provider replacement policy.
+  public static void configureRealtimePartitioning(RealtimeSegmentConfig.Builder builder,
+      @Nullable SegmentPartitionConfig partitionConfig, int partitionId, @Nullable StreamMetadataProvider provider,
+      long timeoutMs, Logger logger, PartitioningListener listener) {
+    if (partitionConfig == null) {
+      return;
+    }
+    Map<String, ColumnPartitionConfig> columns = partitionConfig.getColumnPartitionMap();
+    if (columns.size() != 1) {
+      logger.warn("Cannot partition on multiple columns: {}", columns.keySet());
+      return;
+    }
+    Map.Entry<String, ColumnPartitionConfig> entry = columns.entrySet().iterator().next();
+    ColumnPartitionConfig column = entry.getValue();
+    int numPartitions = column.getNumPartitions();
+    try {
+      // Kafka's selected partition groups do not describe its full partition-function domain. Streams whose shards
+      // split or merge need a separate partitioning contract; this retains the existing live-consumption behavior.
+      int streamPartitions = provider.fetchPartitionCount(timeoutMs);
+      if (streamPartitions != numPartitions) {
+        listener.onPartitionCountMismatch(numPartitions, streamPartitions);
+        numPartitions = streamPartitions;
+      }
+    } catch (Exception e) {
+      listener.onPartitionCountFetchFailure(numPartitions, e);
+    }
+    builder.setPartitionColumn(entry.getKey());
+    builder.setPartitionFunction(PartitionFunctionFactory.getPartitionFunction(column.getFunctionName(), numPartitions,
+        column.getFunctionConfig()));
+    builder.setPartitionId(partitionId);
+  }
+
+  /// Creates and initializes a decoder with the existing bounded initialization retry policy. The returned decoder
+  /// belongs to the caller and remains thread-confined.
+  public static StreamDecoder createStreamDecoder(StreamConfig streamConfig, TableConfig tableConfig, Schema schema,
+      Logger logger)
+      throws AttemptsExceededException, RetriableOperationException {
+    return createStreamDecoder(streamConfig, tableConfig, schema, logger,
+        RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+  }
+
+  static StreamDecoder createStreamDecoder(StreamConfig streamConfig, TableConfig tableConfig, Schema schema,
+      Logger logger, RetryPolicy retryPolicy)
+      throws AttemptsExceededException, RetriableOperationException {
+    Set<String> fieldsToRead = getFieldsForRecordExtractor(tableConfig, schema);
+    AtomicReference<StreamDecoder> initialized = new AtomicReference<>();
+    retryPolicy.attempt(() -> {
+      try {
+        StreamMessageDecoder<?> decoder = createMessageDecoder(streamConfig, tableConfig, schema, fieldsToRead);
+        StreamDataDecoder streamDataDecoder =
+            new StreamDataDecoderImpl(decoder, StreamDataDecoderImpl.isKeyBytesType(schema));
+        initialized.set(new StreamDecoder(streamDataDecoder, decoder.getClass().getName()));
+        return true;
+      } catch (Exception e) {
+        logger.warn("Failed to initialize the StreamMessageDecoder: ", e);
+        return false;
+      }
+    });
+    return initialized.get();
+  }
+
+  private static StreamMessageDecoder<?> createMessageDecoder(StreamConfig streamConfig, TableConfig tableConfig,
+      Schema schema, Set<String> fieldsToRead) {
+    try {
+      StreamMessageDecoder<?> decoder = PluginManager.get().createInstance(streamConfig.getDecoderClass());
+      decoder.init(fieldsToRead, streamConfig, tableConfig, schema);
+      return decoder;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while creating StreamMessageDecoder from stream config: " + streamConfig, e);
+    }
+  }
+
+  /// Construction result carrying the decoder instance and the plugin class used for consumer-state reporting.
+  public record StreamDecoder(StreamDataDecoder decoder, String decoderClassName) {
+  }
+
+  /// Synchronous observation hooks; the consumer continues to own its metadata provider and error reporting.
+  public interface PartitioningListener {
+    void onPartitionCountMismatch(int configuredCount, int streamCount);
+
+    void onPartitionCountFetchFailure(int configuredCount, Exception exception);
   }
 }

@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import java.util.concurrent.Semaphore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.server.api.resources.ReingestionResource.CHECK_INTERVAL_MS;
+import static org.apache.pinot.server.api.resources.ReingestionResource.isReplayStillCurrent;
 import static org.apache.pinot.server.api.resources.ReingestionResource.waitForCondition;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,6 +34,50 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /// Tests how [ReingestionResource] waits for the re-ingestion consumption to complete.
 public class ReingestionResourceTest {
   private static final String DESCRIPTION = "test condition";
+
+  @Test
+  public void testRecoveryAdmissionIsReleasedOnlyOnceAcrossShutdownAndCompletion() {
+    Semaphore admission = new Semaphore(0);
+    ReingestionResource.ReingestionJob job = new ReingestionResource.ReingestionJob("job", "segment", admission);
+    job.releaseAdmission();
+    job.releaseAdmission();
+    assertThat(admission.availablePermits()).isEqualTo(1);
+  }
+
+  @Test
+  public void testReplayPublicationRejectsObsoleteRangeAndIncarnation() {
+    SegmentZKMetadata original = new SegmentZKMetadata("test__0__0__20260101T0000Z");
+    original.setStatus(Status.COMMITTING);
+    original.setStartOffset("10");
+    original.setEndOffset("20");
+    original.setReplicateMode(true);
+    original.setCreationTime(1234);
+    assertThat(isReplayStillCurrent(original, copy(original))).isTrue();
+    assertThat(isReplayStillCurrent(original, null)).isFalse();
+
+    SegmentZKMetadata changed = copy(original);
+    changed.setEndOffset("21");
+    assertThat(isReplayStillCurrent(original, changed)).isFalse();
+    changed = copy(original);
+    changed.setStartOffset("11");
+    assertThat(isReplayStillCurrent(original, changed)).isFalse();
+    changed = copy(original);
+    changed.setCreationTime(1235);
+    assertThat(isReplayStillCurrent(original, changed)).isFalse();
+    changed = copy(original);
+    changed.setReplicateMode(false);
+    assertThat(isReplayStillCurrent(original, changed)).isFalse();
+    changed = copy(original);
+    changed.setStatus(Status.DONE);
+    assertThat(isReplayStillCurrent(original, changed)).isFalse();
+    changed = copy(original);
+    changed.setDownloadUrl("http://controller/winning-attempt");
+    assertThat(isReplayStillCurrent(original, changed)).isFalse();
+  }
+
+  private static SegmentZKMetadata copy(SegmentZKMetadata metadata) {
+    return new SegmentZKMetadata(new ZNRecord(metadata.toZNRecord()));
+  }
 
   @Test
   public void testWaitForConditionWithMaxTimeoutDoesNotTimeOutEarly() {

@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import java.time.Clock;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -60,6 +61,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -906,9 +910,15 @@ public class ReplicaGroupSelectorTest {
     when(server3.getPool()).thenReturn(FALLBACK_POOL_ID);
     Map<String, ServerInstance> serverMap = Map.of(partition0Replica0, server0, partition0Replica1, server1,
         partition1Replica0, server2, partition1Replica1, server3);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    // Missing metadata has one null result per requested path, matching the native batch-read contract.
+    when(propertyStore.get(anyList(), any(), anyInt(), anyBoolean())).thenAnswer(invocation -> {
+      List<String> paths = invocation.getArgument(0);
+      return Collections.nCopies(paths.size(), null);
+    });
     StrictReplicaGroupInstanceSelector instanceSelector =
         (StrictReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig,
-            mock(ZkHelixPropertyStore.class), mock(BrokerMetrics.class), hybridSelector,
+            propertyStore, mock(BrokerMetrics.class), hybridSelector,
             new PinotConfiguration(Map.of()),
             Set.of(partition0Replica0, partition0Replica1, partition1Replica0, partition1Replica1), serverMap,
             idealState, externalView, new HashSet<>(segments));

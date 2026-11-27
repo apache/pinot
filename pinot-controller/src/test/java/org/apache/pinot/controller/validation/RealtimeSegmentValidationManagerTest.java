@@ -74,6 +74,19 @@ public class RealtimeSegmentValidationManagerTest {
   }
 
   @Test
+  public void testReplicateModeRepairRunsWhenTableIsPausedAndModeDisabled() {
+    String tableName = "testTable_REALTIME";
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
+    when(_pinotHelixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
+    when(_llcRealtimeSegmentManager.getPauseStatusDetails(tableName))
+        .thenReturn(new PauseStatusDetails(true, null, PauseState.ReasonCode.ADMINISTRATIVE, null, null));
+    _realtimeSegmentValidationManager.processTable(tableName, new RealtimeSegmentValidationManager.Context());
+    verify(_llcRealtimeSegmentManager).repairCompletedReplicateModeSegments(tableName);
+    verify(_llcRealtimeSegmentManager, never()).ensureAllPartitionsConsuming(any(), any(), any());
+  }
+
+  @Test
   public void testReingestionCalledWhenPauselessDisabled() {
     String rawTable = "testTable";
     String tableName = rawTable + "_REALTIME";

@@ -23,18 +23,23 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
+import org.apache.pinot.common.assignment.ReplicateModeAssignmentUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
@@ -42,11 +47,16 @@ import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.helix.core.assignment.segment.TableAssignment.ReplicateModePartitionAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.helix.core.realtime.ReplicateModeCandidateSelector;
+import org.apache.pinot.controller.helix.core.realtime.ReplicateModeCandidateSelector.CandidateContext;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
@@ -75,7 +85,58 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 ///   well. Upsert and dedup rely on this to serve all segments of a partition from the same instance, so these tables
 ///   cannot relocate COMPLETED segments, must include CONSUMING segments in the rebalance, and upsert tables cannot
 ///   use tiers.
+/// - Replicate-mode CONSUMING segments are assigned through [#assignConsumingSegment]: the complete replica set is
+///   retained in auxiliary IdealState fields, but only its stable consumption leader is assigned to the segment.
 public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
+
+  @Override
+  public List<String> assignConsumingSegment(SegmentZKMetadata segmentZKMetadata, IdealState idealState,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+    if (!segmentZKMetadata.isReplicateMode()) {
+      return assignSegment(segmentZKMetadata.getSegmentName(), idealState, instancePartitionsMap);
+    }
+    Preconditions.checkState(instancePartitionsMap.size() == 1
+            && instancePartitionsMap.containsKey(InstancePartitionsType.CONSUMING),
+        "A replicate-mode consuming segment requires CONSUMING instance partitions");
+    Preconditions.checkState(!segmentZKMetadata.getStatus().isCompleted(),
+        "Cannot assign completed segment: %s as a consuming segment", segmentZKMetadata.getSegmentName());
+    int partitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+
+    // A single consuming replica cannot be used to bootstrap a partition-pinned table's full replica set, e.g. when
+    // strict replica-group routing is enabled after replicate mode. Restore the recorded candidates first.
+    if (_partitionPinned && CollectionUtils.isEmpty(PartitionAssignmentUtils.getInstances(idealState, partitionId))) {
+      List<String> recordedReplicas = ReplicateModeAssignmentUtils.getReplicas(idealState, partitionId);
+      if (!recordedReplicas.isEmpty()) {
+        PartitionAssignmentUtils.setInstances(idealState, partitionId, recordedReplicas);
+      }
+    }
+    List<String> replicas = assignSegment(segmentZKMetadata.getSegmentName(), idealState, instancePartitionsMap);
+    Preconditions.checkState(!replicas.isEmpty(), "No replica candidates for partition: %s", partitionId);
+    String leader = ReplicateModeAssignmentUtils.getLeader(idealState, partitionId);
+    if (leader == null || !replicas.contains(leader)) {
+      Map<String, Integer> leaderCounts = new HashMap<>();
+      ReplicateModeAssignmentUtils.getLeaders(idealState).forEach((id, instance) -> {
+        if (id != partitionId) {
+          leaderCounts.merge(instance, 1, Integer::sum);
+        }
+      });
+      // Rotate the tie-breaking order across partitions so replica groups are not always led by the first group.
+      int startIndex = Math.floorMod(partitionId, replicas.size());
+      int minCount = Integer.MAX_VALUE;
+      for (int i = 0; i < replicas.size(); i++) {
+        String candidate = replicas.get((startIndex + i) % replicas.size());
+        int count = leaderCounts.getOrDefault(candidate, 0);
+        if (count < minCount) {
+          leader = candidate;
+          minCount = count;
+        }
+      }
+    }
+    ReplicateModeAssignmentUtils.setAssignment(idealState, partitionId, leader, replicas);
+    _logger.info("Assigned consumption leader: {} with replica candidates: {} for partition: {} of table: {}", leader,
+        replicas, partitionId, _tableNameWithType);
+    return List.of(leader);
+  }
 
   @Override
   public List<String> assignSegment(String segmentName, IdealState idealState,
@@ -213,6 +274,8 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
   ///   COMPLETED instances, or when the segment has been moved to a tier, because they are not on the CONSUMING
   ///   instances of the partition then. The tier is read from the segment ZK metadata whether or not the table still
   ///   has tiers configured, because removing the tier config does not move the segments back.
+  /// A replicate-mode source with fewer than its recorded replica count cannot bootstrap full partition placement;
+  /// return null so the caller uses the complete candidates from the current CONSUMING instance partitions.
   @Nullable
   @Override
   protected Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {
@@ -243,6 +306,15 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
         continue;
       }
       if (!completed) {
+        // This also applies when replicate mode was disabled before strict routing was enabled. Its old singleton
+        // is a consumption owner, not the full placement of the new ordinary segment. The read is only needed to
+        // bootstrap a partition without an existing numeric assignment; ordinary source placement stays unchanged.
+        SegmentZKMetadata metadata = ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(),
+            _tableNameWithType, segmentName);
+        if (metadata != null && metadata.isReplicateMode()
+            && instanceStateMap.size() < metadata.getNumReplicas()) {
+          return null;
+        }
         return instanceStateMap.keySet();
       }
       if (!relocateCompletedSegments && (latestLLCSegmentName == null
@@ -280,6 +352,10 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
           latestSegmentName, partitionId, segmentZKMetadata.getTier());
       return null;
     }
+    if (segmentZKMetadata.isReplicateMode()
+        && latestInstanceStateMap.size() < segmentZKMetadata.getNumReplicas()) {
+      return null;
+    }
     return latestInstanceStateMap.keySet();
   }
 
@@ -306,17 +382,39 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
             + "includeConsuming: {}, bootstrap: {}, partitionPinned: {}", _tableNameWithType,
         completedInstancePartitions, consumingInstancePartitions, includeConsuming, bootstrap, _partitionPinned);
     Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
+    Map<String, SegmentZKMetadata> replicateSnapshots = getReplicateModeSegments(idealState);
+    Map<String, SegmentZKMetadata> replicateSegments = new TreeMap<>();
+    Map<String, Map<String, String>> ordinaryAssignment = currentAssignment;
+    if (!replicateSnapshots.isEmpty()) {
+      ordinaryAssignment = new TreeMap<>(currentAssignment);
+      for (SegmentZKMetadata metadata : replicateSnapshots.values()) {
+        String segment = metadata.getSegmentName();
+        if (metadata.getStatus() == Status.IN_PROGRESS || metadata.getStatus() == Status.COMMITTING) {
+          replicateSegments.put(segment, metadata);
+          ordinaryAssignment.remove(segment);
+        } else if (metadata.getStatus() == Status.DONE
+            && currentAssignment.get(segment).containsValue(SegmentStateModel.CONSUMING)) {
+          // Completion can persist DONE before updating IdealState. Route the sealed artifact through native
+          // completed placement rather than expanding the stale CONSUMING entry into multiple consumers.
+          ordinaryAssignment.put(segment,
+              SegmentAssignmentUtils.getInstanceStateMap(currentAssignment.get(segment).keySet(),
+                  SegmentStateModel.ONLINE));
+        }
+      }
+    }
 
     // Rebalance tiers first
     Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
-        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap);
+        rebalanceTiers(ordinaryAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap);
 
     List<Map<String, Map<String, String>>> newTierAssignments = pair.getLeft();
     Map<String, Map<String, String>> nonTierAssignment = pair.getRight();
     // Partition ids of the non-tier segments, for the partition-pinned assignment and for the strict replica-group
     // batching of the rebalance, read from the segment ZK metadata for the segments without partition id in their name
+    Set<String> nonTierSegments = new HashSet<>(nonTierAssignment.keySet());
+    nonTierSegments.addAll(replicateSegments.keySet());
     Object2IntMap<String> segmentPartitionIds =
-        _partitionPinned ? getPartitionIds(nonTierAssignment.keySet()) : EMPTY_SEGMENT_PARTITION_IDS;
+        _partitionPinned ? getPartitionIds(nonTierSegments) : EMPTY_SEGMENT_PARTITION_IDS;
 
     Set<String> committingSegments = null;
     if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
@@ -336,11 +434,23 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     Map<Integer, List<String>> partitionAssignment;
     if (_partitionPinned) {
       IntSet partitionsWithSegments = new IntOpenHashSet(segmentPartitionIds.values());
+      Set<Integer> retainedReplicatePartitions = new HashSet<>();
+      boolean tablePaused = PinotLLCRealtimeSegmentManager.isTablePaused(idealState);
+      for (SegmentZKMetadata metadata : replicateSegments.values()) {
+        if (!includeConsuming || tablePaused
+            || PinotLLCRealtimeSegmentManager.isTopicPaused(idealState, metadata.getSegmentName())) {
+          retainedReplicatePartitions.add(new LLCSegmentName(metadata.getSegmentName()).getPartitionGroupId());
+        }
+      }
       partitionAssignment = new TreeMap<>();
       for (int partitionId : PartitionAssignmentUtils.getPartitionAssignment(idealState).keySet()) {
         if (partitionsWithSegments.contains(partitionId)) {
-          partitionAssignment.put(partitionId, PartitionAssignmentUtils.toInstanceList(
-              assignConsumingSegment(partitionId, consumingInstancePartitions)));
+          List<String> recordedReplicas = ReplicateModeAssignmentUtils.getReplicas(idealState, partitionId);
+          List<String> instances = retainedReplicatePartitions.contains(partitionId) && !recordedReplicas.isEmpty()
+              ? recordedReplicas
+              : PartitionAssignmentUtils.toInstanceList(
+                  assignConsumingSegment(partitionId, consumingInstancePartitions));
+          partitionAssignment.put(partitionId, instances);
         }
       }
     } else {
@@ -416,7 +526,161 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
 
     _logger.info("Rebalanced table: {}, number of segments to be added/removed for each instance: {}",
         _tableNameWithType, SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment));
-    return new TableAssignment(newAssignment, partitionAssignment, segmentPartitionIds);
+    Map<Integer, ReplicateModePartitionAssignment> replicateAssignment = rebalanceReplicateModeSegments(idealState,
+        replicateSegments, newAssignment, consumingInstancePartitions, partitionAssignment, segmentPartitionIds,
+        includeConsuming);
+    return new TableAssignment(newAssignment, partitionAssignment, segmentPartitionIds, replicateAssignment,
+        replicateSegments.keySet());
+  }
+
+  /// Snapshot metadata is authoritative even after the current table flags change. Rebalance is infrequent and
+  /// reads LLC metadata in one strict batch, including old COMMITTING segments missing from the native hint list.
+  private Map<String, SegmentZKMetadata> getReplicateModeSegments(IdealState idealState) {
+    if (!IngestionConfigUtils.isReplicateModeEnabled(_tableConfig)
+        && ReplicateModeAssignmentUtils.getLeaders(idealState).isEmpty()) {
+      return Map.of();
+    }
+    List<String> segments = idealState.getRecord().getMapFields().keySet().stream()
+        .filter(segment -> LLCSegmentName.of(segment) != null).sorted().toList();
+    if (segments.isEmpty()) {
+      return Map.of();
+    }
+    List<SegmentZKMetadata> metadataList = ZKMetadataProvider.getSegmentsZKMetadata(
+        _helixManager.getHelixPropertyStore(), _tableNameWithType, segments, null, true);
+    Map<String, SegmentZKMetadata> snapshots = new TreeMap<>();
+    for (int i = 0; i < segments.size(); i++) {
+      SegmentZKMetadata metadata = metadataList.get(i);
+      Preconditions.checkState(metadata != null, "Missing metadata during replicate-mode rebalance: %s",
+          segments.get(i));
+      if (metadata.isReplicateMode()) {
+        snapshots.put(metadata.getSegmentName(), metadata);
+      }
+    }
+    return snapshots;
+  }
+
+  private Map<Integer, ReplicateModePartitionAssignment> rebalanceReplicateModeSegments(IdealState idealState,
+      Map<String, SegmentZKMetadata> segments, Map<String, Map<String, String>> targetAssignment,
+      InstancePartitions consumingInstancePartitions, Map<Integer, List<String>> partitionAssignment,
+      Object2IntMap<String> segmentPartitionIds, boolean includeConsuming) {
+    if (segments.isEmpty()) {
+      return Map.of();
+    }
+    Map<Integer, List<SegmentZKMetadata>> byPartition = new TreeMap<>();
+    segments.values().forEach(metadata -> byPartition.computeIfAbsent(
+        new LLCSegmentName(metadata.getSegmentName()).getPartitionGroupId(), ignored -> new ArrayList<>())
+        .add(metadata));
+    Map<String, Integer> leaderCounts = new HashMap<>();
+    ReplicateModeAssignmentUtils.getLeaders(idealState).values()
+        .forEach(server -> leaderCounts.merge(server, 1, Integer::sum));
+    Map<Integer, ReplicateModePartitionAssignment> roles = new TreeMap<>();
+    Map<Integer, List<String>> eligibleByPartition = new TreeMap<>();
+    IdealState candidateState = new IdealState(new ZNRecord(idealState.getRecord()));
+    Map<String, InstanceConfig> instanceConfigs = null;
+    Set<String> liveInstances = null;
+    for (Map.Entry<Integer, List<SegmentZKMetadata>> entry : byPartition.entrySet()) {
+      int partition = entry.getKey();
+      List<SegmentZKMetadata> partitionSegments = entry.getValue();
+      String recordedLeader = ReplicateModeAssignmentUtils.getLeader(idealState, partition);
+      List<String> recordedReplicas = ReplicateModeAssignmentUtils.getReplicas(idealState, partition);
+      boolean paused = PinotLLCRealtimeSegmentManager.isTablePaused(idealState)
+          || PinotLLCRealtimeSegmentManager.isTopicPaused(idealState, partitionSegments.get(0).getSegmentName());
+      boolean moveConsuming = includeConsuming && !paused;
+      String representative = partitionSegments.get(0).getSegmentName();
+      List<String> replicas = !moveConsuming && !recordedReplicas.isEmpty()
+          ? recordedReplicas
+          : getTargetInstances(representative, consumingInstancePartitions, partitionAssignment, segmentPartitionIds);
+      Preconditions.checkState(!replicas.isEmpty(), "No replica placement for partition: %s", partition);
+      List<SegmentZKMetadata> consuming = partitionSegments.stream()
+          .filter(metadata -> metadata.getStatus() == Status.IN_PROGRESS).toList();
+      Preconditions.checkState(consuming.size() <= 1,
+          "Multiple unfinished consuming segments for replicate-mode partition: %s", partition);
+      String leader = recordedLeader;
+      if (!consuming.isEmpty() && moveConsuming) {
+        if (instanceConfigs == null) {
+          instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager).stream()
+              .collect(Collectors.toMap(InstanceConfig::getInstanceName, instance -> instance));
+          liveInstances = Set.copyOf(_helixManager.getHelixDataAccessor().getChildNames(
+              _helixManager.getHelixDataAccessor().keyBuilder().liveInstances()));
+        }
+        ReplicateModeAssignmentUtils.setAssignment(candidateState, partition,
+            recordedLeader != null && replicas.contains(recordedLeader) ? recordedLeader : replicas.get(0), replicas);
+        if (_partitionPinned) {
+          PartitionAssignmentUtils.setInstances(candidateState, partition, replicas);
+        }
+        CandidateContext context = new CandidateContext(_tableConfig, candidateState, consumingInstancePartitions,
+            instanceConfigs, liveInstances);
+        List<String> eligible = ReplicateModeCandidateSelector.getEligibleServersForRebalance(context, partition,
+            consuming.stream().map(SegmentZKMetadata::getSegmentName).toList(), System.currentTimeMillis());
+        Preconditions.checkState(!eligible.isEmpty(), "No eligible consumption leader for partition: %s", partition);
+        eligibleByPartition.put(partition, eligible);
+        if (recordedLeader != null) {
+          leaderCounts.computeIfPresent(recordedLeader, (server, count) -> Math.max(0, count - 1));
+        }
+        int minCount = eligible.stream().mapToInt(server -> leaderCounts.getOrDefault(server, 0)).min().orElseThrow();
+        if (recordedLeader != null && eligible.contains(recordedLeader)
+            && leaderCounts.getOrDefault(recordedLeader, 0) == minCount) {
+          leader = recordedLeader;
+        } else {
+          int startIndex = Math.floorMod(partition, eligible.size());
+          for (int i = 0; i < eligible.size(); i++) {
+            String candidate = eligible.get((startIndex + i) % eligible.size());
+            if (leaderCounts.getOrDefault(candidate, 0) == minCount) {
+              leader = candidate;
+              break;
+            }
+          }
+        }
+        leaderCounts.merge(leader, 1, Integer::sum);
+      } else if (!consuming.isEmpty()) {
+        Map<String, String> current = idealState.getInstanceStateMap(consuming.get(0).getSegmentName());
+        leader = recordedLeader != null && current.containsKey(recordedLeader)
+            ? recordedLeader
+            : current.keySet().stream().sorted().findFirst()
+                .orElseThrow(() -> new IllegalStateException("Empty consuming assignment"));
+      }
+      if (leader == null || !replicas.contains(leader)) {
+        leader = replicas.get(0);
+      }
+      roles.put(partition, new ReplicateModePartitionAssignment(leader, replicas));
+      for (SegmentZKMetadata metadata : partitionSegments) {
+        String segment = metadata.getSegmentName();
+        Map<String, String> current = idealState.getInstanceStateMap(segment);
+        Preconditions.checkState(current != null && !current.isEmpty(), "Missing assignment for segment: %s", segment);
+        if (metadata.getStatus() == Status.COMMITTING) {
+          // The accepted uploader may still be building. Preserve its assignment until the authoritative artifact
+          // exists; followers must never download a COMMITTING segment as though it were DONE.
+          String owner = recordedLeader != null && current.containsKey(recordedLeader) ? recordedLeader
+              : current.keySet().stream().sorted().findFirst().orElseThrow();
+          targetAssignment.put(segment, new HashMap<>(Map.of(owner, SegmentStateModel.ONLINE)));
+        } else {
+          String state = moveConsuming || current.containsValue(SegmentStateModel.CONSUMING)
+              ? SegmentStateModel.CONSUMING : current.values().iterator().next();
+          targetAssignment.put(segment, new HashMap<>(Map.of(leader, state)));
+        }
+      }
+    }
+    if (!eligibleByPartition.isEmpty()) {
+      // Local tie retention can leave a constrained placement stuck even when a chain of leader exchanges would
+      // improve its spread. Include fixed roles in the load, but move only the unpaused consuming partitions above.
+      Map<Integer, String> currentLeaders = new HashMap<>(ReplicateModeAssignmentUtils.getLeaders(idealState));
+      roles.forEach((partition, role) -> currentLeaders.put(partition, role.leader()));
+      Map<Integer, String> balanced = ReplicateModeLeaderBalancer.balance(currentLeaders, eligibleByPartition);
+      for (int partition : eligibleByPartition.keySet()) {
+        ReplicateModePartitionAssignment role = roles.get(partition);
+        String leader = balanced.get(partition);
+        if (!leader.equals(role.leader())) {
+          roles.put(partition, new ReplicateModePartitionAssignment(leader, role.replicas()));
+          for (SegmentZKMetadata metadata : byPartition.get(partition)) {
+            if (metadata.getStatus() == Status.IN_PROGRESS) {
+              targetAssignment.put(metadata.getSegmentName(),
+                  new HashMap<>(Map.of(leader, SegmentStateModel.CONSUMING)));
+            }
+          }
+        }
+      }
+    }
+    return roles;
   }
 
   /// Returns the target instances of the given segment with the CONSUMING instance partitions. For a partition-pinned

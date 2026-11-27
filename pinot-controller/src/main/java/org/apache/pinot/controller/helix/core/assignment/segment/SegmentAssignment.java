@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -50,6 +51,14 @@ public interface SegmentAssignment {
   /// @return List of instances to assign the segment to
   List<String> assignSegment(String segmentName, IdealState idealState,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap);
+
+  /// Assigns a consuming segment using its persisted creation-time metadata. The default assigns all replicas;
+  /// real-time implementations can use the captured consumption mode to select a single consumption leader.
+  /// Any auxiliary role fields must be updated in the supplied IdealState, alongside the segment assignment.
+  default List<String> assignConsumingSegment(SegmentZKMetadata segmentZKMetadata, IdealState idealState,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+    return assignSegment(segmentZKMetadata.getSegmentName(), idealState, instancePartitionsMap);
+  }
 
   /// Rebalances the segment assignment for a table.
   ///

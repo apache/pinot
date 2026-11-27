@@ -62,6 +62,7 @@ import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
+import org.apache.pinot.common.assignment.ReplicateModeAssignmentUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -85,6 +86,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.TableAssignment;
+import org.apache.pinot.controller.helix.core.assignment.segment.TableAssignment.ReplicateModePartitionAssignment;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
@@ -103,6 +105,7 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.StringUtil;
@@ -296,6 +299,17 @@ public class TableRebalancer {
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, "Cannot find the IdealState for table",
           null, null, null, null, null);
     }
+    if (!dryRun && !ReplicateModeAssignmentUtils.getPendingRestarts(currentIdealState).isEmpty()) {
+      try {
+        restartPendingReplicateModeConsumers(currentIdealState);
+        currentIdealState = _helixDataAccessor.getProperty(idealStatePropertyKey);
+        Preconditions.checkState(currentIdealState != null, "IdealState disappeared while restarting consumers");
+      } catch (Exception e) {
+        onReturnFailure("Could not resume pending replicate-mode consumer restarts", e, tableRebalanceLogger);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+            "Could not resume pending replicate-mode consumer restarts: " + e, null, null, null, null, null);
+      }
+    }
     if (!currentIdealState.isEnabled() && !downtime) {
       onReturnFailure("Cannot rebalance disabled table without downtime, aborting the rebalance", null,
           tableRebalanceLogger);
@@ -363,6 +377,8 @@ public class TableRebalancer {
 
     boolean segmentAssignmentUnchanged = currentAssignment.equals(targetAssignment);
     boolean partitionAssignmentUnchanged = currentPartitionAssignment.equals(targetPartitionAssignment);
+    boolean replicateModeAssignmentUnchanged =
+        isReplicateModeAssignmentApplied(currentIdealState, targetTableAssignment);
     tableRebalanceLogger.info("instancePartitionsUnchanged: {}, tierInstancePartitionsUnchanged: {}, "
             + "segmentAssignmentUnchanged: {}, partitionAssignmentUnchanged: {}", instancePartitionsUnchanged,
         tierInstancePartitionsUnchanged, segmentAssignmentUnchanged, partitionAssignmentUnchanged);
@@ -401,14 +417,17 @@ public class TableRebalancer {
       }
     }
 
-    if (segmentAssignmentUnchanged && !partitionAssignmentUnchanged) {
+    if (segmentAssignmentUnchanged && (!partitionAssignmentUnchanged || !replicateModeAssignmentUnchanged)) {
       // Only the partition assignment changes (e.g. a table created before the partition assignment was introduced,
       // or entries of partitions without segment to drop): the rebalance loop below updates it without moving any
       // segment
       tableRebalanceLogger.info("Table is already balanced, updating the partition assignment from: {} to: {}",
           currentPartitionAssignment, targetPartitionAssignment);
-    } else if (segmentAssignmentUnchanged) {
+    } else if (segmentAssignmentUnchanged && !hasCommittingOwnerOutsideCandidates(targetTableAssignment)) {
       tableRebalanceLogger.info("Table is already balanced");
+      if (!dryRun) {
+        completeRebalancedReplicateModeSegments(tableNameWithType, targetTableAssignment, currentIdealState);
+      }
       if (instancePartitionsUnchanged && tierInstancePartitionsUnchanged) {
         _tableRebalanceObserver.onNoop("Instance unchanged and table is already balanced");
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
@@ -433,6 +452,7 @@ public class TableRebalancer {
       tableRebalanceLogger.info("Rebalancing with downtime");
       if (forceCommit) {
         Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, targetAssignment);
+        excludeDiscardedReplicateModeConsumers(consumingSegmentsToMoveNext, currentIdealState, targetTableAssignment);
         if (!consumingSegmentsToMoveNext.isEmpty()) {
           try {
             currentIdealState = forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext,
@@ -481,13 +501,22 @@ public class TableRebalancer {
 
       // Reuse current IdealState to update the IdealState in cluster
       ZNRecord idealStateRecord = currentIdealState.getRecord();
-      setAssignment(currentIdealState, targetAssignment, targetPartitionAssignment);
+      setAssignment(currentIdealState, targetAssignment, targetPartitionAssignment, targetTableAssignment);
 
       // Check version and update IdealState
       try {
         Preconditions.checkState(_helixDataAccessor.getBaseDataAccessor()
             .set(idealStatePropertyKey.getPath(), idealStateRecord, idealStateRecord.getVersion(),
                 AccessOption.PERSISTENT), "Failed to update IdealState");
+        restartPendingReplicateModeConsumers(currentIdealState);
+        completeRebalancedReplicateModeSegments(tableNameWithType, targetTableAssignment, currentIdealState);
+        if (hasCommittingOwnerOutsideCandidates(targetTableAssignment)) {
+          String msg = "Replicate-mode COMMITTING owner remains outside the new replica candidates; placement and "
+              + "roles were updated, but the unfinished segment must finish or recover before retrying rebalance";
+          onReturnFailure(msg, null, tableRebalanceLogger);
+          return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, msg, instancePartitionsMap,
+              tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+        }
         String msg = "Finished rebalancing with downtime in " + (System.currentTimeMillis() - startTimeMs) + " ms.";
         tableRebalanceLogger.info(msg);
         _tableRebalanceObserver.onSuccess(msg);
@@ -569,6 +598,12 @@ public class TableRebalancer {
       // Wait for ExternalView to converge before updating the next IdealState
       IdealState idealState;
       try {
+        if (!targetTableAssignment.getReplicateModePartitionAssignment().isEmpty()) {
+          IdealState latest = _helixDataAccessor.getProperty(idealStatePropertyKey);
+          if (latest != null) {
+            restartPendingReplicateModeConsumers(latest);
+          }
+        }
         idealState = waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
             externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, estimatedAverageSegmentSizeInBytes,
             allSegmentsFromIdealState, tableRebalanceLogger);
@@ -630,14 +665,14 @@ public class TableRebalancer {
             }
           }
           TableAssignment newTargetAssignment = null;
-          if (!segmentsToMoveChanged) {
+          if (!segmentsToMoveChanged && targetTableAssignment.getReplicateModePartitionAssignment().isEmpty()) {
             newTargetAssignment =
                 getTargetAssignmentForNewIdealState(currentAssignment, oldPartitionAssignment,
                     currentPartitionAssignment, targetTableAssignment, segmentsToMove, stepPartitionAssignment,
                     relocateCompletedSegments, tableRebalanceLogger);
             segmentsToMoveChanged = newTargetAssignment == null;
           }
-          if (segmentsToMoveChanged) {
+          if (segmentsToMoveChanged || !targetTableAssignment.getReplicateModePartitionAssignment().isEmpty()) {
             try {
               // Re-calculate the instance partitions in case the instance configs changed during the rebalance
               instancePartitionsMap =
@@ -665,11 +700,13 @@ public class TableRebalancer {
           segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
         }
 
-        if (!minAvailableReplicasDetermined && !segmentsToMove.isEmpty()) {
+        if ((!minAvailableReplicasDetermined || !targetTableAssignment.getReplicateModePartitionAssignment().isEmpty())
+            && !segmentsToMove.isEmpty()) {
           minAvailableReplicasDetermined = true;
           try {
             minAvailableReplicas = getMinAvailableReplicas(segmentsToMove, currentAssignment, targetAssignment,
-                minReplicasToKeepUpForNoDowntime, tableRebalanceLogger);
+                minReplicasToKeepUpForNoDowntime, targetTableAssignment.getReplicateModeSegments(),
+                tableRebalanceLogger);
           } catch (IllegalStateException e) {
             onReturnFailure(e.getMessage() + ", aborting the rebalance", null, tableRebalanceLogger);
             return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
@@ -696,6 +733,7 @@ public class TableRebalancer {
                 tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
           }
           Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, nextAssignment);
+          excludeDiscardedReplicateModeConsumers(consumingSegmentsToMoveNext, idealState, targetTableAssignment);
           consumingSegmentsToMoveNext.removeIf(
               segment -> forceCommittedPartitions.contains(new LLCSegmentName(segment).getPartitionGroupId()));
 
@@ -726,7 +764,15 @@ public class TableRebalancer {
         }
       } while (needsRecalculation);
 
-      if (currentAssignment.equals(targetAssignment) && currentPartitionAssignment.equals(targetPartitionAssignment)) {
+      if (currentAssignment.equals(targetAssignment) && currentPartitionAssignment.equals(targetPartitionAssignment)
+          && isReplicateModeAssignmentApplied(idealState, targetTableAssignment)) {
+        if (hasCommittingOwnerOutsideCandidates(targetTableAssignment)) {
+          String msg = "Replicate-mode COMMITTING owner remains outside the new replica candidates; wait for "
+              + "completion or recovery, then retry rebalance to relocate that immutable segment";
+          onReturnFailure(msg, null, tableRebalanceLogger);
+          return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, msg, instancePartitionsMap,
+              tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+        }
         // The min available replicas are only determined once a segment needs to be moved
         String moveDescription = minAvailableReplicasDetermined ? "with minAvailableReplicas: " + minAvailableReplicas
             : "without moving any segment";
@@ -735,6 +781,7 @@ public class TableRebalancer {
             - startTimeMs) + " ms.";
         tableRebalanceLogger.info(msg);
         // Record completion
+        completeRebalancedReplicateModeSegments(tableNameWithType, targetTableAssignment, idealState);
         _tableRebalanceObserver.onSuccess(msg);
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
             "Success " + moveDescription
@@ -793,7 +840,7 @@ public class TableRebalancer {
       }
 
       // Reuse current IdealState to update the IdealState in cluster
-      setAssignment(idealState, nextAssignment, nextPartitionAssignment);
+      setAssignment(idealState, nextAssignment, nextPartitionAssignment, targetTableAssignment);
 
       // Check version and update IdealState
       try {
@@ -808,6 +855,7 @@ public class TableRebalancer {
         // captured the newly added / deleted segments
         allSegmentsFromIdealState = currentAssignment.keySet();
         tableRebalanceLogger.info("Successfully updated the IdealState");
+        restartPendingReplicateModeConsumers(idealState);
       } catch (ZkBadVersionException e) {
         tableRebalanceLogger.info("Version changed while updating IdealState");
         // Since IdealState wasn't updated, rollback the stats changes made
@@ -1637,6 +1685,11 @@ public class TableRebalancer {
       Map<Integer, List<String>> oldPartitionAssignment, Map<Integer, List<String>> currentPartitionAssignment,
       TableAssignment target, List<String> segmentsToMove, boolean stepPartitionAssignment,
       boolean relocateCompletedSegments, Logger tableRebalanceLogger) {
+    if (!target.getReplicateModePartitionAssignment().isEmpty() || !target.getReplicateModeSegments().isEmpty()) {
+      // A newly committed/created segment can change both its immutable mode snapshot and the partition leader.
+      // The ordinary map-only shortcut cannot infer either from the numeric full replica assignment.
+      return null;
+    }
     Map<String, Map<String, String>> targetAssignment = target.getSegmentAssignment();
     Map<Integer, List<String>> targetPartitionAssignment = target.getPartitionAssignment();
     // Other instance assignment code returns a TreeMap to keep it sorted, doing the same here
@@ -1717,11 +1770,17 @@ public class TableRebalancer {
   /// the best that can be done then, and helps the table get out of this state.
   ///
   /// @throws IllegalStateException when the configured minimum is not less than the number of replicas
-  private static int getMinAvailableReplicas(List<String> segmentsToMove,
+  @VisibleForTesting
+  static int getMinAvailableReplicas(List<String> segmentsToMove,
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
-      int minReplicasToKeepUpForNoDowntime, Logger tableRebalanceLogger) {
+      int minReplicasToKeepUpForNoDowntime, Set<String> replicateModeSegments, Logger tableRebalanceLogger) {
+    List<String> replicatedSegmentsToMove = segmentsToMove.stream()
+        .filter(segment -> !replicateModeSegments.contains(segment)).toList();
+    if (replicatedSegmentsToMove.isEmpty()) {
+      return 0;
+    }
     int numReplicas = Integer.MAX_VALUE;
-    for (String segment : segmentsToMove) {
+    for (String segment : replicatedSegmentsToMove) {
       numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
     }
     int minAvailableReplicas;
@@ -1734,7 +1793,7 @@ public class TableRebalancer {
       minAvailableReplicas = Math.max(numReplicas + minReplicasToKeepUpForNoDowntime, 0);
     }
     int numCurrentAssignmentReplicas = Integer.MAX_VALUE;
-    for (String segment : segmentsToMove) {
+    for (String segment : replicatedSegmentsToMove) {
       numCurrentAssignmentReplicas = Math.min(currentAssignment.get(segment).size(), numCurrentAssignmentReplicas);
     }
     if (minAvailableReplicas > numCurrentAssignmentReplicas) {
@@ -1761,14 +1820,156 @@ public class TableRebalancer {
   /// Sets the given segment assignment and partition assignment in the given IdealState, with the number of
   /// partitions and replicas derived from the segment assignment. The replicas are left as they are when there is no
   /// segment.
-  private static void setAssignment(IdealState idealState, Map<String, Map<String, String>> segmentAssignment,
-      Map<Integer, List<String>> partitionAssignment) {
+  @VisibleForTesting
+  static void setAssignment(IdealState idealState, Map<String, Map<String, String>> segmentAssignment,
+      Map<Integer, List<String>> partitionAssignment, TableAssignment target) {
+    Map<Integer, ReplicateModePartitionAssignment> nextRoles =
+        getReplicateModeAssignmentForStep(idealState, segmentAssignment, partitionAssignment, target);
+    Map<String, Map<String, String>> previousAssignment = idealState.getRecord().getMapFields();
+    for (String segment : target.getReplicateModeSegments()) {
+      Map<String, String> next = segmentAssignment.get(segment);
+      Map<String, String> previous = previousAssignment.get(segment);
+      if (next == null || next.size() != 1 || !next.containsValue(SegmentStateModel.CONSUMING)) {
+        continue;
+      }
+      String server = next.keySet().iterator().next();
+      LLCSegmentName name = new LLCSegmentName(segment);
+      if (previous != null && SegmentStateModel.CONSUMING.equals(previous.get(server))
+          && (previous.size() != 1 || !server.equals(
+              ReplicateModeAssignmentUtils.getLeader(idealState, name.getPartitionGroupId())))) {
+        // A previous full-R rebalance or stale role can have made this retained consumer terminal DISCARDED.
+        // Persist restart intent with the normalized singleton; an unchanged Helix state alone cannot restart it.
+        ReplicateModeAssignmentUtils.setPendingRestart(idealState, segment, server);
+      }
+    }
     idealState.getRecord().setMapFields(segmentAssignment);
     PartitionAssignmentUtils.setPartitionAssignment(idealState, partitionAssignment);
+    nextRoles.forEach((partition, assignment) -> ReplicateModeAssignmentUtils.setAssignment(idealState, partition,
+        assignment.leader(), assignment.replicas()));
     idealState.setNumPartitions(segmentAssignment.size());
     if (!segmentAssignment.isEmpty()) {
-      idealState.setReplicas(Integer.toString(segmentAssignment.values().iterator().next().size()));
+      int replicas = nextRoles.isEmpty()
+          ? segmentAssignment.values().iterator().next().size()
+          : Math.max(segmentAssignment.values().stream().mapToInt(Map::size).max().orElse(0),
+              nextRoles.values().stream().mapToInt(role -> role.replicas().size()).max().orElse(0));
+      idealState.setReplicas(Integer.toString(replicas));
     }
+  }
+
+  private static Map<Integer, ReplicateModePartitionAssignment> getReplicateModeAssignmentForStep(IdealState idealState,
+      Map<String, Map<String, String>> segmentAssignment, Map<Integer, List<String>> partitionAssignment,
+      TableAssignment target) {
+    Map<Integer, String> consumingOwners = new HashMap<>();
+    for (String segment : target.getReplicateModeSegments()) {
+      Map<String, String> states = segmentAssignment.get(segment);
+      if (states != null && states.size() == 1 && states.containsValue(SegmentStateModel.CONSUMING)) {
+        consumingOwners.put(new LLCSegmentName(segment).getPartitionGroupId(), states.keySet().iterator().next());
+      }
+    }
+    Map<Integer, ReplicateModePartitionAssignment> roles = new TreeMap<>();
+    target.getReplicateModePartitionAssignment().forEach((partition, desired) -> {
+      List<String> candidates = partitionAssignment.getOrDefault(partition, desired.replicas());
+      String leader = consumingOwners.getOrDefault(partition, desired.leader());
+      Preconditions.checkState(!consumingOwners.containsKey(partition) || candidates.contains(leader),
+          "Replicate-mode consumer: %s must belong to candidates: %s for partition: %s", leader, candidates, partition);
+      if (!candidates.contains(leader)) {
+        String existing = ReplicateModeAssignmentUtils.getLeader(idealState, partition);
+        leader = existing != null && candidates.contains(existing) ? existing : candidates.get(0);
+      }
+      roles.put(partition, new ReplicateModePartitionAssignment(leader, candidates));
+    });
+    return roles;
+  }
+
+  @VisibleForTesting
+  static boolean isReplicateModeAssignmentApplied(IdealState idealState, TableAssignment target) {
+    for (Map.Entry<Integer, ReplicateModePartitionAssignment> entry
+        : target.getReplicateModePartitionAssignment().entrySet()) {
+      if (!entry.getValue().leader().equals(ReplicateModeAssignmentUtils.getLeader(idealState, entry.getKey()))
+          || !entry.getValue().replicas().equals(
+              ReplicateModeAssignmentUtils.getReplicas(idealState, entry.getKey()))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @VisibleForTesting
+  static boolean hasCommittingOwnerOutsideCandidates(TableAssignment target) {
+    for (String segment : target.getReplicateModeSegments()) {
+      Map<String, String> states = target.getSegmentAssignment().get(segment);
+      if (states == null || states.size() != 1 || !states.containsValue(SegmentStateModel.ONLINE)) {
+        continue;
+      }
+      ReplicateModePartitionAssignment role = target.getReplicateModePartitionAssignment()
+          .get(new LLCSegmentName(segment).getPartitionGroupId());
+      if (role != null && !role.replicas().contains(states.keySet().iterator().next())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @VisibleForTesting
+  static void excludeDiscardedReplicateModeConsumers(Set<String> segmentsToCommit, IdealState idealState,
+      TableAssignment target) {
+    segmentsToCommit.removeIf(segment -> {
+      if (!target.getReplicateModeSegments().contains(segment)) {
+        return false;
+      }
+      Map<String, String> current = idealState.getInstanceStateMap(segment);
+      // The completion protocol rejected these assignments, so their consumers may already be DISCARDED. Waiting
+      // for them to force-commit would prevent the normalization/reset that makes progress possible again.
+      return current == null || current.size() != 1 || !current.keySet().iterator().next().equals(
+          ReplicateModeAssignmentUtils.getLeader(idealState, new LLCSegmentName(segment).getPartitionGroupId()));
+    });
+  }
+
+  private void restartPendingReplicateModeConsumers(IdealState idealState) {
+    Map<String, String> restarts = ReplicateModeAssignmentUtils.getPendingRestarts(idealState);
+    if (!restarts.isEmpty()) {
+      Preconditions.checkState(_pinotLLCRealtimeSegmentManager != null,
+          "Replicate-mode consumer repair requires the realtime segment manager");
+      restarts.forEach((segment, server) -> _pinotLLCRealtimeSegmentManager.restartReplicateModeConsumer(
+          idealState.getResourceName(), segment, server));
+    }
+  }
+
+  /// An explicit completed-segment assignment supersedes initial fanout, including placement on a completed tier.
+  /// Called only after the final assignment is durable; intermediate rebalance steps must retain recovery intent.
+  @VisibleForTesting
+  void completeRebalancedReplicateModeSegments(String table, TableAssignment target, IdealState knownIdealState) {
+    if (_pinotLLCRealtimeSegmentManager == null
+        || ReplicateModeAssignmentUtils.getLeaders(knownIdealState).isEmpty()) {
+      return;
+    }
+    Set<String> completed = new HashSet<>(_pinotLLCRealtimeSegmentManager.getPendingSegmentCompletions(table));
+    completed.retainAll(target.getSegmentAssignment().keySet());
+    completed.removeAll(target.getReplicateModeSegments());
+    completed.removeIf(segment -> {
+      SegmentZKMetadata metadata =
+          ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), table, segment);
+      return metadata == null || !metadata.isReplicateMode()
+          || metadata.getStatus() != Status.DONE;
+    });
+    if (!completed.isEmpty()) {
+      _pinotLLCRealtimeSegmentManager.completeReplicateModeSegmentCompletions(table, completed);
+      Preconditions.checkState(_pinotLLCRealtimeSegmentManager.getPendingSegmentCompletions(table).stream()
+              .noneMatch(completed::contains),
+          "Could not retire replicate-mode completion records after rebalancing table: %s", table);
+    }
+    // A repair may already have read the old completion record. Fence its earlier IS version after retiring the
+    // record, even if the record was concurrently removed before this method ran. Its CAS retry then sees no intent.
+    PropertyKey key = _helixDataAccessor.keyBuilder().idealStates(table);
+    IdealState current = _helixDataAccessor.getProperty(key);
+    Preconditions.checkState(current != null
+            && current.getRecord().getMapFields().equals(target.getSegmentAssignment())
+            && PartitionAssignmentUtils.getPartitionAssignment(current).equals(target.getPartitionAssignment())
+            && isReplicateModeAssignmentApplied(current, target),
+        "Assignment changed while finalizing replicate-mode rebalance of table: %s; retry rebalance", table);
+    Preconditions.checkState(_helixDataAccessor.getBaseDataAccessor().set(key.getPath(), current.getRecord(),
+            current.getRecord().getVersion(), AccessOption.PERSISTENT),
+        "Assignment changed while retiring replicate-mode completion of table: %s; retry rebalance", table);
   }
 
   /// Uses the default LOGGER
@@ -1810,14 +2011,95 @@ public class TableRebalancer {
       Map<Integer, List<String>> currentPartitionAssignment, TableAssignment target, int minAvailableReplicas,
       boolean enableStrictReplicaGroup, boolean lowDiskMode, int batchSizePerServer,
       DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger) {
+    if (!target.getReplicateModeSegments().isEmpty()) {
+      return getNextReplicateModeAssignment(currentAssignment, currentPartitionAssignment, target,
+          minAvailableReplicas, enableStrictReplicaGroup, lowDiskMode, batchSizePerServer, dataLossRiskAssessor,
+          tableRebalanceLogger);
+    }
     if (enableStrictReplicaGroup) {
-      return getNextStrictReplicaGroupAssignment(currentAssignment, currentPartitionAssignment, target,
+      TableAssignment next = getNextStrictReplicaGroupAssignment(currentAssignment, currentPartitionAssignment, target,
           minAvailableReplicas, lowDiskMode, batchSizePerServer, dataLossRiskAssessor, tableRebalanceLogger);
+      return new TableAssignment(next.getSegmentAssignment(), next.getPartitionAssignment(),
+          target.getSegmentPartitionIds(), target.getReplicateModePartitionAssignment(),
+          target.getReplicateModeSegments());
     }
     Map<String, Map<String, String>> nextAssignment =
         getNextNonStrictReplicaGroupAssignment(currentAssignment, target.getSegmentAssignment(), minAvailableReplicas,
             lowDiskMode, batchSizePerServer, dataLossRiskAssessor);
-    return new TableAssignment(nextAssignment, Map.of());
+    return new TableAssignment(nextAssignment, Map.of(), target.getSegmentPartitionIds(),
+        target.getReplicateModePartitionAssignment(), target.getReplicateModeSegments());
+  }
+
+  /// Historical segments retain the ordinary availability/batching algorithm. Unfinished replicate segments have
+  /// one authoritative consumer, so a handoff replaces its singleton directly instead of creating an extra replica.
+  private static TableAssignment getNextReplicateModeAssignment(Map<String, Map<String, String>> currentAssignment,
+      Map<Integer, List<String>> currentPartitionAssignment, TableAssignment target, int minAvailableReplicas,
+      boolean enableStrictReplicaGroup, boolean lowDiskMode, int batchSizePerServer,
+      DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger) {
+    Map<String, Map<String, String>> ordinaryCurrent = new TreeMap<>(currentAssignment);
+    Map<String, Map<String, String>> ordinaryTarget = new TreeMap<>(target.getSegmentAssignment());
+    target.getReplicateModeSegments().forEach(segment -> {
+      ordinaryCurrent.remove(segment);
+      ordinaryTarget.remove(segment);
+    });
+    TableAssignment ordinary = getNextAssignment(ordinaryCurrent, currentPartitionAssignment,
+        new TableAssignment(ordinaryTarget, target.getPartitionAssignment(), target.getSegmentPartitionIds()),
+        minAvailableReplicas, enableStrictReplicaGroup, lowDiskMode, batchSizePerServer, dataLossRiskAssessor,
+        tableRebalanceLogger);
+    Map<String, Map<String, String>> next = new TreeMap<>(ordinary.getSegmentAssignment());
+    Map<Integer, List<String>> nextPartitions = ordinary.getPartitionAssignment();
+    Map<String, Integer> addedPerServer = new HashMap<>();
+    ordinary.getSegmentAssignment().forEach((segment, states) -> {
+      Set<String> previous = currentAssignment.get(segment).keySet();
+      states.keySet().stream().filter(server -> !previous.contains(server))
+          .forEach(server -> addedPerServer.merge(server, 1, Integer::sum));
+    });
+    for (String segment : new TreeSet<>(target.getReplicateModeSegments())) {
+      Map<String, String> desired = target.getSegmentAssignment().get(segment);
+      Map<String, String> current = currentAssignment.get(segment);
+      if (desired == null || current == null) {
+        continue;
+      }
+      Preconditions.checkState(desired.size() == 1, "Replicate-mode unfinished segment must have one owner: %s",
+          segment);
+      String server = desired.keySet().iterator().next();
+      String state = desired.get(server);
+      if (SegmentStateModel.CONSUMING.equals(state)) {
+        int partition = new LLCSegmentName(segment).getPartitionGroupId();
+        List<String> candidates = nextPartitions.get(partition);
+        if (candidates != null && !candidates.contains(server)) {
+          // A pinned partition can move through an intermediate full replica set. Keep a current owner in that
+          // set, or select one of its intermediate instances, until the desired final leader is reachable.
+          server = current.keySet().stream().filter(candidates::contains).sorted().findFirst()
+              .orElse(candidates.get(0));
+          desired = Map.of(server, state);
+        }
+      }
+      boolean addsServer = !current.containsKey(server);
+      boolean canRetainCurrent = current.size() == 1;
+      if (canRetainCurrent && SegmentStateModel.CONSUMING.equals(state)) {
+        int partition = new LLCSegmentName(segment).getPartitionGroupId();
+        List<String> candidates = nextPartitions.getOrDefault(partition,
+            target.getReplicateModePartitionAssignment().get(partition).replicas());
+        canRetainCurrent = candidates.contains(current.keySet().iterator().next());
+      }
+      if (addsServer && batchSizePerServer != RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER
+          && addedPerServer.getOrDefault(server, 0) >= batchSizePerServer && canRetainCurrent) {
+        // Keeping the current singleton is safe; never expand it to bridge the handoff.
+        next.put(segment, current);
+      } else {
+        if (!current.equals(desired)) {
+          Pair<Boolean, String> risk = dataLossRiskAssessor.assessDataLossRisk(segment);
+          Preconditions.checkState(!risk.getLeft(), risk.getRight());
+        }
+        next.put(segment, new TreeMap<>(desired));
+        if (addsServer) {
+          addedPerServer.merge(server, 1, Integer::sum);
+        }
+      }
+    }
+    return new TableAssignment(next, nextPartitions, target.getSegmentPartitionIds(),
+        target.getReplicateModePartitionAssignment(), target.getReplicateModeSegments());
   }
 
   private static TableAssignment getNextStrictReplicaGroupAssignment(
@@ -2238,6 +2520,24 @@ public class TableRebalancer {
     for (String newInstance : newInstances) {
       numSegmentsToOffloadMap.merge(newInstance, 1, Integer::sum);
     }
+  }
+
+  /// Advances a completed segment towards its current placement without dropping its only serving copy. Unlike a
+  /// full rebalance, completion does not wait for ExternalView between calls, so retain existing hosts until a target
+  /// host is ready. The native single-segment planner handles each step, including temporary extra replicas for RF1.
+  public static Map<String, String> getNextSegmentAssignment(Map<String, String> currentInstanceStateMap,
+      Map<String, String> targetInstanceStateMap, @Nullable Map<String, String> externalViewInstanceStateMap) {
+    boolean targetReady = externalViewInstanceStateMap != null && targetInstanceStateMap.keySet().stream()
+        .anyMatch(instance -> currentInstanceStateMap.containsKey(instance)
+            && (SegmentStateModel.ONLINE.equals(externalViewInstanceStateMap.get(instance))
+                || SegmentStateModel.CONSUMING.equals(externalViewInstanceStateMap.get(instance))));
+    Map<String, String> nextTarget = targetInstanceStateMap;
+    if (!targetReady) {
+      nextTarget = new TreeMap<>(currentInstanceStateMap);
+      nextTarget.putAll(targetInstanceStateMap);
+    }
+    return getNextSingleSegmentAssignment(currentInstanceStateMap, nextTarget, 1, false, Map.of(), new HashMap<>())
+        ._instanceStateMap;
   }
 
   /// Returns the next assignment for a segment based on the current instance state map and the target instance state

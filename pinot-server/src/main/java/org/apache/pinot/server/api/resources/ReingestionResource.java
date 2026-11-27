@@ -21,6 +21,7 @@ package org.apache.pinot.server.api.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.math.LongMath;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.swagger.annotations.Api;
@@ -35,12 +36,16 @@ import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -54,6 +59,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -89,6 +95,8 @@ public class ReingestionResource {
   // TODO: Make them configurable
   @VisibleForTesting
   static final int MAX_PARALLEL_REINGESTIONS = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
+  @VisibleForTesting
+  static final int MAX_REPLICATE_MODE_REINGESTIONS = MAX_PARALLEL_REINGESTIONS * 2;
   public static final long CHECK_INTERVAL_MS = Duration.ofSeconds(5).toMillis();
 
   // Executor for asynchronous re-ingestion
@@ -97,6 +105,8 @@ public class ReingestionResource {
 
   // Tracks queued and running jobs by segment name, also preventing duplicate repairs
   private final ConcurrentHashMap<String, ReingestionJob> _runningJobs = new ConcurrentHashMap<>();
+  // Replicate-mode automatic repairs can span many tables. Bound both their running and queued work per Server.
+  private final Semaphore _replicateRecoverySlots = new Semaphore(MAX_REPLICATE_MODE_REINGESTIONS);
 
   @Inject
   private ServerInstance _serverInstance;
@@ -109,12 +119,26 @@ public class ReingestionResource {
     private final String _jobId;
     private final String _segmentName;
     private final long _startTimeMs;
+    @Nullable
+    private final Semaphore _admission;
+    private final AtomicBoolean _admissionReleased = new AtomicBoolean();
 
     @JsonCreator
     ReingestionJob(@JsonProperty("jobId") String jobId, @JsonProperty("segmentName") String segmentName) {
+      this(jobId, segmentName, null);
+    }
+
+    ReingestionJob(String jobId, String segmentName, @Nullable Semaphore admission) {
       _jobId = jobId;
       _segmentName = segmentName;
       _startTimeMs = System.currentTimeMillis();
+      _admission = admission;
+    }
+
+    void releaseAdmission() {
+      if (_admission != null && _admissionReleased.compareAndSet(false, true)) {
+        _admission.release();
+      }
     }
 
     public String getJobId() {
@@ -178,10 +202,13 @@ public class ReingestionResource {
     }
 
     // Check if download url is present
-    if (segmentZKMetadata.getDownloadUrl() != null) {
+    if (StringUtils.isNotBlank(segmentZKMetadata.getDownloadUrl())) {
       throw new WebApplicationException(
           "Download URL is already present for segment: " + segmentName + ". No need to re-ingest.",
           Response.Status.BAD_REQUEST);
+    }
+    if (segmentZKMetadata.getStatus() != Status.COMMITTING) {
+      throw new WebApplicationException("Segment is not COMMITTING: " + segmentName, Response.Status.CONFLICT);
     }
 
     // Grab start/end offsets
@@ -192,13 +219,20 @@ public class ReingestionResource {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
 
+    if (_runningJobs.containsKey(segmentName)) {
+      return alreadyRunning(segmentName);
+    }
+    boolean boundedRecovery = segmentZKMetadata.isReplicateMode();
+    if (boundedRecovery && !_replicateRecoverySlots.tryAcquire()) {
+      throw new WebApplicationException("Replicate-mode re-ingestion capacity is full",
+          Response.Status.SERVICE_UNAVAILABLE);
+    }
     String jobId = UUID.randomUUID().toString();
-    ReingestionJob job = new ReingestionJob(jobId, segmentName);
+    ReingestionJob job = new ReingestionJob(jobId, segmentName, boundedRecovery ? _replicateRecoverySlots : null);
     // Track the job before submitting it, so queued jobs are listed and duplicate requests are rejected
     if (_runningJobs.putIfAbsent(segmentName, job) != null) {
-      return Response.status(Response.Status.CONFLICT)
-          .entity("Re-ingestion for segment: " + segmentName + " is already in progress.")
-          .build();
+      job.releaseAdmission();
+      return alreadyRunning(segmentName);
     }
 
     // Kick off the actual work asynchronously
@@ -212,11 +246,13 @@ public class ReingestionResource {
               .addMeteredTableValue(realtimeTableName, ServerMeter.SEGMENT_REINGESTION_FAILURE, 1);
         } finally {
           _runningJobs.remove(segmentName, job);
+          job.releaseAdmission();
         }
       });
     } catch (RejectedExecutionException e) {
       // The executor is shut down when the admin API stops
       _runningJobs.remove(segmentName, job);
+      job.releaseAdmission();
       throw new WebApplicationException("Server is shutting down, cannot re-ingest segment: " + segmentName,
           Response.Status.SERVICE_UNAVAILABLE);
     }
@@ -224,11 +260,17 @@ public class ReingestionResource {
     return Response.ok(job).build();
   }
 
+  private static Response alreadyRunning(String segmentName) {
+    return Response.status(Response.Status.CONFLICT)
+        .entity("Re-ingestion for segment: " + segmentName + " is already in progress.").build();
+  }
+
   /// Stops the re-ingestion jobs when the admin API stops. Running jobs are interrupted, and fail and clean up their
   /// segment. Jobs waiting for a re-ingestion thread are dropped.
   @PreDestroy
   public void shutDown() {
     int numDroppedJobs = _reingestionExecutor.shutdownNow().size();
+    _runningJobs.values().forEach(ReingestionJob::releaseAdmission);
     LOGGER.info("Stopped re-ingestion executor, dropped {} jobs waiting for a re-ingestion thread", numDroppedJobs);
   }
 
@@ -257,7 +299,7 @@ public class ReingestionResource {
           segmentZKMetadata.getStatus());
       return;
     }
-    if (segmentZKMetadata.getDownloadUrl() != null) {
+    if (StringUtils.isNotBlank(segmentZKMetadata.getDownloadUrl())) {
       LOGGER.warn("Skipping re-ingestion of segment: {} because its download URL is already present", segmentName);
       return;
     }
@@ -279,12 +321,35 @@ public class ReingestionResource {
 
       File segmentTarFile = writer.buildSegment();
 
+      // A queued/running attempt must not publish into a replaced range, removed table, or changed ingestion schema.
+      SegmentZKMetadata latestMetadata = tableDataManager.fetchZKMetadataNullable(segmentName);
+      if (!isReplayStillCurrent(segmentZKMetadata, latestMetadata) || tableDataManager.isShutDown()) {
+        LOGGER.info("Skipping obsolete re-ingestion publication for segment: {}", segmentName);
+        return;
+      }
+      if (segmentZKMetadata.isReplicateMode()) {
+        IndexLoadingConfig latestConfig = tableDataManager.fetchIndexLoadingConfig();
+        Preconditions.checkState(indexLoadingConfig.getTableConfig().equals(latestConfig.getTableConfig())
+                && indexLoadingConfig.getSchema().equals(latestConfig.getSchema()),
+            "Table config or schema changed while replaying segment: %s", segmentName);
+      }
+
       ServerSegmentCompletionProtocolHandler protocolHandler =
           new ServerSegmentCompletionProtocolHandler(_serverInstance.getServerMetrics(), realtimeTableName);
       protocolHandler.uploadReingestedSegment(segmentName, indexLoadingConfig.getSegmentStoreURI(), segmentTarFile);
 
       LOGGER.info("Re-ingested segment {} uploaded successfully", segmentName);
     }
+  }
+
+  /// A fixed-range attempt is valid only while the same logical segment still needs that exact replay interval.
+  @VisibleForTesting
+  static boolean isReplayStillCurrent(SegmentZKMetadata original, @Nullable SegmentZKMetadata latest) {
+    return latest != null && latest.getStatus() == Status.COMMITTING && StringUtils.isBlank(latest.getDownloadUrl())
+        && original.isReplicateMode() == latest.isReplicateMode()
+        && original.getCreationTime() == latest.getCreationTime()
+        && Objects.equals(original.getStartOffset(), latest.getStartOffset())
+        && Objects.equals(original.getEndOffset(), latest.getEndOffset());
   }
 
   @VisibleForTesting
