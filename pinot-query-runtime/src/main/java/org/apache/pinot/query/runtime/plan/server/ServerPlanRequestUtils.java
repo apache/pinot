@@ -308,14 +308,14 @@ public class ServerPlanRequestUtils {
     List<Expression> expressions = new ArrayList<>();
     for (int i = 0; i < leftKeys.size(); i++) {
       Expression leftExpr = pinotQuery.getSelectList().get(leftKeys.get(i));
-      if (dataContainer.isEmpty()) {
+      List<Expression> inOperands = computeInOperands(dataContainer, dataSchema, rightKeys.get(i));
+      if (inOperands.isEmpty()) {
         // put a constant false expression
         expressions.add(RequestUtils.getLiteralExpression(false));
       } else {
-        int rightIdx = rightKeys.get(i);
-        List<Expression> operands = new ArrayList<>(dataContainer.size() + 1);
+        List<Expression> operands = new ArrayList<>(inOperands.size() + 1);
         operands.add(leftExpr);
-        operands.addAll(computeInOperands(dataContainer, dataSchema, rightIdx));
+        operands.addAll(inOperands);
         expressions.add(RequestUtils.getFunctionExpression(FilterKind.IN.name(), operands));
       }
     }
@@ -333,13 +333,24 @@ public class ServerPlanRequestUtils {
   private static List<Expression> computeInOperands(List<Object[]> dataContainer, DataSchema dataSchema, int colIdx) {
     final DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(colIdx);
     final FieldSpec.DataType storedType = columnDataType.getStoredType().toDataType();
-    final int numRows = dataContainer.size();
+    // A null key never matches in the semi join, so it is left out of the IN list
+    List<Object> values = new ArrayList<>(dataContainer.size());
+    for (Object[] row : dataContainer) {
+      Object value = row[colIdx];
+      if (value != null) {
+        values.add(value);
+      }
+    }
+    final int numRows = values.size();
+    if (numRows == 0) {
+      return List.of();
+    }
     List<Expression> expressions = new ArrayList<>();
     switch (storedType) {
       case INT:
         int[] arrInt = new int[numRows];
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          arrInt[rowIdx] = (int) dataContainer.get(rowIdx)[colIdx];
+          arrInt[rowIdx] = (int) values.get(rowIdx);
         }
         Arrays.sort(arrInt);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
@@ -349,7 +360,7 @@ public class ServerPlanRequestUtils {
       case LONG:
         long[] arrLong = new long[numRows];
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          arrLong[rowIdx] = (long) dataContainer.get(rowIdx)[colIdx];
+          arrLong[rowIdx] = (long) values.get(rowIdx);
         }
         Arrays.sort(arrLong);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
@@ -359,7 +370,7 @@ public class ServerPlanRequestUtils {
       case FLOAT:
         float[] arrFloat = new float[numRows];
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          arrFloat[rowIdx] = (float) dataContainer.get(rowIdx)[colIdx];
+          arrFloat[rowIdx] = (float) values.get(rowIdx);
         }
         Arrays.sort(arrFloat);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
@@ -369,7 +380,7 @@ public class ServerPlanRequestUtils {
       case DOUBLE:
         double[] arrDouble = new double[numRows];
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          arrDouble[rowIdx] = (double) dataContainer.get(rowIdx)[colIdx];
+          arrDouble[rowIdx] = (double) values.get(rowIdx);
         }
         Arrays.sort(arrDouble);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
@@ -379,7 +390,7 @@ public class ServerPlanRequestUtils {
       case STRING:
         String[] arrString = new String[numRows];
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          arrString[rowIdx] = (String) dataContainer.get(rowIdx)[colIdx];
+          arrString[rowIdx] = (String) values.get(rowIdx);
         }
         Arrays.sort(arrString);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
@@ -389,7 +400,7 @@ public class ServerPlanRequestUtils {
       case BIG_DECIMAL:
         BigDecimal[] arrBigDecimal = new BigDecimal[numRows];
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          arrBigDecimal[rowIdx] = (BigDecimal) dataContainer.get(rowIdx)[colIdx];
+          arrBigDecimal[rowIdx] = (BigDecimal) values.get(rowIdx);
         }
         Arrays.sort(arrBigDecimal);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
@@ -399,7 +410,7 @@ public class ServerPlanRequestUtils {
       case BYTES:
         ByteArray[] arrBytes = new ByteArray[numRows];
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          arrBytes[rowIdx] = (ByteArray) dataContainer.get(rowIdx)[colIdx];
+          arrBytes[rowIdx] = (ByteArray) values.get(rowIdx);
         }
         Arrays.sort(arrBytes);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
