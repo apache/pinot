@@ -32,11 +32,13 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
@@ -78,7 +80,7 @@ public class LeafStageSegmentFilterTest {
   public void testFilterNarrowsLeafSegmentsAndKeepsWorkers() {
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, _routingManager) {
       @Override
-      public TableScanMetadata filterLeafStageSegments(TableScanMetadata metadata,
+      public TableScanMetadata filterTableScanSegments(TableScanMetadata metadata,
           Map<String, String> queryOptions) {
         Map<Integer, Map<String, List<String>>> narrowed = new HashMap<>();
         for (Map.Entry<Integer, Map<String, List<String>>> worker : metadata.getWorkedIdToSegmentsMap().entrySet()) {
@@ -100,7 +102,7 @@ public class LeafStageSegmentFilterTest {
   public void testFilterRemovingAllSegmentsKeepsWorkers() {
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, _routingManager) {
       @Override
-      public TableScanMetadata filterLeafStageSegments(TableScanMetadata metadata, Map<String, String> queryOptions) {
+      public TableScanMetadata filterTableScanSegments(TableScanMetadata metadata, Map<String, String> queryOptions) {
         Map<Integer, Map<String, List<String>>> emptied = new HashMap<>();
         for (Integer workerId : metadata.getWorkedIdToSegmentsMap().keySet()) {
           emptied.put(workerId, Map.of("OFFLINE", List.of()));
@@ -116,12 +118,14 @@ public class LeafStageSegmentFilterTest {
   public void testFilterDroppingAWorkerIsRejected() {
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, _routingManager) {
       @Override
-      public TableScanMetadata filterLeafStageSegments(TableScanMetadata metadata, Map<String, String> queryOptions) {
+      public TableScanMetadata filterTableScanSegments(TableScanMetadata metadata, Map<String, String> queryOptions) {
         return new TableScanMetadata(metadata.getScannedTables(), Map.of(), metadata.getTableOptions(),
             metadata.getUnavailableSegmentsMap(), metadata.getTimeBoundaryInfo());
       }
     };
-    expectThrows(RuntimeException.class, () -> plan(workerManager));
+    QueryException exception = expectThrows(QueryException.class, () -> plan(workerManager));
+    assertTrue(exception.getMessage().contains("must keep the workers of the table scan c: expected workers [0, 1]"),
+        exception.getMessage());
   }
 
   private DispatchableSubPlan plan(WorkerManager workerManager) {

@@ -231,7 +231,9 @@ public class PhysicalPlannerContext {
     return _multiClusterRoutingContext;
   }
 
-  /// Returns the filter applied to the segments of each physical leaf-stage table scan, or null when none is set.
+  /// Returns the filter applied to the segments of each physical leaf-stage table scan, or null when none is set. The
+  /// broker's query environment always sets one (the worker manager), so null only comes from the constructors that do
+  /// not take a filter.
   @Nullable
   public LeafStageSegmentFilter getLeafStageSegmentFilter() {
     return _leafStageSegmentFilter;

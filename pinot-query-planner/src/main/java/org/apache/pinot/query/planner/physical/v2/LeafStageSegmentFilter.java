@@ -31,12 +31,14 @@ import java.util.Map;
 /// was already derived from those workers. A worker whose segments are all filtered out stays in the assignment with
 /// empty segment lists. Segments can be removed only by replacing the per-worker segment lists (or the whole map): the
 /// lists and maps that are handed over can be shared with the routing table, and the inner maps can be immutable, so
-/// they must not be modified in place. The unavailable segments and the time boundary are not filtered by the caller.
+/// they must not be modified in place. The same goes for the unavailable-segments map, which the caller does not
+/// filter: a filter that wants to change it returns a new metadata with a copy. The time boundary is not filtered
+/// either.
 public interface LeafStageSegmentFilter {
 
   /// Returns the metadata to use for the scan, which can be the given instance when nothing is filtered.
   ///
   /// @param metadata the physical table scan metadata built from the routing table
   /// @param queryOptions the query options of the request
-  TableScanMetadata filterLeafStageSegments(TableScanMetadata metadata, Map<String, String> queryOptions);
+  TableScanMetadata filterTableScanSegments(TableScanMetadata metadata, Map<String, String> queryOptions);
 }

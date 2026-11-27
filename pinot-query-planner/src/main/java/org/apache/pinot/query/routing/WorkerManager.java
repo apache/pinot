@@ -1295,13 +1295,17 @@ public class WorkerManager implements LeafStageSegmentFilter {
   /// segment lists (or the whole map) on the metadata, rather than by editing them in place: part of what the
   /// assignment is built from is the broker's published partition metadata, shared across queries and read concurrently
   /// by other planning threads. What is handed over is nevertheless kept safe to edit in place.
+  ///
+  /// This hook is only called by the V1 worker assignment. The V2 physical optimizer calls
+  /// [#filterTableScanSegments(TableScanMetadata, Map)] instead, so an extension that must apply to both engines
+  /// overrides both.
   protected void filterLeafStageSegments(DispatchablePlanContext context, DispatchablePlanMetadata metadata) {
   }
 
   /// Extension point to filter the leaf-stage segments assigned by the V2 physical optimizer; no-op by default. See
   /// [LeafStageSegmentFilter] for the contract an override must follow.
   @Override
-  public TableScanMetadata filterLeafStageSegments(TableScanMetadata metadata, Map<String, String> queryOptions) {
+  public TableScanMetadata filterTableScanSegments(TableScanMetadata metadata, Map<String, String> queryOptions) {
     return metadata;
   }
 

@@ -1293,7 +1293,7 @@ public class WorkerManagerTest {
   @Test
   public void testPartitionedLeafPublishesACopyOfTheBrokerSegmentList() {
     // The lists of a one-partition-per-worker assignment come from the broker's published metadata and are handed to
-    // filterLeafStageSegments, which may edit them in place, so they must be copied first.
+    // filterLeafStageSegments (V1), which may edit them in place, so they must be copied first.
     QueryEnvironment queryEnvironment = newPartitionedQueryEnvironment(new int[]{0, 1, 2, 3}, 4, List.of(), 0);
     try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
         "SET useBrokerPruning=false; SELECT col2 FROM testTable "

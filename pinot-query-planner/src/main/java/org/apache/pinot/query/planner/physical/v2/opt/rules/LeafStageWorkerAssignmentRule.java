@@ -207,10 +207,13 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     LeafStageSegmentFilter segmentFilter = _physicalPlannerContext.getLeafStageSegmentFilter();
     if (segmentFilter != null) {
       TableScanMetadata filteredMetadata =
-          segmentFilter.filterLeafStageSegments(metadata, _physicalPlannerContext.getQueryOptions());
-      Preconditions.checkState(
-          filteredMetadata.getWorkedIdToSegmentsMap().keySet().equals(metadata.getWorkedIdToSegmentsMap().keySet()),
-          "Leaf stage segment filter must keep the workers of the table scan");
+          segmentFilter.filterTableScanSegments(metadata, _physicalPlannerContext.getQueryOptions());
+      Set<Integer> workerIds = metadata.getWorkedIdToSegmentsMap().keySet();
+      Map<Integer, Map<String, List<String>>> filteredWorkerMap =
+          filteredMetadata != null ? filteredMetadata.getWorkedIdToSegmentsMap() : null;
+      Preconditions.checkState(filteredWorkerMap != null && filteredWorkerMap.keySet().equals(workerIds),
+          "Leaf stage segment filter must keep the workers of the table scan %s: expected workers %s but got %s",
+          tableName, workerIds, filteredWorkerMap != null ? filteredWorkerMap.keySet() : null);
       metadata = filteredMetadata;
     }
     return tableScan.with(workerAssignmentResult._pinotDataDistribution, metadata);
