@@ -20,7 +20,7 @@
 -->
 # pinot-sql-ddl
 
-Pinot SQL DDL compiler and reverse-emitter. Translates `CREATE TABLE`, `DROP TABLE`,
+Pinot SQL DDL compiler and reverse-emitter. Translates `CREATE TABLE`, `CREATE TABLE LIKE`, `DROP TABLE`,
 `SHOW TABLES`, and `SHOW CREATE TABLE` into the existing `Schema` + `TableConfig` model
 and back.
 
@@ -42,6 +42,48 @@ PROPERTIES (
 
 POST the SQL to `/sql/ddl` on the controller (see [`DESIGN.md`](DESIGN.md) §6 and the
 PR description for the full REST contract and more examples).
+
+## Create a table from an existing definition
+
+```sql
+CREATE TABLE events_copy LIKE events;
+CREATE TABLE IF NOT EXISTS events_offline_copy LIKE events TYPE OFFLINE;
+CREATE TABLE archive.events_copy LIKE production.events;
+```
+
+Without `TYPE`, the target inherits all source variants: OFFLINE creates OFFLINE,
+REALTIME creates REALTIME, and a hybrid source creates both variants with one copied
+schema. `TYPE OFFLINE` or `TYPE REALTIME` selects only that source variant. Source
+and target identifiers must be raw names without `_OFFLINE` or `_REALTIME` suffixes.
+Source and target may be in different databases in the same cluster. An unqualified source
+uses the request's database header, or the default database, independently of the
+target's explicit database qualifier.
+
+The schema and table configs are deep copies of the persisted definitions. Table
+and schema names change; stream settings, task settings, external references, and
+environment-variable placeholders in supported settings (such as topics, credentials,
+and custom values) are inherited. Target-side tuning and existing validation rules
+still apply. Materialized views and Pinot logical-table objects are not supported
+as sources.
+
+An absent source variant is omitted. If a selected source variant's stored config
+cannot be read or parsed, the request fails before creating any target resources.
+An explicit `TYPE` reads only the selected variant.
+
+Existing segments, stream offsets, and runtime state are not copied. REALTIME
+creation starts normal ingestion using the copied stream configuration, so the
+target may receive data immediately. Use `?dryRun=true` to inspect the copied
+`tableConfigs` without creating resources.
+
+If a target variant already exists, the controller returns a conflict or a no-op
+with `IF NOT EXISTS`. A no-op leaves existing variants as they are. Hybrid creation
+validates both configs and then creates OFFLINE and REALTIME in separate calls.
+Coordinate concurrent creates or schema changes for the same target name.
+
+A write failure returns `code` and `error`, plus `createdTables` for variants
+whose creation completed and `schemaCreated` when the request added and verified the schema.
+For example, if REALTIME creation fails after OFFLINE succeeds, inspect the schema
+and the OFFLINE table before retrying. `IF NOT EXISTS` leaves this partial table in place.
 
 ## Module layout
 

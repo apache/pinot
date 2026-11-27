@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import java.util.List;
 import java.util.Locale;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlNode;
@@ -49,6 +50,61 @@ import static org.testng.Assert.fail;
 /// Verifies that statements parse, produce the expected AST shape, and that [CalciteSqlParser]
 /// classifies them as [PinotSqlType#DDL].
 public class PinotDdlParserTest {
+
+  @Test
+  public void createTableLikeSelectsAllSourceVariantsByDefault() {
+    SqlPinotCreateTable node = parseCreate("CREATE TABLE new_table LIKE old_table");
+    assertEquals(node.getName().getSimple(), "new_table");
+    assertEquals(node.getLikeSource().getSimple(), "old_table");
+    assertFalse(node.isIfNotExists());
+    assertNull(node.getTableType());
+  }
+
+  @Test
+  public void createTableLikeQualifiedNamesAndModifiersRoundTrip() {
+    SqlPinotCreateTable node = parseCreate(
+        "CREATE TABLE IF NOT EXISTS \"Destination\".\"NewTable\" "
+            + "LIKE \"Source\".\"OldTable\" TYPE OFFLINE");
+    assertEquals(node.getName().names, List.of("Destination", "NewTable"));
+    assertEquals(node.getLikeSource().names, List.of("Source", "OldTable"));
+    assertTrue(node.isIfNotExists());
+    assertEquals(node.getTableType().toValue(), "OFFLINE");
+    assertEquals(node.getOperandList().get(3), node.getTableType());
+    assertEquals(node.getOperandList().get(6), node.getLikeSource());
+
+    SqlPinotCreateTable reparsed = parseCreate(node.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
+    assertEquals(reparsed.getName().names, node.getName().names);
+    assertEquals(reparsed.getLikeSource().names, node.getLikeSource().names);
+    assertTrue(reparsed.isIfNotExists());
+    assertEquals(reparsed.getTableType().toValue(), "OFFLINE");
+  }
+
+  @Test
+  public void createTableLikeRealtimeAndUntypedRoundTrip() {
+    SqlPinotCreateTable realtime = parseCreate("create table new_table like old_table type realtime");
+    assertEquals(realtime.getTableType().toValue(), "REALTIME");
+    SqlPinotCreateTable untyped = parseCreate("CREATE TABLE new_table LIKE old_table");
+    SqlPinotCreateTable reparsed = parseCreate(untyped.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
+    assertEquals(reparsed.getLikeSource().getSimple(), "old_table");
+    assertNull(reparsed.getTableType());
+    assertFalse(reparsed.isIfNotExists());
+  }
+
+  @Test
+  public void createTableLikeRejectsMissingSourceAndUnsupportedClauses() {
+    String[] invalidStatements = {
+        "CREATE TABLE new_table LIKE",
+        "CREATE TABLE new_table LIKE old_table TYPE",
+        "CREATE TABLE new_table LIKE old_table TYPE HYBRID",
+        "CREATE TABLE new_table (id INT) LIKE old_table",
+        "CREATE TABLE new_table LIKE old_table TABLE_TYPE = OFFLINE",
+        "CREATE TABLE new_table LIKE old_table PROPERTIES ('replication' = '2')",
+        "CREATE TABLE new_table LIKE old_table WITH (type = 'iceberg')"
+    };
+    for (String sql : invalidStatements) {
+      expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToSqlNodeAndOptions(sql));
+    }
+  }
 
   // -------------------------------------------------------------------------------------------
   // CREATE TABLE
@@ -176,10 +232,9 @@ public class PinotDdlParserTest {
 
   @Test
   public void classicCreateTableHasNullWithOptions() {
-    // getWithOptions() is the form discriminator: null means column-list form, non-null (even
-    // empty) means the WITH form was written.
     SqlPinotCreateTable node = parseCreate("CREATE TABLE events (id INT) TABLE_TYPE = OFFLINE");
     assertNull(node.getWithOptions());
+    assertEquals(node.getOperandList().size(), 6);
   }
 
   @Test
@@ -653,6 +708,8 @@ public class PinotDdlParserTest {
   public void allDdlNodesClassifyAsDdl() {
     String[] ddlStatements = {
         "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE",
+        "CREATE TABLE copied LIKE original",
+        "CREATE TABLE IF NOT EXISTS copied LIKE original TYPE REALTIME",
         "CREATE MATERIALIZED VIEW mv (id INT METRIC) REFRESH EVERY '1d' AS SELECT id FROM t",
         "DROP TABLE t",
         "DROP TABLE IF EXISTS t TYPE OFFLINE",

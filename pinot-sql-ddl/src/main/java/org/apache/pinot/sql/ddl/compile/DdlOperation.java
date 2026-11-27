@@ -38,6 +38,7 @@ public enum DdlOperation {
 
   // Table (single-object lifecycle).
   CREATE_TABLE,
+  CREATE_TABLE_LIKE,
   SHOW_CREATE_TABLE,
   DROP_TABLE,
 

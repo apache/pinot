@@ -24,12 +24,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 
 /// Http error info including error message and status code
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class SimpleHttpErrorInfo {
   private int _code;
   private String _error;
 
   @JsonCreator
-  @JsonIgnoreProperties(ignoreUnknown = true)
   public SimpleHttpErrorInfo(@JsonProperty("code") int code, @JsonProperty("error") String message) {
     _code = code;
     _error = message;

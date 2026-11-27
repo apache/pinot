@@ -49,7 +49,9 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.TaskState;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -70,6 +72,9 @@ import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.segment.local.utils.SchemaUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -83,6 +88,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.ddl.compile.CompiledCreateMaterializedView;
 import org.apache.pinot.sql.ddl.compile.CompiledCreateTable;
+import org.apache.pinot.sql.ddl.compile.CompiledCreateTableLike;
 import org.apache.pinot.sql.ddl.compile.CompiledDdl;
 import org.apache.pinot.sql.ddl.compile.CompiledDropMaterializedView;
 import org.apache.pinot.sql.ddl.compile.CompiledDropTable;
@@ -101,7 +107,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/// Controller endpoint for executing Pinot SQL DDL statements. Currently supports CREATE TABLE,
+/// Controller endpoint for executing Pinot SQL DDL statements. Currently supports CREATE TABLE, CREATE TABLE LIKE,
 /// CREATE MATERIALIZED VIEW, DROP TABLE, DROP MATERIALIZED VIEW, SHOW TABLES,
 /// SHOW MATERIALIZED VIEWS, SHOW CREATE TABLE, and SHOW CREATE MATERIALIZED VIEW.
 ///
@@ -155,7 +161,8 @@ public class PinotDdlRestletResource {
   @Path("/sql/ddl")
   @ManualAuthorization // permission check is done after parsing the DDL so we know the operation
   @ApiOperation(value = "Execute a Pinot SQL DDL statement",
-      notes = "Supports CREATE TABLE, CREATE MATERIALIZED VIEW, DROP TABLE, DROP MATERIALIZED VIEW, SHOW TABLES, "
+      notes = "Supports CREATE TABLE, CREATE TABLE LIKE, CREATE MATERIALIZED VIEW, DROP TABLE, "
+          + "DROP MATERIALIZED VIEW, SHOW TABLES, "
           + "SHOW MATERIALIZED VIEWS, SHOW CREATE TABLE, and SHOW CREATE MATERIALIZED VIEW. Returns the generated "
           + "Schema/TableConfig (CREATE), operation outcome (DROP/SHOW TABLES/SHOW MATERIALIZED VIEWS), or canonical "
           + "DDL string (SHOW CREATE TABLE / SHOW CREATE MATERIALIZED VIEW).")
@@ -227,6 +234,9 @@ public class PinotDdlRestletResource {
       case CREATE_TABLE:
         return executeCreate((CompiledCreateTable) compiled, effectiveDatabase, dryRun,
             httpHeaders, httpRequest);
+      case CREATE_TABLE_LIKE:
+        return executeCreateLike((CompiledCreateTableLike) compiled, effectiveDatabase, dryRun,
+            httpHeaders, httpRequest);
       case SHOW_CREATE_TABLE:
         return Response.ok(
             executeShowCreate((CompiledShowCreateTable) compiled, effectiveDatabase,
@@ -251,6 +261,272 @@ public class PinotDdlRestletResource {
         throw new ControllerApplicationException(LOGGER, "Unhandled DDL operation: " + op,
             Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Table DDL: CREATE TABLE LIKE
+  // -------------------------------------------------------------------------------------------
+
+  private Response executeCreateLike(CompiledCreateTableLike create, String database, boolean dryRun,
+      HttpHeaders headers, Request httpRequest) {
+    if (TableNameBuilder.isTableResource(create.getRawTableName())
+        || TableNameBuilder.isTableResource(create.getSourceRawTableName())) {
+      throw badRequest("CREATE TABLE LIKE requires raw table names without _OFFLINE or _REALTIME suffixes. "
+          + "Use TYPE OFFLINE or TYPE REALTIME to select a source variant.");
+    }
+    String targetName = translateTableNameForDdl(create.getDatabaseName() == null
+        ? create.getRawTableName()
+        : create.getDatabaseName() + "." + create.getRawTableName(), headers);
+    // An explicit source qualifier is independent of the target's database/header. An unqualified
+    // source uses the request database, never the explicit target qualifier.
+    String sourceDatabase = create.getSourceDatabaseName();
+    if (sourceDatabase == null && headers != null) {
+      sourceDatabase = headers.getHeaderString(DATABASE);
+    }
+    String sourceName;
+    try {
+      sourceName = DatabaseUtils.translateTableName(create.getSourceRawTableName(), sourceDatabase);
+    } catch (DatabaseConflictException | IllegalArgumentException e) {
+      throw badRequest("Invalid source table reference: " + e.getMessage());
+    }
+
+    TableType sourceType = create.getTableType();
+    List<TableType> sourceTypes = sourceType == null
+        ? List.of(TableType.OFFLINE, TableType.REALTIME)
+        : List.of(sourceType);
+    for (TableType candidate : sourceTypes) {
+      ResourceUtils.checkPermissionAndAccess(TableNameBuilder.forType(candidate).tableNameWithType(sourceName),
+          httpRequest, headers, AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
+    }
+    // LIKE creates a new raw-name identity. Its existence/no-op policy considers both destination
+    // variants even with an explicit source TYPE, so authorize both before looking at either.
+    for (TableType candidate : List.of(TableType.OFFLINE, TableType.REALTIME)) {
+      ResourceUtils.checkPermissionAndAccess(TableNameBuilder.forType(candidate).tableNameWithType(targetName),
+          httpRequest, headers, AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
+    }
+    boolean ifNotExists = create.isIfNotExists();
+    List<String> createdTables = new ArrayList<>(2);
+    DdlExecutionResponse response = new DdlExecutionResponse()
+        .setOperation(DdlOperation.CREATE_TABLE_LIKE)
+        .setDatabaseName(database)
+        .setTableName(targetName)
+        .setSourceTableName(sourceName)
+        .setDryRun(dryRun)
+        .setIfNotExists(ifNotExists)
+        .setCreatedTables(createdTables);
+    Response existingTarget = existingCreateLikeTarget(targetName, ifNotExists, response);
+    if (existingTarget != null) {
+      return existingTarget;
+    }
+
+    if (ZKMetadataProvider.isLogicalTableExists(_pinotHelixResourceManager.getPropertyStore(), sourceName)) {
+      throw badRequest("CREATE TABLE LIKE does not support a logical table as its source: " + sourceName);
+    }
+    // Read templates, rather than resolved variables or decorator output, so the new definition
+    // keeps its declarative settings and does not persist source-side resolved credentials.
+    TableConfig offline = sourceType == TableType.REALTIME
+        ? null
+        : readCreateLikeTableConfig(sourceName, TableType.OFFLINE);
+    TableConfig realtime = sourceType == TableType.OFFLINE
+        ? null
+        : readCreateLikeTableConfig(sourceName, TableType.REALTIME);
+    if (offline == null && realtime == null) {
+      throw new ControllerApplicationException(LOGGER,
+          "Source table not found: " + sourceName + (sourceType == null ? "" : " TYPE " + sourceType),
+          Response.Status.NOT_FOUND);
+    }
+    if ((offline != null && offline.isMaterializedView()) || (realtime != null && realtime.isMaterializedView())) {
+      throw badRequest("CREATE TABLE LIKE does not support a materialized view as its source: " + sourceName);
+    }
+    Schema schema = readCreateLikeSchema(sourceName);
+    if (schema == null) {
+      throw new ControllerApplicationException(LOGGER, "Source schema not found: " + sourceName,
+          Response.Status.NOT_FOUND);
+    }
+
+    // The metadata provider deserializes a fresh schema and table configs for each read, so tuning
+    // and renaming this bundle only changes the destination definition.
+    TableConfigs copied = new TableConfigs(sourceName, schema, offline, realtime);
+    copied.setTableName(targetName);
+    Schema storedSchema = readCreateLikeSchema(targetName);
+    checkCreateLikeSchema(schema, storedSchema);
+    validateCreateLikeConfigs(copied, storedSchema);
+    response.setTableConfigs(copied.toJsonObject());
+    if (dryRun) {
+      return Response.ok(response.setMessage("Dry run: validated CREATE TABLE LIKE without persisting.")).build();
+    }
+
+    boolean schemaCreated = false;
+    try {
+      boolean addedSchema = false;
+      if (storedSchema == null) {
+        try {
+          _pinotHelixResourceManager.addSchema(schema, false, false);
+          addedSchema = true;
+        } catch (SchemaAlreadyExistsException e) {
+          // A concurrent request created the schema. Check its definition below before reusing it.
+        }
+      }
+      Schema currentSchema = readCreateLikeSchema(targetName);
+      if (addedSchema) {
+        // addSchema can return normally when the property-store write fails. Confirm it before reporting progress.
+        if (currentSchema == null) {
+          throw new IllegalStateException("Could not confirm creation of destination schema: " + targetName);
+        }
+        schemaCreated = schema.equals(currentSchema);
+      }
+      Response racedTarget = existingCreateLikeTarget(targetName, ifNotExists, response);
+      if (racedTarget != null) {
+        return racedTarget;
+      }
+      if (currentSchema == null) {
+        throw new ControllerApplicationException(LOGGER, "Destination schema disappeared: " + targetName,
+            Response.Status.CONFLICT);
+      }
+      checkCreateLikeSchema(schema, currentSchema);
+      TableConfig firstConfig = copied.getOffline() != null ? copied.getOffline() : copied.getRealtime();
+      try {
+        _pinotHelixResourceManager.addTable(firstConfig);
+      } catch (TableAlreadyExistsException e) {
+        if (ifNotExists) {
+          Response existing = existingCreateLikeTarget(targetName, true, response);
+          if (existing != null) {
+            return existing;
+          }
+        }
+        throw e;
+      }
+      createdTables.add(firstConfig.getTableName());
+      if (copied.getOffline() != null && copied.getRealtime() != null) {
+        _pinotHelixResourceManager.addTable(copied.getRealtime());
+        createdTables.add(copied.getRealtime().getTableName());
+      }
+      return Response.status(Response.Status.CREATED)
+          .entity(response.setMessage("Successfully created table " + targetName + " LIKE " + sourceName)).build();
+    } catch (TableAlreadyExistsException e) {
+      return createLikeFailure(targetName, schemaCreated, createdTables, Response.Status.CONFLICT.getStatusCode(), e);
+    } catch (ControllerApplicationException e) {
+      return createLikeFailure(targetName, schemaCreated, createdTables, e.getResponse().getStatus(), e);
+    } catch (Exception e) {
+      return createLikeFailure(targetName, schemaCreated, createdTables,
+          Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), e);
+    }
+  }
+
+  @Nullable
+  private Schema readCreateLikeSchema(String rawTableName) {
+    ZkHelixPropertyStore<ZNRecord> store = _pinotHelixResourceManager.getPropertyStore();
+    if (!ZKMetadataProvider.isSchemaExists(store, rawTableName)) {
+      return null;
+    }
+    Schema schema = ZKMetadataProvider.getSchema(store, rawTableName);
+    if (schema == null && ZKMetadataProvider.isSchemaExists(store, rawTableName)) {
+      throw new ControllerApplicationException(LOGGER, "Failed to read schema: " + rawTableName,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return schema;
+  }
+
+  @Nullable
+  private TableConfig readCreateLikeTableConfig(String rawTableName, TableType tableType) {
+    ZkHelixPropertyStore<ZNRecord> store = _pinotHelixResourceManager.getPropertyStore();
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
+    if (!ZKMetadataProvider.isTableConfigExists(store, tableNameWithType)) {
+      return null;
+    }
+    TableConfig config = ZKMetadataProvider.getTableConfig(store, tableNameWithType, false, false);
+    if (config == null && ZKMetadataProvider.isTableConfigExists(store, tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER, "Failed to read table config: " + tableNameWithType,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return config;
+  }
+
+  @Nullable
+  private Response existingCreateLikeTarget(String targetName, boolean ifNotExists, DdlExecutionResponse response) {
+    if (ZKMetadataProvider.isLogicalTableExists(_pinotHelixResourceManager.getPropertyStore(), targetName)) {
+      throw new ControllerApplicationException(LOGGER, "Logical table already exists: " + targetName,
+          Response.Status.CONFLICT);
+    }
+    TableConfig offline = readCreateLikeTableConfig(targetName, TableType.OFFLINE);
+    TableConfig realtime = readCreateLikeTableConfig(targetName, TableType.REALTIME);
+    if ((offline != null && offline.isMaterializedView()) || (realtime != null && realtime.isMaterializedView())) {
+      throw badRequest("Cannot create table '" + targetName + "': a materialized view already exists at this name.");
+    }
+    if (offline == null && realtime == null && !_pinotHelixResourceManager.hasOfflineTable(targetName)
+        && !_pinotHelixResourceManager.hasRealtimeTable(targetName)) {
+      return null;
+    }
+    if (ifNotExists) {
+      return Response.ok(response.setTableConfigs(null)
+          .setMessage("Table " + targetName + " already exists; CREATE IF NOT EXISTS is a no-op.")).build();
+    }
+    throw new ControllerApplicationException(LOGGER, "Table " + targetName + " already exists.",
+        Response.Status.CONFLICT);
+  }
+
+  private static void checkCreateLikeSchema(Schema copiedSchema, @Nullable Schema storedSchema) {
+    if (storedSchema != null && !copiedSchema.equals(storedSchema)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Schema '" + copiedSchema.getSchemaName() + "' already exists and does not match the complete source schema.",
+          Response.Status.CONFLICT);
+    }
+  }
+
+  private void validateCreateLikeConfigs(TableConfigs copied, @Nullable Schema storedSchema) {
+    try {
+      Schema schema = copied.getSchema();
+      TableConfig[] configs = {copied.getOffline(), copied.getRealtime()};
+      for (TableConfig tableConfig : configs) {
+        if (tableConfig != null) {
+          TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Map.of());
+        }
+      }
+      TableConfigValidationUtils.validateSchemaGroovy(schema, _controllerConf);
+      boolean ignoreCase = _pinotHelixResourceManager.getTableCache().isIgnoreCase();
+      if (storedSchema == null) {
+        // A new schema must pass the same admission rules as a POST to /schemas.
+        SchemaUtils.validate(schema, List.of(), ignoreCase);
+      } else {
+        // A matching legacy schema still needs to be loadable, even when it predates the admission rules.
+        checkCreateLikeSchema(schema, storedSchema);
+        SchemaUtils.validate(schema, ignoreCase);
+      }
+      for (TableConfig tableConfig : configs) {
+        if (tableConfig != null) {
+          validateTableConfig(schema, tableConfig);
+          PinotTableRestletResource.tableTasksValidation(tableConfig, _pinotHelixTaskResourceManager);
+        }
+      }
+      if (copied.getOffline() != null && copied.getRealtime() != null) {
+        TableConfigUtils.verifyHybridTableConfigs(copied.getTableName(), copied.getOffline(), copied.getRealtime());
+      }
+    } catch (IllegalArgumentException | IllegalStateException | ConfigValidationException e) {
+      throw new ControllerApplicationException(LOGGER, "CREATE TABLE LIKE validation failed: " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
+    }
+  }
+
+  private static Response createLikeFailure(String targetName, boolean schemaCreated, List<String> createdTables,
+      int status, Exception cause) {
+    String message = "Failed to create table " + targetName + ": " + cause.getMessage();
+    if (schemaCreated) {
+      message += ". This request created schema " + targetName;
+    }
+    if (!createdTables.isEmpty()) {
+      message += ". Completed table variants: " + createdTables;
+    }
+    if (!(cause instanceof ControllerApplicationException)) {
+      // ControllerApplicationException already logged the failure at the appropriate level.
+      if (status >= 500) {
+        LOGGER.error(message, cause);
+      } else {
+        LOGGER.info(message);
+      }
+    }
+    Map<String, Object> error =
+        Map.of("code", status, "error", message, "schemaCreated", schemaCreated, "createdTables", createdTables);
+    return Response.status(status).type(MediaType.APPLICATION_JSON).entity(error).build();
   }
 
   // -------------------------------------------------------------------------------------------

@@ -76,11 +76,12 @@ import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
 ///     → SqlNode (one of SqlPinot{ShowTables,ShowMaterializedViews,CreateTable,ShowCreateTable,
 ///                                DropTable,CreateMaterializedView,ShowCreateMaterializedView,
 ///                                DropMaterializedView})
-///     → ResolvedTableDefinition (CREATE only)
-///     → Schema + TableConfig (CREATE only) via [PropertyMapping] /
+///     → ResolvedTableDefinition (column-list CREATE only)
+///     → Schema + TableConfig (column-list CREATE only) via [PropertyMapping] /
 ///       [MaterializedViewPropertyRouter]
 ///     → CompiledDdl
 /// ```
+/// `CREATE TABLE LIKE` retains both table references and its optional source type without resolving cluster metadata.
 ///
 /// Both the dispatch in [#compile] and the section ordering below follow [DdlOperation]:
 /// Catalog → Table → Materialized View, lifecycle CREATE → SHOW CREATE → DROP within each
@@ -208,7 +209,7 @@ public final class DdlCompiler {
     }
     throw new DdlCompilationException(
         "Unsupported DDL statement; expected SHOW TABLES, SHOW MATERIALIZED VIEWS, "
-            + "CREATE TABLE, SHOW CREATE TABLE, DROP TABLE, CREATE MATERIALIZED VIEW, "
+            + "CREATE TABLE, CREATE TABLE LIKE, SHOW CREATE TABLE, DROP TABLE, CREATE MATERIALIZED VIEW, "
             + "SHOW CREATE MATERIALIZED VIEW, or DROP MATERIALIZED VIEW.");
   }
 
@@ -248,11 +249,17 @@ public final class DdlCompiler {
   // Table DDL: CREATE TABLE
   // -------------------------------------------------------------------------------------------
 
-  private static CompiledCreateTable compileCreate(SqlPinotCreateTable node, DdlCompileContext ctx) {
+  private static CompiledDdl compileCreate(SqlPinotCreateTable node, DdlCompileContext ctx) {
     if (node.getWithOptions() != null) {
       return compileCreateWithOptions(node, ctx);
     }
     QualifiedName name = parseQualifiedName(node.getName());
+    if (node.getLikeSource() != null) {
+      QualifiedName source = parseQualifiedName(node.getLikeSource());
+      TableType sourceType = node.getTableType() == null ? null : parseTableType(node.getTableType().toValue());
+      return new CompiledCreateTableLike(name._databaseName, name._tableName, source._databaseName, source._tableName,
+          sourceType, node.isIfNotExists());
+    }
     TableType tableType = parseTableType(node.getTableType().toValue());
 
     List<String> warnings = new ArrayList<>();
@@ -298,7 +305,7 @@ public final class DdlCompiler {
 
   /// Compiles the options-defined `CREATE TABLE ... WITH (key = value, ...)` form by delegating
   /// to the registered [CreateTableWithOptionsHandler]. The compiler owns the parts common to
-  /// both CREATE TABLE forms — name/database resolution and option de-duplication — and the
+  /// CREATE TABLE forms, including name/database resolution, and de-duplicates options. The
   /// handler owns everything the options mean (schema derivation, table-config construction).
   private static CompiledCreateTable compileCreateWithOptions(SqlPinotCreateTable node, DdlCompileContext ctx) {
     QualifiedName name = parseQualifiedName(node.getName());

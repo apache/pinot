@@ -121,10 +121,12 @@ SqlPinotShow :=                                                ── unified en
 
 SqlPinotCreateTable :=
     CREATE TABLE [IF NOT EXISTS] CompoundIdentifier
-    PinotColumnList
-    [PinotPrimaryKeyList]
-    TABLE_TYPE = (OFFLINE | REALTIME)
-    [PROPERTIES (PinotPropertyList)]
+    (
+        PinotColumnList [PinotPrimaryKeyList]
+        TABLE_TYPE = (OFFLINE | REALTIME) [PROPERTIES (PinotPropertyList)]
+      | WITH (PinotWithOptionList)
+      | LIKE CompoundIdentifier [TYPE (OFFLINE | REALTIME)]
+    )
 
 SqlPinotDrop :=                                                ── unified entry under one DROP token
     DROP (
@@ -673,6 +675,79 @@ accept a name that resolves to a different kind of object. Returning 200 in that
 leave a real OFFLINE table named `foo` standing while the script thinks it cleaned up an
 MV — an actively dangerous failure mode. 400 forces the operator to inspect cluster state
 before acting.
+
+### 6.8a Table DDL: CREATE TABLE LIKE
+
+```sql
+CREATE TABLE [IF NOT EXISTS] [db.]target
+LIKE [db.]source [TYPE OFFLINE | REALTIME];
+```
+
+The parser records the LIKE source on the existing `SqlPinotCreateTable` node.
+`DdlCompiler` produces a `CompiledCreateTableLike` with both table references,
+the optional source type, and the existence flag. The controller resolves the
+source definition when it executes the `CREATE_TABLE_LIKE` operation.
+
+Omitting `TYPE` copies every existing physical variant of the source: OFFLINE,
+REALTIME, or both for a hybrid. An explicit type selects only that variant and
+returns 404 if it is absent. A hybrid is represented by the existing `TableConfigs`
+bundle (one Schema plus optional OFFLINE and REALTIME configs); there is no new
+SPI table type. Materialized views and Pinot `LogicalTableConfig` sources are
+rejected.
+
+The target follows the existing explicit-database/header conflict rule. An explicit
+source database is resolved independently; an unqualified source uses the database
+header and then the default database. A target database qualifier does not become
+the default source database. Authorization uses fully qualified typed resources:
+READ / GET_TABLE_CONFIG for source candidates before discovery, and CREATE /
+CREATE_TABLE for both destination candidates before existence checks. Both target
+permissions are required because any existing target variant blocks the operation,
+including when `TYPE` selects just one source variant. With no `TYPE`,
+both source candidates require READ permission, consistent with other untyped DDLs.
+
+LIKE reads source configs with variable substitution and decorators disabled,
+as in `GET /tableConfigs`. If a getter returns no definition
+for an existing config or schema during preflight, LIKE returns 500 before writing.
+The getters use the controller's standard legacy property-store fallback. Explicit
+`TYPE` reads only the selected variant. Each read deserializes a fresh definition,
+preserving schema metadata, per-variant settings, and symbolic `${VAR}` references.
+`TableConfigs.setTableName` changes structural table/schema
+names. Arbitrary config values such as stream topics, tenants, task settings, and
+explicit instance-partition references retain their values. Target tuning and the
+normal validation pipeline run before persistence, including validation of the
+two copied configs as a hybrid pair.
+
+Source segments, consuming offsets/sequence numbers, runtime assignments, task
+execution records, pause/disabled state, and explicit hybrid time-boundary runtime
+overrides are not copied. Normal REALTIME creation initializes fresh consuming
+segments and starts ingestion using the inherited configuration.
+
+After authorization, the controller checks the target before reading the source.
+An existing target variant yields 409, or a 200 no-op with `IF NOT EXISTS` even
+if the source has since been dropped. Incompatible object kinds
+are rejected even with `IF NOT EXISTS`. An existing standalone schema can be
+reused only when its complete definition equals the copied schema after renaming.
+Dry-run performs preparation and validation without writes.
+
+After validating both configs, the controller uses the existing Helix property store
+and the standard `addSchema` and `addTable` operations. It creates the schema first,
+then OFFLINE, then REALTIME when requested. Each write completes separately.
+Concurrent requests can change the schema or create a target variant between the
+existence check and a write. A concurrent create can still return a write error
+with `IF NOT EXISTS` if the ordinary table API cannot confirm a duplicate.
+Serialize competing creates and schema changes when a caller requires exclusive
+ownership of the target name.
+
+Write-phase failures use the controller's standard `code` and `error` fields.
+`createdTables` lists variants whose `addTable` call completed. `schemaCreated`
+is true when this request completed `addSchema` and read back the expected
+definition. A matching schema reused from an earlier request leaves this flag false. Inspect the current
+target state before cleanup or retry, particularly if other requests were active.
+
+Successful creation returns 201; dry-run and no-op return 200. LIKE responses use
+`sourceTableName`, raw `tableName`, `tableConfigs` (the existing bundle JSON), and
+`createdTables`. The copied bundle is omitted on no-op. Existing operations retain
+their response shape.
 
 ### 6.9 Authorization contract
 
