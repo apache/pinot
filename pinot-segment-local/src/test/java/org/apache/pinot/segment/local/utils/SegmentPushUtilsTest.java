@@ -629,6 +629,107 @@ public class SegmentPushUtilsTest {
     assertEquals(result.get(segmentFiles[3]), segmentFiles[3]);
   }
 
+  @Test
+  public void testGetSegmentUriToTarPathMapWithoutArchiveExtension() {
+    // Committed REALTIME segments are stored in the deep store without archive extension
+    URI outputDirURI = _tempDir.toURI();
+    String segment = outputDirURI.resolve("myTable__0__0__20260601T1557Z").toString();
+    String segmentUnderDirWithDot = outputDirURI.resolve("myTable.2026/myTable__0__1__20260602T1557Z").toString();
+    String segmentArchive = outputDirURI.resolve("myTable_offline.tar.gz").toString();
+    String[] files = {
+        segment, segmentUnderDirWithDot, segmentArchive,
+        outputDirURI.resolve("myTable_offline.metadata.tar.gz").toString(),
+        outputDirURI.resolve("myTable__0__0__20260601T1557Z.tmp." + UUID.randomUUID()).toString(),
+        outputDirURI.resolve("_SUCCESS").toString(), outputDirURI.resolve("notes.txt").toString()
+    };
+    PushJobSpec pushSpec = new PushJobSpec();
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files),
+        Map.of(segment, segment, segmentUnderDirWithDot, segmentUnderDirWithDot, segmentArchive, segmentArchive));
+
+    pushSpec.setPushFileNamePattern("glob:**/myTable__*");
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files),
+        Map.of(segment, segment, segmentUnderDirWithDot, segmentUnderDirWithDot));
+
+    // The check is on the file name, not on the host or the parent directories
+    URI s3OutputDirURI = URI.create("s3://deep.store.bucket/myTable/");
+    String s3Segment = "s3://deep.store.bucket/myTable/myTable__0__0__20260601T1557Z";
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(s3OutputDirURI, new PushJobSpec(), new String[]{
+        s3Segment, "s3://deep.store.bucket/myTable/myTable.2026/notes.txt"
+    }), Map.of(s3Segment, s3Segment));
+
+    assertEquals(SegmentPushUtils.getSegmentName(segment), "myTable__0__0__20260601T1557Z");
+    assertEquals(SegmentPushUtils.getSegmentName(segmentArchive), "myTable_offline");
+  }
+
+  @Test
+  public void testListFilesSkipsDirectories()
+      throws IOException {
+    File segmentDir = new File(_tempDir, "myTable__0__0__20260601T1557Z");
+    assertTrue(segmentDir.mkdir());
+    File segment = new File(segmentDir, "myTable__0__1__20260602T1557Z");
+    assertTrue(segment.createNewFile());
+    assertEquals(SegmentPushUtils.listFiles(new LocalPinotFS(), _tempDir.toURI()),
+        new String[]{segment.getAbsolutePath()});
+  }
+
+  @Test
+  public void testCleanUpOutputDirRejectedForSegmentWithoutArchiveExtension()
+      throws IOException {
+    File segment = new File(_tempDir, "myTable__0__0__20260601T1557Z");
+    assertTrue(segment.createNewFile());
+    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
+    TableSpec tableSpec = new TableSpec();
+    tableSpec.setTableName("myTable");
+    spec.setTableSpec(tableSpec);
+    spec.setPushJobSpec(new PushJobSpec());
+    spec.setCleanUpOutputDir(true);
+    List<String> segmentPaths = List.of(segment.toURI().toString());
+
+    // Fails before anything is pushed or deleted
+    expectThrows(IllegalArgumentException.class, () -> SegmentPushUtils.sendSegmentUris(spec, segmentPaths));
+    expectThrows(IllegalArgumentException.class,
+        () -> SegmentPushUtils.pushSegments(spec, new LocalPinotFS(), segmentPaths, List.of(), List.of()));
+    assertTrue(segment.exists());
+
+    // Segment archives can still be cleaned up
+    SegmentPushUtils.checkCleanUpOutputDir(spec, List.of(new File(_tempDir, "myTable_offline.tar.gz").toURI()
+        .toString(), "s3://deep.store.bucket/myTable/myTable_offline.tar.gz"));
+  }
+
+  @Test
+  public void testListFilesWithoutFileMetadata()
+      throws IOException {
+    // LocalPinotFS.listFiles() returns absolute local paths, which are not valid URIs with a space or '#'
+    File outputDir = new File(_tempDir, "my data #1");
+    File segmentDir = new File(outputDir, "myTable__0__0__20260601T1557Z");
+    assertTrue(segmentDir.mkdirs());
+    File segment = new File(segmentDir, "myTable__0__1__20260602T1557Z");
+    assertTrue(segment.createNewFile());
+    File segmentArchive = new File(outputDir, "myTable_offline.tar.gz");
+    assertTrue(segmentArchive.createNewFile());
+    PinotFS fileSystem = spy(new LocalPinotFS());
+    Mockito.doThrow(new UnsupportedOperationException()).when(fileSystem)
+        .listFilesWithMetadata(any(URI.class), Mockito.anyBoolean());
+    String[] files = SegmentPushUtils.listFiles(fileSystem, outputDir.toURI());
+    Arrays.sort(files);
+    assertEquals(files, new String[]{segment.getAbsolutePath(), segmentArchive.getAbsolutePath()});
+  }
+
+  @Test(dataProvider = "segmentTarExtensions")
+  public void testGenerateSegmentMetadataFileWithoutArchiveExtension(String extension)
+      throws Exception {
+    // The compression format is detected from the content
+    File segment = new File(_tempDir, "myTable__0__0__20260601T1557Z");
+    FileUtils.moveFile(createSegmentMetadataSourceArchive(extension, true), segment);
+    File metadataTar = null;
+    try {
+      metadataTar = SegmentPushUtils.generateSegmentMetadataFile(new LocalPinotFS(), segment.toURI());
+      assertMetadataArchiveContents(metadataTar);
+    } finally {
+      FileUtils.deleteQuietly(metadataTar);
+    }
+  }
+
   @DataProvider(name = "segmentTarExtensions")
   public Object[][] segmentTarExtensions() {
     return new Object[][]{{".tar.gz"}, {".tar.lz4"}, {".tar.zst"}};

@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
@@ -63,6 +64,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -202,6 +204,7 @@ public class SegmentPushUtils implements Serializable {
     String tableName = spec.getTableSpec().getTableName();
     TableType tableType = tableName.endsWith("_" + TableType.REALTIME.name()) ? TableType.REALTIME : TableType.OFFLINE;
     boolean cleanUpOutputDir = spec.isCleanUpOutputDir();
+    checkCleanUpOutputDir(spec, tarFilePaths);
     LOGGER.info("Start pushing segments: {}... to locations: {} for table {}",
         Arrays.toString(tarFilePaths.subList(0, Math.min(5, tarFilePaths.size())).toArray()),
         Arrays.toString(spec.getPinotClusterSpecs()), tableName);
@@ -210,7 +213,7 @@ public class SegmentPushUtils implements Serializable {
     try {
       for (String tarFilePath : tarFilePaths) {
         URI tarFileURI = URI.create(tarFilePath);
-        String segmentName = getSegmentNameFromTarFile(tarFilePath);
+        String segmentName = getSegmentName(tarFilePath);
         for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
           URI controllerURI;
           try {
@@ -266,6 +269,7 @@ public class SegmentPushUtils implements Serializable {
       List<Header> headers, List<NameValuePair> parameters)
       throws RetriableOperationException, AttemptsExceededException {
     String tableName = spec.getTableSpec().getTableName();
+    checkCleanUpOutputDir(spec, segmentUris);
     LOGGER.info("Start sending table {} segment URIs: {} to locations: {}", tableName,
         Arrays.toString(segmentUris.subList(0, Math.min(5, segmentUris.size())).toArray()),
         Arrays.toString(spec.getPinotClusterSpecs()));
@@ -471,7 +475,7 @@ public class SegmentPushUtils implements Serializable {
   }
 
   /// Segments stored in the deep store can omit the archive extension.
-  private static String getSegmentName(String tarFilePath) {
+  public static String getSegmentName(String tarFilePath) {
     String fileName = new File(tarFilePath).getName();
     if (Constants.isSegmentTarFile(fileName)) {
       return getSegmentNameFromTarFile(tarFilePath);
@@ -678,6 +682,9 @@ public class SegmentPushUtils implements Serializable {
     return allSegmentsMetadataTarFile;
   }
 
+  /// Returns the map from segment URI to segment file path for the files with a segment archive extension, and the
+  /// files without any dot in the name such as the segments in the deep store. Directories are not filtered here, use
+  /// [#listFiles(PinotFS, URI)] to list the files.
   public static Map<String, String> getSegmentUriToTarPathMap(URI outputDirURI, PushJobSpec pushSpec,
       String[] files) {
     Map<String, String> segmentUriToTarPathMap = new HashMap<>();
@@ -693,13 +700,12 @@ public class SegmentPushUtils implements Serializable {
         }
       }
 
-      URI uri = outputDirURI != null && "file".equals(outputDirURI.getScheme()) && new File(file).isAbsolute()
-          ? new File(file).toURI() : URI.create(file);
+      URI uri = toFileURI(outputDirURI, file);
       if (uri.getPath().endsWith(Constants.METADATA_TAR_GZ_FILE_EXT)) {
         // Skip segment metadata tar gz files
         continue;
       }
-      if (Constants.isSegmentTarFile(uri.getPath())) {
+      if (Constants.isSegmentTarFile(uri.getPath()) || isSegmentFileWithoutExtension(uri.getPath())) {
         URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputDirURI, uri, pushSpec.getSegmentUriPrefix(),
             pushSpec.getSegmentUriSuffix());
         segmentUriToTarPathMap.put(updatedURI.toString(), file);
@@ -710,6 +716,53 @@ public class SegmentPushUtils implements Serializable {
           pushSpec.getPushFileNamePattern());
     }
     return segmentUriToTarPathMap;
+  }
+
+  /// Converts a path returned by [PinotFS#listFiles(URI, boolean)] to a URI. [LocalPinotFS] returns absolute local
+  /// paths, which can contain characters such as space or `#` that are not valid in a URI.
+  private static URI toFileURI(@Nullable URI outputDirURI, String file) {
+    return outputDirURI != null && "file".equals(outputDirURI.getScheme()) && new File(file).isAbsolute()
+        ? new File(file).toURI() : URI.create(file);
+  }
+
+  /// Segments stored in the deep store, e.g. committed REALTIME segments, have no archive extension. The compression
+  /// format is detected from the content when the segment is decompressed.
+  private static boolean isSegmentFileWithoutExtension(String path) {
+    String fileName = new File(path).getName();
+    // Skip marker files such as _SUCCESS
+    return fileName.indexOf('.') < 0 && !fileName.startsWith("_");
+  }
+
+  /// Segments without archive extension are usually the segments in the deep store of a table, which must not be
+  /// deleted after pushing.
+  @VisibleForTesting
+  static void checkCleanUpOutputDir(SegmentGenerationJobSpec spec, List<String> segmentPaths) {
+    if (spec.isCleanUpOutputDir()) {
+      for (String segmentPath : segmentPaths) {
+        Preconditions.checkArgument(!isSegmentFileWithoutExtension(URI.create(segmentPath).getPath()),
+            "cleanUpOutputDir is not supported for segment without archive extension: %s", segmentPath);
+      }
+    }
+  }
+
+  /// Lists the files under `outputDirURI` recursively for segment push. Directories are skipped because segment files
+  /// without archive extension are also selected for push.
+  public static String[] listFiles(PinotFS outputDirFS, URI outputDirURI)
+      throws IOException {
+    try {
+      return outputDirFS.listFilesWithMetadata(outputDirURI, true).stream()
+          .filter(fileMetadata -> !fileMetadata.isDirectory())
+          .map(FileMetadata::getFilePath)
+          .toArray(String[]::new);
+    } catch (UnsupportedOperationException e) {
+      List<String> files = new ArrayList<>();
+      for (String file : outputDirFS.listFiles(outputDirURI, true)) {
+        if (!isSegmentFileWithoutExtension(file) || !outputDirFS.isDirectory(toFileURI(outputDirURI, file))) {
+          files.add(file);
+        }
+      }
+      return files.toArray(new String[0]);
+    }
   }
 
   /// Generate a segment metadata only tar file, which contains only metadata.properties and creation.meta file.
