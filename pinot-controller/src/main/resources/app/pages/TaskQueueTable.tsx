@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState, useContext } from 'react';
-import { get, keys, last } from 'lodash';
+import { get, has, keys, last } from 'lodash';
 import moment from 'moment';
 import { formatTimeInTimezone } from '../utils/TimezoneUtils';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -111,7 +111,27 @@ const TaskQueueTable = (props) => {
 
   const handleScheduleNow = async () => {
     const res = await PinotMethodUtils.scheduleTaskAction(tableName, taskType);
-    if (get(res, `${taskType}`, null) === null) {
+    const scheduledTasks = get(res, `${taskType}`, null);
+    // baseApi resolves HTTP errors with the error body ({code, error}), which has neither errors field
+    const isScheduleResponse = has(res, 'generationErrors') && has(res, 'schedulingErrors');
+    const hasErrors = !!get(res, 'generationErrors', null) || !!get(res, 'schedulingErrors', null);
+    // A task type that created no task is left out of the response; it is only an error if an error is reported
+    if (!isScheduleResponse) {
+      dispatch({
+        type: 'error',
+        message: (
+          <Box>
+            <Typography>
+              Could not schedule task
+            </Typography>
+            <Typography>
+              {get(res, 'error', 'Unknown error')}
+            </Typography>
+          </Box>
+        ),
+        show: true
+      });
+    } else if (hasErrors && !scheduledTasks) {
       dispatch({
         type: 'error',
         message: (
@@ -129,7 +149,7 @@ const TaskQueueTable = (props) => {
         ),
         show: true
       });
-    } else if (get(res, `${taskType}`, null) === '') {
+    } else if (!scheduledTasks) {
       dispatch({
         type: 'success',
         message: `No task to schedule`,
@@ -138,7 +158,7 @@ const TaskQueueTable = (props) => {
     } else {
       dispatch({
         type: 'success',
-        message: `${get(res, `${taskType}`, null)} scheduled successfully`,
+        message: `${scheduledTasks} scheduled successfully`,
         show: true
       });
     }

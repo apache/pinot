@@ -304,11 +304,13 @@ public class MaterializedViewQuickStart extends Quickstart {
       Map<String, String> scheduled = minionClient.scheduleMinionTasks(
           CommonConstants.MaterializedViewTask.TASK_TYPE,
           MATERIALIZED_VIEW_TABLE + "_OFFLINE");
-      if (scheduled.isEmpty()) {
+      // The response always has the error entries; the task type is left out when it created no task
+      String scheduledTasks = scheduled.get(CommonConstants.MaterializedViewTask.TASK_TYPE);
+      if (scheduledTasks == null) {
         printStatus(Color.YELLOW,
             "No tasks scheduled — MV may already be up-to-date or minion is still starting up");
       } else {
-        printStatus(Color.GREEN, "Scheduled MV tasks: " + scheduled);
+        printStatus(Color.GREEN, "Scheduled MV tasks: " + scheduledTasks);
       }
     } catch (Exception e) {
       printStatus(Color.YELLOW, "Could not schedule MV task (will retry): " + e.getMessage());
