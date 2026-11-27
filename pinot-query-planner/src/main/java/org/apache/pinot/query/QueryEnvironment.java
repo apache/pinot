@@ -61,6 +61,7 @@ import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
+import org.apache.pinot.calcite.rel.rules.PinotMvAggregatePreFilterRule;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
@@ -641,6 +642,13 @@ public class QueryEnvironment {
 
     // Pushdown filters again since filter should be pushed down at the lowest level, after project pushdown.
     hepProgramBuilder.addRuleCollection(filterPushdownRules);
+
+    // Copy sound positive MV group-key predicates as leaf pre-filters before PRUNE_RULES runs so FilterMerge can
+    // combine them with any existing leaf WHERE filter into one LogicalFilter.
+    if (!isRuleSkipped(CommonConstants.Broker.PlannerRuleNames.MV_AGGREGATE_PRE_FILTER, skipRuleSet, useRuleSet,
+        defaultDisabledRuleSet)) {
+      hepProgramBuilder.addRuleInstance(PinotMvAggregatePreFilterRule.INSTANCE);
+    }
 
     // ----
     // Prune duplicate/unnecessary nodes using a single HepInstruction.

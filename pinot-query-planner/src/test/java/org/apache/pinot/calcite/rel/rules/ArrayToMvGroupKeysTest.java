@@ -163,4 +163,55 @@ public class ArrayToMvGroupKeysTest {
     assertThrows(IllegalArgumentException.class,
         () -> ArrayToMvGroupKeys.rewriteProject(project(sv(), arrayToMv(arr())), List.of(0)));
   }
+
+  @Test
+  public void testContainsArrayToMv() {
+    assertFalse(ArrayToMvGroupKeys.containsArrayToMv(sv()));
+    assertFalse(ArrayToMvGroupKeys.containsArrayToMv(arr()));
+    assertFalse(ArrayToMvGroupKeys.containsArrayToMv(_rexBuilder.makeCall(SqlStdOperatorTable.LOWER, sv())));
+
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMv(arrayToMv(arr())));
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMv(
+        _rexBuilder.makeCall(SqlStdOperatorTable.LOWER, arrayToMv(arr()))));
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMv(_rexBuilder.makeCast(_varcharType, arrayToMv(arr()))));
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMv(
+        _rexBuilder.makeCall(SqlStdOperatorTable.COALESCE, arrayToMv(arr()), _rexBuilder.makeLiteral("none"))));
+  }
+
+  @Test
+  public void testContainsArrayToMvColumnDetectsBareAndNestedThroughChains() {
+    RexNode lowerMv = _rexBuilder.makeCall(SqlStdOperatorTable.LOWER, arrayToMv(arr()));
+    RexNode castMv = _rexBuilder.makeCast(_varcharType, arrayToMv(arr()));
+    RexNode coalesceMv =
+        _rexBuilder.makeCall(SqlStdOperatorTable.COALESCE, arrayToMv(arr()), _rexBuilder.makeLiteral("none"));
+    Project project = project(sv(), arrayToMv(arr()), lowerMv, castMv, coalesceMv);
+
+    assertFalse(ArrayToMvGroupKeys.containsArrayToMvColumn(project, 0));
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMvColumn(project, 1));
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMvColumn(project, 2));
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMvColumn(project, 3));
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMvColumn(project, 4));
+
+    RelNode filter = LogicalFilter.create(project,
+        _rexBuilder.makeCall(SqlStdOperatorTable.IS_NOT_NULL, _rexBuilder.makeInputRef(project, 0)));
+    assertFalse(ArrayToMvGroupKeys.containsArrayToMvColumn(filter, 0));
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMvColumn(filter, 1));
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMvColumn(filter, 2));
+
+    // Outer Project passes SV col 0, passes bare MV col 1, wraps bare MV col 1 in LOWER, and wraps SV col 0 in LOWER.
+    RexNode svRef = _rexBuilder.makeInputRef(filter, 0);
+    RexNode mvRef = _rexBuilder.makeInputRef(filter, 1);
+    RelNode outer = LogicalProject.create(filter, List.of(),
+        List.of(svRef, mvRef, _rexBuilder.makeCall(SqlStdOperatorTable.LOWER, mvRef),
+            _rexBuilder.makeCall(SqlStdOperatorTable.LOWER, svRef)),
+        List.of("svOut", "mvOut", "lowerMvOut", "lowerSvOut"), Set.of());
+    assertFalse(ArrayToMvGroupKeys.containsArrayToMvColumn(outer, 0));
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMvColumn(outer, 1));
+    // Nested in outer Project over an inner Project's ARRAY_TO_MV column is also detected.
+    assertTrue(ArrayToMvGroupKeys.containsArrayToMvColumn(outer, 2));
+    assertFalse(ArrayToMvGroupKeys.containsArrayToMvColumn(outer, 3));
+
+    // Trace terminates cleanly at non-Project/Filter nodes.
+    assertFalse(ArrayToMvGroupKeys.containsArrayToMvColumn(_values, 1));
+  }
 }

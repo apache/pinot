@@ -1395,6 +1395,7 @@ public class CommonConstants {
       public static final String SORT_PROJECT_TRANSPOSE = "SortProjectTranspose";
       public static final String UNION_MERGE = "UnionMerge";
       public static final String PROJECT_AGGREGATE_MERGE = "ProjectAggregateMerge";
+      public static final String MV_AGGREGATE_PRE_FILTER = "MvAggregatePreFilter";
     }
 
     /// Set of planner rules that will be disabled by default
