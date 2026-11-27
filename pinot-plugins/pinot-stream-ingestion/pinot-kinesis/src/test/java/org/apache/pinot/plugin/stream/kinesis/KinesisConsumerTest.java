@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.mockito.ArgumentCaptor;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.core.SdkBytes;
@@ -44,6 +45,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -157,6 +159,103 @@ public class KinesisConsumerTest {
 
     // Expect only 1 call to get shard iterator and 1 call to get records
     verify(kinesisClient, times(1)).getShardIterator(any(GetShardIteratorRequest.class));
+    verify(kinesisClient, times(1)).getRecords(any(GetRecordsRequest.class));
+  }
+
+  @Test
+  public void testInclusiveOffsetUsesAtSequenceNumber() {
+    KinesisClient kinesisClient = mock(KinesisClient.class);
+    ArgumentCaptor<GetShardIteratorRequest> iteratorCaptor =
+        ArgumentCaptor.forClass(GetShardIteratorRequest.class);
+    when(kinesisClient.getShardIterator(iteratorCaptor.capture())).thenReturn(
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build());
+    when(kinesisClient.getRecords(any(GetRecordsRequest.class))).thenReturn(
+        GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(_records).build());
+
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(_kinesisConfig, kinesisClient);
+
+    // Inclusive offset (new shard) must use AT_SEQUENCE_NUMBER
+    KinesisPartitionGroupOffset inclusiveOffset = new KinesisPartitionGroupOffset("0", "1", true);
+    KinesisMessageBatch batch = kinesisConsumer.fetchMessages(inclusiveOffset, TIMEOUT);
+    assertEquals(batch.getMessageCount(), NUM_RECORDS);
+
+    GetShardIteratorRequest captured = iteratorCaptor.getValue();
+    assertEquals(captured.shardIteratorType(), ShardIteratorType.AT_SEQUENCE_NUMBER);
+
+    // The next offset returned must be non-inclusive so subsequent fetches use AFTER_SEQUENCE_NUMBER
+    KinesisPartitionGroupOffset nextOffset =
+        (KinesisPartitionGroupOffset) batch.getOffsetOfNextBatch();
+    assertNotNull(nextOffset);
+    assertFalse(nextOffset.isInclusive());
+  }
+
+  @Test
+  public void testNonInclusiveOffsetUsesAfterSequenceNumber() {
+    KinesisClient kinesisClient = mock(KinesisClient.class);
+    ArgumentCaptor<GetShardIteratorRequest> iteratorCaptor =
+        ArgumentCaptor.forClass(GetShardIteratorRequest.class);
+    when(kinesisClient.getShardIterator(iteratorCaptor.capture())).thenReturn(
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build());
+    when(kinesisClient.getRecords(any(GetRecordsRequest.class))).thenReturn(
+        GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(_records).build());
+
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(_kinesisConfig, kinesisClient);
+
+    KinesisPartitionGroupOffset nonInclusiveOffset = new KinesisPartitionGroupOffset("0", "1", false);
+    kinesisConsumer.fetchMessages(nonInclusiveOffset, TIMEOUT);
+
+    GetShardIteratorRequest captured = iteratorCaptor.getValue();
+    assertEquals(captured.shardIteratorType(), ShardIteratorType.AFTER_SEQUENCE_NUMBER);
+  }
+
+  @Test
+  public void testInclusiveOffsetEmptyBatchReusesIterator() {
+    KinesisClient kinesisClient = mock(KinesisClient.class);
+    ArgumentCaptor<GetShardIteratorRequest> iteratorCaptor =
+        ArgumentCaptor.forClass(GetShardIteratorRequest.class);
+    when(kinesisClient.getShardIterator(iteratorCaptor.capture())).thenReturn(
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build());
+    // First call returns empty; second call returns records
+    when(kinesisClient.getRecords(any(GetRecordsRequest.class)))
+        .thenReturn(GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(List.of()).build())
+        .thenReturn(GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(_records).build());
+
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(_kinesisConfig, kinesisClient);
+
+    KinesisPartitionGroupOffset inclusiveOffset = new KinesisPartitionGroupOffset("0", "1", true);
+
+    // First fetch: empty batch, AT_SEQUENCE_NUMBER iterator requested once
+    KinesisMessageBatch emptyBatch = kinesisConsumer.fetchMessages(inclusiveOffset, TIMEOUT);
+    assertEquals(emptyBatch.getMessageCount(), 0);
+    assertEquals(iteratorCaptor.getValue().shardIteratorType(), ShardIteratorType.AT_SEQUENCE_NUMBER);
+
+    // Second fetch with same inclusive offset: cached iterator reused, no new GetShardIterator call
+    KinesisMessageBatch recordsBatch = kinesisConsumer.fetchMessages(inclusiveOffset, TIMEOUT);
+    assertEquals(recordsBatch.getMessageCount(), NUM_RECORDS);
+
+    verify(kinesisClient, times(1)).getShardIterator(any(GetShardIteratorRequest.class));
+    verify(kinesisClient, times(2)).getRecords(any(GetRecordsRequest.class));
+  }
+
+  @Test
+  public void testEmptyBatchIsHandled() {
+    KinesisClient kinesisClient = mock(KinesisClient.class);
+    when(kinesisClient.getShardIterator(any(GetShardIteratorRequest.class))).thenReturn(
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build());
+    // Return empty records with a non-null next shard iterator
+    when(kinesisClient.getRecords(any(GetRecordsRequest.class))).thenReturn(
+        GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(List.of()).build());
+
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(_kinesisConfig, kinesisClient);
+
+    KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
+    KinesisMessageBatch batch = kinesisConsumer.fetchMessages(startOffset, TIMEOUT);
+
+    assertEquals(batch.getMessageCount(), 0);
+    assertFalse(batch.isEndOfPartitionGroup());
+    // Offset of next batch stays at start offset for re-fetch
+    assertEquals(((KinesisPartitionGroupOffset) batch.getOffsetOfNextBatch()).getSequenceNumber(), "1");
+
     verify(kinesisClient, times(1)).getRecords(any(GetRecordsRequest.class));
   }
 
