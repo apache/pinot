@@ -138,6 +138,7 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
         return AggregationFunctionType.MIN;
       case MAXLONG:
         return AggregationFunctionType.MAX;
+      case SUM0:
       case SUMLONG:
       case SUMINT:
         return AggregationFunctionType.SUM;

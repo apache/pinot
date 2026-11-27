@@ -191,6 +191,7 @@ public class AggregationFunctionNullContractTest {
   @Test
   public void testCountingFunctionsReturnZeroWhenNothingAggregated() {
     assertEquals(create("COUNT", "(*)", true).extractFinalResult(null), 0L);
+    assertEquals(create("SUM0", "(column)", true).extractFinalResult(null), 0.0);
     assertEquals(create("DISTINCTCOUNT", "(column)", true).extractFinalResult(null), 0);
     assertEquals(create("DISTINCTCOUNTHLL", "(column)", true).extractFinalResult(null), 0L);
     assertEquals(create("DISTINCTCOUNTBITMAP", "(column)", true).extractFinalResult(null), 0);
@@ -269,7 +270,9 @@ public class AggregationFunctionNullContractTest {
   /// every one of them as honouring the option.
   private static final Set<AggregationFunctionType> HONOURS_NULL_HANDLING = Set.of(
       AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
-      AggregationFunctionType.SUM, AggregationFunctionType.SUM0, AggregationFunctionType.AVG,
+      // SUM0 returns 0.0 on empty/all-null input, so on the zero-filled synthetic block both modes return 0.0;
+      // null-row skipping with non-zero default values is covered by Sum0AggregationFunctionTest.
+      AggregationFunctionType.SUM, AggregationFunctionType.AVG,
       AggregationFunctionType.MODE, AggregationFunctionType.ANYVALUE, AggregationFunctionType.MINMAXRANGE,
       AggregationFunctionType.DISTINCTCOUNT, AggregationFunctionType.DISTINCTCOUNTOFFHEAP,
       AggregationFunctionType.DISTINCTSUM, AggregationFunctionType.DISTINCTAVG, AggregationFunctionType.PERCENTILE,
