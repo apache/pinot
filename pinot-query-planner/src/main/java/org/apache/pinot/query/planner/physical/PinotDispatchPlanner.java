@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
@@ -188,12 +189,12 @@ public class PinotDispatchPlanner {
 
   static boolean hasNonEmptyReplicatedLeaf(Map<Integer, DispatchablePlanMetadata> metadataMap) {
     for (DispatchablePlanMetadata metadata : metadataMap.values()) {
-      Map<String, List<String>> replicatedSegments = metadata.getReplicatedSegments();
+      Map<String, SegmentsToQuery> replicatedSegments = metadata.getReplicatedSegments();
       if (replicatedSegments == null) {
         continue;
       }
-      for (List<String> segments : replicatedSegments.values()) {
-        if (segments != null && !segments.isEmpty()) {
+      for (SegmentsToQuery segmentsToQuery : replicatedSegments.values()) {
+        if (!segmentsToQuery.getSegments().isEmpty() || !segmentsToQuery.getOptionalSegments().isEmpty()) {
           return true;
         }
       }

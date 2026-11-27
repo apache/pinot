@@ -39,6 +39,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -79,7 +80,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID
 /// Note that this implementation means:
 /// 1) Inconsistent selection of new segments across queries (some queries will serve new segments and others won't).
 /// 2) When there is no state update from helix, new segments won't be retired because of the time passing (those with
-/// creation time more than 5 minutes ago).
+/// creation time more than 5 minutes ago). Only [#selectOnAllInstances] checks the creation time on every call.
 /// TODO: refresh new/old segment state where there is no update from helix for long time.
 ///
 /// Alongside the selection state, this class maintains a [TableReplicaHealth] describing how well the
@@ -412,6 +413,25 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     int requestIdInt = (int) (requestId % MAX_REQUEST_ID);
     // Read the volatile reference once, so that the whole selection has a consistent view of the state
     return select(segments, requestIdInt, _segmentStates, queryOptions);
+  }
+
+  @Override
+  public SegmentsToQuery selectOnAllInstances(Collection<String> segments) {
+    // Read the volatile reference once, so that the whole selection has a consistent view of the state
+    SegmentStates segmentStates = _segmentStates;
+    // The states retire a new segment only when the assignment changes, so check its creation time against the clock
+    long currentTimeMs = _clock.millis();
+    long newSegmentExpirationMillis = _newSegmentExpirationTimeInSeconds * 1000;
+    List<String> requiredSegments = new ArrayList<>(segments.size());
+    List<String> optionalSegments = new ArrayList<>();
+    for (String segment : segments) {
+      if (segmentStates.isNewAndNotFullyOnline(segment, currentTimeMs, newSegmentExpirationMillis)) {
+        optionalSegments.add(segment);
+      } else {
+        requiredSegments.add(segment);
+      }
+    }
+    return new SegmentsToQuery(requiredSegments, optionalSegments);
   }
 
   @Override

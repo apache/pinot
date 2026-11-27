@@ -226,7 +226,8 @@ public class ServerQueryRequest {
     return _segmentsToQuery;
   }
 
-  /// Whether this request has at least one segment to read, whichever of the two representations carries them.
+  /// Whether this request has at least one segment to read, whichever of the two representations carries them. An
+  /// optional segment counts, as the server reads it when it has loaded it.
   ///
   /// A request holds its segments either flat in [#getSegmentsToQuery()], for a plain table, or grouped per
   /// referenced table in [#getTableSegmentsContexts()], for a logical table; the other one is null. Resolving that
@@ -234,13 +235,14 @@ public class ServerQueryRequest {
   public boolean hasSegmentsToQuery() {
     if (_tableSegmentsContexts != null) {
       for (TableSegmentsContext tableSegmentsContext : _tableSegmentsContexts) {
-        if (CollectionUtils.isNotEmpty(tableSegmentsContext.getSegments())) {
+        if (CollectionUtils.isNotEmpty(tableSegmentsContext.getSegments())
+            || CollectionUtils.isNotEmpty(tableSegmentsContext.getOptionalSegments())) {
           return true;
         }
       }
       return false;
     }
-    return CollectionUtils.isNotEmpty(_segmentsToQuery);
+    return CollectionUtils.isNotEmpty(_segmentsToQuery) || CollectionUtils.isNotEmpty(_optionalSegments);
   }
 
   public List<String> getOptionalSegments() {

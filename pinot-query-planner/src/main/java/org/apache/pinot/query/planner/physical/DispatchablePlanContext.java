@@ -33,6 +33,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -183,9 +184,9 @@ public class DispatchablePlanContext {
       // construct each worker metadata
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap =
           dispatchablePlanMetadata.getWorkerIdToServerInstanceMap();
-      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
+      Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap =
           dispatchablePlanMetadata.getWorkerIdToSegmentsMap();
-      Map<Integer, Map<String, List<String>>> workerIdToTableNameSegmentsMap =
+      Map<Integer, Map<String, SegmentsToQuery>> workerIdToTableNameSegmentsMap =
           dispatchablePlanMetadata.getWorkerIdToTableSegmentsMap();
       Map<Integer, Map<Integer, MailboxInfos>> workerIdToMailboxesMap =
           dispatchablePlanMetadata.getWorkerIdToMailboxesMap();
@@ -204,12 +205,12 @@ public class DispatchablePlanContext {
         // every site that populates these maps (WorkerManager and PlanFragmentAndMailboxAssignment) fills them in
         // the same per-worker loop as workerIdToServerInstanceMap, so every worker gets an entry.
         if (workerIdToSegmentsMap != null) {
-          Map<String, List<String>> segmentsMap = workerIdToSegmentsMap.get(workerId);
+          Map<String, SegmentsToQuery> segmentsMap = workerIdToSegmentsMap.get(workerId);
           Preconditions.checkNotNull(segmentsMap, "Missing segments map for worker id: %s", workerId);
           workerMetadata.setTableSegmentsMap(segmentsMap);
         }
         if (workerIdToTableNameSegmentsMap != null) {
-          Map<String, List<String>> tableNameSegmentsMap = workerIdToTableNameSegmentsMap.get(workerId);
+          Map<String, SegmentsToQuery> tableNameSegmentsMap = workerIdToTableNameSegmentsMap.get(workerId);
           Preconditions.checkNotNull(tableNameSegmentsMap, "Missing logical table segments map for worker id: %s",
               workerId);
           workerMetadata.setLogicalTableSegmentsMap(tableNameSegmentsMap);

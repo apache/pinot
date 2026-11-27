@@ -18,18 +18,18 @@
  */
 package org.apache.pinot.query.planner.physical.v2;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 
 
 /// Additional metadata for the [org.apache.pinot.query.planner.physical.v2.nodes.PhysicalTableScan].
 public class TableScanMetadata {
   private final Set<String> _scannedTables;
-  /// Stores workerId, which is an integer, to the segment mapping. The segment mapping is a map from table-type to list
-  /// of segments. Used for physical tables.
+  /// Stores workerId, which is an integer, to the segment mapping. The segment mapping is a map from table-type to the
+  /// segments to query. Used for physical tables.
   ///
   /// ```
   /// {
@@ -42,9 +42,9 @@ public class TableScanMetadata {
   ///   }
   /// }
   /// ```
-  private final Map<Integer, Map<String, List<String>>> _workedIdToSegmentsMap;
+  private final Map<Integer, Map<String, SegmentsToQuery>> _workedIdToSegmentsMap;
   /// Stores workerId to the segment mapping for logical tables. The segment mapping is a map from
-  /// physical table name (with type suffix) to list of segments. Used for logical tables.
+  /// physical table name (with type suffix) to the segments to query. Used for logical tables.
   ///
   /// ```
   /// {
@@ -59,7 +59,7 @@ public class TableScanMetadata {
   /// }
   /// ```
   @Nullable
-  private final Map<Integer, Map<String, List<String>>> _workerIdToLogicalTableSegmentsMap;
+  private final Map<Integer, Map<String, SegmentsToQuery>> _workerIdToLogicalTableSegmentsMap;
   private final Map<String, String> _tableOptions;
   private final Map<String, Set<String>> _unavailableSegmentsMap;
   @Nullable
@@ -68,7 +68,7 @@ public class TableScanMetadata {
   private final boolean _isLogicalTable;
 
   /// Constructor for physical table scan metadata.
-  public TableScanMetadata(Set<String> scannedTables, Map<Integer, Map<String, List<String>>> workedIdToSegmentsMap,
+  public TableScanMetadata(Set<String> scannedTables, Map<Integer, Map<String, SegmentsToQuery>> workedIdToSegmentsMap,
       Map<String, String> tableOptions, Map<String, Set<String>> unavailableSegmentsMap,
       @Nullable TimeBoundaryInfo timeBoundaryInfo) {
     _scannedTables = scannedTables;
@@ -82,7 +82,7 @@ public class TableScanMetadata {
 
   /// Constructor for logical table scan metadata.
   public TableScanMetadata(Set<String> scannedTables,
-      Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap,
+      Map<Integer, Map<String, SegmentsToQuery>> workerIdToLogicalTableSegmentsMap,
       Map<String, String> tableOptions, Map<String, Set<String>> unavailableSegmentsMap,
       @Nullable TimeBoundaryInfo timeBoundaryInfo, boolean isLogicalTable) {
     _scannedTables = scannedTables;
@@ -104,12 +104,12 @@ public class TableScanMetadata {
   }
 
   @Nullable
-  public Map<Integer, Map<String, List<String>>> getWorkedIdToSegmentsMap() {
+  public Map<Integer, Map<String, SegmentsToQuery>> getWorkedIdToSegmentsMap() {
     return _workedIdToSegmentsMap;
   }
 
   @Nullable
-  public Map<Integer, Map<String, List<String>>> getWorkerIdToLogicalTableSegmentsMap() {
+  public Map<Integer, Map<String, SegmentsToQuery>> getWorkerIdToLogicalTableSegmentsMap() {
     return _workerIdToLogicalTableSegmentsMap;
   }
 

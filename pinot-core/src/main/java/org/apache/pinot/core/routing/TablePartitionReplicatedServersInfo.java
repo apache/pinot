@@ -93,6 +93,9 @@ public class TablePartitionReplicatedServersInfo {
   /// rather than silently dropping their rows; one that scatters over all the servers holding the table (the regular
   /// routing path) can ignore this set, because it picks the deferred segments up through the routing table.
   ///
+  /// The deferred segments of a partition that does have an entry are not reported here: the entry lists them as its
+  /// [PartitionInfo#_optionalSegments].
+  ///
   /// Empty when there is nothing to report, and never `null`: the consumers above read it without a null check.
   public Set<Integer> getPartitionsWithOnlyDeferredSegments() {
     return _partitionsWithOnlyDeferredSegments;
@@ -101,10 +104,20 @@ public class TablePartitionReplicatedServersInfo {
   public static class PartitionInfo {
     public final Set<String> _fullyReplicatedServers;
     public final List<String> _segments;
+    /// The deferred segments of the partition: new segments (recently created or pushed) that are left out of
+    /// [#_segments] because they do not have all of their replicas online yet, so that the partition keeps its fully
+    /// replicated servers. Any of those servers may or may not have loaded them, so they can only be queried as
+    /// optional segments, which a server skips when it does not have them.
+    public final List<String> _optionalSegments;
 
     public PartitionInfo(Set<String> fullyReplicatedServers, List<String> segments) {
+      this(fullyReplicatedServers, segments, List.of());
+    }
+
+    public PartitionInfo(Set<String> fullyReplicatedServers, List<String> segments, List<String> optionalSegments) {
       _fullyReplicatedServers = fullyReplicatedServers;
       _segments = segments;
+      _optionalSegments = optionalSegments;
     }
   }
 }

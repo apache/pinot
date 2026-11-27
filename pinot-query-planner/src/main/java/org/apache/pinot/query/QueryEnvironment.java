@@ -871,6 +871,13 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE;
     }
 
+    /// Whether a replicated leaf stage sends the new segments that are not online on all of their servers yet as
+    /// optional segments. See [CommonConstants.Broker#CONFIG_OF_MSE_ENABLE_REPLICATED_LEAF_OPTIONAL_SEGMENTS].
+    @Value.Default
+    default boolean enableReplicatedLeafOptionalSegments() {
+      return CommonConstants.Broker.DEFAULT_MSE_ENABLE_REPLICATED_LEAF_OPTIONAL_SEGMENTS;
+    }
+
     @Value.Default
     default boolean defaultEnableGroupTrim() {
       return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;

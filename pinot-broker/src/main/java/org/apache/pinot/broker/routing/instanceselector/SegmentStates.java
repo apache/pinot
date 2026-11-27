@@ -124,6 +124,28 @@ public final class SegmentStates {
     return _routings[groupId].getNumCandidates() == 0 && !_segmentGroups._groups[groupId]._new;
   }
 
+  /// Returns whether the given segment is a new segment that an enabled instance might not have loaded yet: it is not
+  /// online on all of its enabled candidates, or it is not tracked yet, which a segment only is while it is being
+  /// added, because the routing components learn about it one after another.
+  ///
+  /// A tracked segment is new only until the given expiration time has passed since its creation, as of the given
+  /// current time. The states are rebuilt only when the assignment changes, so on their own they keep a segment new
+  /// for as long as the assignment stays the same.
+  public boolean isNewAndNotFullyOnline(String segment, long currentTimeMs, long newSegmentExpirationMillis) {
+    int groupId = getGroupId(segment);
+    if (groupId == UNKNOWN_SEGMENT) {
+      return true;
+    }
+    GroupRouting routing = _routings[groupId];
+    boolean newAndNotFullyOnline =
+        routing.getNumCandidates() > 0 ? !routing._allOnline : _segmentGroups._groups[groupId]._new;
+    if (!newAndNotFullyOnline) {
+      return false;
+    }
+    long creationTimeMs = _segmentGroups._newSegmentCreationTimeMap.getLong(segment);
+    return InstanceSelector.isNewSegment(creationTimeMs, currentTimeMs, newSegmentExpirationMillis);
+  }
+
   int getNumSlots() {
     return _enabledBySlot.length;
   }

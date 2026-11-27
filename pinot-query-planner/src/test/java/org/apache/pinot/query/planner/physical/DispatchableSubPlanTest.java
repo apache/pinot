@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
@@ -77,7 +78,8 @@ public class DispatchableSubPlanTest {
         PlanNode.NodeHint.EMPTY, List.of(), List.of());
     PlanFragment fragment = new PlanFragment(0, oldRoot, List.of());
     DispatchablePlanFragment original = new DispatchablePlanFragment(fragment);
-    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = Map.of(0, Map.of("OFFLINE", List.of("segment0")));
+    Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap =
+        Map.of(0, Map.of("OFFLINE", new SegmentsToQuery(List.of("segment0"))));
     original.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
 
     ValueNode newRoot = new ValueNode(0, new DataSchema(new String[0], new ColumnDataType[0]),
