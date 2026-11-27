@@ -44,7 +44,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -64,7 +63,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
@@ -77,8 +75,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
-import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -88,8 +84,6 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 
@@ -672,11 +666,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     TableConfig tableConfig = indexLoadingConfig.getTableConfig();
     Schema schema = indexLoadingConfig.getSchema();
     assert tableConfig != null && schema != null;
-    // Clone a schema to avoid modifying the cached one
-    schema = JsonUtils.jsonNodeToObject(schema.toJsonObject(), Schema.class);
-    validate(tableConfig, schema);
-    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
-    setDefaultTimeValueIfInvalid(tableConfig, schema, zkMetadata);
+    schema = SchemaUtils.prepareRealtimeSegmentSchema(tableConfig, schema, zkMetadata,
+        segmentSchema -> validate(tableConfig, segmentSchema));
 
     // Generates only one semaphore for every partition
     ConsumerCoordinator consumerCoordinator = getConsumerCoordinator(partitionGroupId);
@@ -815,29 +806,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   /// manage the segments, so its values have to be within the valid range.
   @VisibleForTesting
   static void setDefaultTimeValueIfInvalid(TableConfig tableConfig, Schema schema, SegmentZKMetadata zkMetadata) {
-    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    if (StringUtils.isEmpty(timeColumnName)) {
-      return;
-    }
-    DateTimeFieldSpec timeColumnSpec = schema.getSpecForTimeColumn(timeColumnName);
-    Preconditions.checkState(timeColumnSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName,
-        schema.getSchemaName());
-    String defaultTimeString = timeColumnSpec.getDefaultNullValueString();
-    DateTimeFormatSpec dateTimeFormatSpec = timeColumnSpec.getFormatSpec();
-    try {
-      long defaultTimeMs = dateTimeFormatSpec.fromFormatToMillis(defaultTimeString);
-      if (TimeUtils.timeValueInValidRange(defaultTimeMs)) {
-        return;
-      }
-    } catch (Exception e) {
-      // Ignore
-    }
-    String creationTimeString = dateTimeFormatSpec.fromMillisToFormat(zkMetadata.getCreationTime());
-    Object creationTime = timeColumnSpec.getDataType().convert(creationTimeString);
-    timeColumnSpec.setDefaultNullValue(creationTime);
-    LOGGER.info(
-        "Default time: {} does not comply with format: {}, using creation time: {} as the default time for table: {}",
-        defaultTimeString, timeColumnSpec.getFormat(), creationTime, tableConfig.getTableName());
+    SchemaUtils.setDefaultTimeValueIfInvalid(tableConfig, schema, zkMetadata);
   }
 
   @Override

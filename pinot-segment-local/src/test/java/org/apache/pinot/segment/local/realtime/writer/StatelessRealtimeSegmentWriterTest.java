@@ -46,8 +46,13 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -56,6 +61,7 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.RetriableDecodeException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
@@ -73,6 +79,7 @@ import org.testng.annotations.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -225,25 +232,82 @@ public class StatelessRealtimeSegmentWriterTest {
     }
   }
 
+  @DataProvider
+  public Object[][] partitionedReplays() {
+    return new Object[][]{
+        {List.of(3), false},
+        {List.of(1, 3), false},
+        {List.of(0, 1, 2, 3), false},
+        {List.of(3), true}
+    };
+  }
+
+  @Test(dataProvider = "partitionedReplays")
+  public void testPartitionedReplayKeepsOriginalPartitionIds(List<Integer> selectedPartitions,
+      boolean partitionCountUnavailable)
+      throws Exception {
+    StreamMetadataProvider metadataProvider = mock(StreamMetadataProvider.class);
+    List<PartitionGroupMetadata> groups =
+        selectedPartitions.stream().map(id -> new PartitionGroupMetadata(id, new LongMsgOffset(0))).toList();
+    when(metadataProvider.computePartitionGroupMetadata(any(), any(), any(), anyInt())).thenReturn(groups);
+    if (partitionCountUnavailable) {
+      when(metadataProvider.fetchPartitionCount(anyLong()))
+          .thenThrow(new IllegalStateException("Metadata unavailable"));
+    } else {
+      when(metadataProvider.fetchPartitionCount(anyLong())).thenReturn(4);
+    }
+    when(metadataProvider.fetchStreamPartitionOffset(any(), anyLong())).thenReturn(new LongMsgOffset(0));
+    for (int partitionId : selectedPartitions) {
+      try (Replay replay = replay(12, List.of(records(0, 12)), partitionId, metadataProvider)) {
+        replay.writer().startConsumption();
+        awaitDone(replay.writer());
+        assertNull(replay.writer().getConsumptionException());
+        assertTrue(replay.writer().isSuccess());
+        MutableSegmentImpl segment = (MutableSegmentImpl) field(replay.writer(), "_realtimeSegment");
+        assertEquals(segment.getNumDocsIndexed(), 3);
+        for (int docId = 0; docId < 3; docId++) {
+          assertEquals(segment.getValue(docId, "value"), partitionId + 4 * docId);
+        }
+        DataSourceMetadata metadata = segment.getDataSource("value").getDataSourceMetadata();
+        assertEquals(metadata.getPartitionFunction().getNumPartitions(), 4);
+        assertEquals(metadata.getPartitions(), Set.of(partitionId));
+      }
+    }
+  }
+
   private static Replay replay(int endOffset, List<MessageBatch<byte[]>> batches)
       throws Exception {
+    return replay(endOffset, batches, 0, null);
+  }
+
+  private static Replay replay(int endOffset, List<MessageBatch<byte[]>> batches, int partitionId,
+      @Nullable StreamMetadataProvider metadataProvider)
+      throws Exception {
     File root = Files.createTempDirectory(StatelessRealtimeSegmentWriterTest.class.getSimpleName()).toFile();
+    Map<String, String> streamConfigs = Map.of(StreamConfigProperties.STREAM_TYPE, STREAM_TYPE,
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
+        "testTopic",
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
+            StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), ScriptedConsumerFactory.class.getName(),
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
+        IntegerDecoder.class.getName(), StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "1000");
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     TableConfig table = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName("ts")
-        .setStreamConfigs(Map.of(StreamConfigProperties.STREAM_TYPE, STREAM_TYPE,
-            StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
-            "testTopic",
-            StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
-                StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), ScriptedConsumerFactory.class.getName(),
-            StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
-            IntegerDecoder.class.getName(), StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "1000"))
-        .build();
+        .setIngestionConfig(ingestionConfig).build();
+    if (metadataProvider != null) {
+      table.getIndexingConfig().setSegmentPartitionConfig(
+          new SegmentPartitionConfig(Map.of("value", new ColumnPartitionConfig("Modulo", 4))));
+      streamIngestionConfig.setDropRecordOnPartitionMismatch(true);
+    }
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addSingleValueDimension("value", DataType.INT)
         .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     IndexLoadingConfig config = new IndexLoadingConfig(table, schema);
     config.setTableDataDir(root.getAbsolutePath());
     SegmentZKMetadata metadata =
-        new SegmentZKMetadata(new LLCSegmentName(RAW_TABLE_NAME, 0, 0, System.nanoTime()).getSegmentName());
+        new SegmentZKMetadata(new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, System.nanoTime()).getSegmentName());
     metadata.setStartOffset("0");
     metadata.setEndOffset(Integer.toString(endOffset));
     PartitionGroupConsumer consumer = mock(PartitionGroupConsumer.class);
@@ -254,10 +318,12 @@ public class StatelessRealtimeSegmentWriterTest {
       return remaining.removeFirst();
     });
     ScriptedConsumerFactory.CONSUMER.set(consumer);
+    ScriptedConsumerFactory.METADATA_PROVIDER.set(metadataProvider);
     try {
       return new Replay(new StatelessRealtimeSegmentWriter(metadata, config, null), consumer, requestedOffsets, root);
     } finally {
       ScriptedConsumerFactory.CONSUMER.remove();
+      ScriptedConsumerFactory.METADATA_PROVIDER.remove();
     }
   }
 
@@ -353,6 +419,13 @@ public class StatelessRealtimeSegmentWriterTest {
   /// Supplies a consumer from the constructing test thread; ThreadLocal isolates parallel constructor calls.
   public static class ScriptedConsumerFactory extends InterruptIgnoringConsumerFactory {
     private static final ThreadLocal<PartitionGroupConsumer> CONSUMER = new ThreadLocal<>();
+    private static final ThreadLocal<StreamMetadataProvider> METADATA_PROVIDER = new ThreadLocal<>();
+
+    @Nullable
+    @Override
+    public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
+      return METADATA_PROVIDER.get();
+    }
 
     @Override
     public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
