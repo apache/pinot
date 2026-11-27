@@ -56,6 +56,12 @@ public class RealtimeProvisioningRule extends AbstractRule {
   public static final String NUM_SEGMENTS_QUERIED_PER_HOST = "Number of Segments Queried per Host";
   public static final String CONSUMING_MEMORY_PER_HOST = "Consuming Memory per Host";
   public static final String TOTAL_MEMORY_USED_PER_HOST = "Total Memory Used per Host";
+  /// Advisory sanity-check messages; matrix estimates are unchanged.
+  ///
+  /// Stored as a nested map `"1" -> msg, "2" -> msg, ...` so it fits the existing
+  /// `Map<String, Map<String, String>>` recommender payload without a schema break.
+  /// Consumers that iterate recommendation keys as matrices should skip this key.
+  public static final String WARNINGS = "Warnings";
 
   private final RealtimeProvisioningRuleParams _params;
 
@@ -151,6 +157,16 @@ public class RealtimeProvisioningRule extends AbstractRule {
     rtProvRecommendations.put(NUM_SEGMENTS_QUERIED_PER_HOST, numSegmentsQueried);
     rtProvRecommendations.put(CONSUMING_MEMORY_PER_HOST, consumingMemory);
     rtProvRecommendations.put(TOTAL_MEMORY_USED_PER_HOST, totalMemory);
+
+    List<String> warningMessages = memoryEstimator.getWarnings();
+    if (!warningMessages.isEmpty()) {
+      // Numbered string keys keep the nested Map shape stable for JSON consumers.
+      Map<String, String> warnings = new LinkedHashMap<>();
+      for (int i = 0; i < warningMessages.size(); i++) {
+        warnings.put(String.valueOf(i + 1), warningMessages.get(i));
+      }
+      rtProvRecommendations.put(WARNINGS, warnings);
+    }
   }
 
   private Map<String, String> makeMatrix(String[][] elements, int[] numHosts, int[] numHours) {

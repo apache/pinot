@@ -39,6 +39,7 @@ import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
 import org.apache.pinot.controller.recommender.io.metadata.TimeFieldSpecMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.TimeGranularitySpecMetadata;
+import org.apache.pinot.controller.recommender.realtime.provisioning.RealtimeProvisioningWarnings.Estimate;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
@@ -96,6 +97,7 @@ public class MemoryEstimator {
   private String[][] _numRowsInSegment;
   private String[][] _consumingMemoryPerHost;
   private String[][] _numSegmentsQueriedPerHost;
+  private List<String> _warnings = List.of();
 
   /// Constructor used for processing the given completed segment
   public MemoryEstimator(TableConfig tableConfig, Schema schema, File sampleCompletedSegment,
@@ -239,6 +241,8 @@ public class MemoryEstimator {
     _numRowsInSegment = new String[numHours.length][numHosts.length];
     _consumingMemoryPerHost = new String[numHours.length][numHosts.length];
     _numSegmentsQueriedPerHost = new String[numHours.length][numHosts.length];
+    _warnings = List.of();
+    Estimate[][] estimates = new Estimate[numHours.length][numHosts.length];
     for (int i = 0; i < numHours.length; i++) {
       for (int j = 0; j < numHosts.length; j++) {
         _activeMemoryPerHost[i][j] = NOT_APPLICABLE;
@@ -292,17 +296,21 @@ public class MemoryEstimator {
           long mappedMemoryPerHost = totalMemoryForConsumingSegmentsPerHost + (numCompletedSegmentsPerPartition
               * totalConsumingPartitionsPerHost * completedSegmentSizeBytes);
 
-          if (activeMemoryPerHostBytes <= _maxUsableHostMemory) {
-            _activeMemoryPerHost[i][j] =
-                DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
-            _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
-            _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
-            _numRowsInSegment[i][j] = String.valueOf(totalDocs);
-            _numSegmentsQueriedPerHost[i][j] =
-                String.valueOf(numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost);
-          }
+          // Always surface computed values (including when over max usable host memory) so callers can
+          // display them with warnings instead of opaque "NA" cells. Combinations where
+          // numHoursToConsume > retentionHours remain NA (skipped above).
+          _activeMemoryPerHost[i][j] =
+              DataSizeUtils.fromBytes(activeMemoryPerHostBytes) + "/" + DataSizeUtils.fromBytes(mappedMemoryPerHost);
+          _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
+          _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
+          _numRowsInSegment[i][j] = String.valueOf(totalDocs);
+          int numSegmentsQueriedPerHost = numActiveSegmentsPerPartition * totalConsumingPartitionsPerHost;
+          _numSegmentsQueriedPerHost[i][j] = String.valueOf(numSegmentsQueriedPerHost);
+          estimates[i][j] =
+              new Estimate(completedSegmentSizeBytes, activeMemoryPerHostBytes, numSegmentsQueriedPerHost);
         }
       }
+      _warnings = RealtimeProvisioningWarnings.generate(estimates, _maxUsableHostMemory, numHours, numHosts);
     } finally {
       // cleanup
       FileUtils.deleteQuietly(_workingDir);
@@ -443,6 +451,11 @@ public class MemoryEstimator {
 
   public String[][] getNumSegmentsQueriedPerHost() {
     return _numSegmentsQueriedPerHost;
+  }
+
+  /// Ordered sanity-check warnings for the most recent provisioning estimate.
+  public List<String> getWarnings() {
+    return _warnings;
   }
 
   private static File generateCompletedSegment(SchemaWithMetaData schemaWithMetadata, Schema schema,
