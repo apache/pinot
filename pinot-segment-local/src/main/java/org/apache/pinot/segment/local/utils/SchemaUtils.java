@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -196,6 +197,9 @@ public class SchemaUtils {
           .equals(FieldSpec.DataType.DOUBLE)) {
         validateDefaultIsNotNaN(fieldSpec);
       }
+      if (fieldSpec.getDataType() == FieldSpec.DataType.VARIANT) {
+        validateVariantFieldSpec(fieldSpec);
+      }
       if (!fieldSpec.isSingleValueField()) {
         validateMultiValueCompatibility(fieldSpec);
       }
@@ -222,12 +226,27 @@ public class SchemaUtils {
             fieldSpec.getName());
   }
 
+  private static void validateVariantFieldSpec(FieldSpec fieldSpec) {
+    Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.DIMENSION,
+        "VARIANT column must be a dimension: %s", fieldSpec.getName());
+    Preconditions.checkState(
+        Arrays.equals((byte[]) fieldSpec.getDefaultNullValue(), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES),
+        "VARIANT column cannot define a custom default null value: %s", fieldSpec.getName());
+    FieldSpec.MaxLengthExceedStrategy strategy = fieldSpec.getEffectiveMaxLengthExceedStrategy();
+    Preconditions.checkState(strategy != FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH
+            && strategy != FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE,
+        "VARIANT column cannot use truncating or substituting max length strategy %s: %s", strategy,
+        fieldSpec.getName());
+  }
+
   /// Validations for MV type columns. Kept here (rather than in [Schema#validate()]) so that schema construction
   /// via `SchemaBuilder.build()` stays a pure DTO operation and only the controller-side ingest validation rejects
   /// MV JSON columns.
   private static void validateMultiValueCompatibility(FieldSpec fieldSpec) {
     Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.JSON),
         "JSON columns cannot be of multi-value type");
+    Preconditions.checkState(fieldSpec.getDataType() != FieldSpec.DataType.VARIANT,
+        "VARIANT columns cannot be of multi-value type");
   }
 
   /// Validates that the schema is compatible with the given table config
