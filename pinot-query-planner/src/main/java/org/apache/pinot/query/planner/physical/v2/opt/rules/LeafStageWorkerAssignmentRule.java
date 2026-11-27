@@ -62,6 +62,7 @@ import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.logical.LeafStageToPinotQuery;
 import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
 import org.apache.pinot.query.planner.physical.v2.HashDistributionDesc;
+import org.apache.pinot.query.planner.physical.v2.LeafStageSegmentFilter;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
 import org.apache.pinot.query.planner.physical.v2.TableScanMetadata;
@@ -203,6 +204,15 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         instanceIdToSegments, tablePartitionInfoMap, inferInvalidPartitionSegment, inferRealtimeSegmentPartition);
     TableScanMetadata metadata = new TableScanMetadata(Set.of(tableName), workerAssignmentResult._workerIdToSegmentsMap,
         tableOptions, segmentUnavailableMap, timeBoundaryInfo);
+    LeafStageSegmentFilter segmentFilter = _physicalPlannerContext.getLeafStageSegmentFilter();
+    if (segmentFilter != null) {
+      TableScanMetadata filteredMetadata =
+          segmentFilter.filterLeafStageSegments(metadata, _physicalPlannerContext.getQueryOptions());
+      Preconditions.checkState(
+          filteredMetadata.getWorkedIdToSegmentsMap().keySet().equals(metadata.getWorkedIdToSegmentsMap().keySet()),
+          "Leaf stage segment filter must keep the workers of the table scan");
+      metadata = filteredMetadata;
+    }
     return tableScan.with(workerAssignmentResult._pinotDataDistribution, metadata);
   }
 

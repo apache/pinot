@@ -31,6 +31,7 @@ import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
+import org.apache.pinot.query.planner.physical.v2.LeafStageSegmentFilter;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -68,6 +69,8 @@ public class PhysicalPlannerContext {
   private final boolean _liteModeJoinsEnabled;
   @Nullable
   private final MultiClusterRoutingContext _multiClusterRoutingContext;
+  @Nullable
+  private final LeafStageSegmentFilter _leafStageSegmentFilter;
   private int _liteModeEffectiveSortLimit = -1;
 
   /// Used by controller when it needs to extract table names from the query.
@@ -87,6 +90,7 @@ public class PhysicalPlannerContext {
     _defaultHashFunction = DistHashFunction.valueOf(KeySelector.DEFAULT_HASH_ALGORITHM.toUpperCase());
     _liteModeJoinsEnabled = CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS;
     _multiClusterRoutingContext = null;
+    _leafStageSegmentFilter = null;
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
@@ -103,6 +107,17 @@ public class PhysicalPlannerContext {
       boolean defaultUseBrokerPruning, int defaultLiteModeLeafStageLimit, String defaultHashFunction,
       int defaultLiteModeLeafStageFanOutAdjustedLimit, boolean defaultLiteModeEnableJoins,
       @Nullable MultiClusterRoutingContext multiClusterRoutingContext) {
+    this(routingManager, hostName, port, requestId, instanceId, queryOptions, defaultUseLiteMode, defaultRunInBroker,
+        defaultUseBrokerPruning, defaultLiteModeLeafStageLimit, defaultHashFunction,
+        defaultLiteModeLeafStageFanOutAdjustedLimit, defaultLiteModeEnableJoins, multiClusterRoutingContext, null);
+  }
+
+  public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
+      String instanceId, Map<String, String> queryOptions, boolean defaultUseLiteMode, boolean defaultRunInBroker,
+      boolean defaultUseBrokerPruning, int defaultLiteModeLeafStageLimit, String defaultHashFunction,
+      int defaultLiteModeLeafStageFanOutAdjustedLimit, boolean defaultLiteModeEnableJoins,
+      @Nullable MultiClusterRoutingContext multiClusterRoutingContext,
+      @Nullable LeafStageSegmentFilter leafStageSegmentFilter) {
     _routingManager = routingManager;
     _hostName = hostName;
     _port = port;
@@ -120,6 +135,7 @@ public class PhysicalPlannerContext {
     _instanceIdToQueryServerInstance.put(instanceId, getBrokerQueryServerInstance());
     _liteModeJoinsEnabled = defaultLiteModeEnableJoins;
     _multiClusterRoutingContext = multiClusterRoutingContext;
+    _leafStageSegmentFilter = leafStageSegmentFilter;
   }
 
   public Supplier<Integer> getNodeIdGenerator() {
@@ -213,6 +229,12 @@ public class PhysicalPlannerContext {
   @Nullable
   public MultiClusterRoutingContext getMultiClusterRoutingContext() {
     return _multiClusterRoutingContext;
+  }
+
+  /// Returns the filter applied to the segments of each physical leaf-stage table scan, or null when none is set.
+  @Nullable
+  public LeafStageSegmentFilter getLeafStageSegmentFilter() {
+    return _leafStageSegmentFilter;
   }
 
   private QueryServerInstance getBrokerQueryServerInstance() {
