@@ -46,7 +46,8 @@ repo. It is intentionally short and focused on day-to-day work.
 When locating a plugin implementation, consult [kb/plugin-modules.md](kb/plugin-modules.md).
 
 ## Build and test
-- Build JDK: Use JDK 25+ for Pinot services and the default build; client and SPI artifacts still target Java 11 bytecode.
+- Build JDK: Use JDK 25+ for Pinot services and the default build. Java/JDBC client and `pinot-common` artifacts target
+  Java 17 bytecode. `pinot-spi`, `pinot-segment-spi`, and `pinot-timeseries-spi` target Java 11 bytecode.
 - Runtime JRE: Broker/server/controller/minion run on Java 25+.
 - Default to affected modules and their dependencies: `./mvnw -pl <module> -am test`.
 - Faster module build: `./mvnw -pl <module> -am verify -Ppinot-fastdev`. This profile skips style and license checks;

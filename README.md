@@ -161,7 +161,8 @@ $ git clone https://github.com/apache/pinot.git
 $ cd pinot
 
 # Pinot services require JDK 25+ to build and run
-# Java/JDBC clients and SPI artifacts continue to target Java 11 bytecode
+# Java/JDBC clients and pinot-common require Java 17+ starting with Pinot 1.7.0
+# Standalone SPI artifacts target Java 11 bytecode
 
 # Build Pinot
 # -Pbin-dist is required to build the binary distribution
@@ -172,6 +173,8 @@ $ ./mvnw clean install -DskipTests -Pbin-dist -Pbuild-shaded-jar
 $ cd build/
 $ bin/quick-start-batch.sh
 ```
+
+For client JVM requirements and migration guidance, see [Runtime support](RELEASE_POLICY.md#runtime-support).
 
 For UI development setup refer this [doc](https://github.com/apache/pinot/blob/master/pinot-controller/src/main/resources/Readme.md).
 

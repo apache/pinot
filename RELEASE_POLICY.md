@@ -92,13 +92,17 @@ plan downtime if required.
 
 ## Runtime support
 
-Published documentation currently states:
-
 | Requirement | Detail |
 | ----------- | ------ |
 | Pinot services (build and runtime) | JDK 25+ |
-| SPI and Java/JDBC client artifacts | JDK 11+ |
+| `pinot-java-client`, `pinot-jdbc-client`, and `pinot-common` starting with 1.7.0 | Java 17+ |
+| `pinot-spi`, `pinot-segment-spi`, and `pinot-timeseries-spi` | Java 11+ |
 | Last release with JDK 8 | 0.12.1 |
+
+Upgrade your application JVM before adopting the 1.7.0 Java/JDBC client or
+`pinot-common` artifacts. The 1.6.0 versions of those artifacts support Java 11.
+When using Arrow responses from a classpath-based application on Java 17 or later,
+start the JVM with `--add-opens=java.base/java.nio=ALL-UNNAMED`.
 
 See the [version reference](https://docs.pinot.apache.org/start-here/pinot-versions)
 for the live matrix. Client connectors that run inside Spark or Flink keep a

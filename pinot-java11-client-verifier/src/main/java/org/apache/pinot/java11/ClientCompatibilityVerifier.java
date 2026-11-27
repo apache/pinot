@@ -25,14 +25,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.ResultSetMetaData;
 import java.sql.Types;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -66,61 +64,32 @@ import org.apache.pinot.common.response.encoder.ResponseEncoderFactory;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.grpc.BrokerGrpcQueryClient;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
-import org.apache.pinot.tsdb.spi.AggInfo;
-import org.apache.pinot.tsdb.spi.TimeBuckets;
-import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.serde.TimeSeriesPlanSerde;
 
 
-/// Verifies that Pinot's consumer-facing client and SPI artifacts actually work on an older JVM, by being run _by_ that
-/// JVM.
+/// Exercises the Java and JDBC clients on the minimum supported JVM and scans the runtime classpath
+/// for dependency bytecode that the JVM cannot load. The build itself requires JDK 25.
 ///
-/// Six modules (pinot-spi, pinot-segment-spi, pinot-timeseries-spi, pinot-common, pinot-java-client and
-/// pinot-jdbc-client) hard-code a compiler `release` of 11 so that third-party plugins and embedding applications
-/// are not forced onto the JDK that Pinot's services require. `--release` makes Pinot's own code in those modules
-/// Java 11 clean, but it says nothing about their transitive dependency closure: a routine dependency bump can drop a
-/// Java 17+ jar into the client's classpath, and nothing in the build would notice. This verifier closes that gap.
-///
-/// It must be launched by a JVM at the target feature release (11 by default) -- running it on the build JDK proves
-/// nothing, so [#checkJvmIsAtTargetFeatureVersion] fails loudly in that case. The build itself still requires JDK
-/// 25 (`requireJavaVersion` in the root pom), so CI builds the artifacts with JDK 25 and then runs this class
-/// under Java 11.
-///
-/// Usage: `java -cp <runtime closure> org.apache.pinot.java11.Java11CompatibilityVerifier [targetJavaFeatureVersion]` .
-/// Exits 0 if every check passes, 1 otherwise.
-///
-/// The assertions go through a local [#require] helper rather than TestNG on purpose. A test framework on the
-/// classpath would be scanned by [#checkClasspathClosureIsLoadable] alongside the real dependencies, so a TestNG
-/// or byte-buddy release that dropped Java 11 support would fail this job for a reason no Pinot consumer would ever
-/// hit.
-///
-/// Not thread-safe, and deliberately single-threaded: checks run sequentially on the calling thread so that a failure
-/// maps to exactly one named check.
-public final class Java11CompatibilityVerifier {
-  private static final int DEFAULT_TARGET_JAVA_FEATURE_VERSION = 11;
+/// Usage: `java -cp <runtime closure> org.apache.pinot.java11.ClientCompatibilityVerifier [targetJavaFeatureVersion]`.
+/// The target defaults to 17. Running on a different JVM fails, and the checks require no test framework on the
+/// runtime classpath. The checks run sequentially on the calling thread.
+public final class ClientCompatibilityVerifier {
+  private static final int DEFAULT_TARGET_JAVA_FEATURE_VERSION = 17;
   private static final String SAMPLE_BROKER_RESPONSE_RESOURCE = "sample-broker-response.json";
   private static final String JDBC_SERVICE_DESCRIPTOR = "META-INF/services/java.sql.Driver";
   private static final String SAMPLE_TABLE_NAME = "baseballStats";
   private static final String JVM_VERSION_CHECK = "jvm-is-at-target-feature-version";
 
-  /// Every module that hard-codes a Java 11 compiler release. All of them have to be on the verified closure, otherwise
-  /// this job quietly checks less than it advertises. Add to this list when a seventh module gets pinned.
-  private static final List<String> JAVA11_PINNED_MODULES = List.of(
+  /// The client runtimes must include the client libraries, common code and the standalone SPI artifacts.
+  private static final List<String> REQUIRED_MODULES = List.of(
       "pinot-spi", "pinot-segment-spi", "pinot-timeseries-spi", "pinot-common", "pinot-java-client",
       "pinot-jdbc-client");
 
   /// Encoders and compression codecs that must stay covered. Iterating whatever the factories happen to return would
-  /// let a refactor drop ARROW or ZSTD -- and with them arrow-memory-netty and the JNI codecs, the most likely sources
+  /// let a refactor drop ARROW or ZSTD -- and with them Arrow memory and the JNI codecs, the most likely sources
   /// of a Java version floor bump -- while the job stayed green.
   private static final List<String> REQUIRED_RESPONSE_ENCODERS = List.of("JSON", "ARROW");
   private static final List<String> REQUIRED_COMPRESSION_CODECS = List.of("ZSTD", "SNAPPY", "LZ4", "GZIP", "DEFLATE");
@@ -135,7 +104,7 @@ public final class Java11CompatibilityVerifier {
   private final String _sampleBrokerResponseJson;
   private final JsonNode _sampleBrokerResponse;
 
-  private Java11CompatibilityVerifier(int targetJavaFeatureVersion)
+  private ClientCompatibilityVerifier(int targetJavaFeatureVersion)
       throws IOException {
     _targetJavaFeatureVersion = targetJavaFeatureVersion;
     _sampleBrokerResponseJson = readResource(SAMPLE_BROKER_RESPONSE_RESOURCE);
@@ -154,12 +123,12 @@ public final class Java11CompatibilityVerifier {
     int targetJavaFeatureVersion = DEFAULT_TARGET_JAVA_FEATURE_VERSION;
     if (args.length > 1) {
       throw new IllegalArgumentException(
-          "Usage: Java11CompatibilityVerifier [targetJavaFeatureVersion], got: " + Arrays.toString(args));
+          "Usage: ClientCompatibilityVerifier [targetJavaFeatureVersion], got: " + Arrays.toString(args));
     }
     if (args.length == 1) {
       targetJavaFeatureVersion = Integer.parseInt(args[0].trim());
     }
-    System.exit(new Java11CompatibilityVerifier(targetJavaFeatureVersion).run());
+    System.exit(new ClientCompatibilityVerifier(targetJavaFeatureVersion).run());
   }
 
   private int run() {
@@ -168,10 +137,10 @@ public final class Java11CompatibilityVerifier {
     // aborts the run.
     checks.put(JVM_VERSION_CHECK, this::checkJvmIsAtTargetFeatureVersion);
     checks.put("classpath-closure-is-loadable", this::checkClasspathClosureIsLoadable);
-    checks.put("spi-schema-deserialization", this::checkSpiSchemaDeserialization);
-    checks.put("spi-table-config-deserialization", this::checkSpiTableConfigDeserialization);
-    checks.put("segment-spi-data-buffer", this::checkSegmentSpiDataBuffer);
-    checks.put("timeseries-spi-plan-serde", this::checkTimeSeriesSpiPlanSerde);
+    checks.put("spi-schema-deserialization", SpiCompatibilityVerifier.Core::checkSpiSchemaDeserialization);
+    checks.put("spi-table-config-deserialization", SpiCompatibilityVerifier.Core::checkSpiTableConfigDeserialization);
+    checks.put("segment-spi-data-buffer", SpiCompatibilityVerifier.Segment::checkSegmentSpiDataBuffer);
+    checks.put("timeseries-spi-plan-serde", SpiCompatibilityVerifier.TimeSeries::checkTimeSeriesSpiPlanSerde);
     checks.put("common-data-schema-round-trip", this::checkCommonDataSchemaRoundTrip);
     checks.put("common-broker-response-deserialization", this::checkCommonBrokerResponseDeserialization);
     checks.put("common-response-encoders", this::checkCommonResponseEncoders);
@@ -234,8 +203,7 @@ public final class Java11CompatibilityVerifier {
         System.getProperty("java.home"));
   }
 
-  /// Walks the whole runtime closure looking for bytecode this JVM could not load. `--release 11` covers Pinot's
-  /// own class files; this is the part that covers everybody else's.
+  /// Scans the full runtime classpath for bytecode above the target JVM's supported version.
   private void checkClasspathClosureIsLoadable()
       throws IOException {
     String classpath = System.getProperty("java.class.path");
@@ -251,7 +219,7 @@ public final class Java11CompatibilityVerifier {
     //  - third-party bytecode specifically must have been read. Counting the verifier's own
     //    target/classes towards that would make the guard unfalsifiable, which is why the scanner
     //    keeps the archive and directory counts apart;
-    //  - every Java-11-pinned module must be present, so that making one of them optional or
+    //  - every required Pinot module must be present, so that making one of them optional or
     //    provided shrinks coverage loudly instead of silently.
     require(result.getArchivesScanned() >= MIN_EXPECTED_ARCHIVES,
         "only %d jars on the classpath, expected at least %d -- the runtime closure was not resolved properly",
@@ -259,39 +227,15 @@ public final class Java11CompatibilityVerifier {
     require(result.getClassFilesInArchives() >= MIN_EXPECTED_CLASS_FILES_IN_ARCHIVES,
         "only %d class files inspected inside jars, expected at least %d -- the scan is broken, not the closure",
         result.getClassFilesInArchives(), MIN_EXPECTED_CLASS_FILES_IN_ARCHIVES);
-    assertPinnedModulesArePresent(result.getArchiveNames());
+    assertRequiredModulesArePresent(result.getArchiveNames());
 
-    for (String skipped : result.getSkippedEntries()) {
-      // A `pom`-type dependency (groovy-all) legitimately lands on the classpath as a .pom. Anything
-      // else that carried no bytecode means the closure is not what we think it is.
-      require(skipped.endsWith("(not an archive)") && skipped.contains(".pom "),
-          "unexpected classpath entry that could not be scanned: %s", skipped);
-      System.out.printf("        skipped classpath entry: %s%n", skipped);
-    }
-
-    if (result.getTotalViolationCount() > 0) {
-      StringBuilder message = new StringBuilder(
-          String.format("%d class file(s) on the client runtime closure cannot be loaded by Java %d. A dependency was "
-                  + "bumped to a release that no longer supports Java %d; pin it back or drop it from the client "
-                  + "closure. Offenders:", result.getTotalViolationCount(), _targetJavaFeatureVersion,
-              _targetJavaFeatureVersion));
-      for (ClasspathClosureScanner.Violation violation : result.getReportedViolations()) {
-        message.append("\n          ").append(violation);
-      }
-      if (result.getTotalViolationCount() > result.getReportedViolations().size()) {
-        message.append("\n          ... and ")
-            .append(result.getTotalViolationCount() - result.getReportedViolations().size())
-            .append(" more");
-      }
-      throw new AssertionError(message.toString());
-    }
+    ClasspathClosureScanner.assertLoadable(result, _targetJavaFeatureVersion, "client");
   }
 
-  /// Fails unless a jar is on the closure for every module that pins its bytecode to Java 11. Without this, dropping
-  /// one of them from the closure leaves every check passing while silently verifying less than the job claims to.
-  private static void assertPinnedModulesArePresent(List<String> archiveNames) {
+  /// Ensures the resolved classpath covers every Pinot artifact exercised by this verifier.
+  private static void assertRequiredModulesArePresent(List<String> archiveNames) {
     List<String> missing = new ArrayList<>();
-    for (String artifactId : JAVA11_PINNED_MODULES) {
+    for (String artifactId : REQUIRED_MODULES) {
       boolean found = false;
       for (String archiveName : archiveNames) {
         // Jar names are <artifactId>-<version>.jar; require the '-' so pinot-spi does not match
@@ -306,111 +250,8 @@ public final class Java11CompatibilityVerifier {
       }
     }
     require(missing.isEmpty(),
-        "these Java 11 pinned modules are not on the verified closure, so this job is no longer checking them: %s. "
-            + "Either restore the dependency or update JAVA11_PINNED_MODULES.", missing);
-  }
-
-  /// pinot-spi schema deserialization, which is Jackson plus the SPI's own field spec model.
-  private void checkSpiSchemaDeserialization()
-      throws IOException {
-    String schemaJson = "{"
-        + "\"schemaName\":\"" + SAMPLE_TABLE_NAME + "\","
-        + "\"dimensionFieldSpecs\":["
-        + "{\"name\":\"playerName\",\"dataType\":\"STRING\"},"
-        + "{\"name\":\"teams\",\"dataType\":\"STRING\",\"singleValueField\":false}],"
-        + "\"metricFieldSpecs\":[{\"name\":\"numGames\",\"dataType\":\"LONG\"}],"
-        + "\"dateTimeFieldSpecs\":[{\"name\":\"gameDate\",\"dataType\":\"LONG\","
-        + "\"format\":\"1:MILLISECONDS:EPOCH\",\"granularity\":\"1:DAYS\"}]}";
-
-    Schema schema = Schema.fromString(schemaJson);
-    require(SAMPLE_TABLE_NAME.equals(schema.getSchemaName()), "unexpected schema name: %s", schema.getSchemaName());
-    require(schema.getColumnNames().size() == 4, "expected 4 columns, got %s", schema.getColumnNames());
-    require(schema.getFieldSpecFor("playerName").getDataType() == DataType.STRING, "playerName should be STRING");
-    require(!schema.getFieldSpecFor("teams").isSingleValueField(), "teams should be multi-valued");
-    require(schema.getDateTimeSpec("gameDate") != null, "gameDate date-time spec missing");
-
-    Schema reparsed = Schema.fromString(schema.toSingleLineJsonString());
-    require(schema.equals(reparsed), "schema did not survive a JSON round trip");
-  }
-
-  /// pinot-spi table config deserialization, the other half of what a third-party plugin reads.
-  private void checkSpiTableConfigDeserialization()
-      throws IOException {
-    String tableConfigJson = "{"
-        + "\"tableName\":\"" + SAMPLE_TABLE_NAME + "\","
-        + "\"tableType\":\"OFFLINE\","
-        + "\"segmentsConfig\":{\"replication\":\"2\",\"timeColumnName\":\"gameDate\"},"
-        + "\"tenants\":{\"broker\":\"DefaultTenant\",\"server\":\"DefaultTenant\"},"
-        + "\"tableIndexConfig\":{\"invertedIndexColumns\":[\"playerName\"],\"loadMode\":\"MMAP\"},"
-        + "\"metadata\":{}}";
-
-    TableConfig tableConfig = JsonUtils.stringToObject(tableConfigJson, TableConfig.class);
-    require(tableConfig.getTableType() == TableType.OFFLINE, "unexpected table type: %s", tableConfig.getTableType());
-    require((SAMPLE_TABLE_NAME + "_OFFLINE").equals(tableConfig.getTableName()), "unexpected table name: %s",
-        tableConfig.getTableName());
-    require("2".equals(tableConfig.getValidationConfig().getReplication()), "unexpected replication: %s",
-        tableConfig.getValidationConfig().getReplication());
-    require(tableConfig.getIndexingConfig().getInvertedIndexColumns().contains("playerName"),
-        "inverted index column lost: %s", tableConfig.getIndexingConfig().getInvertedIndexColumns());
-
-    TableConfig reserialized = JsonUtils.stringToObject(JsonUtils.objectToString(tableConfig), TableConfig.class);
-    require(tableConfig.getTableName().equals(reserialized.getTableName()),
-        "table config did not survive a JSON round trip");
-  }
-
-  /// pinot-segment-spi's off-heap buffer, which is what a third-party index or reader plugin built against the SPI
-  /// actually uses. Worth exercising rather than merely scanning: the allocation path goes through `Unsafe` and
-  /// `sun.misc.Cleaner` reflection whose availability is exactly what shifts between JDK releases, and the
-  /// class-file scan cannot see that.
-  private void checkSegmentSpiDataBuffer()
-      throws IOException {
-    int size = 64;
-    try (PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(size, ByteOrder.LITTLE_ENDIAN,
-        "java11-verifier")) {
-      require(buffer.size() == size, "unexpected buffer size: %d", buffer.size());
-      buffer.putInt(0, 0xCAFEBABE);
-      buffer.putLong(8, 1750000000000L);
-      buffer.putDouble(16, 0.305d);
-      require(buffer.getInt(0) == 0xCAFEBABE, "int lost in the off-heap buffer: %d", buffer.getInt(0));
-      require(buffer.getLong(8) == 1750000000000L, "long lost in the off-heap buffer: %d", buffer.getLong(8));
-      require(buffer.getDouble(16) == 0.305d, "double lost in the off-heap buffer: %s", buffer.getDouble(16));
-
-      byte[] bytes = "baseballStats".getBytes(StandardCharsets.UTF_8);
-      buffer.readFrom(24, bytes, 0, bytes.length);
-      byte[] readBack = new byte[bytes.length];
-      buffer.copyTo(24, readBack, 0, readBack.length);
-      require(Arrays.equals(bytes, readBack), "bytes lost in the off-heap buffer: %s",
-          new String(readBack, StandardCharsets.UTF_8));
-    }
-  }
-
-  /// pinot-timeseries-spi's plan model, which a time series language plugin serializes and ships.
-  private void checkTimeSeriesSpiPlanSerde() {
-    LeafTimeSeriesPlanNode leaf = new LeafTimeSeriesPlanNode("sfp#0", List.of(), SAMPLE_TABLE_NAME, "gameDate",
-        TimeUnit.MILLISECONDS, 0L, "battingAverage > 0.3", "numGames",
-        new AggInfo("SUM", false, Map.of("window", "60")), List.of("playerName"), 100, Map.of("timeoutMs", "20000"));
-
-    String serialized = TimeSeriesPlanSerde.serialize(leaf);
-    require(serialized.contains(SAMPLE_TABLE_NAME), "table name lost during plan serialization: %s", serialized);
-
-    BaseTimeSeriesPlanNode deserialized = TimeSeriesPlanSerde.deserialize(serialized);
-    require(deserialized instanceof LeafTimeSeriesPlanNode, "unexpected plan node type: %s",
-        deserialized.getClass().getName());
-    LeafTimeSeriesPlanNode roundTripped = (LeafTimeSeriesPlanNode) deserialized;
-    require(SAMPLE_TABLE_NAME.equals(roundTripped.getTableName()), "unexpected table name: %s",
-        roundTripped.getTableName());
-    require("numGames".equals(roundTripped.getValueExpression()), "unexpected value expression: %s",
-        roundTripped.getValueExpression());
-    require(roundTripped.getAggInfo() != null && "SUM".equals(roundTripped.getAggInfo().getAggFunction()),
-        "aggregation lost during the plan round trip: %s", roundTripped.getAggInfo());
-    require(List.of("playerName").equals(roundTripped.getGroupByExpressions()), "group by lost: %s",
-        roundTripped.getGroupByExpressions());
-    require(roundTripped.getLimit() == 100, "unexpected limit: %d", roundTripped.getLimit());
-
-    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(1750000000L, Duration.ofSeconds(60), 10);
-    require(timeBuckets.getNumBuckets() == 10, "unexpected bucket count: %d", timeBuckets.getNumBuckets());
-    require(timeBuckets.getTimeBuckets().length == 10, "unexpected bucket array length: %d",
-        timeBuckets.getTimeBuckets().length);
+        "these required modules are not on the verified closure, so this job is no longer checking them: %s. "
+            + "Either restore the dependency or update REQUIRED_MODULES.", missing);
   }
 
   /// pinot-common's wire-format schema, both its binary encoding and its JSON encoding.
@@ -705,8 +546,7 @@ public final class Java11CompatibilityVerifier {
     for (DriverPropertyInfo info : propertyInfo) {
       propertyNames.add(info.name);
     }
-    // Membership, not position: a future driver property added ahead of "tenant" is not a Java 11
-    // problem and must not turn this job red.
+    // JDBC can report the tenant property in any position.
     require(propertyNames.contains("tenant"), "the driver did not report a tenant property: %s", propertyNames);
     require(driver.getMajorVersion() > 0, "unexpected driver major version: %d", driver.getMajorVersion());
   }
@@ -786,7 +626,7 @@ public final class Java11CompatibilityVerifier {
 
   private static String readResource(String resource)
       throws IOException {
-    try (InputStream inputStream = Java11CompatibilityVerifier.class.getClassLoader()
+    try (InputStream inputStream = ClientCompatibilityVerifier.class.getClassLoader()
         .getResourceAsStream(resource)) {
       if (inputStream == null) {
         throw new IOException("Resource not found on the classpath: " + resource);

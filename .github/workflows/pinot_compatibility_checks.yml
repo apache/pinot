@@ -91,11 +91,11 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      # Build the PR branch's Java 11 artifact surface to get new JARs to validate and compare
-      - name: Build Java 11 artifacts on PR branch
+      # Build the SPI and client artifacts to validate bytecode and compare SPI APIs.
+      - name: Build SPI and client artifacts on PR branch
         timeout-minutes: 120
         run: |
-          JAVA11_MODULES=(
+          MODULES=(
             pinot-spi
             pinot-segment-spi
             pinot-common
@@ -103,8 +103,8 @@ jobs:
             pinot-clients/pinot-java-client
             pinot-clients/pinot-jdbc-client
           )
-          mvn clean package -T1C -pl "$(IFS=,; echo "${JAVA11_MODULES[*]}")" -am -DskipTests -DskipShade
-      - name: Validate Java 11 artifact bytecode
+          mvn clean package -T1C -pl "$(IFS=,; echo "${MODULES[*]}")" -am -DskipTests -DskipShade
+      - name: Validate SPI and client artifact bytecode
         run: |
           python3 - <<'PY'
           import glob
@@ -113,15 +113,15 @@ jobs:
           import sys
           import zipfile
 
+          # Java 11 uses classfile major 55. Java 17 uses classfile major 61.
           modules = {
-              "pinot-spi": "pinot-spi",
-              "pinot-segment-spi": "pinot-segment-spi",
-              "pinot-common": "pinot-common",
-              "pinot-timeseries/pinot-timeseries-spi": "pinot-timeseries-spi",
-              "pinot-clients/pinot-java-client": "pinot-java-client",
-              "pinot-clients/pinot-jdbc-client": "pinot-jdbc-client",
+              "pinot-spi": 55,
+              "pinot-segment-spi": 55,
+              "pinot-timeseries/pinot-timeseries-spi": 55,
+              "pinot-common": 61,
+              "pinot-clients/pinot-java-client": 61,
+              "pinot-clients/pinot-jdbc-client": 61,
           }
-          max_major = 55
           violations = []
 
           def main_artifact(module, artifact_id):
@@ -137,7 +137,8 @@ jobs:
                   raise RuntimeError(f"Expected one main artifact for {module}, found: {candidates}")
               return candidates[0]
 
-          for module, artifact_id in modules.items():
+          for module, max_major in modules.items():
+              artifact_id = module.rsplit("/", 1)[-1]
               jar_path = main_artifact(module, artifact_id)
               print(f"Validating {jar_path}")
               with zipfile.ZipFile(jar_path) as jar:
@@ -152,7 +153,7 @@ jobs:
                           violations.append(f"{jar_path}!/{entry}: classfile major {major} > {max_major}")
 
           if violations:
-              print("Found classes above Java 11 bytecode:", file=sys.stderr)
+              print("Found invalid or incompatible classfiles:", file=sys.stderr)
               print("\n".join(violations[:100]), file=sys.stderr)
               if len(violations) > 100:
                   print(f"... and {len(violations) - 100} more", file=sys.stderr)

@@ -42,12 +42,10 @@ import java.util.zip.ZipFile;
 /// Scans every entry of a classpath and reports any class file whose bytecode version is newer than a given Java
 /// feature release can load.
 ///
-/// This complements the hard-coded compiler `release` of 11 on Pinot's client and SPI modules. That pin
-/// guarantees Pinot's _own_ bytecode is Java 11 clean, but says nothing about the transitive third-party closure those
-/// modules drag in. A dependency bump that pulls in a Java 17+ jar would otherwise only be discovered by a user hitting
-/// [UnsupportedClassVersionError] at runtime.
+/// Compiler release targets constrain Pinot's own bytecode. This scan independently checks the transitive runtime
+/// dependencies, which a version upgrade could otherwise raise above the supported Java release.
 ///
-/// Two categories of entry are deliberately _not_ violations, because a Java 11 JVM never loads them:
+/// Two categories of entry are skipped because the target JVM never loads them:
 ///   - `module-info.class` descriptors, which are compiled at the version of the JDK that built the jar and are
 ///     ignored entirely on the classpath.
 ///   - Entries under `META-INF/versions/<n>/` that this JVM would not select. A JVM only performs multi-release
@@ -162,6 +160,31 @@ final class ClasspathClosureScanner {
           _reportedViolations.add(new Violation(classpathEntry, classFile, majorVersion));
         }
       }
+    }
+  }
+
+  static void assertLoadable(Result result, int javaVersion, String artifact) {
+    for (String skipped : result.getSkippedEntries()) {
+      // A POM-type dependency (for example, groovy-all) may be present on the resolved classpath.
+      if (!skipped.endsWith("(not an archive)") || !skipped.contains(".pom ")) {
+        throw new AssertionError("Unexpected classpath entry that could not be scanned: " + skipped);
+      }
+      System.out.printf("        skipped classpath entry: %s%n", skipped);
+    }
+
+    if (result.getTotalViolationCount() > 0) {
+      StringBuilder message = new StringBuilder(String.format(
+          "%d class file(s) on the %s runtime classpath cannot be loaded by Java %d:",
+          result.getTotalViolationCount(), artifact, javaVersion));
+      for (Violation violation : result.getReportedViolations()) {
+        message.append("\n          ").append(violation);
+      }
+      if (result.getTotalViolationCount() > result.getReportedViolations().size()) {
+        message.append("\n          ... and ")
+            .append(result.getTotalViolationCount() - result.getReportedViolations().size())
+            .append(" more");
+      }
+      throw new AssertionError(message.toString());
     }
   }
 

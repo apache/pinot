@@ -117,10 +117,10 @@
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
     <!--
-      Pinot services build against Java 25 by default. SPI/client modules consumed
-      by external JVMs (pinot-spi, pinot-segment-spi, pinot-timeseries-spi,
-      pinot-common, pinot-java-client, pinot-jdbc-client) hard-code Java 11
-      bytecode in their own maven-compiler-plugin configuration.
+      Pinot services build against Java 25 by default. pinot-common, pinot-java-client,
+      and pinot-jdbc-client target Java 17. pinot-spi, pinot-segment-spi, and
+      pinot-timeseries-spi target Java 11. Each of these modules pins its target
+      in its own maven-compiler-plugin configuration.
     -->
     <jdk.version>25</jdk.version>
     <!-- OS classifier for platform-specific protoc/grpc binaries, overridden by OS detection profiles -->
