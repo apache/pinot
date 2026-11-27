@@ -24,9 +24,11 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -197,6 +199,22 @@ public interface TableRouteInfo {
   /// @param preferTls whether to prefer TLS for the requests
   /// @return A map of ServerRoutingInstance and InstanceRequest
   Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls);
+
+  /// Sends enough groups for pagination without requiring servers to implement GROUP BY OFFSET.
+  static BrokerRequest prepareServerRequest(BrokerRequest brokerRequest) {
+    PinotQuery query = brokerRequest.getPinotQuery();
+    int limit = query.getLimit();
+    int offset = query.getOffset();
+    if (query.getGroupByListSize() == 0 || offset <= 0 || limit <= 0 || query.isExplain()) {
+      return brokerRequest;
+    }
+    // The broker still needs the original LIMIT and OFFSET to paginate after merging.
+    BrokerRequest serverRequest = brokerRequest.deepCopy();
+    PinotQuery serverQuery = serverRequest.getPinotQuery();
+    serverQuery.setLimit(GroupByUtils.getGroupByCandidateLimit(limit, offset));
+    serverQuery.setOffset(0);
+    return serverRequest;
+  }
 
   static InstanceRequest createInstanceRequest(BrokerRequest brokerRequest, String brokerId, long requestId) {
     InstanceRequest instanceRequest = new InstanceRequest();

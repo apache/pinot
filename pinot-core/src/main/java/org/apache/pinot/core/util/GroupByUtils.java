@@ -610,12 +610,17 @@ public final class GroupByUtils {
     }
   }
 
+  /// Number of candidate groups needed to return the requested page.
+  public static int getGroupByCandidateLimit(int limit, int offset) {
+    return limit <= 0 ? limit : (int) Math.min((long) limit + Math.max(offset, 0), Integer.MAX_VALUE);
+  }
+
   /// Creates an indexed table for the data table reducer given a sample data table.
   public static IndexedTable createIndexedTableForDataTableReducer(DataTable dataTable, QueryContext queryContext,
       DataTableReducerContext reducerContext, int numThreads, ExecutorService executorService) {
     DataSchema dataSchema = dataTable.getDataSchema();
     int numGroups = dataTable.getNumberOfRows();
-    int limit = queryContext.getLimit();
+    int candidateLimit = getGroupByCandidateLimit(queryContext.getLimit(), queryContext.getOffset());
     boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
     boolean hasHaving = queryContext.getHavingFilter() != null;
     boolean hasFinalInput =
@@ -624,16 +629,16 @@ public final class GroupByUtils {
     int minInitialIndexedTableCapacity = reducerContext.getMinInitialIndexedTableCapacity();
 
     // Disable trim when min trim size is non-positive
-    int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
+    int trimSize = minTrimSize > 0 ? getTableCapacity(candidateLimit, minTrimSize) : Integer.MAX_VALUE;
 
     // Keep more groups when there is HAVING clause
     // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
-    int resultSize = hasHaving ? trimSize : limit;
+    int resultSize = hasHaving ? trimSize : candidateLimit;
 
     /// Grouping-set queries must not incrementally trim while merging server responses (a row could be dropped
     /// before all its partial aggregates are merged) nor apply a per-server top-K. Force the trim-disabled path
     /// so all groups are merged first; finish() then keeps the correct global top-K (resultSize) and the broker
-    /// applies the final ORDER BY + LIMIT over the fully-merged table.
+    /// applies the final ORDER BY, OFFSET and LIMIT over the fully-merged table.
     if (queryContext.isGroupingSets()) {
       int initialCapacity = getIndexedTableInitialCapacity(resultSize, numGroups, minInitialIndexedTableCapacity);
       return getTrimDisabledIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, initialCapacity,

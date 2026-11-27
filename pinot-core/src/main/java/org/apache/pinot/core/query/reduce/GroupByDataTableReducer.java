@@ -94,7 +94,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(_queryContext, dataSchema);
 
-    if (dataTableMap.isEmpty()) {
+    if (dataTableMap.isEmpty() || _queryContext.getLimit() == 0) {
       PostAggregationHandler postAggregationHandler =
           new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema));
       DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
@@ -190,9 +190,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
     PostAggregationHandler postAggregationHandler = new PostAggregationHandler(_queryContext, dataSchema);
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
 
-    // Directly return when there is no record returned, or limit is 0
     int limit = _queryContext.getLimit();
-    if (numRecords == 0 || limit == 0) {
+    int offset = Math.max(_queryContext.getOffset(), 0);
+    if (numRecords <= offset) {
       brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, List.of()));
       return;
     }
@@ -217,14 +217,22 @@ public class GroupByDataTableReducer implements DataTableReducer {
           }
         }
         if (havingFilterHandler.isMatch(row)) {
-          rows.add(row);
+          if (offset > 0) {
+            offset--;
+          } else {
+            rows.add(row);
+          }
         }
       }
     } else {
-      int numRows = Math.min(numRecords, limit);
+      for (int i = 0; i < offset; i++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, "GroupByDataTableReducer");
+        sortedIterator.next();
+      }
+      int numRows = Math.min(numRecords - offset, limit);
       rows = new ArrayList<>(numRows);
       for (int i = 0; i < numRows; i++) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, "GroupByDataTableReducer");
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(offset + i, "GroupByDataTableReducer");
         Object[] row = sortedIterator.next().getValues();
         for (int j = 0; j < numColumns; j++) {
           Object value = row[j];
@@ -439,10 +447,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
     PostAggregationHandler postAggregationHandler = new PostAggregationHandler(_queryContext, dataSchema);
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
 
-    // Directly return when there is no record returned, or limit is 0
     int numRows = dataTable.getNumberOfRows();
     int limit = _queryContext.getLimit();
-    if (numRows == 0 || limit == 0) {
+    int offset = Math.max(_queryContext.getOffset(), 0);
+    if (numRows <= offset) {
       brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, List.of()));
       return;
     }
@@ -454,19 +462,21 @@ public class GroupByDataTableReducer implements DataTableReducer {
       rows = new ArrayList<>();
       HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler,
           _queryContext.requiresNullAwareKeyEvaluation());
-      for (int i = 0; i < numRows; i++) {
+      for (int i = 0; i < numRows && rows.size() < limit; i++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, "GroupByDataTableReducer");
         Object[] row = getConvertedRowWithFinalResult(dataTable, i);
         if (havingFilterHandler.isMatch(row)) {
-          rows.add(row);
-          if (rows.size() == limit) {
-            break;
+          if (offset > 0) {
+            offset--;
+          } else {
+            rows.add(row);
           }
         }
       }
     } else {
-      numRows = Math.min(numRows, limit);
-      rows = new ArrayList<>(numRows);
-      for (int i = 0; i < numRows; i++) {
+      int pageSize = Math.min(numRows - offset, limit);
+      rows = new ArrayList<>(pageSize);
+      for (int i = offset; i < offset + pageSize; i++) {
         rows.add(getConvertedRowWithFinalResult(dataTable, i));
       }
     }

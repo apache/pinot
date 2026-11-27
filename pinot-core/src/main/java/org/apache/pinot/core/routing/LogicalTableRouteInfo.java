@@ -100,17 +100,25 @@ public class LogicalTableRouteInfo implements TableRouteInfo {
 
     ServerInstance.RoutingType routingType =
         preferTls ? ServerInstance.RoutingType.NETTY_TLS : ServerInstance.RoutingType.NETTY;
-    for (Map.Entry<ServerInstance, List<TableSegmentsInfo>> entry : offlineTableRouteInfo.entrySet()) {
-      requestMap.put(entry.getKey().toServerRoutingInstance(TableType.OFFLINE, routingType),
-          getInstanceRequest(requestId, brokerId, _offlineBrokerRequest, entry.getValue()));
-    }
-
-    for (Map.Entry<ServerInstance, List<TableSegmentsInfo>> entry : realtimeTableRouteInfo.entrySet()) {
-      requestMap.put(entry.getKey().toServerRoutingInstance(TableType.REALTIME, routingType),
-          getInstanceRequest(requestId, brokerId, _realtimeBrokerRequest, entry.getValue()));
-    }
+    addInstanceRequests(offlineTableRouteInfo, _offlineBrokerRequest, TableType.OFFLINE, routingType, requestId,
+        brokerId, requestMap);
+    addInstanceRequests(realtimeTableRouteInfo, _realtimeBrokerRequest, TableType.REALTIME, routingType, requestId,
+        brokerId, requestMap);
 
     return requestMap;
+  }
+
+  private void addInstanceRequests(Map<ServerInstance, List<TableSegmentsInfo>> tableRouteInfo,
+      BrokerRequest brokerRequest, TableType tableType, ServerInstance.RoutingType routingType, long requestId,
+      String brokerId, Map<ServerRoutingInstance, InstanceRequest> requestMap) {
+    if (tableRouteInfo.isEmpty()) {
+      return;
+    }
+    BrokerRequest serverRequest = TableRouteInfo.prepareServerRequest(brokerRequest);
+    for (Map.Entry<ServerInstance, List<TableSegmentsInfo>> entry : tableRouteInfo.entrySet()) {
+      requestMap.put(entry.getKey().toServerRoutingInstance(tableType, routingType),
+          getInstanceRequest(requestId, brokerId, serverRequest, entry.getValue()));
+    }
   }
 
   private InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest,
