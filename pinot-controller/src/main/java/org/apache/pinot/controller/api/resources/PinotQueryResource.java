@@ -237,7 +237,8 @@ public class PinotQueryResource {
       try {
         // Parsed inside the try, so that a query that does not parse (e.g. one using the legacy OPTION(...) syntax
         // while the cluster rejects it) reports a failed compilation for that query rather than failing the request
-        Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
+        SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(sqlQuery);
+        Map<String, String> queryOptionsMap = sqlNodeAndOptions.getOptions();
         String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
         TableCache tableCache;
         if (CollectionUtils.isNotEmpty(request.getTableConfigs()) && CollectionUtils.isNotEmpty(request.getSchemas())) {
@@ -250,8 +251,8 @@ public class PinotQueryResource {
           tableCache = _pinotHelixResourceManager.getTableCache();
           LOGGER.info("Validating multi-stage query: {} compilation using Zk table cache", sqlQuery);
         }
-        try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
-            sqlQuery)) {
+        try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null)
+            .compile(sqlQuery, sqlNodeAndOptions)) {
           MultiStageQueryValidationResponse multiStageQueryValidationResponse =
               new MultiStageQueryValidationResponse(true, null, null, sqlQuery);
           multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
