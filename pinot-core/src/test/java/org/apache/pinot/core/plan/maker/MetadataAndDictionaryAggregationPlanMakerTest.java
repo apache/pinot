@@ -149,13 +149,15 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   }
 
   /// Builds a segment with fully predictable data so that aggregation results can be asserted exactly. It contains the
-  /// 10 rows where row {@code i} (for {@code i = 1..10}) has {@code metricCol = i}, {@code intCol = i + 10} and
-  /// {@code bytesCol = new byte[]{(byte) i}}, and every row is duplicated (20 rows total).
+  /// 10 rows where row {@code i} (for {@code i = 1..10}) has {@code metricCol = i}, {@code intCol = i + 10},
+  /// {@code doubleCol = i + 0.5} and {@code bytesCol = new byte[]{(byte) i}}, and every row is duplicated (20 rows
+  /// total).
   private void buildPredictableSegment()
       throws Exception {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(PREDICTABLE_TABLE_NAME)
         .addMetric("metricCol", FieldSpec.DataType.INT)
         .addMetric("intCol", FieldSpec.DataType.INT)
+        .addMetric("doubleCol", FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension("bytesCol", FieldSpec.DataType.BYTES)
         .build();
     TableConfig tableConfig =
@@ -168,6 +170,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
         GenericRow record = new GenericRow();
         record.putValue("metricCol", i);
         record.putValue("intCol", i + 10);
+        record.putValue("doubleCol", i + 0.5);
         record.putValue("bytesCol", new byte[]{(byte) i});
         records.add(record);
       }
@@ -351,6 +354,56 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
       assertTrue(exception.getMessage().contains("Cannot compute " + function + " for non-numeric type: BYTES"),
           exception.getMessage());
     }
+  }
+
+  /// MINLONG/MAXLONG only accept integer columns and MINSTRING/MAXSTRING only accept STRING columns. A dictionary on
+  /// a column of any other type must not make them resolvable from the dictionary: the resolver would either throw
+  /// (MINLONG over DOUBLE) or return the raw dictionary value (MINSTRING over INT). They must fall back to the scan.
+  @Test(dataProvider = "typedMinMaxOnWrongColumnType")
+  public void testTypedMinMaxOnWrongColumnTypeFallsToScan(String query) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    Operator<?> operator =
+        PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(_predictableSegment), queryContext).run();
+    assertTrue(operator instanceof AggregationOperator, query);
+    assertFalse(operator instanceof NonScanBasedAggregationOperator, query);
+  }
+
+  @DataProvider(name = "typedMinMaxOnWrongColumnType")
+  public Object[][] typedMinMaxOnWrongColumnType() {
+    return new Object[][]{
+        {"select minLong(doubleCol) from " + PREDICTABLE_TABLE_NAME},
+        {"select maxLong(doubleCol) from " + PREDICTABLE_TABLE_NAME},
+        {"select minLong(doubleCol), sum(intCol) from " + PREDICTABLE_TABLE_NAME},
+        {"select minString(intCol) from " + PREDICTABLE_TABLE_NAME},
+        {"select maxString(intCol) from " + PREDICTABLE_TABLE_NAME},
+        {"select minString(intCol), sum(intCol) from " + PREDICTABLE_TABLE_NAME}
+    };
+  }
+
+  /// With a scanned aggregation present, the metadata-eligible functions are still resolved by the partial path.
+  /// MINLONG over a DOUBLE column used to throw there because it was treated as eligible; it must now be scanned.
+  @Test
+  public void testMinLongOnDoubleColumnWithScannedAggregationExecutes() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "select minLong(doubleCol), sum(intCol) from " + PREDICTABLE_TABLE_NAME);
+    Operator<?> operator =
+        PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(_predictableSegment), queryContext).run();
+    List<Object> results = ((AggregationResultsBlock) operator.nextBlock()).getResults();
+    assertNotNull(results);
+    // sum(intCol) = (11 + ... + 20) over the two row copies
+    assertEquals(((Number) results.get(1)).doubleValue(), 310.0);
+  }
+
+  /// MINLONG/MAXLONG over an integer column are still resolved from the dictionary.
+  @Test
+  public void testMinMaxLongOnIntegerColumnStillResolvedFromDictionary() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "select minLong(intCol), maxLong(intCol) from " + PREDICTABLE_TABLE_NAME);
+    Operator<?> operator =
+        PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(_predictableSegment), queryContext).run();
+    assertTrue(operator instanceof NonScanBasedAggregationOperator);
+    List<Object> results = ((AggregationResultsBlock) operator.nextBlock()).getResults();
+    assertEquals(results, List.of(11L, 20L));
   }
 
   /// Verifies that a column aggregation resolved by metadata is excluded from the scan projection,

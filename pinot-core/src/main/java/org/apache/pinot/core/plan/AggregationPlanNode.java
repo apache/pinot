@@ -43,6 +43,7 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
@@ -274,6 +275,18 @@ public class AggregationPlanNode implements PlanNode {
     // columns. Non-numeric columns (e.g. BYTES) store min/max as raw values that cannot be parsed as numbers.
     if (NUMERIC_METADATA_FUNCTIONS.contains(functionType)
         && !dataSource.getDataSourceMetadata().getDataType().getStoredType().isNumeric()) {
+      return false;
+    }
+
+    // MINLONG/MAXLONG only accept integer columns and MINSTRING/MAXSTRING only accept STRING columns. A dictionary does
+    // not make them resolvable on other types: the resolver would throw for MINLONG over DOUBLE, and return the raw
+    // dictionary value for MINSTRING over INT. Leave those to the scan, which applies the function's own validation.
+    DataType storedType = dataSource.getDataSourceMetadata().getDataType().getStoredType();
+    if ((functionType == MINLONG || functionType == MAXLONG) && storedType != DataType.INT
+        && storedType != DataType.LONG) {
+      return false;
+    }
+    if ((functionType == MINSTRING || functionType == MAXSTRING) && storedType != DataType.STRING) {
       return false;
     }
 
