@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.HashUtil;
@@ -50,7 +51,9 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   private final QueryContext _queryContext;
   private final Map<String, DataSource> _dataSourceMap;
   private final TransformFunction _transformFunction;
+  private final Predicate _predicate;
   private final Predicate.Type _predicateType;
+  @Nullable
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
@@ -69,6 +72,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       columnContextMap.put(column, ColumnContext.fromDataSource(dataSource));
     });
     _transformFunction = TransformFunctionFactory.get(lhs, columnContextMap, _queryContext);
+    _predicate = predicate;
     _predicateType = predicate.getType();
     if (_predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL) {
       _predicateEvaluator = null;
@@ -132,9 +136,11 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder =
-        new StringBuilder(EXPLAIN_NAME).append("(operator:").append(_predicateEvaluator.getPredicateType());
-    stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
+    Predicate.Type predicateType =
+        _predicateEvaluator != null ? _predicateEvaluator.getPredicateType() : _predicateType;
+    Predicate predicate = _predicateEvaluator != null ? _predicateEvaluator.getPredicate() : _predicate;
+    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(operator:").append(predicateType);
+    stringBuilder.append(",predicate:").append(predicate.toString());
     return stringBuilder.append(')').toString();
   }
 
@@ -146,7 +152,10 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
     super.explainAttributes(attributeBuilder);
-    attributeBuilder.putString("operator", _predicateEvaluator.getPredicateType().name());
-    attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
+    Predicate.Type predicateType =
+        _predicateEvaluator != null ? _predicateEvaluator.getPredicateType() : _predicateType;
+    Predicate predicate = _predicateEvaluator != null ? _predicateEvaluator.getPredicate() : _predicate;
+    attributeBuilder.putString("operator", predicateType.name());
+    attributeBuilder.putString("predicate", predicate.toString());
   }
 }

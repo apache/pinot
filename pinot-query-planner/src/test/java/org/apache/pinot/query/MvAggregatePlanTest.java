@@ -134,7 +134,7 @@ public class MvAggregatePlanTest extends QueryEnvironmentTestBase {
   @Test
   public void testArrayToMvIsNullableOnANullableColumn() {
     // f has column-based null handling, so its MV column is nullable, and ARRAY_TO_MV of it is nullable too: a null
-    // array forms the null group. So Calcite does not remove COALESCE. The leaf stage cannot run COALESCE on a
+    // array forms the null group. So Calcite does not remove COALESCE, and the leaf stage evaluates COALESCE on the
     // multi-value column, see MvAggregate.json.
     String plan = explain("EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') = 'a'");
     assertTrue(plan.contains("COALESCE"), plan);

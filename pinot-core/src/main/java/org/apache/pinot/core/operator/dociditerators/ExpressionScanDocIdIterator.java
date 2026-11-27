@@ -430,84 +430,272 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
         }
       }
     } else {
-      // TODO(https://github.com/apache/pinot/issues/10882): support NULL for multi-value.
       if (_predicateEvaluationResult == PredicateEvaluationResult.NULL) {
+        _numEntriesScanned += numDocs;
+        RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+        if (nullBitmap != null) {
+          for (int i : nullBitmap) {
+            matchingDocIds.add(docIds[i]);
+          }
+        }
         return;
       }
       boolean predicateEvaluationResult = _predicateEvaluationResult == PredicateEvaluationResult.TRUE;
       assert (_predicateEvaluator != null);
       if (resultMetadata.hasDictionary()) {
         int[][] dictIdsArray = _transformFunction.transformToDictIdsMV(projectionBlock);
-        for (int i = 0; i < numDocs; i++) {
-          int[] dictIds = dictIdsArray[i];
-          int numDictIds = dictIds.length;
-          _numEntriesScanned += numDictIds;
-          if (_predicateEvaluator.applyMV(dictIds, numDictIds) == predicateEvaluationResult) {
-            matchingDocIds.add(docIds[i]);
+        RoaringBitmap nullBitmap = getNullBitmapIfEnabled(projectionBlock);
+        if (nullBitmap != null) {
+          IntIterator nullIterator = nullBitmap.getIntIterator();
+          int nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+          for (int i = 0; i < numDocs; i++) {
+            if (i == nextNullDocId) {
+              nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+              continue;
+            }
+            int[] dictIds = dictIdsArray[i];
+            int numDictIds = dictIds.length;
+            _numEntriesScanned += numDictIds;
+            if (_predicateEvaluator.applyMV(dictIds, numDictIds) == predicateEvaluationResult) {
+              matchingDocIds.add(docIds[i]);
+            }
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            int[] dictIds = dictIdsArray[i];
+            int numDictIds = dictIds.length;
+            _numEntriesScanned += numDictIds;
+            if (_predicateEvaluator.applyMV(dictIds, numDictIds) == predicateEvaluationResult) {
+              matchingDocIds.add(docIds[i]);
+            }
           }
         }
       } else {
         switch (resultMetadata.getDataType().getStoredType()) {
-          case INT:
+          case INT: {
             int[][] intValuesArray = _transformFunction.transformToIntValuesMV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              int[] values = intValuesArray[i];
-              int numValues = values.length;
-              _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
-                matchingDocIds.add(docIds[i]);
+            RoaringBitmap nullBitmap = getNullBitmapIfEnabled(projectionBlock);
+            if (nullBitmap != null) {
+              IntIterator nullIterator = nullBitmap.getIntIterator();
+              int nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+              for (int i = 0; i < numDocs; i++) {
+                if (i == nextNullDocId) {
+                  nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+                  continue;
+                }
+                int[] values = intValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                int[] values = intValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
               }
             }
             break;
-          case LONG:
+          }
+          case LONG: {
             long[][] longValuesArray = _transformFunction.transformToLongValuesMV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              long[] values = longValuesArray[i];
-              int numValues = values.length;
-              _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
-                matchingDocIds.add(docIds[i]);
+            RoaringBitmap nullBitmap = getNullBitmapIfEnabled(projectionBlock);
+            if (nullBitmap != null) {
+              IntIterator nullIterator = nullBitmap.getIntIterator();
+              int nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+              for (int i = 0; i < numDocs; i++) {
+                if (i == nextNullDocId) {
+                  nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+                  continue;
+                }
+                long[] values = longValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                long[] values = longValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
               }
             }
             break;
-          case FLOAT:
+          }
+          case FLOAT: {
             float[][] floatValuesArray = _transformFunction.transformToFloatValuesMV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              float[] values = floatValuesArray[i];
-              int numValues = values.length;
-              _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
-                matchingDocIds.add(docIds[i]);
+            RoaringBitmap nullBitmap = getNullBitmapIfEnabled(projectionBlock);
+            if (nullBitmap != null) {
+              IntIterator nullIterator = nullBitmap.getIntIterator();
+              int nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+              for (int i = 0; i < numDocs; i++) {
+                if (i == nextNullDocId) {
+                  nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+                  continue;
+                }
+                float[] values = floatValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                float[] values = floatValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
               }
             }
             break;
-          case DOUBLE:
+          }
+          case DOUBLE: {
             double[][] doubleValuesArray = _transformFunction.transformToDoubleValuesMV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              double[] values = doubleValuesArray[i];
-              int numValues = values.length;
-              _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
-                matchingDocIds.add(docIds[i]);
+            RoaringBitmap nullBitmap = getNullBitmapIfEnabled(projectionBlock);
+            if (nullBitmap != null) {
+              IntIterator nullIterator = nullBitmap.getIntIterator();
+              int nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+              for (int i = 0; i < numDocs; i++) {
+                if (i == nextNullDocId) {
+                  nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+                  continue;
+                }
+                double[] values = doubleValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                double[] values = doubleValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
               }
             }
             break;
-          case STRING:
+          }
+          case STRING: {
             String[][] valuesArray = _transformFunction.transformToStringValuesMV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              String[] values = valuesArray[i];
-              int numValues = values.length;
-              _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
-                matchingDocIds.add(docIds[i]);
+            RoaringBitmap nullBitmap = getNullBitmapIfEnabled(projectionBlock);
+            if (nullBitmap != null) {
+              IntIterator nullIterator = nullBitmap.getIntIterator();
+              int nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+              for (int i = 0; i < numDocs; i++) {
+                if (i == nextNullDocId) {
+                  nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+                  continue;
+                }
+                String[] values = valuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                String[] values = valuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
               }
             }
             break;
+          }
+          case BYTES: {
+            byte[][][] bytesValuesArray = _transformFunction.transformToBytesValuesMV(projectionBlock);
+            RoaringBitmap nullBitmap = getNullBitmapIfEnabled(projectionBlock);
+            if (nullBitmap != null) {
+              IntIterator nullIterator = nullBitmap.getIntIterator();
+              int nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+              for (int i = 0; i < numDocs; i++) {
+                if (i == nextNullDocId) {
+                  nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+                  continue;
+                }
+                byte[][] values = bytesValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                byte[][] values = bytesValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
+              }
+            }
+            break;
+          }
+          case BIG_DECIMAL: {
+            BigDecimal[][] bigDecimalValuesArray = _transformFunction.transformToBigDecimalValuesMV(projectionBlock);
+            RoaringBitmap nullBitmap = getNullBitmapIfEnabled(projectionBlock);
+            if (nullBitmap != null) {
+              IntIterator nullIterator = nullBitmap.getIntIterator();
+              int nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+              for (int i = 0; i < numDocs; i++) {
+                if (i == nextNullDocId) {
+                  nextNullDocId = nullIterator.hasNext() ? nullIterator.next() : numDocs;
+                  continue;
+                }
+                BigDecimal[] values = bigDecimalValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                BigDecimal[] values = bigDecimalValuesArray[i];
+                int numValues = values.length;
+                _numEntriesScanned += numValues;
+                if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
+                  matchingDocIds.add(docIds[i]);
+                }
+              }
+            }
+            break;
+          }
           default:
             throw new IllegalStateException();
         }
       }
     }
+  }
+
+  @Nullable
+  private RoaringBitmap getNullBitmapIfEnabled(ProjectionBlock projectionBlock) {
+    if (!_nullHandlingEnabled) {
+      return null;
+    }
+    RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+    return (nullBitmap != null && !nullBitmap.isEmpty()) ? nullBitmap : null;
   }
 
   @Override

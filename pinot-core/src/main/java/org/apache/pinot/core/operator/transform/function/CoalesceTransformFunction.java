@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -36,6 +37,10 @@ import org.roaringbitmap.RoaringBitmap;
 /// The result is first non-null value in the argument list.
 /// If all arguments are null, return null.
 ///
+/// Supports both single-value and multi-value arguments. If any argument is multi-value, the output is multi-value;
+/// single-value fallback arguments are wrapped as single-element arrays for rows where earlier arguments are null,
+/// while non-null empty arrays are preserved as-is.
+///
 /// Note: arguments have to be compatible type.
 /// Number of arguments has to be greater than 0.
 ///
@@ -44,16 +49,27 @@ import org.roaringbitmap.RoaringBitmap;
 /// Coalesce(columnA, nullColumn): columnA
 /// Coalesce(nullColumnA, nullColumnB): null
 public class CoalesceTransformFunction extends BaseTransformFunction {
+  private static final TransformResultMetadata UNKNOWN_MV_METADATA =
+      new TransformResultMetadata(DataType.UNKNOWN, false, false);
+
   private TransformFunction[] _transformFunctions;
+  private boolean[] _argIsSingleValue;
+  private boolean[] _argIsLiteral;
+  private Object[] _literalMVValues;
+  private boolean _isSingleValue;
   private DataType _dataType;
   private TransformResultMetadata _resultMetadata;
 
-  /// Returns a bit map of corresponding column. Returns an empty bitmap by default if null option is disabled.
+  /// Returns a bit map of corresponding column. Short-circuits once a non-null argument is encountered, since
+  /// subsequent arguments cannot be reached for any document in the block.
   private static RoaringBitmap[] getNullBitMaps(ValueBlock valueBlock, TransformFunction[] transformFunctions) {
     RoaringBitmap[] roaringBitmaps = new RoaringBitmap[transformFunctions.length];
     for (int i = 0; i < roaringBitmaps.length; i++) {
-      TransformFunction func = transformFunctions[i];
-      roaringBitmaps[i] = func.getNullBitmap(valueBlock);
+      RoaringBitmap nullBitmap = transformFunctions[i].getNullBitmap(valueBlock);
+      if (nullBitmap == null || nullBitmap.isEmpty()) {
+        break;
+      }
+      roaringBitmaps[i] = nullBitmap;
     }
     return roaringBitmaps;
   }
@@ -258,6 +274,299 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     return _stringValuesSV;
   }
 
+  /// Get transform int MV results based on store type.
+  private int[][] getIntTransformResultsMV(ValueBlock valueBlock) {
+    RoaringBitmap firstNullBitmap = _transformFunctions[0].getNullBitmap(valueBlock);
+    if ((firstNullBitmap == null || firstNullBitmap.isEmpty()) && !_argIsSingleValue[0]) {
+      return _transformFunctions[0].transformToIntValuesMV(valueBlock);
+    }
+    int length = valueBlock.getNumDocs();
+    initIntValuesMV(length);
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, firstNullBitmap);
+    int[][][] mvData = new int[width][][];
+    int[][] svData = new int[width][];
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!_argIsSingleValue[j]) {
+          if (mvData[j] == null) {
+            mvData[j] = _transformFunctions[j].transformToIntValuesMV(valueBlock);
+          }
+          _intValuesMV[i] = mvData[j][i];
+        } else if (_argIsLiteral[j]) {
+          int[] literalValue = (int[]) _literalMVValues[j];
+          if (literalValue == null) {
+            literalValue = new int[]{((LiteralTransformFunction) _transformFunctions[j]).getIntLiteral()};
+            _literalMVValues[j] = literalValue;
+          }
+          _intValuesMV[i] = literalValue;
+        } else {
+          if (svData[j] == null) {
+            svData[j] = _transformFunctions[j].transformToIntValuesSV(valueBlock);
+          }
+          _intValuesMV[i] = new int[]{svData[j][i]};
+        }
+        hasNonNullValue = true;
+        break;
+      }
+      if (!hasNonNullValue) {
+        _intValuesMV[i] = NullValuePlaceHolder.INT_ARRAY;
+      }
+    }
+    return _intValuesMV;
+  }
+
+  /// Get transform long MV results based on store type.
+  private long[][] getLongTransformResultsMV(ValueBlock valueBlock) {
+    RoaringBitmap firstNullBitmap = _transformFunctions[0].getNullBitmap(valueBlock);
+    if ((firstNullBitmap == null || firstNullBitmap.isEmpty()) && !_argIsSingleValue[0]) {
+      return _transformFunctions[0].transformToLongValuesMV(valueBlock);
+    }
+    int length = valueBlock.getNumDocs();
+    initLongValuesMV(length);
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, firstNullBitmap);
+    long[][][] mvData = new long[width][][];
+    long[][] svData = new long[width][];
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!_argIsSingleValue[j]) {
+          if (mvData[j] == null) {
+            mvData[j] = _transformFunctions[j].transformToLongValuesMV(valueBlock);
+          }
+          _longValuesMV[i] = mvData[j][i];
+        } else if (_argIsLiteral[j]) {
+          long[] literalValue = (long[]) _literalMVValues[j];
+          if (literalValue == null) {
+            literalValue = new long[]{((LiteralTransformFunction) _transformFunctions[j]).getLongLiteral()};
+            _literalMVValues[j] = literalValue;
+          }
+          _longValuesMV[i] = literalValue;
+        } else {
+          if (svData[j] == null) {
+            svData[j] = _transformFunctions[j].transformToLongValuesSV(valueBlock);
+          }
+          _longValuesMV[i] = new long[]{svData[j][i]};
+        }
+        hasNonNullValue = true;
+        break;
+      }
+      if (!hasNonNullValue) {
+        _longValuesMV[i] = NullValuePlaceHolder.LONG_ARRAY;
+      }
+    }
+    return _longValuesMV;
+  }
+
+  /// Get transform float MV results based on store type.
+  private float[][] getFloatTransformResultsMV(ValueBlock valueBlock) {
+    RoaringBitmap firstNullBitmap = _transformFunctions[0].getNullBitmap(valueBlock);
+    if ((firstNullBitmap == null || firstNullBitmap.isEmpty()) && !_argIsSingleValue[0]) {
+      return _transformFunctions[0].transformToFloatValuesMV(valueBlock);
+    }
+    int length = valueBlock.getNumDocs();
+    initFloatValuesMV(length);
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, firstNullBitmap);
+    float[][][] mvData = new float[width][][];
+    float[][] svData = new float[width][];
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!_argIsSingleValue[j]) {
+          if (mvData[j] == null) {
+            mvData[j] = _transformFunctions[j].transformToFloatValuesMV(valueBlock);
+          }
+          _floatValuesMV[i] = mvData[j][i];
+        } else if (_argIsLiteral[j]) {
+          float[] literalValue = (float[]) _literalMVValues[j];
+          if (literalValue == null) {
+            literalValue = new float[]{((LiteralTransformFunction) _transformFunctions[j]).getFloatLiteral()};
+            _literalMVValues[j] = literalValue;
+          }
+          _floatValuesMV[i] = literalValue;
+        } else {
+          if (svData[j] == null) {
+            svData[j] = _transformFunctions[j].transformToFloatValuesSV(valueBlock);
+          }
+          _floatValuesMV[i] = new float[]{svData[j][i]};
+        }
+        hasNonNullValue = true;
+        break;
+      }
+      if (!hasNonNullValue) {
+        _floatValuesMV[i] = NullValuePlaceHolder.FLOAT_ARRAY;
+      }
+    }
+    return _floatValuesMV;
+  }
+
+  /// Get transform double MV results based on store type.
+  private double[][] getDoubleTransformResultsMV(ValueBlock valueBlock) {
+    RoaringBitmap firstNullBitmap = _transformFunctions[0].getNullBitmap(valueBlock);
+    if ((firstNullBitmap == null || firstNullBitmap.isEmpty()) && !_argIsSingleValue[0]) {
+      return _transformFunctions[0].transformToDoubleValuesMV(valueBlock);
+    }
+    int length = valueBlock.getNumDocs();
+    initDoubleValuesMV(length);
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, firstNullBitmap);
+    double[][][] mvData = new double[width][][];
+    double[][] svData = new double[width][];
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!_argIsSingleValue[j]) {
+          if (mvData[j] == null) {
+            mvData[j] = _transformFunctions[j].transformToDoubleValuesMV(valueBlock);
+          }
+          _doubleValuesMV[i] = mvData[j][i];
+        } else if (_argIsLiteral[j]) {
+          double[] literalValue = (double[]) _literalMVValues[j];
+          if (literalValue == null) {
+            literalValue = new double[]{((LiteralTransformFunction) _transformFunctions[j]).getDoubleLiteral()};
+            _literalMVValues[j] = literalValue;
+          }
+          _doubleValuesMV[i] = literalValue;
+        } else {
+          if (svData[j] == null) {
+            svData[j] = _transformFunctions[j].transformToDoubleValuesSV(valueBlock);
+          }
+          _doubleValuesMV[i] = new double[]{svData[j][i]};
+        }
+        hasNonNullValue = true;
+        break;
+      }
+      if (!hasNonNullValue) {
+        _doubleValuesMV[i] = NullValuePlaceHolder.DOUBLE_ARRAY;
+      }
+    }
+    return _doubleValuesMV;
+  }
+
+  /// Get transform BigDecimal MV results based on store type.
+  private BigDecimal[][] getBigDecimalTransformResultsMV(ValueBlock valueBlock) {
+    RoaringBitmap firstNullBitmap = _transformFunctions[0].getNullBitmap(valueBlock);
+    if ((firstNullBitmap == null || firstNullBitmap.isEmpty()) && !_argIsSingleValue[0]) {
+      return _transformFunctions[0].transformToBigDecimalValuesMV(valueBlock);
+    }
+    int length = valueBlock.getNumDocs();
+    initBigDecimalValuesMV(length);
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, firstNullBitmap);
+    BigDecimal[][][] mvData = new BigDecimal[width][][];
+    BigDecimal[][] svData = new BigDecimal[width][];
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!_argIsSingleValue[j]) {
+          if (mvData[j] == null) {
+            mvData[j] = _transformFunctions[j].transformToBigDecimalValuesMV(valueBlock);
+          }
+          _bigDecimalValuesMV[i] = mvData[j][i];
+        } else if (_argIsLiteral[j]) {
+          BigDecimal[] literalValue = (BigDecimal[]) _literalMVValues[j];
+          if (literalValue == null) {
+            literalValue =
+                new BigDecimal[]{((LiteralTransformFunction) _transformFunctions[j]).getBigDecimalLiteral()};
+            _literalMVValues[j] = literalValue;
+          }
+          _bigDecimalValuesMV[i] = literalValue;
+        } else {
+          if (svData[j] == null) {
+            svData[j] = _transformFunctions[j].transformToBigDecimalValuesSV(valueBlock);
+          }
+          _bigDecimalValuesMV[i] = new BigDecimal[]{svData[j][i]};
+        }
+        hasNonNullValue = true;
+        break;
+      }
+      if (!hasNonNullValue) {
+        _bigDecimalValuesMV[i] = NullValuePlaceHolder.BIG_DECIMAL_ARRAY;
+      }
+    }
+    return _bigDecimalValuesMV;
+  }
+
+  /// Get transform String MV results based on store type.
+  private String[][] getStringTransformResultsMV(ValueBlock valueBlock) {
+    RoaringBitmap firstNullBitmap = _transformFunctions[0].getNullBitmap(valueBlock);
+    if ((firstNullBitmap == null || firstNullBitmap.isEmpty()) && !_argIsSingleValue[0]) {
+      return _transformFunctions[0].transformToStringValuesMV(valueBlock);
+    }
+    int length = valueBlock.getNumDocs();
+    initStringValuesMV(length);
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, firstNullBitmap);
+    String[][][] mvData = new String[width][][];
+    String[][] svData = new String[width][];
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!_argIsSingleValue[j]) {
+          if (mvData[j] == null) {
+            mvData[j] = _transformFunctions[j].transformToStringValuesMV(valueBlock);
+          }
+          _stringValuesMV[i] = mvData[j][i];
+        } else if (_argIsLiteral[j]) {
+          String[] literalValue = (String[]) _literalMVValues[j];
+          if (literalValue == null) {
+            literalValue = new String[]{((LiteralTransformFunction) _transformFunctions[j]).getStringLiteral()};
+            _literalMVValues[j] = literalValue;
+          }
+          _stringValuesMV[i] = literalValue;
+        } else {
+          if (svData[j] == null) {
+            svData[j] = _transformFunctions[j].transformToStringValuesSV(valueBlock);
+          }
+          _stringValuesMV[i] = new String[]{svData[j][i]};
+        }
+        hasNonNullValue = true;
+        break;
+      }
+      if (!hasNonNullValue) {
+        _stringValuesMV[i] = NullValuePlaceHolder.STRING_ARRAY;
+      }
+    }
+    return _stringValuesMV;
+  }
+
+  private RoaringBitmap[] getNullBitMaps(ValueBlock valueBlock, @Nullable RoaringBitmap firstNullBitmap) {
+    RoaringBitmap[] nullBitMaps = new RoaringBitmap[_transformFunctions.length];
+    if (firstNullBitmap == null || firstNullBitmap.isEmpty()) {
+      return nullBitMaps;
+    }
+    nullBitMaps[0] = firstNullBitmap;
+    for (int i = 1; i < nullBitMaps.length; i++) {
+      RoaringBitmap nullBitmap = _transformFunctions[i].getNullBitmap(valueBlock);
+      if (nullBitmap == null || nullBitmap.isEmpty()) {
+        break;
+      }
+      nullBitMaps[i] = nullBitmap;
+    }
+    return nullBitMaps;
+  }
+
   @Override
   public String getName() {
     return TransformFunctionType.COALESCE.getName();
@@ -268,9 +577,19 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     int argSize = arguments.size();
     Preconditions.checkArgument(argSize > 0, "COALESCE needs to have at least one argument.");
     _transformFunctions = new TransformFunction[argSize];
+    _argIsSingleValue = new boolean[argSize];
+    _argIsLiteral = new boolean[argSize];
+    _isSingleValue = true;
     for (int i = 0; i < argSize; i++) {
       TransformFunction func = arguments.get(i);
-      DataType dataType = func.getResultMetadata().getDataType();
+      TransformResultMetadata metadata = func.getResultMetadata();
+      boolean isSingleValue = metadata.isSingleValue();
+      _argIsSingleValue[i] = isSingleValue;
+      _argIsLiteral[i] = func instanceof LiteralTransformFunction;
+      if (!isSingleValue) {
+        _isSingleValue = false;
+      }
+      DataType dataType = metadata.getDataType();
       // A whole OPEN_STRUCT argument supplies its JSON document through transformToStringValuesSV.
       if (dataType == DataType.OPEN_STRUCT) {
         dataType = DataType.STRING;
@@ -282,28 +601,33 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       }
       _transformFunctions[i] = func;
     }
+    if (!_isSingleValue) {
+      _literalMVValues = new Object[argSize];
+    }
     // TODO: Support BOOLEAN, TIMESTAMP, BYTES
     switch (_dataType) {
       case INT:
-        _resultMetadata = INT_SV_NO_DICTIONARY_METADATA;
+        _resultMetadata = _isSingleValue ? INT_SV_NO_DICTIONARY_METADATA : INT_MV_NO_DICTIONARY_METADATA;
         break;
       case LONG:
-        _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
+        _resultMetadata = _isSingleValue ? LONG_SV_NO_DICTIONARY_METADATA : LONG_MV_NO_DICTIONARY_METADATA;
         break;
       case FLOAT:
-        _resultMetadata = FLOAT_SV_NO_DICTIONARY_METADATA;
+        _resultMetadata = _isSingleValue ? FLOAT_SV_NO_DICTIONARY_METADATA : FLOAT_MV_NO_DICTIONARY_METADATA;
         break;
       case DOUBLE:
-        _resultMetadata = DOUBLE_SV_NO_DICTIONARY_METADATA;
+        _resultMetadata = _isSingleValue ? DOUBLE_SV_NO_DICTIONARY_METADATA : DOUBLE_MV_NO_DICTIONARY_METADATA;
         break;
       case BIG_DECIMAL:
-        _resultMetadata = BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
+        _resultMetadata = _isSingleValue
+            ? BIG_DECIMAL_SV_NO_DICTIONARY_METADATA
+            : BIG_DECIMAL_MV_NO_DICTIONARY_METADATA;
         break;
       case STRING:
-        _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
+        _resultMetadata = _isSingleValue ? STRING_SV_NO_DICTIONARY_METADATA : STRING_MV_NO_DICTIONARY_METADATA;
         break;
       case UNKNOWN:
-        _resultMetadata = UNKNOWN_METADATA;
+        _resultMetadata = _isSingleValue ? UNKNOWN_METADATA : UNKNOWN_MV_METADATA;
         break;
       default:
         throw new UnsupportedOperationException("Coalesce only supports numerical and string data type");
@@ -317,6 +641,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    if (!_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
     if (_dataType != DataType.INT) {
       return super.transformToIntValuesSV(valueBlock);
     }
@@ -325,6 +652,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    if (!_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
     if (_dataType != DataType.LONG) {
       return super.transformToLongValuesSV(valueBlock);
     }
@@ -333,6 +663,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
+    if (!_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
     if (_dataType != DataType.FLOAT) {
       return super.transformToFloatValuesSV(valueBlock);
     }
@@ -341,6 +674,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    if (!_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
     if (_dataType != DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(valueBlock);
     }
@@ -349,6 +685,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    if (!_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
     if (_dataType != DataType.BIG_DECIMAL) {
       return super.transformToBigDecimalValuesSV(valueBlock);
     }
@@ -357,6 +696,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    if (!_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
     if (_dataType != DataType.STRING) {
       return super.transformToStringValuesSV(valueBlock);
     }
@@ -364,22 +706,96 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   }
 
   @Override
+  public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
+    if (_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
+    if (_dataType != DataType.INT) {
+      return super.transformToIntValuesMV(valueBlock);
+    }
+    return getIntTransformResultsMV(valueBlock);
+  }
+
+  @Override
+  public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
+    if (_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
+    if (_dataType != DataType.LONG) {
+      return super.transformToLongValuesMV(valueBlock);
+    }
+    return getLongTransformResultsMV(valueBlock);
+  }
+
+  @Override
+  public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
+    if (_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
+    if (_dataType != DataType.FLOAT) {
+      return super.transformToFloatValuesMV(valueBlock);
+    }
+    return getFloatTransformResultsMV(valueBlock);
+  }
+
+  @Override
+  public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
+    if (_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
+    if (_dataType != DataType.DOUBLE) {
+      return super.transformToDoubleValuesMV(valueBlock);
+    }
+    return getDoubleTransformResultsMV(valueBlock);
+  }
+
+  @Override
+  public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
+    if (_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
+    if (_dataType != DataType.BIG_DECIMAL) {
+      return super.transformToBigDecimalValuesMV(valueBlock);
+    }
+    return getBigDecimalTransformResultsMV(valueBlock);
+  }
+
+  @Override
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
+    if (_isSingleValue) {
+      throw new UnsupportedOperationException();
+    }
+    if (_dataType != DataType.STRING) {
+      return super.transformToStringValuesMV(valueBlock);
+    }
+    return getStringTransformResultsMV(valueBlock);
+  }
+
+  @Nullable
+  @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(valueBlock, _transformFunctions);
-    RoaringBitmap bitmap = nullBitMaps[0];
-    if (bitmap == null || bitmap.isEmpty()) {
+    RoaringBitmap firstBitmap = _transformFunctions[0].getNullBitmap(valueBlock);
+    if (firstBitmap == null || firstBitmap.isEmpty()) {
       return null;
     }
-    for (int i = 1; i < nullBitMaps.length; i++) {
-      RoaringBitmap curBitmap = nullBitMaps[i];
+    if (_transformFunctions.length == 1) {
+      return firstBitmap.clone();
+    }
+    RoaringBitmap result = null;
+    for (int i = 1; i < _transformFunctions.length; i++) {
+      RoaringBitmap curBitmap = _transformFunctions[i].getNullBitmap(valueBlock);
       if (curBitmap == null || curBitmap.isEmpty()) {
         return null;
       }
-      bitmap.and(curBitmap);
+      if (result == null) {
+        result = RoaringBitmap.and(firstBitmap, curBitmap);
+      } else {
+        result.and(curBitmap);
+      }
+      if (result.isEmpty()) {
+        return null;
+      }
     }
-    if (bitmap == null || bitmap.isEmpty()) {
-      return null;
-    }
-    return bitmap;
+    return result;
   }
 }
