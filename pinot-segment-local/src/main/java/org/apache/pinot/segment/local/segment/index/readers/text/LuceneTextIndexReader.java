@@ -334,6 +334,23 @@ public class LuceneTextIndexReader implements TextIndexReader {
   }
 
   @Override
+  public DocScorer createDocScorer(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    requirePerRowIndex();
+    try {
+      validateDocCount();
+      Query query = buildQuery(searchQuery, optionsString, null);
+      IndexSearcher searcher = LuceneTextScoreStatsUtils.scoringSearcher(_indexSearcher, query, _column, globalStats);
+      return new LuceneDocScorer(searcher, query, _docIdTranslator, _column, searchQuery);
+    } catch (QueryException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while scoring the text index for column:" + _column + " search query:" + searchQuery, e);
+    }
+  }
+
+  @Override
   public TextScoreStats getTextScoreStats(String searchQuery, @Nullable String optionsString) {
     requirePerRowIndex();
     try {

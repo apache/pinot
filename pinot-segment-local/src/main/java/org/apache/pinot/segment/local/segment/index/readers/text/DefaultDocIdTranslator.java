@@ -19,7 +19,9 @@
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import java.io.IOException;
+import java.util.Arrays;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /// Lucene docIDs are not same as pinot docIDs. The internal implementation
@@ -35,8 +37,48 @@ class DefaultDocIdTranslator implements DocIdTranslator {
     _buffer = buffer;
   }
 
+  @Override
   public int getPinotDocId(int luceneDocId) {
-    return _buffer.getInt(luceneDocId * Integer.BYTES);
+    return _buffer.getInt((long) luceneDocId * Integer.BYTES);
+  }
+
+  /// Returns the number of Lucene document ID entries backed by this mapping buffer.
+  int size() {
+    return (int) (_buffer.size() / Integer.BYTES);
+  }
+
+  /// Scans Lucene docIds in `[0, min(maxLuceneDoc, size()))` and records every `(luceneDocId, targetIdx)` pair
+  /// whose mapped Pinot docId appears in the strictly ascending `sortedUniqueTargets[0 .. numTargets - 1]`.
+  ///
+  /// The recorded `luceneDocIdsOut` entries are naturally in strictly ascending Lucene docId order.
+  /// Stops early once `numTargets` matches are found.
+  ///
+  /// @return number of matches written to `luceneDocIdsOut` and `targetIndicesOut`
+  int findLuceneDocIds(int maxLuceneDoc, int[] sortedUniqueTargets, int numTargets, int[] luceneDocIdsOut,
+      int[] targetIndicesOut) {
+    if (numTargets <= 0) {
+      return 0;
+    }
+    int limit = Math.min(maxLuceneDoc, size());
+    int minTarget = sortedUniqueTargets[0];
+    int maxTarget = sortedUniqueTargets[numTargets - 1];
+    int found = 0;
+    for (int luceneDocId = 0; luceneDocId < limit; luceneDocId++) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(luceneDocId, "DefaultDocIdTranslator");
+      int pinotDocId = _buffer.getInt((long) luceneDocId * Integer.BYTES);
+      if (pinotDocId < minTarget || pinotDocId > maxTarget) {
+        continue;
+      }
+      int idx = numTargets == 1 ? 0 : Arrays.binarySearch(sortedUniqueTargets, 0, numTargets, pinotDocId);
+      if (idx >= 0) {
+        luceneDocIdsOut[found] = luceneDocId;
+        targetIndicesOut[found] = idx;
+        if (++found == numTargets) {
+          break;
+        }
+      }
+    }
+    return found;
   }
 
   @Override

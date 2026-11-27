@@ -76,6 +76,7 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;
   private final IndexSearcher _indexSearcher;
+  private final int _numDocs;
   private final DocIdTranslator _docIdTranslator;
   private final Analyzer _analyzer;
   private boolean _useANDForMultiTermQueries = false;
@@ -176,6 +177,7 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
       Map<String, String> sharedConfig,
       Map<String, Map<String, String>> perColumnConfig) {
     _columns = columns;
+    _numDocs = numDocs;
     TextIndexConfig config = new TextIndexConfigBuilder().withProperties(sharedConfig).build();
     try {
       File indexFile = getTextIndexFile(indexDir);
@@ -385,6 +387,14 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
     }
   }
 
+  private void validateDocCount() {
+    int maxDoc = _indexReader.maxDoc();
+    if (maxDoc > _numDocs) {
+      throw new IllegalStateException(
+          "Lucene text index contains " + maxDoc + " documents, exceeding segment document count: " + _numDocs);
+    }
+  }
+
   @Override
   public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString) {
     return getDocScores(column, searchQuery, optionsString, null);
@@ -394,9 +404,26 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
   public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString,
       @Nullable TextScoreStats globalStats) {
     try {
+      validateDocCount();
       Query query = parseQuery(column, searchQuery, optionsString);
       IndexSearcher searcher = LuceneTextScoreStatsUtils.scoringSearcher(_indexSearcher, query, column, globalStats);
       return new LuceneDocScoreCollector(_docIdTranslator::getPinotDocId).collectScores(searcher, query);
+    } catch (QueryException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while scoring the text index for column: " + column + " search query:" + searchQuery, e);
+    }
+  }
+
+  @Override
+  public DocScorer createDocScorer(String column, String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    try {
+      validateDocCount();
+      Query query = parseQuery(column, searchQuery, optionsString);
+      IndexSearcher searcher = LuceneTextScoreStatsUtils.scoringSearcher(_indexSearcher, query, column, globalStats);
+      return new LuceneDocScorer(searcher, query, _docIdTranslator, column, searchQuery);
     } catch (QueryException e) {
       throw e;
     } catch (Exception e) {
