@@ -299,7 +299,7 @@
     ]
   },
   "mv_aggregate_null_handling": {
-    "comment": "With column-based null handling the MV column is nullable. A null row forms one null group, as in the single-stage engine. CROSS JOIN UNNEST differs here: it drops the null row. ARRAY_TO_MV is nullable when its array is nullable, so Calcite keeps COALESCE and IS NULL checks around it. The leaf stage cannot run COALESCE on a multi-value column. Above the leaf stage, COALESCE around an ARRAY_TO_MV group key nests ARRAY_TO_MV in another expression, which is not supported.",
+    "comment": "With column-based null handling the MV column is nullable. A null row forms one null group, as in the single-stage engine. CROSS JOIN UNNEST differs here: it drops the null row. ARRAY_TO_MV is nullable when its array is nullable, so Calcite keeps COALESCE and IS NULL checks around it. The leaf stage evaluates COALESCE and null checks on multi-value columns. Above the leaf stage, COALESCE around an ARRAY_TO_MV group key nests ARRAY_TO_MV in another expression, which is not supported.",
     "extraProps": {
       "enableColumnBasedNullHandling": true
     },
@@ -343,10 +343,15 @@
         "ignoreV2Optimizer": true
       },
       {
-        "description": "ARRAY_TO_MV of a nullable column is nullable, so COALESCE around an MV key on a scan stays. The leaf stage cannot run COALESCE on a multi-value column, so the query fails when it runs",
+        "description": "ARRAY_TO_MV of a nullable column is nullable, so Calcite does not fold ARRAY_TO_MV(col) IS NULL, and the check keeps only the null row",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE ARRAY_TO_MV(strMv) IS NULL",
+        "outputs": [[1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "ARRAY_TO_MV of a nullable column is nullable, so COALESCE around an MV key on a scan replaces the null row with the fallback group",
         "sql": "SET enableNullHandling=true; SELECT COALESCE(ARRAY_TO_MV(strMv), 'none'), COUNT(*) FROM {tbl} GROUP BY 1",
-        "outputs": [],
-        "expectedException": ".*Caught exception while doing operator.*",
+        "outputs": [["a", 2], ["b", 1], ["none", 1]],
         "ignoreV2Optimizer": true
       },
       {
@@ -357,24 +362,63 @@
         "ignoreV2Optimizer": true
       },
       {
-        "description": "COALESCE around ARRAY_TO_MV of a nullable column in a filter on a scan stays. The leaf stage cannot run it, so the query fails when it runs",
+        "description": "COALESCE around ARRAY_TO_MV of a nullable column in a filter on a scan matches non-null rows containing the value",
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE COALESCE(ARRAY_TO_MV(strMv), 'x') = 'a'",
-        "outputs": [],
-        "expectedException": ".*Caught exception while doing operator.*",
+        "outputs": [[2]],
         "ignoreV2Optimizer": true
       },
       {
-        "description": "CAST around COALESCE around ARRAY_TO_MV of a nullable column in a filter on a scan: COALESCE stays, and the query fails when it runs",
+        "description": "COALESCE around ARRAY_TO_MV of a nullable column in a filter on a scan matches the null row via its fallback value",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE COALESCE(ARRAY_TO_MV(strMv), 'x') = 'x'",
+        "outputs": [[1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "CAST around COALESCE around ARRAY_TO_MV of a nullable column in a filter on a scan delegates through MV cast",
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE CAST(COALESCE(ARRAY_TO_MV(intMv), 0) AS VARCHAR) = '1'",
-        "outputs": [],
-        "expectedException": ".*Caught exception while doing operator.*",
+        "outputs": [[1]],
         "ignoreV2Optimizer": true
       },
       {
-        "description": "COALESCE around ARRAY_TO_MV of a nullable column in a leaf WHERE under an MV aggregate stays. The leaf stage cannot run it, so the query fails when it runs",
+        "description": "COALESCE around ARRAY_TO_MV of a nullable column in a leaf WHERE under an MV aggregate filters rows before the join and group-by",
         "sql": "SET enableNullHandling=true; SELECT ARRAY_TO_MV(t1.strMv), COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k WHERE COALESCE(ARRAY_TO_MV(t1.strMv), 'x') = 'a' GROUP BY ARRAY_TO_MV(t1.strMv)",
-        "outputs": [],
-        "expectedException": ".*Caught exception while doing operator.*",
+        "outputs": [["a", 2], ["b", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "IS NULL on a nullable MV expression (filterMv) matches only the SQL NULL row, not non-null empty arrays",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE ARRAY_TO_MV(filterMv(strMv, 'v = ''z''')) IS NULL",
+        "outputs": [[1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "IS NOT NULL on a nullable MV expression (filterMv) keeps non-null empty arrays and excludes only the SQL NULL row",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE ARRAY_TO_MV(filterMv(strMv, 'v = ''z''')) IS NOT NULL",
+        "outputs": [[2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Inequality on a nullable MV expression excludes the SQL NULL row when null handling is enabled",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE CAST(ARRAY_TO_MV(intMv) AS BIGINT) <> 1",
+        "outputs": [[1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "NOT predicate on a nullable MV expression excludes the SQL NULL row when null handling is enabled",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE NOT (CAST(ARRAY_TO_MV(intMv) AS BIGINT) = 1)",
+        "outputs": [[1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "COALESCE over filterMv in GROUP BY preserves non-null empty arrays (contributing no group) and replaces only the SQL NULL row",
+        "sql": "SET enableNullHandling=true; SELECT COALESCE(ARRAY_TO_MV(filterMv(strMv, 'v = ''b''')), 'none'), COUNT(*) FROM {tbl} GROUP BY 1",
+        "outputs": [["b", 1], ["none", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "COALESCE over filterMv in WHERE preserves non-null empty arrays and replaces only the SQL NULL row with the fallback",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE COALESCE(ARRAY_TO_MV(filterMv(strMv, 'v = ''b''')), 'none') = 'none'",
+        "outputs": [[1]],
         "ignoreV2Optimizer": true
       }
     ]

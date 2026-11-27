@@ -40,8 +40,11 @@ import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
+import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -52,7 +55,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -63,6 +66,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests for [ExpressionScanDocIdIterator], in particular that the matching docIds it emits are attributed to the
@@ -81,15 +86,19 @@ public class ExpressionScanDocIdIteratorTest {
   private static final String INT_COLUMN = "intColumn";
   private static final String NULLABLE_INT_COLUMN = "nullableIntColumn";
   private static final String INT_MV_COLUMN = "intMvColumn";
+  private static final String NULLABLE_INT_MV_COLUMN = "nullableIntMvColumn";
+  private static final String NULLABLE_STRING_MV_COLUMN = "nullableStringMvColumn";
   // Enough docs for the candidate set to span multiple 10k doc-id batches
   private static final int NUM_DOCS = 50_000;
 
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
-      .addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
-      .addSingleValueDimension(NULLABLE_INT_COLUMN, FieldSpec.DataType.INT)
-      .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
+      .addSingleValueDimension(INT_COLUMN, DataType.INT)
+      .addSingleValueDimension(NULLABLE_INT_COLUMN, DataType.INT)
+      .addMultiValueDimension(INT_MV_COLUMN, DataType.INT)
+      .addMultiValueDimension(NULLABLE_INT_MV_COLUMN, DataType.INT)
+      .addMultiValueDimension(NULLABLE_STRING_MV_COLUMN, DataType.STRING)
       .build();
 
   private IndexSegment _segment;
@@ -99,16 +108,21 @@ public class ExpressionScanDocIdIteratorTest {
       throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
 
-    // Column values == docId, so expected results are directly computable from docIds; nullableIntColumn is null for
-    // every docId divisible by 3; intMvColumn holds [docId % 100, 500 + docId % 100]
+    // Column values == docId, so expected results are directly computable from docIds; nullable columns are null for
+    // every docId divisible by 3; intMvColumn / nullableIntMvColumn hold [docId % 100, 500 + docId % 100];
+    // nullableStringMvColumn holds ["v" + (docId % 100), "w" + (docId % 100)]
     List<GenericRow> records = new ArrayList<>(NUM_DOCS);
     for (int i = 0; i < NUM_DOCS; i++) {
       GenericRow record = new GenericRow();
       record.putValue(INT_COLUMN, i);
       if (i % 3 == 0) {
         record.addNullValueField(NULLABLE_INT_COLUMN);
+        record.addNullValueField(NULLABLE_INT_MV_COLUMN);
+        record.addNullValueField(NULLABLE_STRING_MV_COLUMN);
       } else {
         record.putValue(NULLABLE_INT_COLUMN, i);
+        record.putValue(NULLABLE_INT_MV_COLUMN, new Object[]{i % 100, 500 + i % 100});
+        record.putValue(NULLABLE_STRING_MV_COLUMN, new Object[]{"v" + (i % 100), "w" + (i % 100)});
       }
       record.putValue(INT_MV_COLUMN, new Object[]{i % 100, 500 + i % 100});
       records.add(record);
@@ -227,6 +241,96 @@ public class ExpressionScanDocIdIteratorTest {
     }
   }
 
+  @Test
+  public void testApplyAndMultiValueNullHandling() {
+    MutableRoaringBitmap candidates = new MutableRoaringBitmap();
+    MutableRoaringBitmap expectedNulls = new MutableRoaringBitmap();
+    MutableRoaringBitmap expectedEqTrues = new MutableRoaringBitmap();
+    MutableRoaringBitmap expectedNeqTruesWithNullHandling = new MutableRoaringBitmap();
+    MutableRoaringBitmap expectedNeqTruesWithoutNullHandling = new MutableRoaringBitmap();
+    for (int i = 0; i < NUM_DOCS; i += 2) {
+      candidates.add(i);
+      if (i % 3 == 0) {
+        expectedNulls.add(i);
+        expectedNeqTruesWithoutNullHandling.add(i);
+      } else if (i % 100 == 8) {
+        expectedEqTrues.add(i);
+      } else {
+        expectedNeqTruesWithNullHandling.add(i);
+        expectedNeqTruesWithoutNullHandling.add(i);
+      }
+    }
+
+    // Dictionary-encoded MV expression (filterMv preserves the dictionary on dict-encoded columns)
+    String dictEqQuery = "SELECT COUNT(*) FROM testTable WHERE filterMv(nullableIntMvColumn, 'v >= 0') = 8";
+    String dictNeqQuery = "SELECT COUNT(*) FROM testTable WHERE filterMv(nullableIntMvColumn, 'v >= 0') <> 8";
+    // Non-dictionary MV expressions across numeric and string types
+    String longEqQuery = "SELECT COUNT(*) FROM testTable WHERE CAST(nullableIntMvColumn AS LONG) = 8";
+    String longNeqQuery = "SELECT COUNT(*) FROM testTable WHERE CAST(nullableIntMvColumn AS LONG) <> 8";
+    String doubleEqQuery = "SELECT COUNT(*) FROM testTable WHERE CAST(nullableIntMvColumn AS DOUBLE) = 8";
+    String doubleNeqQuery = "SELECT COUNT(*) FROM testTable WHERE CAST(nullableIntMvColumn AS DOUBLE) <> 8";
+    String stringEqQuery = "SELECT COUNT(*) FROM testTable WHERE CAST(nullableStringMvColumn AS STRING) = 'v8'";
+    String stringNeqQuery = "SELECT COUNT(*) FROM testTable WHERE CAST(nullableStringMvColumn AS STRING) <> 'v8'";
+
+    for (String eqQuery : List.of(dictEqQuery, longEqQuery, doubleEqQuery, stringEqQuery)) {
+      // NULL evaluation result
+      assertEquals(runApplyAndWithEvalResult(candidates, eqQuery,
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL, true), expectedNulls);
+      // TRUE evaluation result with nullHandlingEnabled=true
+      assertEquals(runApplyAndWithEvalResult(candidates, eqQuery,
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE, true), expectedEqTrues);
+      // FALSE evaluation result with nullHandlingEnabled=true (must exclude null rows!)
+      assertEquals(runApplyAndWithEvalResult(candidates, eqQuery,
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE, true), expectedNeqTruesWithNullHandling);
+    }
+
+    for (String neqQuery : List.of(dictNeqQuery, longNeqQuery, doubleNeqQuery, stringNeqQuery)) {
+      // Exclusive predicate (!=) with nullHandlingEnabled=true must exclude null rows
+      assertEquals(runApplyAndWithEvalResult(candidates, neqQuery,
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE, true), expectedNeqTruesWithNullHandling);
+      // Exclusive predicate (!=) with nullHandlingEnabled=false does not filter out null rows via null bitmap
+      assertEquals(runApplyAndWithEvalResult(candidates, neqQuery,
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE, false), expectedNeqTruesWithoutNullHandling);
+    }
+
+    // Verify pull-ahead projection also attributes MV NULL and FALSE results to the right docIds
+    ProjectionOperatorUtils.setImplementation(PullAheadProjectionOperator::new);
+    try {
+      assertEquals(runApplyAndWithEvalResult(candidates, dictEqQuery,
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL, true), expectedNulls);
+      assertEquals(runApplyAndWithEvalResult(candidates, longEqQuery,
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL, true), expectedNulls);
+      assertEquals(runApplyAndWithEvalResult(candidates, longEqQuery,
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE, true), expectedNeqTruesWithNullHandling);
+    } finally {
+      ProjectionOperatorUtils.setImplementation(new ProjectionOperatorUtils.DefaultImplementation());
+    }
+  }
+
+  @Test
+  public void testExpressionFilterOperatorExplainWithNullPredicates() {
+    for (String query : List.of(
+        "SELECT COUNT(*) FROM testTable WHERE MOD(nullableIntColumn, 7) IS NULL",
+        "SELECT COUNT(*) FROM testTable WHERE MOD(nullableIntColumn, 7) IS NOT NULL",
+        "SELECT COUNT(*) FROM testTable WHERE CAST(nullableIntMvColumn AS LONG) IS NULL",
+        "SELECT COUNT(*) FROM testTable WHERE CAST(nullableIntMvColumn AS LONG) IS NOT NULL")) {
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      queryContext.setNullHandlingEnabled(true);
+      Predicate predicate = queryContext.getFilter().getPredicate();
+      ExpressionFilterOperator filterOperator =
+          new ExpressionFilterOperator(_segment, queryContext, predicate, NUM_DOCS);
+
+      String explainString = filterOperator.toExplainString();
+      assertTrue(explainString.contains("operator:" + predicate.getType()), explainString);
+      assertTrue(explainString.contains("predicate:" + predicate), explainString);
+
+      ExplainInfo explainInfo = filterOperator.getExplainInfo();
+      assertEquals(explainInfo.getAttributes().get("operator").getString(), predicate.getType().name());
+      assertEquals(explainInfo.getAttributes().get("predicate").getString(), predicate.toString());
+      assertFalse(explainInfo.getTitle().isEmpty());
+    }
+  }
+
   private MutableRoaringBitmap runApplyAnd(MutableRoaringBitmap candidates, String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     Predicate predicate = queryContext.getFilter().getPredicate();
@@ -234,6 +338,32 @@ public class ExpressionScanDocIdIteratorTest {
         new ExpressionFilterOperator(_segment, queryContext, predicate, NUM_DOCS);
     ScanBasedDocIdIterator docIdIterator =
         (ScanBasedDocIdIterator) filterOperator.nextBlock().getBlockDocIdSet().iterator();
+    return docIdIterator.applyAnd(candidates);
+  }
+
+  private MutableRoaringBitmap runApplyAndWithEvalResult(MutableRoaringBitmap candidates, String query,
+      ExpressionScanDocIdIterator.PredicateEvaluationResult evalResult, boolean nullHandlingEnabled) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    queryContext.setNullHandlingEnabled(nullHandlingEnabled);
+    Predicate predicate = queryContext.getFilter().getPredicate();
+    ExpressionContext lhs = predicate.getLhs();
+    Set<String> columns = new HashSet<>();
+    lhs.getColumns(columns);
+    Map<String, DataSource> dataSourceMap = new HashMap<>();
+    Map<String, ColumnContext> columnContextMap = new HashMap<>();
+    for (String column : columns) {
+      DataSource dataSource = _segment.getDataSource(column, queryContext.getSchema());
+      dataSourceMap.put(column, dataSource);
+      columnContextMap.put(column, ColumnContext.fromDataSource(dataSource));
+    }
+    TransformFunction transformFunction = TransformFunctionFactory.get(lhs, columnContextMap, queryContext);
+    PredicateEvaluator predicateEvaluator = evalResult == ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL
+        ? null
+        : PredicateEvaluatorProvider.getPredicateEvaluator(predicate, transformFunction.getDictionary(),
+            transformFunction.getResultMetadata().getDataType(), queryContext);
+    ExpressionScanDocIdIterator docIdIterator =
+        new ExpressionScanDocIdIterator(transformFunction, predicateEvaluator, dataSourceMap, NUM_DOCS, evalResult,
+            queryContext);
     return docIdIterator.applyAnd(candidates);
   }
 
