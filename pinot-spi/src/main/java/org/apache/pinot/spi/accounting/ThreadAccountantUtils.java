@@ -165,6 +165,11 @@ public class ThreadAccountantUtils {
     }
 
     @Override
+    public ExternalExecutionSampler captureExternalExecutionSampler() {
+      return new ExternalExecutionSampler(() -> { }, () -> false);
+    }
+
+    @Override
     public void clear() {
     }
 
