@@ -280,7 +280,8 @@ public class QueryRouter {
         }
       }
       for (SentPing sentPing : sentPings) {
-        if (sentPing.response().getFinalResponses().values().iterator().next().getDataTable() == null) {
+        DataTable dataTable = sentPing.response().getFinalResponses().values().iterator().next().getDataTable();
+        if (dataTable == null || !dataTable.getExceptions().isEmpty()) {
           answered = false;
           sentPing.channel().close();
         }
@@ -465,6 +466,12 @@ public class QueryRouter {
     }
   }
 
+   void markServerDeserializationError(ServerRoutingInstance serverRoutingInstance, @Nullable Channel channel,
+       Exception exception, int responseSize, int deserializationTimeMs) {
+     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
+       asyncQueryResponse.receiveDeserializationError(serverRoutingInstance, channel, exception, 0, 0);
+     }
+   }
   /// Marks a server as unavailable for every in-flight query. Called when a server's channel goes inactive
   /// ([DataTableHandler]) or a request write to it fails ([ServerChannels]). Queries submitted with
   /// `skipUnavailableServers=true` degrade to partial results for this genuine unavailability; others are failed.

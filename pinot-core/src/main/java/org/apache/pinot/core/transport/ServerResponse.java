@@ -111,4 +111,11 @@ public class ServerResponse {
     _responseSize = responseSize;
     _deserializationTimeMs = deserializationTimeMs;
   }
+
+  // Record synthetic error DataTable without setting receive timestamp so responseDelayMs remains -1
+  void receiveDeserializationError(DataTable dataTable, int responseSize, int deserializationTimeMs) {
+    _dataTable = dataTable;
+    _responseSize = responseSize;
+    _deserializationTimeMs = deserializationTimeMs;
+  }
 }
