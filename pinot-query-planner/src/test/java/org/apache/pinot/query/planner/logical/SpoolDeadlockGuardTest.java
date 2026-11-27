@@ -21,6 +21,9 @@ package org.apache.pinot.query.planner.logical;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.testng.annotations.Test;
@@ -68,6 +71,27 @@ public class SpoolDeadlockGuardTest extends StagesTestBase {
             join(
                 exchange(2, spool.newReceiver()),
                 exchange(4, spool.newReceiver())
+            )
+        )
+    );
+    assertRisk(SpoolDeadlockGuard.findRisk(root), 1, "JOIN", 2, 4, 3);
+  }
+
+  @Test
+  public void mergeReceiveOnProbePathStillStreams() {
+    SpoolBuilder spool = new SpoolBuilder(3, sort(tableScan("T1")));
+    SimpleChildBuilder<MailboxReceiveNode> probe = spool.newReceiver();
+    SimpleChildBuilder<MailboxReceiveNode> build = spool.newReceiver();
+    MailboxSendNode root = when(
+        exchange(1,
+            join(
+                exchange(2, (stageId, schema, hints) -> {
+                  MailboxReceiveNode receive = probe.build(stageId);
+                  return new MailboxMergeReceiveNode(stageId, receive.getDataSchema(), receive.getSenderStageId(),
+                      receive.getExchangeType(), receive.getDistributionType(), receive.getKeys(),
+                      List.of(new RelFieldCollation(0)), receive.getSender());
+                }),
+                exchange(4, build)
             )
         )
     );

@@ -23,6 +23,8 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -82,7 +84,7 @@ public class EquivalentStagesReplacer {
     private final boolean _guarded;
     private final List<SpoolSubstitution> _substitutions = new ArrayList<>();
     /// A stage can be visited more than once (for example the leader of a group), so a receive is decided only once.
-    private final Set<MailboxReceiveNode> _visitedReceives = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<BaseMailboxReceiveNode> _visitedReceives = Collections.newSetFromMap(new IdentityHashMap<>());
 
     public Replacer(PlanNode root, OnSubstitution listener, boolean guarded) {
       _root = root;
@@ -92,6 +94,15 @@ public class EquivalentStagesReplacer {
 
     @Override
     public Void visitMailboxReceive(MailboxReceiveNode node, GroupedStages equivalenceGroups) {
+      return visitReceive(node, equivalenceGroups);
+    }
+
+    @Override
+    public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, GroupedStages equivalenceGroups) {
+      return visitReceive(node, equivalenceGroups);
+    }
+
+    private Void visitReceive(BaseMailboxReceiveNode node, GroupedStages equivalenceGroups) {
       if (!_visitedReceives.add(node)) {
         return null;
       }

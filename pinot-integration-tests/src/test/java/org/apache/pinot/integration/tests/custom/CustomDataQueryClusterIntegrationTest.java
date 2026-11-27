@@ -458,6 +458,11 @@ public abstract class CustomDataQueryClusterIntegrationTest extends CustomSuiteH
     return _sharedClusterTestSuite._controllerStarter;
   }
 
+  /// Returns broker starters from the shared suite instance.
+  protected List<BaseBrokerStarter> getSharedBrokerStarters() {
+    return _sharedClusterTestSuite._brokerStarters;
+  }
+
   /// Returns server starters from the shared suite instance.
   protected List<BaseServerStarter> getSharedServerStarters() {
     return _sharedClusterTestSuite._serverStarters;

@@ -866,6 +866,12 @@ public class CommonConstants {
         "pinot.broker.multistage.prefer.select.alias.in.group.by";
     public static final boolean DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY = false;
 
+    /// Whether global ordered windows sort on each sender and merge the ordered streams at the receiver.
+    /// Sender sorting also requires a homogeneous broker/server release build; snapshots retain receiver sorting.
+    public static final String CONFIG_OF_WINDOW_K_WAY_MERGE =
+        "pinot.broker.multistage.window.k.way.merge";
+    public static final boolean DEFAULT_WINDOW_K_WAY_MERGE = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -1291,6 +1297,9 @@ public class CommonConstants {
 
         /// Option to customize the value of [Broker#CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY]
         public static final String PREFER_SELECT_ALIAS_IN_GROUP_BY = "preferSelectAliasInGroupBy";
+
+        /// Per-query override of [Broker#CONFIG_OF_WINDOW_K_WAY_MERGE].
+        public static final String WINDOW_K_WAY_MERGE = "windowKWayMerge";
 
         // Vector search query options
 
