@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.ws.rs.NotFoundException;
+import javax.ws.rs.core.Response;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -378,6 +379,24 @@ public class MinionTaskUtilsTest {
     assertFalse(MinionTaskUtils.crcMatches(1000, 5000, 2000, -1));
     assertFalse(MinionTaskUtils.crcMatches(1000, -1, 2000, 5000));
     assertFalse(MinionTaskUtils.crcMatches(1000, -1, 2000, -1));
+    assertFalse(MinionTaskUtils.crcMatches(-1, -1, -1, -1));
+
+    // String overload (used by Check B deepstore validation).
+    assertTrue(MinionTaskUtils.crcMatches("1000", "5000", "1000", "9999"));
+    assertTrue(MinionTaskUtils.crcMatches("1000", "5000", "2000", "5000"));
+    assertFalse(MinionTaskUtils.crcMatches("1000", "5000", "2000", "9999"));
+    assertFalse(MinionTaskUtils.crcMatches("1000", null, "2000", "5000"));
+    assertFalse(MinionTaskUtils.crcMatches(null, null, "invalid", "-1"));
+  }
+
+  @Test
+  public void testParseCrc() {
+    assertEquals(MinionTaskUtils.parseCrc("1000"), 1000L);
+    assertEquals(MinionTaskUtils.parseCrc(null), -1L);
+    assertEquals(MinionTaskUtils.parseCrc("not-a-number"), -1L);
+    // Absent on-disk data CRC is serialized as Long.MIN_VALUE; treat as unavailable.
+    assertEquals(MinionTaskUtils.parseCrc(String.valueOf(Long.MIN_VALUE)), -1L);
+    assertEquals(MinionTaskUtils.parseCrc("-1"), -1L);
   }
 
   @Test
@@ -416,6 +435,15 @@ public class MinionTaskUtilsTest {
             responses, new String[]{"server1"}, this));
     assertTrue(e.getMessage().contains("seg1"), e.getMessage());
     assertEquals(e.getCause().getMessage(), "connection reset");
+  }
+
+  @Test
+  public void testUnsafeSharedFetchReturnsNullWhenAllSnapshotsAreConfirmedMissing() {
+    NotFoundException noSnapshot = new NotFoundException(Response.status(Response.Status.NOT_FOUND)
+        .header(ValidDocIdsBitmapResponse.MISSING_SNAPSHOT_HEADER, true).build());
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", 1000L,
+        "UNSAFE", List.of(noSnapshot, noSnapshot), new String[]{"server1", "server2"}, this);
+    assertNull(result);
   }
 
   @Test

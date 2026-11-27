@@ -42,7 +42,13 @@ public enum MinionMeter implements AbstractMetrics.Meter {
   TRANSFORMATION_ERROR_COUNT("rows", false),
   DROPPED_RECORD_COUNT("rows", false),
   CORRUPTED_RECORD_COUNT("rows", false),
-  STAR_TREE_INDEX_BUILD_FAILURES("segments", false);
+  STAR_TREE_INDEX_BUILD_FAILURES("segments", false),
+  // Upsert compaction CRC / skip observability (issue #13491 residual hardening)
+  CRC_SKIP_ZK_CHANGED("segments", false),
+  CRC_MISMATCH_DEEPSTORE("segments", false),
+  CRC_MISMATCH_SERVER_BITMAP("segments", false),
+  VALID_DOC_IDS_UNAVAILABLE("segments", false),
+  COMPACTION_SKIP_EMPTY_VALID_DOCS("segments", false);
 
   private final String _meterName;
   private final String _unit;

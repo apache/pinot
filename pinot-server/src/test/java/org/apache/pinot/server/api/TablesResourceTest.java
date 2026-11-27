@@ -658,6 +658,28 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
+  public void testValidDocIdsBitmapDistinguishesMissingSnapshotFromMissingSegment()
+      throws Exception {
+    String tableNameWithType = "snapshotMissing_REALTIME";
+    addTable(tableNameWithType);
+    try {
+      ImmutableSegment segment = setUpSegment(tableNameWithType, null, "noSnapshot", new ArrayList<>());
+      String path = "/segments/" + tableNameWithType + "/";
+      try (Response response = _webTarget.path(path + "absent/validDocIdsBitmap").request().get()) {
+        assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+        assertNull(response.getHeaderString(ValidDocIdsBitmapResponse.MISSING_SNAPSHOT_HEADER));
+      }
+      try (Response response = _webTarget.path(path + segment.getSegmentName() + "/validDocIdsBitmap")
+          .request().get()) {
+        assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+        assertEquals(response.getHeaderString(ValidDocIdsBitmapResponse.MISSING_SNAPSHOT_HEADER), "true");
+      }
+    } finally {
+      _tableDataManagerMap.remove(tableNameWithType).shutDown();
+    }
+  }
+
+  @Test
   public void testValidDocIdsBitmapForSnapshotWithDelete()
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
