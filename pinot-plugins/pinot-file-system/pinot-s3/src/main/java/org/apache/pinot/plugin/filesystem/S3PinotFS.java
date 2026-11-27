@@ -102,6 +102,8 @@ public class S3PinotFS extends BasePinotFS {
   public static final String S3A_SCHEME = "s3a";
   public static final String SCHEME_SEPARATOR = "://";
   public static final int DELETE_BATCH_SIZE = 1000;
+  // ListObjectsV2 returns at most 1,000 keys per request.
+  private static final int LIST_MAX_KEYS = 1000;
 
   private S3Client _s3Client;
   private S3Config _s3Config;
@@ -794,6 +796,67 @@ public class S3PinotFS extends BasePinotFS {
     }
     LOGGER.info("Listed {} files (max: {}) from URI: {}, is recursive: {}",
         result.size(), maxResults, fileUri, recursive);
+    return result;
+  }
+
+  @Override
+  public boolean supportsListingAfter() {
+    return true;
+  }
+
+  @Override
+  public List<FileMetadata> listFilesWithMetadataAfter(final URI fileUri, @Nullable final String startAfter,
+      final int maxResults)
+      throws IOException {
+    final List<FileMetadata> result = new ArrayList<>();
+    if (maxResults <= 0) {
+      return result;
+    }
+    final String scheme = fileUri.getScheme();
+    Preconditions.checkArgument(scheme.equals(S3_SCHEME) || scheme.equals(S3A_SCHEME));
+    final String pathPrefix = scheme + SCHEME_SEPARATOR + fileUri.getHost() + DELIMITER;
+    Preconditions.checkArgument(startAfter == null || startAfter.startsWith(pathPrefix),
+        "startAfter %s is not under %s", startAfter, pathPrefix);
+    try {
+      final String prefix = normalizeToDirectoryPrefix(fileUri);
+      String continuationToken = null;
+      boolean isDone = false;
+      while (!isDone && result.size() < maxResults) {
+        final ListObjectsV2Request.Builder builder = ListObjectsV2Request.builder().bucket(fileUri.getHost())
+            .maxKeys(Math.min(maxResults - result.size(), LIST_MAX_KEYS));
+        if (!prefix.equals(DELIMITER)) {
+          builder.prefix(prefix);
+        }
+        if (continuationToken != null) {
+          builder.continuationToken(continuationToken);
+        } else if (startAfter != null) {
+          // StartAfter is ignored once a continuation token is set.
+          builder.startAfter(startAfter.substring(pathPrefix.length()));
+        }
+        final ListObjectsV2Request request = builder.build();
+        LOGGER.debug("Trying to send ListObjectsV2Request {}", request);
+        final ListObjectsV2Response response = retryWithS3CredentialRefresh(() -> _s3Client.listObjectsV2(request));
+        for (final S3Object s3Object : response.contents()) {
+          if (s3Object.key().endsWith(DELIMITER)) {
+            continue;
+          }
+          result.add(new FileMetadata.Builder()
+              .setFilePath(pathPrefix + getNormalizedFileKey(s3Object))
+              .setLastModifiedTime(s3Object.lastModified().toEpochMilli())
+              .setLength(s3Object.size())
+              .setIsDirectory(false)
+              .build());
+          if (result.size() >= maxResults) {
+            break;
+          }
+        }
+        isDone = !response.isTruncated();
+        continuationToken = response.nextContinuationToken();
+      }
+    } catch (Throwable t) {
+      throw new IOException(t);
+    }
+    LOGGER.debug("Listed {} files (max: {}) after {} from URI: {}", result.size(), maxResults, startAfter, fileUri);
     return result;
   }
 

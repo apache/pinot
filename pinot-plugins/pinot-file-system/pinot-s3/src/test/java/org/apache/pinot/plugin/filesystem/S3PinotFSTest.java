@@ -271,6 +271,31 @@ public class S3PinotFSTest {
   }
 
   @Test(dataProvider = "scheme")
+  public void testListFilesWithMetadataAfter(String scheme)
+      throws Exception {
+    String folder = "list-after-" + scheme;
+    for (String day : new String[]{"d=01", "d=02", "d=03"}) {
+      for (String fileName : new String[]{"a.txt", "b.txt"}) {
+        createEmptyFile(folder + DELIMITER + day, fileName);
+      }
+    }
+    URI dir = URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folder));
+    String root = String.format(FILE_FORMAT, scheme, BUCKET, folder + DELIMITER);
+
+    // A key that does not exist seeks past the whole d=01 range in one request.
+    List<String> afterD01 = _s3PinotFS.listFilesWithMetadataAfter(dir, root + "d=01/~", 3).stream()
+        .map(FileMetadata::getFilePath).collect(Collectors.toList());
+    Assert.assertEquals(afterD01, List.of(root + "d=02/a.txt", root + "d=02/b.txt", root + "d=03/a.txt"));
+
+    List<String> resumed = _s3PinotFS.listFilesWithMetadataAfter(dir, afterD01.get(2), 10).stream()
+        .map(FileMetadata::getFilePath).collect(Collectors.toList());
+    Assert.assertEquals(resumed, List.of(root + "d=03/b.txt"));
+
+    Assert.assertEquals(_s3PinotFS.listFilesWithMetadataAfter(dir, null, 10).size(), 6);
+    Assert.assertTrue(_s3PinotFS.listFilesWithMetadataAfter(dir, root + "d=04", 10).isEmpty());
+  }
+
+  @Test(dataProvider = "scheme")
   public void testDeleteFile(String scheme)
       throws Exception {
     String[] originalFiles = new String[]{"a-delete.txt", "b-delete.txt", "c-delete.txt"};

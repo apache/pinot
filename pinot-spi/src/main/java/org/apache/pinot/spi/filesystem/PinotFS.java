@@ -27,6 +27,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -186,6 +187,27 @@ public interface PinotFS extends Closeable, Serializable {
       }
     }
     return result;
+  }
+
+  /// Whether [#listFilesWithMetadataAfter] is supported.
+  default boolean supportsListingAfter() {
+    return false;
+  }
+
+  /// Lists the files (never directories) under `fileUri` recursively, in the store's key order, starting strictly
+  /// after the key `startAfter` names. That key need not exist, so a caller can skip a range of keys with one request
+  /// instead of paging through it. Only stores whose listing is sorted and can start at an arbitrary key implement
+  /// this; see [#supportsListingAfter]. Where file paths escape the key (GCS URI-escapes object names), path order
+  /// and key order can differ.
+  ///
+  /// @param fileUri location to list files from
+  /// @param startAfter a path in the form [FileMetadata#getFilePath] returns, or null to start at the first file
+  /// @param maxResults maximum number of files to return; fewer are returned only when no files remain
+  /// @return the next files in order, at most `maxResults`
+  /// @throws IOException on IO failure
+  default List<FileMetadata> listFilesWithMetadataAfter(URI fileUri, @Nullable String startAfter, int maxResults)
+      throws IOException {
+    throw new UnsupportedOperationException();
   }
 
   /// Copies a file from a remote filesystem to the local one. Keeps the original file.
