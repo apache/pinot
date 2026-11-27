@@ -2765,6 +2765,10 @@ public class PinotHelixResourceManager {
     MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, tableNameWithType);
     LOGGER.info("Deleting table {}: Removed all minion task metadata", tableNameWithType);
 
+    // Remove operation leases
+    ZKMetadataProvider.removeOperationLeasesFromPropertyStore(_propertyStore, tableNameWithType);
+    LOGGER.info("Deleting table {}: Removed operation leases", tableNameWithType);
+
     // Remove materialized view metadata (if any) and unregister from consistency manager
     notifyMaterializedViewConsistencyManagerForTableDrop(tableNameWithType);
     try {
