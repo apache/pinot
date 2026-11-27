@@ -55,6 +55,8 @@ public class MmapMemory implements Memory {
   /// is stored by [#_section].
   private final long _size;
   private final MapSection _section;
+  /// Whether the file was mapped read-only. Read-only mappings never have dirty pages, so [#flush()] skips them.
+  private final boolean _readOnly;
   private boolean _closed = false;
 
   static {
@@ -68,6 +70,7 @@ public class MmapMemory implements Memory {
 
   public MmapMemory(File file, boolean readOnly, long offset, long size) {
     _size = size;
+    _readOnly = readOnly;
 
     try {
       _section = MAP_FUN.map(file, readOnly, offset, size);
@@ -89,8 +92,20 @@ public class MmapMemory implements Memory {
 
   @Override
   public void flush() {
+    // Nothing to write back for read-only or empty mappings, and an unmapped region must not be msynced.
+    if (_readOnly || _size == 0 || _closed) {
+      return;
+    }
     MSyncFlag mode = MSyncFlag.MS_SYNC;
-    PosixAPI.posix().msync(_address, _size, mode);
+    PosixAPI posix = PosixAPI.posix();
+    long pageSize = Unsafer.UNSAFE.pageSize();
+    long pageOffset = _address % pageSize;
+    long pageAlignedAddress = _address - pageOffset;
+    int ret = posix.msync(pageAlignedAddress, _size + pageOffset, mode);
+    if (ret != 0) {
+      throw new RuntimeException("msync failed for address: " + _address + ", size: " + _size + ": "
+          + posix.lastErrorStr());
+    }
   }
 
   @Override

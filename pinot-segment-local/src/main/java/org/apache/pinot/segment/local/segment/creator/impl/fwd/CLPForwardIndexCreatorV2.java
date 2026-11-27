@@ -24,7 +24,7 @@ import com.yscope.clp.compressorfrontend.MessageEncoder;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardOpenOption;
@@ -94,7 +94,7 @@ public class CLPForwardIndexCreatorV2 implements CompressionStatsTrackingForward
 
   private final File _intermediateFilesDir;
   private final FileChannel _dataFile;
-  private final ByteBuffer _fileBuffer;
+  private final MappedByteBuffer _fileBuffer;
 
   private final boolean _isClpEncoded;
   private int _logtypeDictSize;
@@ -452,9 +452,16 @@ public class CLPForwardIndexCreatorV2 implements CompressionStatsTrackingForward
   @Override
   public void close()
       throws IOException {
-    // Delete all temp files
-    FileUtils.deleteDirectory(_intermediateFilesDir);
-    _dataFile.close();
+    try {
+      try {
+        org.apache.pinot.common.utils.FileUtils.forceMappedBuffers(_fileBuffer);
+      } finally {
+        org.apache.pinot.common.utils.FileUtils.syncAndClose(_dataFile);
+      }
+    } finally {
+      // Delete all temp files, even if the final sync failed
+      FileUtils.deleteQuietly(_intermediateFilesDir);
+    }
   }
 
   /// Returns the original UTF-8 message bytes written to this CLP index, or `-1` when tracking is disabled.
