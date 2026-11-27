@@ -32,6 +32,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -450,6 +452,73 @@ public class ServerSegmentMetadataReader {
     return serverResponses;
   }
 
+  /// Fetches loaded segment CRCs from the specified servers and transposes them into a per-segment, per-replica map.
+  ///
+  /// @param tableNameWithType Table name with type suffix
+  /// @param serverEndpoints BiMap of server instance name to admin endpoint URL
+  /// @param segmentFilter Optional set of segment names to retain; null or empty retains all segments
+  /// @param timeoutMs Timeout in milliseconds for server admin HTTP requests
+  /// @return Map of segment name to a map of server instance name to loaded CRC string
+  /// @throws IOException If any server request fails, times out, or returns invalid JSON
+  public Map<String, Map<String, String>> getSegmentCrcsFromServers(String tableNameWithType,
+      BiMap<String, String> serverEndpoints, @Nullable Set<String> segmentFilter, int timeoutMs)
+      throws IOException {
+    if (serverEndpoints.isEmpty()) {
+      return Map.of();
+    }
+    LOGGER.debug("Reading loaded segment CRCs from {} servers for table {}.", serverEndpoints.size(),
+        tableNameWithType);
+    BiMap<String, String> endpointsToServers = serverEndpoints.inverse();
+    List<String> serverUrls = new ArrayList<>(serverEndpoints.size());
+    for (String endpoint : endpointsToServers.keySet()) {
+      serverUrls.add(generateSegmentsCrcServerURL(tableNameWithType, endpoint));
+    }
+
+    long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers, _authProvider);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequestUntil(serverUrls, tableNameWithType, false, timeoutMs, deadlineNanos,
+            "segment CRCs");
+    if (serviceResponse._failedResponseCount > 0) {
+      Set<String> failedServers = new TreeSet<>(serverEndpoints.keySet());
+      failedServers.removeAll(serviceResponse._httpResponses.keySet());
+      throw new IOException(String.format(
+          "Got %d failed responses from total %d server instances for table: %s (failed servers: %s)",
+          serviceResponse._failedResponseCount, serverUrls.size(), tableNameWithType, failedServers));
+    }
+
+    boolean filterSegments = segmentFilter != null && !segmentFilter.isEmpty();
+    Map<String, Map<String, String>> segmentToServerCrcs = new TreeMap<>();
+    for (Map.Entry<String, String> serverResponse : serviceResponse._httpResponses.entrySet()) {
+      String serverInstance = serverResponse.getKey();
+      Map<String, String> serverSegmentCrcs;
+      try {
+        serverSegmentCrcs =
+            JsonUtils.stringToObject(serverResponse.getValue(), new TypeReference<Map<String, String>>() {
+            });
+      } catch (JsonProcessingException e) {
+        throw new IOException(
+            String.format("Failed to parse segment CRC response from server: %s for table: %s", serverInstance,
+                tableNameWithType), e);
+      }
+      if (serverSegmentCrcs == null) {
+        throw new IOException(
+            String.format("Received null segment CRC response from server: %s for table: %s", serverInstance,
+                tableNameWithType));
+      }
+      for (Map.Entry<String, String> segmentCrc : serverSegmentCrcs.entrySet()) {
+        String segmentName = segmentCrc.getKey();
+        if (filterSegments && !segmentFilter.contains(segmentName)) {
+          continue;
+        }
+        segmentToServerCrcs.computeIfAbsent(segmentName, k -> new TreeMap<>())
+            .put(serverInstance, segmentCrc.getValue());
+      }
+    }
+    return segmentToServerCrcs;
+  }
+
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, @Nullable List<String> columns,
       String endpoint, boolean includeColumnCompressionStats) {
     tableNameWithType = encode(tableNameWithType);
@@ -518,6 +587,11 @@ public class ServerSegmentMetadataReader {
   private String generateStaleSegmentsServerURL(String tableNameWithType, String endpoint) {
     tableNameWithType = encode(tableNameWithType);
     return String.format("%s/tables/%s/segments/isStale", endpoint, tableNameWithType);
+  }
+
+  private String generateSegmentsCrcServerURL(String tableNameWithType, String endpoint) {
+    tableNameWithType = encode(tableNameWithType);
+    return String.format("%s/tables/%s/segments/crc", endpoint, tableNameWithType);
   }
 
   private static String encode(String value) {

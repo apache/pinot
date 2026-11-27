@@ -91,6 +91,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -106,7 +107,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 /// - GET requests:
 ///   - "/segments/{tableName}": get the name of all segments
 ///   - "/segments/{tableName}/servers": get a map from server to segments hosted by the server
-///   - "/segments/{tableName}/crc": get a map from segment to CRC of the segment (OFFLINE table only)
+///   - "/segments/{tableName}/crc": get a map from segment to ZK CRC of the segment (OFFLINE table only)
+///   - "/segments/{tableNameWithType}/serverCrcs": get a map from segment to server-loaded CRC per replica
 ///   - "/segments/{tableName}/{segmentName}/metadata: get the metadata for a segment
 ///   - "/segments/{tableName}/metadata: get the metadata for all segments from the server
 ///   - "/segments/{tableName}/zkmetadata: get the zk metadata for all segments of a table
@@ -274,6 +276,71 @@ public class PinotSegmentRestletResource {
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, TableType.OFFLINE, LOGGER)
             .get(0);
     return _pinotHelixResourceManager.getSegmentsCrcForTable(offlineTableName);
+  }
+
+  @GET
+  @Path("segments/{tableNameWithType}/serverCrcs")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_SEGMENT_MAP)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get per-replica server-loaded CRCs for table segments",
+      notes = "Queries all servers hosting the table and returns a map of segment name to server instance to loaded "
+          + "CRC string. Unlike /segments/{tableName}/crc which returns ZK CRCs, this endpoint returns the CRCs "
+          + "actually loaded on each replica. For REALTIME tables, mutable (CONSUMING) segments report "
+          + "Long.MIN_VALUE (\"-9223372036854775808\"). Healthy servers that have not loaded an assigned segment "
+          + "are omitted from that segment's entry, so callers validating full replication should verify all "
+          + "expected replicas are present against IdealState/ExternalView.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Invalid table name or query parameter"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<String, Map<String, String>> getServerSegmentCrcs(
+      @ApiParam(value = "Name of the table with type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Repeatable segment names to include (e.g. ?segments=segA&segments=segB; not "
+          + "comma-separated; all segments if not specified)", allowMultiple = true)
+      @QueryParam("segments") List<String> segments,
+      @Context HttpHeaders headers) {
+    try {
+      tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    } catch (DatabaseConflictException | IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
+    }
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == null) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Table type not provided with table name %s", tableNameWithType), Status.BAD_REQUEST);
+    }
+    if (segments != null) {
+      for (String segment : segments) {
+        if (StringUtils.isBlank(segment)) {
+          throw new ControllerApplicationException(LOGGER, "Segment name filter must not contain blank values",
+              Status.BAD_REQUEST);
+        }
+      }
+    }
+    if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to find table: %s", tableNameWithType), Status.NOT_FOUND);
+    }
+    String segmentCount = (segments == null || segments.isEmpty()) ? "all" : String.valueOf(segments.size());
+    LOGGER.info("Received a request to fetch server-loaded CRCs for {} segments of table {}", segmentCount,
+        tableNameWithType);
+    try {
+      TableMetadataReader tableMetadataReader =
+          new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+      return tableMetadataReader.getSegmentCrcs(tableNameWithType, segments,
+          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+    } catch (IllegalStateException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.NOT_FOUND, e);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Error resolving server admin endpoints: " + e.getMessage(), Status.INTERNAL_SERVER_ERROR, e);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER,
+          "Error fetching segment CRCs from Pinot servers: " + ioe.getMessage(), Status.INTERNAL_SERVER_ERROR, ioe);
+    }
   }
 
   @GET
