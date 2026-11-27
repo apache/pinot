@@ -164,5 +164,57 @@
         ]
       }
     ]
+  },
+  "outer_join_null_extended_keys": {
+    "tables": {
+      "left_tbl": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "value_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 1],
+          ["a", 2],
+          ["b", 3],
+          ["c", 4],
+          ["d", 5],
+          ["e", 6]
+        ]
+      },
+      "right_tbl": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "metric_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 100],
+          ["b", 200],
+          ["c", 300],
+          ["v", 400],
+          ["w", 500],
+          ["x", 600],
+          ["y", 700],
+          ["z", 800]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Group by the key of the left side of a RIGHT JOIN, which is null for every unmatched right row",
+        "sql": "SELECT l.key_col, COUNT(*), SUM(r.metric_col) FROM {left_tbl} l RIGHT JOIN {right_tbl} r ON l.key_col = r.key_col GROUP BY l.key_col"
+      },
+      {
+        "description": "Distinct key of the left side of a RIGHT JOIN, which is null for every unmatched right row",
+        "sql": "SELECT DISTINCT l.key_col FROM {left_tbl} l RIGHT JOIN {right_tbl} r ON l.key_col = r.key_col"
+      },
+      {
+        "description": "Group by the key of the right side of a LEFT JOIN, which is null for every unmatched left row",
+        "sql": "SELECT l.key_col, COUNT(*), SUM(r.metric_col) FROM {right_tbl} r LEFT JOIN {left_tbl} l ON r.key_col = l.key_col GROUP BY l.key_col"
+      },
+      {
+        "description": "Window partitioned by the key of the right side of a LEFT JOIN, which is null for every unmatched left row",
+        "sql": "SELECT l.key_col, COUNT(*) OVER (PARTITION BY l.key_col) FROM {right_tbl} r LEFT JOIN {left_tbl} l ON r.key_col = l.key_col"
+      }
+    ]
   }
 }

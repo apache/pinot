@@ -181,6 +181,11 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
   }
 
   PRelNode inheritDistDescFromInputsForJoin(PRelNode currentNode) {
+    if (((Join) currentNode.unwrap()).getJoinType().generatesNullsOnRight()) {
+      // A LEFT or FULL join emits the unmatched left rows with null right columns on the workers that hold them, so
+      // the output is not distributed like the right input.
+      return currentNode;
+    }
     // Inherit distribution trait from inputs (except left-most input, which is already inherited).
     PinotDataDistribution currentDistribution = currentNode.getPinotDataDistributionOrThrow();
     Set<HashDistributionDesc> newDistributionSet =
@@ -479,6 +484,13 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       return new PinotDataDistribution(RelDistribution.Type.SINGLETON, workers, workers.hashCode(), null, null);
     }
     PinotDataDistribution inputDistribution = currentNode.getPRelInput(0).getPinotDataDistributionOrThrow();
+    if (inputDistribution.getType() == RelDistribution.Type.HASH_DISTRIBUTED && currentNode.unwrap() instanceof Join
+        && ((Join) currentNode.unwrap()).getJoinType().generatesNullsOnLeft()) {
+      // A RIGHT or FULL join emits the unmatched right rows with null left columns on the workers that hold them, so
+      // the output is not distributed like the left input.
+      return new PinotDataDistribution(RelDistribution.Type.RANDOM_DISTRIBUTED, inputDistribution.getWorkers(),
+          inputDistribution.getWorkerHash(), null, null);
+    }
     PinotDataDistribution newDistribution = inputDistribution.apply(DistMappingGenerator.compute(
         currentNode.unwrap().getInput(0), currentNode.unwrap(), null),
         PinotDistMapping.doesDropCollation(currentNode.unwrap()));
