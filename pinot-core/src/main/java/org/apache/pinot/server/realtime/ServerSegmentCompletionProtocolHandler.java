@@ -268,13 +268,21 @@ public class ServerSegmentCompletionProtocolHandler {
       throws Exception {
     String destUriStr = StringUtil.join(File.separator, segmentStoreUri, _rawTableName,
         SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    URI destUri = new URI(destUriStr);
     try (PinotFS pinotFS = PinotFSFactory.create(new URI(segmentStoreUri).getScheme())) {
-      URI destUri = new URI(destUriStr);
-      if (pinotFS.exists(destUri)) {
-        pinotFS.delete(destUri, true);
+      try {
+        pinotFS.copyFromLocalFile(segmentTarFile, destUri);
+      } catch (Exception copyFailure) {
+        // The SDK may have stored the object and then thrown. Do not let a throwing delete replace that failure.
+        try {
+          pinotFS.delete(destUri, true);
+        } catch (Exception deleteFailure) {
+          LOGGER.warn("Failed to delete temporary segment file: {}", destUri, deleteFailure);
+        }
+        throw copyFailure;
       }
-      pinotFS.copyFromLocalFile(segmentTarFile, destUri);
     }
+    // Leave the temp object after this returns. A client timeout can still overlap the controller copying the URI.
 
     String controllerUrl = getControllerUrl();
     LOGGER.info("Pushing metadata of segment {} of table {} to controller: {}", segmentTarFile.getName(),
