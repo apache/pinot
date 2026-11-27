@@ -26,6 +26,7 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Query.OptimizationConstants;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.RoaringBitmapWriter;
@@ -52,6 +53,8 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     _predicateEvaluator = predicateEvaluator;
     _reader = dataSource.getForwardIndex();
     _readerContext = _reader.createContext(queryOptions);
+    // Released by close() at the end of the scan, or by the QueryThreadContext when the query task ends before that
+    QueryThreadContext.registerResource(_readerContext);
     _numDocs = numDocs;
     _maxNumValuesPerMVEntry = dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
     _valueMatcher = getValueMatcher();
@@ -283,6 +286,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   @Override
   public void close() {
     if (_readerContext != null) {
+      QueryThreadContext.unregisterResource(_readerContext);
       _readerContext.close();
     }
   }

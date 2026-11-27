@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.MapUtils;
 
@@ -46,8 +47,6 @@ public class DataFetcher implements AutoCloseable {
   private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
 
-  // TODO: Figure out a way to close the reader context within the ColumnValueReader
-  //       ChunkReaderContext should be closed explicitly to release the off-heap buffer
   private final Map<String, ColumnValueReader> _columnValueReaderMap;
   private final int[] _reusableMVDictIds;
   private final int _maxNumValuesPerMVEntry;
@@ -314,6 +313,9 @@ public class DataFetcher implements AutoCloseable {
     private ForwardIndexReaderContext getReaderContext() {
       if (!_readerContextCreated) {
         _readerContext = _reader.createContext(_queryOptions);
+        // Released by close() at the end of the projection, or by the QueryThreadContext when the query task ends
+        // before that (timeout, cancellation, exception or early termination)
+        QueryThreadContext.registerResource(_readerContext);
         _readerContextCreated = true;
       }
       return _readerContext;
@@ -590,6 +592,7 @@ public class DataFetcher implements AutoCloseable {
     @Override
     public void close() {
       if (_readerContext != null) {
+        QueryThreadContext.unregisterResource(_readerContext);
         _readerContext.close();
       }
     }

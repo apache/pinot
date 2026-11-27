@@ -26,6 +26,11 @@ package org.apache.pinot.segment.spi.index.reader;
 /// inside the context in order to accelerate the following reads.
 public interface ForwardIndexReaderContext extends AutoCloseable {
 
+  /// Releases the resources of the context, for example a direct buffer.
+  ///
+  /// Implementations must be idempotent. The query engine registers the context with
+  /// `org.apache.pinot.spi.query.QueryThreadContext#registerResource`, so a context can be closed by its owner and
+  /// again when the query task ends.
   @Override
   void close();
 }

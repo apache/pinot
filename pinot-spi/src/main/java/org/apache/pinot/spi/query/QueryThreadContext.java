@@ -22,6 +22,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -37,6 +41,8 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.executor.DecoratorExecutorService;
 import org.apache.pinot.spi.trace.LoggerConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// The [QueryThreadContext] class is a thread-local context for storing common query-related information associated to
@@ -55,6 +61,7 @@ public class QueryThreadContext implements AutoCloseable {
   // Check if query should be terminated, and sample resource usage per 8192 records
   public static final int CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK = 0x1FFF;
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryThreadContext.class);
   private static final ThreadLocal<QueryThreadContext> THREAD_LOCAL = new ThreadLocal<>();
 
   private final QueryExecutionContext _executionContext;
@@ -63,6 +70,10 @@ public class QueryThreadContext implements AutoCloseable {
   private final ThreadAccountant _accountant;
   // The stats of the query execution served by this thread, replaced by the query executor per execution
   private RemoteAccessStats _remoteAccessStats;
+  // The resources this thread registered and has not released yet, closed by close(). Only the owning thread reads or
+  // writes it, so it needs no synchronization. Created on the first registration.
+  @Nullable
+  private Set<AutoCloseable> _resources;
 
   private QueryThreadContext(QueryExecutionContext executionContext, @Nullable MseWorkerInfo mseWorkerInfo,
       ThreadAccountant accountant, RemoteAccessStats remoteAccessStats) {
@@ -188,20 +199,54 @@ public class QueryThreadContext implements AutoCloseable {
   /// Closes the [QueryThreadContext] and removes it from the thread-local storage and MDC context.
   @Override
   public void close() {
-    _accountant.clear();
-    THREAD_LOCAL.remove();
-    LoggerConstants.REQUEST_ID_KEY.unregisterFromMdc();
-    LoggerConstants.CORRELATION_ID_KEY.unregisterFromMdc();
-    LoggerConstants.QUERY_HASH_KEY.unregisterFromMdc();
-    if (_mseWorkerInfo != null) {
-      LoggerConstants.STAGE_ID_KEY.unregisterFromMdc();
-      LoggerConstants.WORKER_ID_KEY.unregisterFromMdc();
-      if (LoggerConstants.UPSTREAM_STAGE_IDS_KEY.isRegistered()) {
-        LoggerConstants.UPSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+    try {
+      closeResources();
+    } finally {
+      // Runs even when a resource throws an Error, so that a pooled thread never keeps the context of a finished task
+      _accountant.clear();
+      THREAD_LOCAL.remove();
+      LoggerConstants.REQUEST_ID_KEY.unregisterFromMdc();
+      LoggerConstants.CORRELATION_ID_KEY.unregisterFromMdc();
+      LoggerConstants.QUERY_HASH_KEY.unregisterFromMdc();
+      if (_mseWorkerInfo != null) {
+        LoggerConstants.STAGE_ID_KEY.unregisterFromMdc();
+        LoggerConstants.WORKER_ID_KEY.unregisterFromMdc();
+        if (LoggerConstants.UPSTREAM_STAGE_IDS_KEY.isRegistered()) {
+          LoggerConstants.UPSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+        }
+        if (LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.isRegistered()) {
+          LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+        }
       }
-      if (LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.isRegistered()) {
-        LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+    }
+  }
+
+  /// Closes every resource that is still registered. A resource that fails to close does not stop the close of the
+  /// others. An [Exception] is logged. The first [Error] is rethrown after every resource is closed.
+  private void closeResources() {
+    if (_resources == null || _resources.isEmpty()) {
+      return;
+    }
+    // Copy first so that a resource that unregisters itself in close() does not modify the set while it is iterated
+    List<AutoCloseable> resources = new ArrayList<>(_resources);
+    _resources = null;
+    LOGGER.debug("Closing {} query resources that their owners did not close", resources.size());
+    Error error = null;
+    for (AutoCloseable resource : resources) {
+      try {
+        resource.close();
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while closing query resource: {}", resource, e);
+      } catch (Error e) {
+        if (error == null) {
+          error = e;
+        } else {
+          error.addSuppressed(e);
+        }
       }
+    }
+    if (error != null) {
+      throw error;
     }
   }
 
@@ -247,6 +292,50 @@ public class QueryThreadContext implements AutoCloseable {
   @Nullable
   public static QueryThreadContext getIfAvailable() {
     return THREAD_LOCAL.get();
+  }
+
+  /// Registers a resource that the current thread owns until it closes its [QueryThreadContext]. [#close] closes every
+  /// resource that is still registered. This releases the resource when the query task ends on a timeout, a
+  /// cancellation, an exception or an early termination, and not only when the owner reads to the end. The owner calls
+  /// [#unregisterResource] when it closes the resource itself, which keeps the registry small.
+  ///
+  /// Only the current thread may use the resource, or threads that finish before the current thread closes its
+  /// [QueryThreadContext]: [#close] can free off-heap memory that another thread is still reading.
+  ///
+  /// The `close()` method of the resource must be idempotent. An owner that closes the resource on another thread
+  /// cannot unregister it, so the resource can be closed a second time when the task ends.
+  ///
+  /// The registry keeps a strong reference to the resource. A resource that its owner abandons stays allocated until
+  /// the task ends, not until the garbage collector runs. So a task that abandons the reads of many segments holds
+  /// the reader contexts of all of them until it ends.
+  ///
+  /// Does nothing when the resource is `null` or the thread has no [QueryThreadContext]. The resource is then released
+  /// only by its owner, or by the garbage collector. This also applies after a nested [#open] on the same thread: the
+  /// close of the inner context removes the thread-local context, and the resources registered after that are not
+  /// tracked.
+  public static void registerResource(@Nullable AutoCloseable resource) {
+    if (resource == null) {
+      return;
+    }
+    QueryThreadContext threadContext = THREAD_LOCAL.get();
+    if (threadContext != null) {
+      if (threadContext._resources == null) {
+        threadContext._resources = Collections.newSetFromMap(new IdentityHashMap<>());
+      }
+      threadContext._resources.add(resource);
+    }
+  }
+
+  /// Removes a resource registered with [#registerResource] by the current thread. The caller closes the resource.
+  /// Does nothing when the resource is `null` or the current thread did not register it.
+  public static void unregisterResource(@Nullable AutoCloseable resource) {
+    if (resource == null) {
+      return;
+    }
+    QueryThreadContext threadContext = THREAD_LOCAL.get();
+    if (threadContext != null && threadContext._resources != null) {
+      threadContext._resources.remove(resource);
+    }
   }
 
   /// Registers a generic response-metadata entry (arbitrary JSON value) on the current query's
