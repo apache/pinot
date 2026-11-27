@@ -171,16 +171,31 @@ public class TableStateUtils {
       if (!_consumingSegments.contains(consumerName) && !_unloadedSegments.containsKey(consumerName)) {
         return false;
       }
+      return areRequiredSegmentsReady("Consumer", consumerName, segmentName -> isRequiredHistory(segmentName, consumer),
+          isLocallyReady, logUnavailableSegments);
+    }
+
+    /// Returns whether every segment of the partition assigned ONLINE to this instance is loaded or ready locally, e.g.
+    /// before an OFFLINE upsert partition takes its snapshot. Segments of unknown partition are conservatively
+    /// included.
+    public boolean isPartitionLoaded(int partitionId, Predicate<String> isLocallyReady,
+        boolean logUnavailableSegments) {
+      return areRequiredSegmentsReady("Partition", partitionId, segmentName -> isInPartition(segmentName, partitionId),
+          isLocallyReady, logUnavailableSegments);
+    }
+
+    private boolean areRequiredSegmentsReady(String waiterType, Object waiter, Predicate<String> isRequired,
+        Predicate<String> isLocallyReady, boolean logUnavailableSegments) {
       for (Map.Entry<String, String> entry : _unloadedSegments.entrySet()) {
         String segmentName = entry.getKey();
-        if (!isLocallyReady.test(segmentName) && isRequiredHistory(segmentName, consumer)) {
+        if (!isLocallyReady.test(segmentName) && isRequired.test(segmentName)) {
           if (logUnavailableSegments) {
             String actualState = entry.getValue();
             if (SegmentStateModel.ERROR.equals(actualState)) {
-              LOGGER.error("Consumer: {} is waiting for history segment: {} in ERROR state, expected: {}",
-                  consumerName, segmentName, SegmentStateModel.ONLINE);
+              LOGGER.error("{}: {} is waiting for segment: {} in ERROR state, expected: {}", waiterType, waiter,
+                  segmentName, SegmentStateModel.ONLINE);
             } else {
-              LOGGER.info("Consumer: {} is waiting for history segment: {} in state: {}, expected: {}", consumerName,
+              LOGGER.info("{}: {} is waiting for segment: {} in state: {}, expected: {}", waiterType, waiter,
                   segmentName, actualState, SegmentStateModel.ONLINE);
             }
           }
@@ -196,11 +211,15 @@ public class TableStateUtils {
         return llcSegmentName.getPartitionGroupId() == consumer.getPartitionGroupId()
             && llcSegmentName.getSequenceNumber() < consumer.getSequenceNumber();
       }
-      Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
-      if (partitionId == null) {
-        partitionId = _metadataPartitionIds.get(segmentName);
+      return isInPartition(segmentName, consumer.getPartitionGroupId());
+    }
+
+    private boolean isInPartition(String segmentName, int partitionId) {
+      Integer segmentPartitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
+      if (segmentPartitionId == null) {
+        segmentPartitionId = _metadataPartitionIds.get(segmentName);
       }
-      return partitionId == null || partitionId == consumer.getPartitionGroupId();
+      return segmentPartitionId == null || segmentPartitionId == partitionId;
     }
   }
 

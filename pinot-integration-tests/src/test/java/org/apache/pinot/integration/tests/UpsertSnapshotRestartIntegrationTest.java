@@ -23,25 +23,39 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.Lock;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.SnapshotPass;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.Enablement;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -51,6 +65,8 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /// Restarts the server of a full upsert table with metadata TTL, snapshot and preload enabled, consuming from Kafka.
@@ -66,6 +82,7 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
   private static final double TTL_MS = 100_000d;
   private static final long PHASE1_BASE_TS = 1_000L;
   private static final long PHASE2_BASE_TS = 200_000L;
+  private static final long OFFLINE_BASE_TS = 1_700_000_000_000L;
   private static final long WAIT_MS = 300_000L;
 
   @BeforeClass
@@ -150,6 +167,101 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     runScenario("reload", true, false, true);
   }
 
+  /// An OFFLINE table has no consuming segment, so it takes the snapshot after each upload. Once seg1 replaces every
+  /// row of seg0, seg0 is out of TTL and its snapshot is empty. The restarted server preloads both segments from their
+  /// snapshots, skips seg0 as out of TTL, and must still return one row per primary key. An upload after the restart
+  /// takes the snapshot again.
+  @Test
+  public void testOfflineRestart()
+      throws Exception {
+    String table = "upsertSnapshotRestart_offline";
+    String offlineTable = TableNameBuilder.OFFLINE.tableNameWithType(table);
+    Schema schema = createSchema();
+    schema.setSchemaName(table);
+    addSchema(schema);
+    TableConfig tableConfig = createOfflineUpsertTableConfig(table);
+    addTableConfig(tableConfig);
+
+    uploadOfflineSegment(tableConfig, schema, PHASE1_BASE_TS, "0");
+    uploadOfflineSegment(tableConfig, schema, PHASE2_BASE_TS, "1");
+    waitForRawRowCount(table, 2 * NUM_KEYS);
+    waitForSnapshotPass(offlineTable, pass -> pass.numSegments() == 2);
+    for (String segmentName : _helixResourceManager.getSegmentsFor(offlineTable, false)) {
+      assertTrue(isSnapshotUpToDate(offlineTable, segmentName), "snapshot of " + segmentName + " before restart");
+    }
+    assertEquals(countStar(table), (long) NUM_KEYS, "pre-restart count");
+
+    _serverStarters.set(0, restartServer(_serverStarters.get(0)));
+    waitForRawRowCount(table, 2 * NUM_KEYS);
+    assertEquals(countStar(table), (long) NUM_KEYS, "expected one row per primary key after restart");
+    assertEquals(duplicatePkCount(table), 0, "found duplicate primary keys after restart");
+
+    // Preloading takes no snapshot, so the restarted server takes its first one after this upload
+    assertNull(lastSnapshotPass(offlineTable), "snapshot pass before the first upload after restart");
+    uploadOfflineSegment(tableConfig, schema, PHASE2_BASE_TS + (long) TTL_MS, "2");
+    waitForRawRowCount(table, 3 * NUM_KEYS);
+    waitForSnapshotPass(offlineTable, pass -> true);
+    assertEquals(countStar(table), (long) NUM_KEYS, "expected one row per primary key after the next upload");
+    assertEquals(duplicatePkCount(table), 0, "found duplicate primary keys after the next upload");
+    dropOfflineTable(table);
+  }
+
+  private TableConfig createOfflineUpsertTableConfig(String table) {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+    upsertConfig.setEnablePreload(true);
+    upsertConfig.setMetadataTTL(TTL_MS);
+    // OFFLINE upsert keeps each partition on one instance per replica-group
+    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME), false, 0,
+            null), null, new InstanceReplicaGroupPartitionConfig(true, 0, 1, 0, 1, 1, false, null), null, false);
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(table)
+        .setTimeColumnName(getTimeColumnName())
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setSegmentPartitionConfig(
+            new SegmentPartitionConfig(Map.of(getPartitionColumn(), new ColumnPartitionConfig("Murmur", 1))))
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.name(), instanceAssignmentConfig))
+        .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.name(),
+            new SegmentAssignmentConfig(null, getPartitionColumn())))
+        .build();
+  }
+
+  /// Builds a segment with one row per primary key at the given base timestamp, and uploads it.
+  private void uploadOfflineSegment(TableConfig tableConfig, Schema schema, long baseTs, String postfix)
+      throws Exception {
+    File csvFile = new File(_tempDir, tableConfig.getTableName() + "_" + postfix + ".csv");
+    // OFFLINE segments must have their time range between 1971 and 2071
+    FileUtils.writeLines(csvFile,
+        Stream.concat(Stream.of(CSV_HEADER), rows(OFFLINE_BASE_TS + baseTs).stream()).toList());
+    TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentFromFile(csvFile, tableConfig, schema, postfix, _segmentDir, _tarDir,
+        FileFormat.CSV);
+    uploadSegments(tableConfig.getTableName(), TableType.OFFLINE, _tarDir);
+  }
+
+  /// Waits until the server serves the given number of rows with upsert skipped, i.e. all the segments are loaded.
+  private void waitForRawRowCount(String table, long expected) {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        ResultSetGroup resultSetGroup =
+            getPinotConnection().execute("SELECT COUNT(*) FROM " + table + " OPTION(skipUpsert=true)");
+        return resultSetGroup.getExceptions().isEmpty() && resultSetGroup.getResultSet(0).getLong(0) == expected;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 500L, WAIT_MS, "expected " + expected + " rows in " + table + " with upsert skipped");
+  }
+
+  /// Waits for the last snapshot pass to be consistent and to match the given condition.
+  private void waitForSnapshotPass(String tableNameWithType, Predicate<SnapshotPass> condition) {
+    TestUtils.waitForCondition(aVoid -> {
+      SnapshotPass pass = lastSnapshotPass(tableNameWithType);
+      return pass != null && pass.consistent() && condition.test(pass);
+    }, 500L, WAIT_MS, "expected a consistent snapshot pass of " + tableNameWithType);
+  }
+
   private List<String> rows(long baseTs) {
     List<String> rows = new ArrayList<>();
     for (int pk = 1; pk <= NUM_KEYS; pk++) {
@@ -158,9 +270,9 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     return rows;
   }
 
-  private RealtimeTableDataManager tdm(String realtimeTable) {
-    return (RealtimeTableDataManager) _serverStarters.get(0).getServerInstance().getInstanceDataManager()
-        .getTableDataManager(realtimeTable);
+  private BaseTableDataManager tdm(String tableNameWithType) {
+    return (BaseTableDataManager) _serverStarters.get(0).getServerInstance().getInstanceDataManager()
+        .getTableDataManager(tableNameWithType);
   }
 
   private List<String> sortedLlcSegmentNames(String realtimeTable) {
@@ -228,7 +340,7 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
 
   /// Returns whether the validDocIds snapshot of the segment on disk matches its validDocIds in memory.
   private boolean isSnapshotUpToDate(String realtimeTable, String segmentName) {
-    RealtimeTableDataManager tableDataManager = tdm(realtimeTable);
+    BaseTableDataManager tableDataManager = tdm(realtimeTable);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     assertNotNull(segmentDataManager, "segment " + segmentName + " not found");
     try {

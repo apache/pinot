@@ -44,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
+import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -92,6 +93,8 @@ import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils.ReadinessSnapshot;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -186,6 +189,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   protected volatile boolean _shutDown;
   protected volatile boolean _isDeleted;
+
+  /// How long a readiness rejection can be served from a cached snapshot of the segment assignment and current state.
+  public static final long READINESS_SNAPSHOT_MAX_AGE_MS = TimeUnit.SECONDS.toMillis(5);
+  private static final long READINESS_SNAPSHOT_MAX_AGE_NS =
+      TimeUnit.MILLISECONDS.toNanos(READINESS_SNAPSHOT_MAX_AGE_MS);
+  // Share rejection checks across waiters. Both fields are guarded by _readinessSnapshotLock.
+  private final Object _readinessSnapshotLock = new Object();
+  private ReadinessSnapshot _readinessSnapshot;
+  private long _readinessSnapshotTimeNs;
 
   protected boolean _enableAsyncSegmentRefresh;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
@@ -1068,6 +1080,66 @@ public abstract class BaseTableDataManager implements TableDataManager {
     } else {
       replaceUpsertSegment(segmentName, oldSegmentManager, newSegmentManager, partitionUpsertMetadataManager);
     }
+    onUpsertSegmentAdded(partitionId, partitionUpsertMetadataManager);
+  }
+
+  /// Called after an immutable segment is added to, or replaces a segment in, the given upsert partition. Not called
+  /// for preloaded segments. No-op by default.
+  protected void onUpsertSegmentAdded(int partitionId, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+  }
+
+  /// Evaluates a readiness check against this instance's segment assignment and current state. A rejection can come
+  /// from a snapshot read up to [#READINESS_SNAPSHOT_MAX_AGE_MS] ago, but not before `notBeforeNs`, re-evaluated
+  /// against local readiness so that a segment finishing locally clears it at once. A success is always confirmed with
+  /// a fresh read, as the assignment, current state or partition metadata may have changed since the snapshot.
+  ///
+  /// @param check the check on a snapshot, and whether to log the segments it waits for
+  /// @param notBeforeNs the earliest [#readinessCheckTimeNs()] a reused snapshot may be read at, e.g. a consumer's
+  ///                    creation time, so that the check sees an assignment at least that recent
+  protected boolean isReady(BiPredicate<ReadinessSnapshot, Boolean> check, long notBeforeNs) {
+    return isReady(check, true, notBeforeNs);
+  }
+
+  /// As [#isReady(BiPredicate, long)], reusing any snapshot read up to [#READINESS_SNAPSHOT_MAX_AGE_MS] ago.
+  protected boolean isReady(BiPredicate<ReadinessSnapshot, Boolean> check) {
+    return isReady(check, false, 0);
+  }
+
+  private boolean isReady(BiPredicate<ReadinessSnapshot, Boolean> check, boolean hasNotBefore, long notBeforeNs) {
+    ReadinessSnapshot snapshot;
+    synchronized (_readinessSnapshotLock) {
+      long nowNs = readinessCheckTimeNs();
+      if (_readinessSnapshot == null || (hasNotBefore && _readinessSnapshotTimeNs - notBeforeNs < 0)
+          || nowNs - _readinessSnapshotTimeNs >= READINESS_SNAPSHOT_MAX_AGE_NS) {
+        // Record the read's start time, not its completion time
+        snapshot = getReadinessSnapshot();
+        _readinessSnapshot = snapshot;
+        _readinessSnapshotTimeNs = nowNs;
+        return check.test(snapshot, true);
+      }
+      snapshot = _readinessSnapshot;
+    }
+    // Local completion can clear a cached rejection immediately, without waiting for the next ZooKeeper poll.
+    // A cached success must never authorize: assignment, current state, or partition metadata may change.
+    return check.test(snapshot, false) && check.test(getReadinessSnapshot(), true);
+  }
+
+  private ReadinessSnapshot getReadinessSnapshot() {
+    return TableStateUtils.getReadinessSnapshot(_helixManager, _tableNameWithType,
+        this::isPartitionMetadataInitialized);
+  }
+
+  /// Returns whether the segment's upsert/dedup metadata is ready locally, even if its ONLINE transition is pending.
+  protected boolean isPartitionMetadataInitialized(String segmentName) {
+    SegmentDataManager manager = _segmentDataManagerMap.get(segmentName);
+    // Mere immutable presence is insufficient because initial upsert loading registers the manager before its metadata
+    // is populated. Always inspect the currently registered manager.
+    return manager instanceof ImmutableSegmentDataManager immutable && immutable.isPartitionMetadataInitialized();
+  }
+
+  @VisibleForTesting
+  protected long readinessCheckTimeNs() {
+    return System.nanoTime();
   }
 
   protected void replaceUpsertSegment(String segmentName, SegmentDataManager oldSegmentManager,

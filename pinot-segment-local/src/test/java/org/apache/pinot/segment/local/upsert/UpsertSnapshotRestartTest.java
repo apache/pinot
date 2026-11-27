@@ -69,6 +69,7 @@ public class UpsertSnapshotRestartTest {
   private static final File SEGMENTS_DIR = new File(TEMP_DIR, "segments");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
+  private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
       .addSingleValueDimension("pk", FieldSpec.DataType.INT).addMetric("ts", FieldSpec.DataType.INT)
       .setPrimaryKeyColumns(List.of("pk")).build();
@@ -224,6 +225,64 @@ public class UpsertSnapshotRestartTest {
     segA.destroy();
   }
 
+  /// A full upsert REALTIME table skips snapshots until it gets its first consuming segment.
+  @Test
+  public void testRealtimeSkipsSnapshotBeforeFirstConsumingSegment()
+      throws Exception {
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager(REALTIME_TABLE_NAME, false);
+    ImmutableSegmentImpl segA = addSegment(manager, "segA");
+    ImmutableSegmentImpl segB = addSegment(manager, "segB");
+    manager.takeSnapshot();
+    assertFalse(hasSnapshot("segA"));
+    assertFalse(hasSnapshot("segB"));
+    close(manager, segA, segB);
+  }
+
+  /// An OFFLINE table never gets a consuming segment, so it takes snapshots and persists the TTL watermark without one.
+  @Test
+  public void testOfflineTakesSnapshotWithoutConsumingSegment()
+      throws Exception {
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager(OFFLINE_TABLE_NAME, false);
+    ImmutableSegmentImpl segA = addSegment(manager, "segA");
+    ImmutableSegmentImpl segB = addSegment(manager, "segB");
+    manager.takeSnapshot();
+    assertEquals(loadSnapshot("segA"), "{2}");
+    assertEquals(loadSnapshot("segB"), "{0,1}");
+    assertEquals(persistedWatermark(manager), 290.0);
+    close(manager, segA, segB);
+  }
+
+  /// The snapshot is taken before removing the expired primary keys, as on a REALTIME commit. pk 3 only exists in segA,
+  /// which is out of TTL, so it is removed. After a restart, segA is skipped as out of TTL and gets its valid docs from
+  /// the snapshot, so its primary keys are not added back.
+  @Test(dataProvider = "restartModes")
+  public void testOfflineRestartAfterTtlCleanup(boolean preload, boolean addSegBFirst)
+      throws Exception {
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager(OFFLINE_TABLE_NAME, false);
+    ImmutableSegmentImpl segA = addSegment(manager, "segA");
+    ImmutableSegmentImpl segB = addSegment(manager, "segB");
+    manager.takeSnapshot();
+    manager.removeExpiredPrimaryKeys();
+    assertEquals(manager.getNumPrimaryKeys(), 2);
+    close(manager, segA, segB);
+
+    manager = newManager(OFFLINE_TABLE_NAME, false);
+    assertEquals(persistedWatermark(manager), 290.0);
+    segA = load("segA");
+    segB = load("segB");
+    List<ImmutableSegmentImpl> segments = addSegBFirst ? List.of(segB, segA) : List.of(segA, segB);
+    for (ImmutableSegmentImpl segment : segments) {
+      if (preload) {
+        manager.preloadSegment(segment);
+      } else {
+        manager.addSegment(segment);
+      }
+    }
+    assertEquals(validDocIds(segA) + " | " + validDocIds(segB), "{2} | {0,1}");
+    assertEquals(manager.getNumPrimaryKeys(), 2);
+    close(manager, segA, segB);
+  }
+
   private ReentrantLock newSegmentLock(String segmentName) {
     return new ReentrantLock() {
       @Override
@@ -234,13 +293,18 @@ public class UpsertSnapshotRestartTest {
   }
 
   private ConcurrentMapPartitionUpsertMetadataManager newManager() {
+    return newManager(REALTIME_TABLE_NAME, true);
+  }
+
+  private ConcurrentMapPartitionUpsertMetadataManager newManager(String tableNameWithType,
+      boolean gotFirstConsumingSegment) {
     UpsertContext context = new UpsertContext.Builder().setTableConfig(TABLE_CONFIG).setSchema(SCHEMA)
         .setTableDataManager(_tableDataManager).setPrimaryKeyColumns(List.of("pk"))
         .setComparisonColumns(List.of("ts")).setEnableSnapshot(true).setMetadataTTL(METADATA_TTL)
         .setTableIndexDir(TEMP_DIR).build();
     ConcurrentMapPartitionUpsertMetadataManager manager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, context);
-    manager._gotFirstConsumingSegment = true;
+        new ConcurrentMapPartitionUpsertMetadataManager(tableNameWithType, 0, context);
+    manager._gotFirstConsumingSegment = gotFirstConsumingSegment;
     return manager;
   }
 

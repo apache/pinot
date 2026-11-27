@@ -580,7 +580,7 @@ public class RealtimeTableReadinessTest {
     }
 
     @Override
-    long readinessCheckTimeNs() {
+    protected long readinessCheckTimeNs() {
       return _nowNs;
     }
 

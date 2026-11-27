@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.manager;
 
 import com.google.common.cache.CacheBuilder;
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -98,6 +99,7 @@ public class BaseTableDataManagerPartitionMetadataTest {
     }
     verify(segment).onSegmentAdded();
     verify(partition).addSegment(segment);
+    verifyUpsertSnapshotScheduled(table, failInitialization ? 0 : 1);
   }
 
   @Test(dataProvider = "initializationFailure")
@@ -129,6 +131,8 @@ public class BaseTableDataManagerPartitionMetadataTest {
       verify(segment).onSegmentAdded();
     }
     verify(partition).preloadSegment(segment);
+    // Preloaded segments come with their snapshot, so they don't schedule one
+    verifyUpsertSnapshotScheduled(table, 0);
   }
 
   @DataProvider
@@ -183,11 +187,35 @@ public class BaseTableDataManagerPartitionMetadataTest {
     verify(partition).replaceSegment(replacement, oldSegment);
   }
 
+  @Test
+  public void testUpsertReplacementSchedulesSnapshot() {
+    PartitionUpsertMetadataManager partition = mock(PartitionUpsertMetadataManager.class);
+    BaseTableDataManager table = createTableManager(partition);
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.getConsistencyMode()).thenReturn(ConsistencyMode.NONE);
+    when(table._tableUpsertMetadataManager.getContext()).thenReturn(context);
+    ImmutableSegment oldSegment = createSegment();
+    table.registerSegment(SEGMENT_NAME, new ImmutableSegmentDataManager(oldSegment));
+
+    ImmutableSegment replacement = createSegment();
+    table.addSegment(replacement, null);
+    verify(partition).replaceSegment(replacement, oldSegment);
+    verifyUpsertSnapshotScheduled(table, 1);
+  }
+
+  /// Verifies how many times the OFFLINE upsert snapshot was scheduled. It's scheduled after a segment is added to or
+  /// replaced in its partition, and not when that fails or the segment is preloaded.
+  private static void verifyUpsertSnapshotScheduled(BaseTableDataManager table, int numScheduled) {
+    verify(table._segmentRefreshExecutor, times(numScheduled)).execute(any(Runnable.class));
+  }
+
   private static BaseTableDataManager createTableManager(PartitionUpsertMetadataManager partition) {
     BaseTableDataManager table = new OfflineTableDataManager();
     table._tableNameWithType = "testTable_REALTIME";
     table._logger = LoggerFactory.getLogger(BaseTableDataManagerPartitionMetadataTest.class);
     table._recentlyDeletedSegments = CacheBuilder.newBuilder().build();
+    // Receives the OFFLINE upsert snapshot tasks, which these tests do not run
+    table._segmentRefreshExecutor = mock(ExecutorService.class);
     if (partition != null) {
       table._tableUpsertMetadataManager = mock(TableUpsertMetadataManager.class);
       when(table._tableUpsertMetadataManager.getOrCreatePartitionManager(0)).thenReturn(partition);
