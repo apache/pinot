@@ -36,6 +36,7 @@ import org.apache.parquet.avro.AvroReadSupport;
 import org.apache.parquet.avro.AvroSchemaConverter;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetReader;
+import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.io.InputFile;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
@@ -106,25 +107,37 @@ public class ParquetUtils {
   /// (see [#isUnsignedInt32]).
   public static Set<String> getUnsignedInt32FieldNames(Path path)
       throws IOException {
+    Set<String> fieldNames = new HashSet<>();
+    for (Type field : getParquetSchema(path).getFields()) {
+      if (!field.isRepetition(Type.Repetition.REPEATED) && isUnsignedInt32(field)) {
+        fieldNames.add(field.getName());
+      }
+    }
+    return fieldNames;
+  }
+
+  /// Returns the physical Parquet schema for the given file path.
+  public static MessageType getParquetSchema(Path path)
+      throws IOException {
+    return getParquetFileMetadata(path).getSchema();
+  }
+
+  /// Returns the immutable footer metadata for the given Parquet file path.
+  public static FileMetaData getParquetFileMetadata(Path path)
+      throws IOException {
     InputFile inputFile = HadoopInputFile.fromPath(path, getParquetHadoopConfiguration());
     try (ParquetFileReader reader = ParquetFileReader.open(inputFile)) {
-      Set<String> fieldNames = new HashSet<>();
-      for (Type field : reader.getFileMetaData().getSchema().getFields()) {
-        if (!field.isRepetition(Type.Repetition.REPEATED) && isUnsignedInt32(field)) {
-          fieldNames.add(field.getName());
-        }
-      }
-      return fieldNames;
+      return reader.getFileMetaData();
     }
   }
 
   public static boolean hasAvroSchemaInFileMetadata(Path path)
       throws IOException {
-    InputFile inputFile = HadoopInputFile.fromPath(path, getParquetHadoopConfiguration());
-    try (ParquetFileReader reader = ParquetFileReader.open(inputFile)) {
-      Map<String, String> metaData = reader.getFileMetaData().getKeyValueMetaData();
-      return metaData.containsKey(AVRO_SCHEMA_METADATA_KEY) || metaData.containsKey(OLD_AVRO_SCHEMA_METADATA_KEY);
-    }
+    return hasAvroSchemaInFileMetadata(getParquetFileMetadata(path).getKeyValueMetaData());
+  }
+
+  static boolean hasAvroSchemaInFileMetadata(Map<String, String> metadata) {
+    return metadata.containsKey(AVRO_SCHEMA_METADATA_KEY) || metadata.containsKey(OLD_AVRO_SCHEMA_METADATA_KEY);
   }
 
   public static Configuration getParquetHadoopConfiguration() {
