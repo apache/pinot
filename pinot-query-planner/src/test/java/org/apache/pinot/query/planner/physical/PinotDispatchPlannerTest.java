@@ -22,7 +22,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.testng.annotations.Test;
 
@@ -149,6 +151,50 @@ public class PinotDispatchPlannerTest extends QueryEnvironmentTestBase {
       assertEquals(countMultiReceiverSends(_queryEnvironment.planQuery("SET useSpools='" + mode + "'; " + random)), 0,
           "Mode " + mode + " shared a stage that calls RAND()");
     }
+  }
+
+  /// The same check for `MATCH_RECOGNIZE`: a `DEFINE` condition that calls `RAND()` draws its own values in each
+  /// subquery, so the two equal Match stages must not be shared. The scans below them hold no volatile call and can be.
+  @Test
+  public void testMatchRecognizeStagesWithVolatileFunctionsAreNotShared() {
+    String matches = "(SELECT mno FROM a MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts "
+        + "MEASURES MATCH_NUMBER() AS mno PATTERN (A B+) DEFINE B AS %s) ORDER BY mno LIMIT 1000)";
+    String query = "SELECT x.c, y.c FROM (SELECT COUNT(*) AS c FROM " + matches + ") x "
+        + "JOIN (SELECT MAX(mno) AS c FROM " + matches + ") y ON TRUE";
+    String deterministic = String.format(query, "B.col3 > 10", "B.col3 > 10");
+    assertEquals(countSharedMatchStages(_queryEnvironment.planQuery("SET useSpools='on'; " + deterministic)), 1,
+        "Expected the deterministic query to share its Match stage, otherwise this test does not exercise the check");
+    String random = String.format(query, "RAND() < 0.5", "RAND() < 0.5");
+    for (String mode : List.of("on", "auto")) {
+      assertEquals(countSharedMatchStages(_queryEnvironment.planQuery("SET useSpools='" + mode + "'; " + random)), 0,
+          "Mode " + mode + " shared a MATCH_RECOGNIZE stage that calls RAND()");
+    }
+  }
+
+  private static int countSharedMatchStages(DispatchableSubPlan subPlan) {
+    int count = 0;
+    for (DispatchablePlanFragment fragment : subPlan.getQueryStageMap().values()) {
+      PlanNode root = fragment.getPlanFragment().getFragmentRoot();
+      if (root instanceof MailboxSendNode && ((MailboxSendNode) root).isMultiSend() && stageContainsMatch(root)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  private static boolean stageContainsMatch(PlanNode node) {
+    if (node instanceof MatchNode) {
+      return true;
+    }
+    if (node instanceof MailboxReceiveNode) {
+      return false;
+    }
+    for (PlanNode input : node.getInputs()) {
+      if (stageContainsMatch(input)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static int countMultiReceiverSends(DispatchableSubPlan subPlan) {

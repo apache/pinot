@@ -57,6 +57,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalMatch;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
@@ -72,6 +73,7 @@ import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
 import org.apache.pinot.common.catalog.PinotCatalogReader;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
@@ -99,6 +101,7 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.query.validate.GroupByAliasShadowedByColumnException;
+import org.apache.pinot.query.validate.MatchRecognizeValidator;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -453,6 +456,22 @@ public class QueryEnvironment {
   /// in case it was legal to apply an automatic cast for these types!).
   private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
     try {
+      // MATCH_RECOGNIZE checks and rewrites must run on the raw SqlNode tree: the omitted-vs-explicit AFTER MATCH
+      // distinction is lost during conversion to RelNode, and some unsupported constructs fail inside
+      // SqlToRelConverter with an assertion instead of a usable message. See MatchRecognizeValidator.
+      MatchRecognizeValidator matchRecognizeValidator = new MatchRecognizeValidator();
+      sqlNode.accept(matchRecognizeValidator);
+      if (matchRecognizeValidator.hasMatchRecognize()) {
+        if (plannerContext.isUsePhysicalOptimizer()) {
+          PhysicalPlannerContext physicalPlannerContext = plannerContext.getPhysicalPlannerContext();
+          boolean useLiteMode = physicalPlannerContext != null && physicalPlannerContext.isUseLiteMode();
+          throw new MatchRecognizeValidator.UnsupportedMatchRecognizeException(
+              "MATCH_RECOGNIZE is not supported by the multi-stage physical optimizer"
+                  + (useLiteMode ? " in lite mode" : "")
+                  + ". Retry with the query option 'usePhysicalOptimizer=false'.");
+        }
+        plannerContext.markContainsMatchRecognize();
+      }
       SqlNode validated = plannerContext.getValidator().validate(sqlNode);
       if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
@@ -501,7 +520,10 @@ public class QueryEnvironment {
       } catch (Throwable e) {
         throw new RuntimeException("Failed to convert query to relational expression:\n" + sqlNode, e);
       }
-      RelNode rootNode = relRoot.rel;
+      // Calcite keeps the MATCH_RECOGNIZE partition keys only as a bit set. Their source order can be recovered from
+      // the field names only here: field trimming drops projects that only rename, so later a MATCH_RECOGNIZE input
+      // can carry the table's column names instead of the aliases that PARTITION BY refers to.
+      RelNode rootNode = PinotLogicalMatch.pinPartitionKeyOrder(relRoot.rel);
       try {
         // NOTE: DO NOT use converter.decorrelate(sqlNode, rootNode) because the converted type check can fail. This is
         //       probably a bug in Calcite.
@@ -566,6 +588,9 @@ public class QueryEnvironment {
 
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+    if (plannerContext.containsMatchRecognize()) {
+      checkServersSupportMatchRecognize();
+    }
     long requestId = _envConfig.getRequestId();
     if (plannerContext.isUsePhysicalOptimizer()) {
       Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> plan = PinotLogicalQueryPlanner.makePlanV2(relRoot,
@@ -581,6 +606,30 @@ public class QueryEnvironment {
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
     return pinotDispatchPlanner.createDispatchableSubPlan(plan, _multiClusterRoutingContext);
+  }
+
+  /// A server that predates `MATCH_RECOGNIZE` cannot read its plan node and fails the query with an error that does
+  /// not say why, for example while a rolling upgrade is in progress. Rejects the query with an actionable error
+  /// instead, until every server advertises [InstanceCapability#MSE_MATCH_RECOGNIZE]. The routing manager computes the
+  /// minimum revision from the instance configs that it already reads, so the check costs no ZooKeeper access. The
+  /// minimum covers the instance config of every server, also of a disabled, stopped or decommissioned one.
+  ///
+  /// It runs where the dispatchable plan is built, so the execution and every `EXPLAIN` that plans the implementation
+  /// fail. `EXPLAIN PLAN WITHOUT IMPLEMENTATION` builds no dispatchable plan and still returns the logical plan.
+  private void checkServersSupportMatchRecognize() {
+    WorkerManager workerManager = _envConfig.getWorkerManager();
+    if (workerManager == null) {
+      // Without a worker manager there are no servers to dispatch to.
+      return;
+    }
+    InstanceCapability capability = InstanceCapability.MSE_MATCH_RECOGNIZE;
+    if (workerManager.getRoutingManager().getMinServerCapabilityRevision(capability) < capability.revision()) {
+      throw QueryErrorCode.QUERY_PLANNING.asException("MATCH_RECOGNIZE requires every server to support it, but the "
+          + "instance config of at least one server, possibly a disabled, stopped or decommissioned one, does not "
+          + "advertise the instance capability '" + capability + "'. Upgrade all servers to a version that supports "
+          + "MATCH_RECOGNIZE, or drop the instance configs of servers that no longer exist, and retry. The broker log "
+          + "names the servers below the required revision.");
+    }
   }
 
   // --------------------------------------------------------------------------

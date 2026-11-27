@@ -64,6 +64,8 @@ public class PlannerContext implements AutoCloseable, Context {
   @Nullable
   private final PhysicalPlannerContext _physicalPlannerContext;
   private final SearchSealer _searchSealer;
+  /// Set by the validation when the query uses `MATCH_RECOGNIZE`, see [#markContainsMatchRecognize()].
+  private boolean _containsMatchRecognize;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
@@ -181,5 +183,16 @@ public class PlannerContext implements AutoCloseable, Context {
 
   public boolean isUsePhysicalOptimizer() {
     return _physicalPlannerContext != null;
+  }
+
+  /// Whether the validated query uses `MATCH_RECOGNIZE`. The dispatch planning then checks that every server can run
+  /// the plan node of `MATCH_RECOGNIZE`.
+  public boolean containsMatchRecognize() {
+    return _containsMatchRecognize;
+  }
+
+  /// Records that the query uses `MATCH_RECOGNIZE`. Called by the validation, which already looks for it.
+  public void markContainsMatchRecognize() {
+    _containsMatchRecognize = true;
   }
 }

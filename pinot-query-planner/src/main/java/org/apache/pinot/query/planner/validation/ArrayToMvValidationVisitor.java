@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.validation;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -31,7 +32,9 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.MvAggregateNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -62,6 +65,7 @@ import org.apache.pinot.spi.exception.QueryException;
 /// | Array-typed group key (`GROUP BY mvCol`) | not checked (the FINAL aggregate fails) | see below |
 /// | Join non-equi condition | error | error |
 /// | Window | not checked (a window never runs in the leaf stage) | error |
+/// | MATCH_RECOGNIZE MEASURES and DEFINE | not checked (MATCH_RECOGNIZE never runs in the leaf stage) | error |
 ///
 /// Every error message ends with [#SUPPORTED_USES] and carries [QueryErrorCode#QUERY_PLANNING].
 ///
@@ -311,6 +315,27 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   public Void visitWindow(WindowNode node, Boolean isIntermediateStage) {
     if (isIntermediateStage && containsArrayToMv(node.getAggCalls())) {
       throw error("ARRAY_TO_MV found in WINDOW in the " + stageName(true) + " stage");
+    }
+    node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
+    return null;
+  }
+
+  @Override
+  public Void visitMatch(MatchNode node, Boolean isIntermediateStage) {
+    if (isIntermediateStage) {
+      // MEASURES expressions and DEFINE predicates are both evaluated by the MATCH_RECOGNIZE operator itself.
+      List<RexExpression> expressions = new ArrayList<>(node.getMeasures().size() + node.getPatternSymbols().size());
+      for (MatchNode.Measure measure : node.getMeasures()) {
+        expressions.add(measure.getExpression());
+      }
+      for (PatternSymbol symbol : node.getPatternSymbols()) {
+        if (symbol.getDefinition() != null) {
+          expressions.add(symbol.getDefinition());
+        }
+      }
+      if (containsArrayToMv(expressions)) {
+        throw error("ARRAY_TO_MV found in MATCH_RECOGNIZE MEASURES or DEFINE in the " + stageName(true) + " stage");
+      }
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
