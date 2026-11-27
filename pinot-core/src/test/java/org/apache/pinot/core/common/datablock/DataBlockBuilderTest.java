@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.common.datablock;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -476,5 +478,47 @@ public class DataBlockBuilderTest {
       }
       Assert.assertEquals(actualBitSet, expectedBitSet, "Null row ids mismatch");
     }
+  }
+
+  /// A column map gives the same bytes as projecting the rows first, so senders can project without copying rows.
+  @Test
+  public void buildFromProjectedRowsMatchesProjectedRows()
+      throws IOException {
+    DataSchema schema = new DataSchema(new String[]{"i", "s", "l", "d"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.LONG, ColumnDataType.DOUBLE});
+    List<Object[]> rows = new ArrayList<>();
+    for (int i = 0; i < 100; i++) {
+      rows.add(new Object[]{i, i % 3 == 0 ? null : "s" + (i % 7), (long) i * 10, i / 2.0});
+    }
+    int[] columnMap = {3, 1, 1};
+    DataSchema projectedSchema = new DataSchema(new String[]{"d", "s", "s2"},
+        new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.STRING, ColumnDataType.STRING});
+    List<Object[]> projectedRows = new ArrayList<>();
+    for (Object[] row : rows) {
+      projectedRows.add(new Object[]{row[3], row[1], row[1]});
+    }
+
+    DataBlock expected = DataBlockBuilder.buildFromRows(projectedRows, projectedSchema);
+    DataBlock actual = DataBlockBuilder.buildFromProjectedRows(rows, projectedSchema, null, columnMap);
+
+    assertEquals(toBytes(actual), toBytes(expected));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void buildFromProjectedRowsRejectsAColumnMapOfAnotherSize()
+      throws IOException {
+    DataSchema schema = new DataSchema(new String[]{"i"}, new ColumnDataType[]{ColumnDataType.INT});
+    DataBlockBuilder.buildFromProjectedRows(List.<Object[]>of(new Object[]{1, 2}), schema, null, new int[]{0, 1});
+  }
+
+  private static byte[] toBytes(DataBlock block)
+      throws IOException {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    for (ByteBuffer buffer : block.serialize()) {
+      byte[] bytes = new byte[buffer.remaining()];
+      buffer.get(bytes);
+      out.write(bytes);
+    }
+    return out.toByteArray();
   }
 }

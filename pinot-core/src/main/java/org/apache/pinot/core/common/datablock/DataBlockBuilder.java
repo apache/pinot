@@ -25,9 +25,11 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.AbstractList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.RandomAccess;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
@@ -66,6 +68,56 @@ public class DataBlockBuilder {
       PagedPinotOutputStream.PageAllocator allocator)
       throws IOException {
     return buildFromRows(rows, dataSchema, null, allocator);
+  }
+
+  /// Builds a block that holds only some columns of the given rows, without creating a projected copy of each row.
+  ///
+  /// Column `i` of the block reads `row[columnMap[i]]`, and `dataSchema` describes the columns of the block, not the
+  /// columns of the rows.
+  ///
+  /// `aggFunctions` follows the same convention as [#buildFromRows(List, DataSchema, AggregationFunction[])],
+  /// relative to the columns of the block: the last `aggFunctions.length` columns of the block are the aggregation
+  /// columns.
+  public static RowDataBlock buildFromProjectedRows(List<Object[]> rows, DataSchema dataSchema,
+      @Nullable AggregationFunction[] aggFunctions, int[] columnMap)
+      throws IOException {
+    Preconditions.checkArgument(columnMap.length == dataSchema.size(),
+        "The column map has %s columns, but the data schema has %s", columnMap.length, dataSchema.size());
+    return buildFromRows(new ProjectedRows(rows, columnMap), dataSchema, aggFunctions,
+        PagedPinotOutputStream.HeapPageAllocator.createSmall());
+  }
+
+  /// The rows of a projection, for [#buildFromProjectedRows]. [#get(int)] copies the selected columns of the row into
+  /// one array that it reuses, so a projection allocates no array per row, and [#buildFromRows] keeps its loop
+  /// unchanged for regular rows.
+  ///
+  /// This is correct only because [#buildFromRows] reads each row completely before it gets the next one, and does not
+  /// keep a reference to the row array. A change to that loop must keep both properties. Not thread-safe: one
+  /// instance serves one call.
+  private static final class ProjectedRows extends AbstractList<Object[]> implements RandomAccess {
+    private final List<Object[]> _rows;
+    private final int[] _columnMap;
+    private final Object[] _row;
+
+    ProjectedRows(List<Object[]> rows, int[] columnMap) {
+      _rows = rows;
+      _columnMap = columnMap;
+      _row = new Object[columnMap.length];
+    }
+
+    @Override
+    public Object[] get(int index) {
+      Object[] sourceRow = _rows.get(index);
+      for (int i = 0; i < _columnMap.length; i++) {
+        _row[i] = sourceRow[_columnMap[i]];
+      }
+      return _row;
+    }
+
+    @Override
+    public int size() {
+      return _rows.size();
+    }
   }
 
   public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema,

@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -74,6 +76,28 @@ public class TransformOperatorTest {
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1, "a"});
     assertEquals(resultRows.get(1), new Object[]{2, "b"});
+  }
+
+  /// When every projection is a column reference, the operator returns a view. It must hold the same rows as a copy,
+  /// with the output schema, and serialize to the same values.
+  @Test
+  public void shouldReturnAViewForColumnReferences() {
+    DataSchema inputSchema = new DataSchema(new String[]{"intCol", "strCol"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
+    });
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1, "a"}, new Object[]{2, "b"}));
+    DataSchema resultSchema = new DataSchema(new String[]{"strCol", "intCol", "strCol2"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    List<RexExpression> projects =
+        List.of(new RexExpression.InputRef(1), new RexExpression.InputRef(0), new RexExpression.InputRef(1));
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    MseBlock.Data result = (MseBlock.Data) operator.nextBlock();
+    assertEquals(result.getDataSchema(), resultSchema);
+    Object[] expected = {new Object[]{"a", 1, "a"}, new Object[]{"b", 2, "b"}};
+    assertTrue(Arrays.deepEquals(DataBlockExtractUtils.extractRows(result.asSerialized().getDataBlock()).toArray(),
+        expected));
+    assertTrue(Arrays.deepEquals(result.asRowHeap().getRows().toArray(), expected));
   }
 
   @Test
