@@ -139,6 +139,7 @@ public class MockRoutingManagerFactory {
         // Create TablePartitionInfo from TablePartitionReplicatedServersInfo to mimic the simpler case when:
         // 1. There are no excluded new segments.
         // 2. There are no segments with invalid partition id.
+        // 3. All segments use the same partition function configuration.
         TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfos = partitionInfo.getPartitionInfoMap();
         List<List<String>> segmentsByPartition = new ArrayList<>();
         for (TablePartitionReplicatedServersInfo.PartitionInfo partition : partitionInfos) {
@@ -147,7 +148,7 @@ public class MockRoutingManagerFactory {
         TablePartitionInfo tablePartitionInfo =
             new TablePartitionInfo(tableNameWithType, partitionInfo.getPartitionColumn(),
                 partitionInfo.getPartitionFunctionName(), partitionInfo.getNumPartitions(), segmentsByPartition,
-                List.of());
+                List.of(), true);
         tablePartitionInfoMap.put(tableNameWithType, tablePartitionInfo);
       }
     }

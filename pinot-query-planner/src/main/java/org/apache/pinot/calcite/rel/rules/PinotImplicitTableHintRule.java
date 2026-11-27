@@ -87,7 +87,8 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
       return Map.of();
     }
     Map<String, String> kvOptions = hint.kvOptions;
-    if (Boolean.parseBoolean(kvOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED))) {
+    if (Boolean.parseBoolean(kvOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED))
+        || kvOptions.containsKey(PinotHintStrategyTable.GROUP_BY_ROUTE)) {
       return null;
     }
     if (kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_KEY)

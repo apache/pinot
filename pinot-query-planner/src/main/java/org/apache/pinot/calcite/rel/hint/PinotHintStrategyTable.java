@@ -33,10 +33,14 @@ public class PinotHintStrategyTable {
   private PinotHintStrategyTable() {
   }
 
+  /// Internal scan marker applied after SQL hint validation, when a direct aggregate pins an ordinary routing table.
+  public static final String GROUP_BY_ROUTE = "_use_group_by_route";
+
   public static final HintStrategyTable PINOT_HINT_STRATEGY_TABLE = HintStrategyTable.builder()
       .hintStrategy(PinotHintOptions.AGGREGATE_HINT_OPTIONS, HintPredicates.AGGREGATE)
       .hintStrategy(PinotHintOptions.JOIN_HINT_OPTIONS, HintPredicates.JOIN)
-      .hintStrategy(PinotHintOptions.TABLE_HINT_OPTIONS, HintPredicates.TABLE_SCAN)
+      .hintStrategy(PinotHintOptions.TABLE_HINT_OPTIONS, (hint, node) -> HintPredicates.TABLE_SCAN.apply(hint, node)
+          && !hint.kvOptions.containsKey(GROUP_BY_ROUTE))
       .hintStrategy(PinotHintOptions.WINDOW_HINT_OPTIONS, HintPredicates.WINDOW)
       .hintStrategy(PinotHintOptions.SET_OP_HINT_OPTIONS, HintPredicates.SETOP)
       .build();

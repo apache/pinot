@@ -39,6 +39,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
@@ -50,10 +51,12 @@ import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
+import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
@@ -935,7 +938,14 @@ public class WorkerManager {
     // When broker pruning is enabled, routingPinotQuery carries the leaf stage filter so that segment pruners can
     // eliminate segments. When disabled (null), fall back to an unfiltered SELECT * routing request.
     Map<String, RoutingTable> routingTableMap = null;
-    if (routingPinotQuery != null) {
+    if (metadata.getTableOptions() != null
+        && metadata.getTableOptions().containsKey(PinotHintStrategyTable.GROUP_BY_ROUTE)) {
+      PlannerContext.GroupByRoute checked = context.getPlannerContext().getGroupByRoutes().get(tableName);
+      Preconditions.checkState(checked != null, "Missing verified GROUP BY route for table: %s", tableName);
+      routingTableMap =
+          Map.of(TableType.OFFLINE.name(), pruneGroupByRoute(checked.route(), fragment, tableName, context));
+    }
+    if (routingTableMap == null && routingPinotQuery != null) {
       try {
         routingTableMap = getRoutingTable(routingPinotQuery, context.getRequestId());
       } catch (RuntimeException e) {
@@ -1031,6 +1041,25 @@ public class WorkerManager {
 
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+  }
+
+  private RoutingTable pruneGroupByRoute(RoutingTable route, PlanFragment fragment, String tableName,
+      DispatchablePlanContext context) {
+    Set<String> pruned = getPrunedSegments(fragment, tableName, context);
+    if (pruned == null || pruned.isEmpty()) {
+      return route;
+    }
+    Map<ServerInstance, SegmentsToQuery> remaining = new HashMap<>();
+    int removed = 0;
+    for (var entry : route.getServerInstanceToSegmentsMap().entrySet()) {
+      List<String> segments = entry.getValue().getSegments();
+      List<String> kept = segments.stream().filter(segment -> !pruned.contains(segment)).toList();
+      removed += segments.size() - kept.size();
+      if (!kept.isEmpty()) {
+        remaining.put(entry.getKey(), new SegmentsToQuery(kept, null));
+      }
+    }
+    return new RoutingTable(remaining, route.getUnavailableSegments(), route.getNumPrunedSegments() + removed);
   }
 
   private static int getRandomScanWorkers(PlanNode root, Map<String, String> options) {
@@ -1880,6 +1909,59 @@ public class WorkerManager {
             "Null segment list for table type: %s, worker: %s for table: %s", tableType, workerId, tableName);
       }
     }
+  }
+
+  /// Checks the ordinary selector's segment assignment. When every partition has just one server, a group that
+  /// contains the partition key can finish there. Pin this route so dispatch uses the same replica choices.
+  public boolean hasPartitionedGroupByRoute(String tableName, Set<String> groupColumns, PlannerContext planner) {
+    PlannerContext.GroupByRoute checked = planner.getGroupByRoutes().get(tableName);
+    if (checked != null) {
+      return groupColumns.contains(checked.partitionColumn());
+    }
+    TableType type = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (type == TableType.REALTIME || (type == null
+        && _routingManager.routingExists(TableNameBuilder.REALTIME.tableNameWithType(tableName)))) {
+      return false;
+    }
+    String offline = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    TablePartitionInfo partitions = _routingManager.getTablePartitionInfo(offline);
+    if (partitions == null || !partitions.hasConsistentPartitionFunction()
+        || !groupColumns.contains(partitions.getPartitionColumn())) {
+      return false;
+    }
+    RoutingTable route = getRoutingTableHelper(offline, planner.getEnvConfig().getRequestId(), planner.getOptions());
+    if (route == null || !route.getUnavailableSegments().isEmpty()) {
+      return false;
+    }
+    Map<String, ServerInstance> owners = new HashMap<>();
+    for (var entry : route.getServerInstanceToSegmentsMap().entrySet()) {
+      if (CollectionUtils.isNotEmpty(entry.getValue().getOptionalSegments())) {
+        return false;
+      }
+      for (String segment : entry.getValue().getSegments()) {
+        if (owners.put(segment, entry.getKey()) != null) {
+          return false;
+        }
+      }
+    }
+    if (owners.isEmpty()) {
+      return false;
+    }
+    for (List<String> partition : partitions.getSegmentsByPartition()) {
+      ServerInstance owner = null;
+      for (String segment : partition) {
+        ServerInstance server = owners.remove(segment);
+        if (server == null || (owner != null && !owner.equals(server))) {
+          return false;
+        }
+        owner = server;
+      }
+    }
+    if (!owners.isEmpty()) {
+      return false;
+    }
+    planner.getGroupByRoutes().put(tableName, new PlannerContext.GroupByRoute(partitions.getPartitionColumn(), route));
+    return true;
   }
 
   @Nullable

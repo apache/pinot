@@ -44,10 +44,10 @@
       "partitioned_counts": {
         "schema": [
           {"name": "num", "type": "INT"},
-          {"name": "name", "type": "STRING"}
+          {"name": "name", "type": "STRING", "notNull": true}
         ],
-        "inputs": [[4, "e"], [4, "e"], [5, "e"]],
-        "partitionColumns": ["num"],
+        "inputs": [[4, "G"], [4, "G"], [4, "B"]],
+        "partitionColumns": ["name"],
         "partitionCount": 2
       },
       "tbl_empty" : {
@@ -98,18 +98,18 @@
       },
       {
         "description": "Server final results on a group key partitioned across leaf workers",
-        "sql": "SET serverReturnFinalResult=true; SELECT num, COUNT(DISTINCT name) FROM {partitioned_counts} GROUP BY num",
-        "h2Sql": "SELECT num, COUNT(DISTINCT name) FROM {partitioned_counts} GROUP BY num"
+        "sql": "SET serverReturnFinalResult=true; SELECT name, COUNT(DISTINCT num) FROM {partitioned_counts} GROUP BY name",
+        "h2Sql": "SELECT name, COUNT(DISTINCT num) FROM {partitioned_counts} GROUP BY name"
       },
       {
         "description": "Server final result options must preserve exact distinct sets when a value spans workers",
-        "sql": "SET serverReturnFinalResult=true; SET serverReturnFinalResultKeyUnpartitioned=true; SELECT LENGTH(name), COUNT(DISTINCT name) FROM {partitioned_counts} GROUP BY LENGTH(name)",
-        "h2Sql": "SELECT LENGTH(name), COUNT(DISTINCT name) FROM {partitioned_counts} GROUP BY LENGTH(name)"
+        "sql": "SET serverReturnFinalResult=true; SET serverReturnFinalResultKeyUnpartitioned=true; SELECT LENGTH(name), COUNT(DISTINCT num) FROM {partitioned_counts} GROUP BY LENGTH(name)",
+        "h2Sql": "SELECT LENGTH(name), COUNT(DISTINCT num) FROM {partitioned_counts} GROUP BY LENGTH(name)"
       },
       {
         "description": "The planned scalar merge takes precedence over the storage-engine option",
-        "sql": "SET serverReturnFinalResultKeyUnpartitioned=false; SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ name, COUNT(DISTINCT num) FROM {partitioned_counts} GROUP BY name",
-        "h2Sql": "SELECT name, COUNT(DISTINCT num) FROM {partitioned_counts} GROUP BY name"
+        "sql": "SET serverReturnFinalResultKeyUnpartitioned=false; SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ num, COUNT(DISTINCT name) FROM {partitioned_counts} GROUP BY num",
+        "h2Sql": "SELECT num, COUNT(DISTINCT name) FROM {partitioned_counts} GROUP BY num"
       },
       {
         "description": "Group by non-partition column but aggregate on partition column with hint",
