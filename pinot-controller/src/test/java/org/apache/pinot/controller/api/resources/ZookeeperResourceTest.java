@@ -39,12 +39,19 @@ import org.apache.zookeeper.data.Stat;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.expectThrows;
 
 
 public class ZookeeperResourceTest extends ControllerTest {
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    setupSharedStateAndValidate();
+  }
+
   @Test
   public void testZookeeperDataEndpoints()
       throws Exception {

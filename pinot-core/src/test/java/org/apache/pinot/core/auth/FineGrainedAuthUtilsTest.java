@@ -118,6 +118,17 @@ public class FineGrainedAuthUtilsTest {
   }
 
   @Test
+  public void testFineGrainedAccessIsAllowedByDefault() {
+    FineGrainedAccessControl accessControl = new FineGrainedAccessControl() {
+    };
+
+    // Clusters without authentication rely on the allow-all default, including for raw ZK reads. Principal-based
+    // implementations gate GetZnode explicitly instead.
+    assertTrue(accessControl.hasAccess(null, TargetType.CLUSTER, null, Actions.Cluster.GET_ZNODE));
+    assertTrue(accessControl.hasAccess(null, TargetType.CLUSTER, null, Actions.Cluster.GET_CLUSTER_CONFIG));
+  }
+
+  @Test
   public void testValidateFineGrainedAuthAllowed() {
     FineGrainedAccessControl ac = mock(FineGrainedAccessControl.class);
     when(ac.hasAccess(any(HttpHeaders.class), any(), any(), any()))

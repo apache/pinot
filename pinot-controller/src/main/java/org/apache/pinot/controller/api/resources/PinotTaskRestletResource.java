@@ -87,6 +87,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.table.TableConfigRedactionUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -346,6 +347,27 @@ public class PinotTaskRestletResource {
     }
   }
 
+  /// Returns the task config as REST responses display it. Task configs are derived from table configs and copy the
+  /// same credentials out of them (filesystem properties, auth tokens, connection strings), so they get the table
+  /// config display policy. The stored task config is left untouched for the minions that execute it.
+  private static PinotTaskConfig redactTaskConfig(PinotTaskConfig taskConfig) {
+    return new PinotTaskConfig(taskConfig.getTaskType(),
+        TableConfigRedactionUtils.redactProperties(taskConfig.getConfigs()));
+  }
+
+  /// Applies [#redactTaskConfig] to every subtask config carried by a debug response.
+  private static void redactTaskConfigs(@Nullable PinotHelixTaskResourceManager.TaskDebugInfo debugInfo) {
+    if (debugInfo == null || debugInfo.getSubtaskInfos() == null) {
+      return;
+    }
+    for (PinotHelixTaskResourceManager.SubtaskDebugInfo subtaskInfo : debugInfo.getSubtaskInfos()) {
+      PinotTaskConfig taskConfig = subtaskInfo.getTaskConfig();
+      if (taskConfig != null) {
+        subtaskInfo.setTaskConfig(redactTaskConfig(taskConfig));
+      }
+    }
+  }
+
   @GET
   @Path("/tasks/{taskType}/debug")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_TASK)
@@ -362,6 +384,7 @@ public class PinotTaskRestletResource {
     try {
       Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> debugInfo =
           _pinotHelixTaskResourceManager.getTasksDebugInfo(taskType, verbosity);
+      debugInfo.values().forEach(PinotTaskRestletResource::redactTaskConfigs);
       asyncResponse.resume(debugInfo);
     } catch (Exception e) {
       asyncResponse.resume(e);
@@ -388,6 +411,7 @@ public class PinotTaskRestletResource {
       String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, headers);
       Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> debugInfo =
           _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, translatedTableName, verbosity);
+      debugInfo.values().forEach(PinotTaskRestletResource::redactTaskConfigs);
       asyncResponse.resume(debugInfo);
     } catch (Exception e) {
       asyncResponse.resume(e);
@@ -482,6 +506,7 @@ public class PinotTaskRestletResource {
           : null;
       PinotHelixTaskResourceManager.TaskDebugInfo debugInfo =
           _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, translatedTableName, verbosity);
+      redactTaskConfigs(debugInfo);
       asyncResponse.resume(debugInfo);
     } catch (Exception e) {
       asyncResponse.resume(e);
@@ -549,7 +574,10 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      List<PinotTaskConfig> configs = _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName);
+      List<PinotTaskConfig> configs = new ArrayList<>();
+      for (PinotTaskConfig config : _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName)) {
+        configs.add(redactTaskConfig(config));
+      }
       asyncResponse.resume(configs);
     } catch (Exception e) {
       asyncResponse.resume(e);
@@ -585,8 +613,9 @@ public class PinotTaskRestletResource {
       String subtaskNames,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      Map<String, PinotTaskConfig> configs =
-          _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName, subtaskNames);
+      Map<String, PinotTaskConfig> configs = new HashMap<>();
+      _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName, subtaskNames)
+          .forEach((subtaskName, config) -> configs.put(subtaskName, redactTaskConfig(config)));
       asyncResponse.resume(configs);
     } catch (Exception e) {
       asyncResponse.resume(e);

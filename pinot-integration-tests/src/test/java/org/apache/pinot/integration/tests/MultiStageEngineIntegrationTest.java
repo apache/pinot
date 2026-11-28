@@ -2330,6 +2330,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode tableConfigsNode =
         JsonUtils.stringToJsonNode(getOrCreateAdminClient().getTableClient().getTableConfig("mytable"));
+    tableConfigsNode = tableConfigsNode.has("configs") ? tableConfigsNode.get("configs") : tableConfigsNode;
     JsonNode schemaNode =
         JsonUtils.stringToJsonNode(getOrCreateAdminClient().getSchemaClient().getSchema("mytable"));
     List<String> successfulQueries = Arrays.asList("SELECT COUNT(*) FROM mytable",
@@ -2380,6 +2381,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode tableConfigsNode =
         JsonUtils.stringToJsonNode(getOrCreateAdminClient().getTableClient().getTableConfig("mytable"));
+    tableConfigsNode = tableConfigsNode.has("configs") ? tableConfigsNode.get("configs") : tableConfigsNode;
     JsonNode schemaNode =
         JsonUtils.stringToJsonNode(getOrCreateAdminClient().getSchemaClient().getSchema("mytable"));
     List<String> mixedQueries = Arrays.asList("SELECT COUNT(*) FROM mytable", "SELECT invalidColumn FROM mytable",
@@ -2428,6 +2430,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode tableConfigsNode =
         JsonUtils.stringToJsonNode(getOrCreateAdminClient().getTableClient().getTableConfig("mytable"));
+    tableConfigsNode = tableConfigsNode.has("configs") ? tableConfigsNode.get("configs") : tableConfigsNode;
     JsonNode schemaNode =
         JsonUtils.stringToJsonNode(getOrCreateAdminClient().getSchemaClient().getSchema("mytable"));
 
@@ -2599,6 +2602,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode tableConfigsNode =
         JsonUtils.stringToJsonNode(getOrCreateAdminClient().getTableClient().getTableConfig("mytable"));
+    tableConfigsNode = tableConfigsNode.has("configs") ? tableConfigsNode.get("configs") : tableConfigsNode;
     JsonNode schemaNode =
         JsonUtils.stringToJsonNode(getOrCreateAdminClient().getSchemaClient().getSchema("mytable"));
 

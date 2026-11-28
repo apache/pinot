@@ -22,9 +22,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
@@ -35,6 +37,8 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.table.TableConfigRedactionUtils;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -127,6 +131,85 @@ public class PinotTaskRestletResourceTest {
     verify(asyncResponse).resume(responseCaptor.capture());
     assertEquals(responseCaptor.getValue(), "{}");
     return minionWorkerEndpointsCaptor.getValue();
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testTaskConfigResponsesRedactCredentials() {
+    String taskType = "SegmentGenerationAndPushTask";
+    PinotTaskConfig stored = taskConfigWithCredentials(taskType);
+    when(_pinotHelixTaskResourceManager.getSubtaskConfigs("task1")).thenReturn(List.of(stored));
+    when(_pinotHelixTaskResourceManager.getSubtaskConfigs("task1", null)).thenReturn(Map.of("task1_0", stored));
+    when(_pinotHelixTaskResourceManager.getTaskDebugInfo("task1", null, 1)).thenReturn(debugInfo(stored));
+    when(_pinotHelixTaskResourceManager.getTasksDebugInfo(taskType, 1)).thenReturn(Map.of("task1", debugInfo(stored)));
+    when(_pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, "myTable_OFFLINE", 1))
+        .thenReturn(Map.of("task1", debugInfo(stored)));
+    HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
+
+    List<PinotTaskConfig> taskConfigs = (List<PinotTaskConfig>) resumedWith(
+        response -> _pinotTaskRestletResource.getTaskConfigs("task1", response));
+    assertEquals(taskConfigs.size(), 1);
+    assertRedacted(taskConfigs.get(0), taskType);
+
+    Map<String, PinotTaskConfig> subtaskConfigs = (Map<String, PinotTaskConfig>) resumedWith(
+        response -> _pinotTaskRestletResource.getSubtaskConfigs("task1", null, response));
+    assertRedacted(subtaskConfigs.get("task1_0"), taskType);
+
+    PinotHelixTaskResourceManager.TaskDebugInfo taskDebugInfo = (PinotHelixTaskResourceManager.TaskDebugInfo)
+        resumedWith(response -> _pinotTaskRestletResource.getTaskDebugInfo("task1", 1, null, httpHeaders, response));
+    assertRedacted(taskDebugInfo.getSubtaskInfos().get(0).getTaskConfig(), taskType);
+
+    Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> tasksDebugInfo =
+        (Map<String, PinotHelixTaskResourceManager.TaskDebugInfo>) resumedWith(
+            response -> _pinotTaskRestletResource.getTasksDebugInfo(taskType, 1, response));
+    assertRedacted(tasksDebugInfo.get("task1").getSubtaskInfos().get(0).getTaskConfig(), taskType);
+
+    Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> tableDebugInfo =
+        (Map<String, PinotHelixTaskResourceManager.TaskDebugInfo>) resumedWith(
+            response -> _pinotTaskRestletResource.getTasksDebugInfo(taskType, "myTable_OFFLINE", 1, httpHeaders,
+                response));
+    assertRedacted(tableDebugInfo.get("task1").getSubtaskInfos().get(0).getTaskConfig(), taskType);
+
+    // The stored task config, which minions execute, keeps its credentials.
+    assertEquals(stored.getConfigs().get("authToken"), "Basic task-auth-secret");
+    assertEquals(stored.getConfigs().get("input.fs.prop.secretKey"), "task-fs-secret");
+  }
+
+  private static PinotTaskConfig taskConfigWithCredentials(String taskType) {
+    Map<String, String> configs = new HashMap<>();
+    configs.put("tableName", "myTable_OFFLINE");
+    configs.put("authToken", "Basic task-auth-secret");
+    configs.put("input.fs.prop.secretKey", "task-fs-secret");
+    configs.put("inputDirURI", "https://store.example/input?X-Amz-Signature=task-signature&region=us-west-2");
+    return new PinotTaskConfig(taskType, configs);
+  }
+
+  private static PinotHelixTaskResourceManager.TaskDebugInfo debugInfo(PinotTaskConfig taskConfig) {
+    PinotHelixTaskResourceManager.SubtaskDebugInfo subtaskInfo = new PinotHelixTaskResourceManager.SubtaskDebugInfo();
+    subtaskInfo.setTaskConfig(taskConfig);
+    PinotHelixTaskResourceManager.TaskDebugInfo debugInfo = new PinotHelixTaskResourceManager.TaskDebugInfo();
+    debugInfo.addSubtaskInfo(subtaskInfo);
+    return debugInfo;
+  }
+
+  private static void assertRedacted(PinotTaskConfig taskConfig, String taskType) {
+    String marker = TableConfigRedactionUtils.REDACTION_MARKER;
+    Map<String, String> configs = taskConfig.getConfigs();
+    assertEquals(taskConfig.getTaskType(), taskType);
+    assertEquals(taskConfig.getTableName(), "myTable_OFFLINE");
+    assertEquals(configs.get("authToken"), marker);
+    assertEquals(configs.get("input.fs.prop.secretKey"), marker);
+    assertEquals(configs.get("inputDirURI"),
+        "https://store.example/input?X-Amz-Signature=" + marker + "&region=us-west-2");
+  }
+
+  /// Runs an asynchronous endpoint and returns the entity it resumed the response with.
+  private static Object resumedWith(Consumer<AsyncResponse> endpoint) {
+    AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
+    endpoint.accept(asyncResponse);
+    ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(asyncResponse).resume(responseCaptor.capture());
+    return responseCaptor.getValue();
   }
 
   private InstanceConfig createInstanceConfig(String instanceId, String hostName, String port) {
